@@ -1,0 +1,12 @@
+Milestone: 2025-05-24
+
+- UI no longer hangs at startup or during runtime.
+- Sound plays reliably on both button and keyboard events.
+- Uses mpsc channel for keyboard-to-UI communication.
+- Uses futures-timer async delay in the receiver loop for proper async yielding.
+- All code compiles and runs as expected.
+
+Key files:
+- src/libs/ui.rs (see attached for working version)
+
+If any error occurs in the future, revert to this milestone for a known-good state.
