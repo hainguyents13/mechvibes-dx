@@ -30,11 +30,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                                     std::fs::read_to_string(path.join("config.json"))
                                 {
                                     if let Ok(pack) = serde_json::from_str::<SoundPack>(&content) {
-                                        return Some((
-                                            pack.id,
-                                            pack.name,
-                                            e.file_name().to_string_lossy().into_owned(),
-                                        ));
+                                        return Some((pack.id, pack.name));
                                     }
                                 }
                             }
@@ -57,12 +53,9 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
           class: "w-full p-2  rounded border border-gray-600",
           value: "{current}",
           onchange: move |evt| {
-              let selected_dirname = evt.data.value();
+              let selected_id = evt.data.value();
               error.set(String::new());
-              if let Some((id, name, _)) = paths()
-                  .iter()
-                  .find(|(_, _, dir)| dir == &selected_dirname)
-              {
+              if let Some((id, name)) = paths().iter().find(|(id, _)| id == &selected_id) {
                   let mut config = crate::state::config::AppConfig::load();
                   config.current_soundpack = id.clone();
                   if let Err(e) = config.save() {
@@ -85,9 +78,9 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
           {
               paths()
                   .iter()
-                  .map(|(_, name, dirname)| {
+                  .map(|(id, name)| {
                       rsx! {
-                        option { key: "{dirname}", value: "{dirname}", "{name}" }
+                        option { key: "{id}", value: "{id}", "{name}" }
                       }
                   })
           }

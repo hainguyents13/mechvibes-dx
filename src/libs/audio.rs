@@ -5,7 +5,7 @@ use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 static AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 
