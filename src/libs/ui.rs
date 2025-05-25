@@ -1,17 +1,24 @@
 use crate::libs::audio::AudioContext;
 use crate::libs::keyboard::start_keyboard_listener;
+use crate::state::keyboard::KeyboardState;
+use crate::KeyboardChannel;
 use dioxus::prelude::*;
+use dioxus::prelude::{use_effect, use_future, use_hook, use_signal};
+use dioxus_radio::prelude::*;
 use std::sync::mpsc;
 use std::sync::Arc;
 
 pub fn app() -> Element {
-    // Create AudioContext and store it in a hook
-    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
-    // Create a channel for keyboard events
-    let (tx, rx) = mpsc::channel::<()>();
-    let rx = Arc::new(rx);
+    // Set up the global keyboard state management
+    use_init_radio_station::<KeyboardState, KeyboardChannel>(|| KeyboardState::new());
+    let radio = use_radio::<KeyboardState, KeyboardChannel>(KeyboardChannel::Main);
 
-    // Start keyboard listener in background, passing the sender
+    // Initialize the audio system for mechanical keyboard sounds
+    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
+
+    // Create a channel for real-time keyboard event communication
+    let (tx, rx) = mpsc::channel::<String>();
+    let rx = Arc::new(rx); // Launch the keyboard event listener in a background task
     {
         let tx = tx.clone();
         use_future(move || {
@@ -24,39 +31,58 @@ pub fn app() -> Element {
         });
     }
 
-    // Poll the receiver and play sound if a message is received
+    // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
         let rx = rx.clone();
+        let radio = radio.clone();
+
         use_future(move || {
             let ctx = ctx.clone();
             let rx = rx.clone();
+            let mut radio = radio;
+
             async move {
                 loop {
-                    if rx.try_recv().is_ok() {
-                        ctx.play_random_sound();
+                    if let Ok(keycode) = rx.try_recv() {
+                        if keycode.starts_with("UP:") {
+                            let key = &keycode[3..];
+                            ctx.play_key_event_sound(key, false);
+
+                            // Update keyboard state - key released
+                            radio.write().key_pressed = false;
+                        } else if !keycode.is_empty() {
+                            ctx.play_key_event_sound(&keycode, true); // Update keyboard state - key pressed
+                            let mut state = radio.write();
+                            state.key_pressed = true;
+                            state.last_key = keycode.clone();
+                        }
                     }
-                    // Yield to the async runtime instead of sleeping the thread
-                    futures_timer::Delay::new(std::time::Duration::from_millis(10)).await;
+                    futures_timer::Delay::new(std::time::Duration::from_millis(1)).await;
                 }
             }
         });
     }
 
+    // volume state
+    // Default volume is 1.0 (100%)
+    let volume = use_signal(|| 1.0f32); // Update audio system volume when the volume control changes
+    let ctx = audio_context.clone();
+    use_effect(move || {
+        ctx.set_volume(volume());
+    });
+
+    // Render the main application interface
     rsx! {
-      div { style: "padding: 20px; text-align: center;",
-        h1 { "Mechvibes Dioxus" }
-        button {
-          onclick: {
-              let ctx = audio_context.clone();
-              move |_| {
-                  println!("🛠 Button clicked!");
-                  println!("🎵 Playing button click sound...");
-                  ctx.play_random_sound();
-              }
-          },
-          "Test âm thanh"
-        }
+      div { class: "container mx-auto p-16 text-center",
+        // Mechanical keyboard logo with animated press effect
+        crate::components::logo::Logo {}
+
+        // Volume control slider for sound effects
+        crate::components::volume_slider::VolumeSlider { volume }
+
+        // Button to test the current sound configuration
+        crate::components::test_sound_button::TestSoundButton {}
       }
     }
 }
