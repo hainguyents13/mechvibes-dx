@@ -144,13 +144,7 @@ fn update_context(
     }
 
     // Log key mappings
-    let keys: Vec<_> = soundpack.def.keys().collect();
-    println!(
-        "🔍 Loaded soundpack '{}' with {} key mappings: {:?}",
-        soundpack.name,
-        keys.len(),
-        keys
-    );
+    println!("🔍 Loaded soundpack: {}", soundpack.name,);
 
     // Update key mappings
     if let Ok(mut key_map) = context.key_map.lock() {
