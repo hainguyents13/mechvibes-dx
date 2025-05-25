@@ -1,3 +1,7 @@
+use crate::components::dock::Dock;
+use crate::components::logo::Logo;
+use crate::components::soundpack_selector::SoundpackSelector;
+use crate::components::volume_slider::VolumeSlider;
 use crate::libs::keyboard::start_keyboard_listener;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
@@ -13,7 +17,7 @@ pub fn app() -> Element {
     use_init_radio_station::<KeyboardState, KeyboardChannel>(|| KeyboardState::new());
     let radio = use_radio::<KeyboardState, KeyboardChannel>(KeyboardChannel::Main);
 
-    // Initialize the audio system for mechanical keyboard sounds
+    // Initialize the audio system for mechvibes sounds
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Create a channel for real-time keyboard event communication
@@ -75,15 +79,16 @@ pub fn app() -> Element {
 
     // Render the main application interface
     rsx! {
-      div { class: "container mx-auto p-16 text-center",
-        // Mechanical keyboard logo with animated press effect
-        crate::components::logo::Logo {}
+      div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
+        div { class: "mb-12",
+          // Mechvibes logo with animated press effect
+          Logo {}
+        }
+        // Soundpack selector for switching sound packs in real-time
+        SoundpackSelector { audio_ctx: audio_context.clone() }
         // Volume control slider for sound effects
-        crate::components::volume_slider::VolumeSlider { volume } // Soundpack selector for switching sound packs in real-time
-        crate::components::soundpack_selector::SoundpackSelector { audio_ctx: audio_context.clone() }
-
-        // Button to test the current sound configuration
-        crate::components::test_sound_button::TestSoundButton {}
+        VolumeSlider { volume }
       }
+      Dock {}
     }
 }

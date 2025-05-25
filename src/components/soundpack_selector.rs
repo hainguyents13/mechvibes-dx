@@ -47,10 +47,10 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     let mut current = use_signal(|| config.current_soundpack);
 
     rsx! {
-      div { class: "p-4 rounded-lg 0 mb-4",
-        div { class: "text-lg font-bold mb-2", "Sound Pack" }
+      div {
+
         select {
-          class: "w-full p-2  rounded border border-gray-600",
+          class: "w-full select ",
           value: "{current}",
           onchange: move |evt| {
               let selected_id = evt.data.value();
