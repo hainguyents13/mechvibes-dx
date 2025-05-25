@@ -89,7 +89,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
             error
                 .with(|err| {
                     (!err.is_empty()).then(|| rsx! {
-                      div { class: "text-xs text-red-400 mt-2", "{err}" }
+                      div { class: "text-sm text-red-400 mt-2", "{err}" }
                     })
                 })
         }

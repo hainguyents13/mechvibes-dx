@@ -3,20 +3,53 @@ use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+/// Maps a keyboard key to its standardized code across different platforms
 fn map_key_to_code(key: Key) -> &'static str {
     let code = match key {
+        // Common keys across all platforms
         Key::Space => "Space",
-        Key::Alt => "AltLeft",
-        Key::AltGr => "AltRight",
         Key::Backspace => "Backspace",
         Key::CapsLock => "CapsLock",
-        Key::ControlLeft => "ControlLeft",
-        Key::ControlRight => "ControlRight",
-        Key::Delete => "Delete",
-        Key::DownArrow => "ArrowDown",
-        Key::End => "End",
+        Key::Tab => "Tab",
         Key::Return => "Enter",
         Key::Escape => "Escape",
+        Key::Delete => "Delete",
+
+        // Modifier keys with left/right variants
+        Key::Alt => "AltLeft",
+        Key::AltGr => "AltRight",
+        Key::ShiftLeft => "ShiftLeft",
+        Key::ShiftRight => "ShiftRight",
+        Key::ControlLeft => "ControlLeft",
+        Key::ControlRight => "ControlRight",
+        Key::MetaLeft => {
+            if cfg!(target_os = "macos") {
+                "MetaLeft"
+            } else {
+                "OSLeft"
+            }
+        }
+        Key::MetaRight => {
+            if cfg!(target_os = "macos") {
+                "MetaRight"
+            } else {
+                "OSRight"
+            }
+        }
+
+        // Arrow keys
+        Key::UpArrow => "ArrowUp",
+        Key::DownArrow => "ArrowDown",
+        Key::LeftArrow => "ArrowLeft",
+        Key::RightArrow => "ArrowRight",
+
+        // Navigation keys
+        Key::Home => "Home",
+        Key::End => "End",
+        Key::PageUp => "PageUp",
+        Key::PageDown => "PageDown",
+
+        // Function keys
         Key::F1 => "F1",
         Key::F2 => "F2",
         Key::F3 => "F3",
@@ -29,15 +62,8 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::F10 => "F10",
         Key::F11 => "F11",
         Key::F12 => "F12",
-        Key::Home => "Home",
-        Key::LeftArrow => "ArrowLeft",
-        Key::PageDown => "PageDown",
-        Key::PageUp => "PageUp",
-        Key::RightArrow => "ArrowRight",
-        Key::ShiftLeft => "ShiftLeft",
-        Key::ShiftRight => "ShiftRight",
-        Key::Tab => "Tab",
-        Key::UpArrow => "ArrowUp",
+
+        // Alpha keys A-Z
         Key::KeyA => "KeyA",
         Key::KeyB => "KeyB",
         Key::KeyC => "KeyC",
@@ -64,16 +90,41 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::KeyX => "KeyX",
         Key::KeyY => "KeyY",
         Key::KeyZ => "KeyZ",
-        Key::Num0 => "Num0",
-        Key::Num1 => "Num1",
-        Key::Num2 => "Num2",
-        Key::Num3 => "Num3",
-        Key::Num4 => "Num4",
-        Key::Num5 => "Num5",
-        Key::Num6 => "Num6",
-        Key::Num7 => "Num7",
-        Key::Num8 => "Num8",
-        Key::Num9 => "Num9",
+
+        // Number keys
+        Key::Num0 => "Digit0",
+        Key::Num1 => "Digit1",
+        Key::Num2 => "Digit2",
+        Key::Num3 => "Digit3",
+        Key::Num4 => "Digit4",
+        Key::Num5 => "Digit5",
+        Key::Num6 => "Digit6",
+        Key::Num7 => "Digit7",
+        Key::Num8 => "Digit8",
+        Key::Num9 => "Digit9", // Special characters and punctuation
+        // These can vary by keyboard layout
+        Key::BackQuote => "Backquote", // `
+        Key::Minus => "Minus",         // -
+        Key::Equal => "Equal",         // =
+        Key::Quote => "Quote",         // '
+        Key::Comma => "Comma",         // ,
+        Key::Slash => "Slash",         // /
+
+        // Reserved for future rdev updates
+        /*
+        Key::BracketLeft => "BracketLeft", // [
+        Key::BracketRight => "BracketRight", // ]
+        Key::Backslash => "Backslash", // \
+        Key::Semicolon => "Semicolon", // ;
+        Key::Period => "Period", // .
+        Key::MediaVolumeDown => "AudioVolumeDown",
+        Key::MediaVolumeUp => "AudioVolumeUp",
+        Key::MediaVolumeMute => "AudioVolumeMute",
+        Key::MediaPlayPause => "MediaPlayPause",
+        Key::MediaPreviousTrack => "MediaTrackPrevious",
+        Key::MediaNextTrack => "MediaTrackNext",
+        */
+        // Unknown or unmapped keys
         _ => "",
     };
     println!("🔍 Mapping key {:?} to code '{}'", key, code);
