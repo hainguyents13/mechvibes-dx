@@ -13,6 +13,7 @@ dioxus-radio = "0.3.0"
 env_logger = "0.11.6"
 futures-timer = "3.0.3"
 lucide-dioxus = { version = "2.1.0", features = ["arrows"] }
+once_cell = "1.21.3"
 rand = "0.9.0"
 rdev = "0.5.3"
 rodio = "0.20.1"

@@ -45,6 +45,7 @@ pub fn app() -> Element {
             async move {
                 loop {
                     if let Ok(keycode) = rx.try_recv() {
+                        println!("🔍 UI received key event: '{}'", keycode);
                         if keycode.starts_with("UP:") {
                             let key = &keycode[3..];
                             ctx.play_key_event_sound(key, false);
@@ -77,9 +78,9 @@ pub fn app() -> Element {
       div { class: "container mx-auto p-16 text-center",
         // Mechanical keyboard logo with animated press effect
         crate::components::logo::Logo {}
-
         // Volume control slider for sound effects
-        crate::components::volume_slider::VolumeSlider { volume }
+        crate::components::volume_slider::VolumeSlider { volume } // Soundpack selector for switching sound packs in real-time
+        crate::components::soundpack_selector::SoundpackSelector { audio_ctx: audio_context.clone() }
 
         // Button to test the current sound configuration
         crate::components::test_sound_button::TestSoundButton {}

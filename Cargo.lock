@@ -2951,6 +2951,7 @@ dependencies = [
  "env_logger",
  "futures-timer",
  "lucide-dioxus",
+ "once_cell",
  "rand 0.9.1",
  "rdev",
  "rodio",
