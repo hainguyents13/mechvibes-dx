@@ -31,7 +31,7 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            current_soundpack: "oreo".to_string(),
+            current_soundpack: "".to_string(),
             volume: 1.0,
         }
     }

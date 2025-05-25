@@ -62,7 +62,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                       error.set(format!("Failed to save config: {}", e));
                       return;
                   }
-                  match props.audio_ctx.try_reload_soundpack() {
+                  match crate::libs::audio::load_soundpack(&props.audio_ctx) {
                       Ok(_) => {
                           current.set(id.clone());
                           println!("✅ Soundpack changed to: {}", name);
