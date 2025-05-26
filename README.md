@@ -1,26 +1,18 @@
-# Development
+# MechvibesDX
 
-Your new bare-bones project includes minimal organization with a single `main.rs` file and a few assets.
+MechvibesDX is an upgraded version of Mechvibes, rewritten from scratch in Rust using Dioxus.
 
-### Tailwind
-1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-2. Install the Tailwind CSS CLI: https://tailwindcss.com/docs/installation
-3. Run the following command in the root of the project to start the Tailwind CSS compiler:
+The codebase is now available for inspection and learning purposes. MechvibesDX provides a modern, performant implementation with improved features and stability compared to the original.
 
-```bash
-npx tailwindcss -i ./input.css -o ./assets/tailwind.css --watch
-```
-
-### Serving Your App
-
-Run the following command in the root of your project to start developing with the default platform:
+You can try it out right now by cloning the repo and building with Dioxus CLI:
 
 ```bash
+git clone https://github.com/hainguyents13/mechvibes-dx.git
+cd mechvibes-dx
 dx serve
 ```
 
-To run for a different platform, use the `--platform platform` flag. E.g.
-```bash
-dx serve --platform desktop
-```
+Please note that pull requests and issues are currently disabled while development continues.
+Feel free to browse the code and follow progress!
 
+Thank you for your support!
