@@ -6,8 +6,8 @@
     "version": "1.0.0",
     "tags": ["oreo", "ryan", "sound pack", "fun", "thocky"],
     "keycap": "pbt",
-    "icon": "./icon.avif",
-    "source": "./oreo.ogg",
+    "icon": "icon.avif",
+    "source": "oreo.ogg",
     "method": "single",
     "includes_numpad": true,
     "def": {

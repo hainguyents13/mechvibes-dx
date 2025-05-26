@@ -2,18 +2,15 @@ use dioxus::prelude::*;
 
 #[component]
 pub fn VolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -> Element {
-    use crate::libs::theme::use_effective_theme;
-    let effective_theme = use_effective_theme();
-
     rsx! {
       div { class: "grid grid-cols-12 gap-4",
         div { class: "rounded col-span-4 flex items-center",
           label {
             r#for: "volume-slider",
-            class: format!("label label-text text-base {}", effective_theme.text_secondary()),
+            class: "label label-text text-base",
             "Volume "
           }
-          span { class: format!("font-bold ml-1 {}", effective_theme.text_primary()), "{(volume() * 100.0) as u8}%" }
+          span { class: "font-bold ml-1", "{(volume() * 100.0) as u8}%" }
         }
         div { class: "col-span-8",
           input {

@@ -18,9 +18,6 @@ pub fn Layout() -> Element {
 
     rsx! {
       div { class: format!("min-h-screen {}", effective_theme.bg_primary()),
-        // App info display component (debug info)
-        crate::components::app_info::AppInfoDisplay {}
-
         // Main content area
         Outlet::<Route> {}
 

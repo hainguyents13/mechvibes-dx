@@ -17,7 +17,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     });
 
     rsx! {
-      div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
+      div { class: "container mx-auto p-16 text-center flex flex-col gap-2",
         div { class: "mb-12",
           // Mechvibes logo with animated press effect
           Logo {}
@@ -25,8 +25,32 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
 
         // Soundpack selector
         SoundpackSelector { audio_ctx: audio_ctx.clone() }
-        // Volume control slider for sound effects
+        // divider
+        div { class: "divider" }
+        // Volume control slider
         VolumeSlider { volume, on_change: None }
+        // divider
+        div { class: "divider" }
+        // Version
+        div { class: "text-sm text-gray-800 font-bold", "Mechvibes v3.0.6" }
+        // Footer with credits
+        div { class: "text-sm text-gray-500 mt-4",
+          "Made with ❤️ by "
+          a {
+            href: "https://github.com/hainguyents13/mechvibes-dx",
+            target: "_blank",
+            class: "link ",
+            "hainguyents13"
+          }
+          br {}
+          " and "
+          a {
+            href: "https://github.com/hainguyents13/mechvibes-dx/graphs/contributors",
+            target: "_blank",
+            class: "link ",
+            "these awesome people"
+          }
+        }
       }
     }
 }

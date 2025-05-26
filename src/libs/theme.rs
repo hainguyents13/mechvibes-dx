@@ -14,8 +14,8 @@ impl Theme {
             Theme::Dark => EffectiveTheme::Dark,
             Theme::Light => EffectiveTheme::Light,
             Theme::System => {
-                // For now, default to dark. In a real app, you'd check system preference
-                EffectiveTheme::Dark
+                // For now, default to light. In a real app, you'd check system preference
+                EffectiveTheme::Light
             }
         }
     }
@@ -39,13 +39,6 @@ impl EffectiveTheme {
         match self {
             EffectiveTheme::Dark => "bg-gray-800",
             EffectiveTheme::Light => "bg-gray-100",
-        }
-    }
-
-    pub fn bg_tertiary(&self) -> &'static str {
-        match self {
-            EffectiveTheme::Dark => "bg-gray-700",
-            EffectiveTheme::Light => "bg-gray-200",
         }
     }
 
@@ -81,20 +74,6 @@ impl EffectiveTheme {
         match self {
             EffectiveTheme::Dark => "hover:bg-gray-700",
             EffectiveTheme::Light => "hover:bg-gray-50",
-        }
-    }
-
-    pub fn bg_hover_secondary(&self) -> &'static str {
-        match self {
-            EffectiveTheme::Dark => "hover:bg-gray-600",
-            EffectiveTheme::Light => "hover:bg-gray-200",
-        }
-    }
-
-    pub fn placeholder(&self) -> &'static str {
-        match self {
-            EffectiveTheme::Dark => "placeholder-gray-400",
-            EffectiveTheme::Light => "placeholder-gray-500",
         }
     }
 }

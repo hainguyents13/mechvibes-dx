@@ -9,6 +9,18 @@ pub struct SoundpackItem {
     // Just use the full SoundPack struct directly - no duplication
     #[serde(flatten)]
     pub soundpack: SoundPack,
+
+    // Đường dẫn tương đối
+    #[serde(default)]
+    pub relative_path: String,
+
+    // Đường dẫn đầy đủ đến icon (nếu có)
+    #[serde(default)]
+    pub full_icon_path: Option<String>,
+
+    // Đường dẫn đầy đủ đến file sound
+    #[serde(default)]
+    pub full_sound_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -80,7 +92,29 @@ impl SoundpackCache {
                                     std::fs::read_to_string(path.join("config.json"))
                                 {
                                     if let Ok(pack) = serde_json::from_str::<SoundPack>(&content) {
-                                        return Some(SoundpackItem { soundpack: pack });
+                                        // Lấy tên thư mục (đường dẫn tương đối)
+                                        let dir_name = path
+                                            .file_name()
+                                            .and_then(|name| name.to_str())
+                                            .unwrap_or("unknown");
+
+                                        // Tạo đường dẫn đầy đủ cho icon nếu có
+                                        let full_icon_path = pack.icon.as_ref().map(|icon_path| {
+                                            format!("./soundpacks/{}/{}", dir_name, icon_path)
+                                        });
+
+                                        // Tạo đường dẫn đầy đủ cho file sound nếu có
+                                        let full_sound_path =
+                                            pack.source.as_ref().map(|sound_path| {
+                                                format!("./soundpacks/{}/{}", dir_name, sound_path)
+                                            });
+
+                                        return Some(SoundpackItem {
+                                            soundpack: pack,
+                                            relative_path: format!("./soundpacks/{}", dir_name),
+                                            full_icon_path,
+                                            full_sound_path,
+                                        });
                                     }
                                 }
                             }
@@ -102,11 +136,8 @@ impl SoundpackCache {
     pub fn get_soundpacks(&self) -> &Vec<SoundpackItem> {
         &self.soundpacks
     }
-    pub fn get_soundpack_by_id(&self, id: &str) -> Option<&SoundPack> {
-        self.soundpacks
-            .iter()
-            .find(|item| item.soundpack.id == id)
-            .map(|item| &item.soundpack)
+    pub fn get_soundpack_by_id(&self, id: &str) -> Option<&SoundpackItem> {
+        self.soundpacks.iter().find(|item| item.soundpack.id == id)
     }
 }
 
