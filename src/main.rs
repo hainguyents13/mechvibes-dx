@@ -3,7 +3,7 @@
 mod components;
 mod libs;
 mod state;
-pub use crate::components::header::app as TailwindStylesheet;
+pub use crate::components::header::Header;
 use dioxus::desktop::{Config, LogicalPosition, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use libs::ui;
@@ -13,8 +13,8 @@ fn main() {
     println!("🚀 Initializing Mechvibes DX...");
     let _manifest = state::AppManifest::load();
 
-    // Preload soundpack cache to improve startup performance
-    let _cache = state::SoundpackCache::load();
+    // Initialize global app state before rendering
+    state::app::init_app_state();
 
     // Create a WindowBuilder with fixed size of 600x800
     let window_builder = WindowBuilder::default()
@@ -36,7 +36,7 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-      TailwindStylesheet {}
+      Header {}
       ui::app {}
     }
 }

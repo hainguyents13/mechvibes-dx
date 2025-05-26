@@ -7,6 +7,10 @@ use std::sync::mpsc;
 use std::sync::Arc;
 
 pub fn app() -> Element {
+    // Get global app state from the global signal
+    let app_state = crate::state::app::use_app_state();
+    use_context_provider(|| app_state);
+
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new());
 

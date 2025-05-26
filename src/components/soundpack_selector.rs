@@ -1,9 +1,7 @@
 use crate::libs::audio::AudioContext;
-use crate::state::soundpack_cache::SoundpackCache;
-use dioxus::html::u::is;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{ChevronDown, Music, RotateCcw, Search};
+use lucide_dioxus::{ChevronDown, Music, Search};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,17 +19,22 @@ impl PartialEq for SoundpackSelectorProps {
 #[allow(non_snake_case)]
 pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     use crate::libs::theme::use_effective_theme;
+    use crate::state::app::use_app_state;
+
+    // Get global app state
+    let app_state = use_app_state();
+
+    // UI state
     let effective_theme = use_effective_theme();
     let mut error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let mut is_refreshing = use_signal(|| false);
+    let mut is_refreshing = use_signal(|| false); // Use global app state for soundpacks and current soundpack
+    let soundpacks =
+        use_memo(move || app_state.with(|state| state.soundpack_cache.get_soundpacks().clone()));
+    let current = use_signal(|| app_state.with(|state| state.config.current_soundpack.clone()));
 
-    // Load soundpacks from cache
-    let mut soundpack_cache = use_signal(|| SoundpackCache::load());
-    let soundpacks = use_memo(move || soundpack_cache().get_soundpacks().clone()); // Get current soundpack from config
-    let config = crate::state::config::AppConfig::load();
-    let current = use_signal(|| config.current_soundpack); // Filter soundpacks based on search query
+    // Filter soundpacks based on search query
     let filtered_soundpacks = use_memo(move || {
         let query = search_query().to_lowercase();
         if query.is_empty() {
@@ -46,7 +49,9 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                 })
                 .collect()
         }
-    }); // Find current soundpack info
+    });
+
+    // Find current soundpack info
     let current_soundpack = use_memo(move || {
         soundpacks()
             .iter()
@@ -64,7 +69,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
               effective_theme.border(),
               effective_theme.bg_hover_secondary(),
           ),
-          onclick: move |_| is_open.set(!is_open()), // Current selection display
+          onclick: move |_| is_open.set(!is_open()),
+          // Current selection display
           div { class: "flex items-center gap-3 flex-1",
             if let Some(pack) = current_soundpack() {
               // Soundpack icon
@@ -168,9 +174,10 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                                 .iter()
                                 .find(|p| p.soundpack.id == pack_id)
                             {
-                                let mut config = crate::state::config::AppConfig::load();
+                                // Lấy config từ global state thay vì tải lại từ file
+                                let mut config = app_state.with(|state| (*state.config).clone());
                                 config.current_soundpack = pack_id.clone();
-                                if let Err(e) = config.save() {
+                                if let Err(e) = crate::state::app::save_config(config) {
                                     error.set(format!("Failed to save config: {}", e));
                                     return;
                                 }
@@ -255,11 +262,9 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                   is_refreshing.set(true);
                   error.set(String::new());
                   let mut is_refreshing = is_refreshing.clone();
-                  let mut soundpack_cache = soundpack_cache.clone();
                   spawn(async move {
-                      Delay::new(Duration::from_millis(5000)).await;
-                      let new_cache = SoundpackCache::rebuild();
-                      soundpack_cache.set(new_cache);
+                      Delay::new(Duration::from_millis(1000)).await;
+                      crate::state::app::reload_soundpacks();
                       is_refreshing.set(false);
                   });
               }

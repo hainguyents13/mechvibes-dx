@@ -34,12 +34,9 @@ impl AppConfig {
         let config_path = PathBuf::from("./data/config.json");
         if let Ok(contents) = fs::read_to_string(config_path) {
             match serde_json::from_str::<AppConfig>(&contents) {
-                Ok(mut config) => {
-                    // Update version and timestamp when loading
-                    config.version = env!("CARGO_PKG_VERSION").to_string();
-                    config.last_updated = Utc::now();
-                    // Save the updated config
-                    let _ = config.save();
+                Ok(config) => {
+                    // Không cập nhật version và last_updated khi chỉ đọc config
+                    // Không lưu lại file khi chỉ đọc config
                     config
                 }
                 Err(e) => {
