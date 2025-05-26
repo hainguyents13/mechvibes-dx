@@ -16,6 +16,14 @@ pub struct AudioContext {
     pub(crate) key_sinks: Arc<Mutex<HashMap<String, Sink>>>,
 }
 
+// Manual PartialEq implementation for component compatibility
+impl PartialEq for AudioContext {
+    fn eq(&self, other: &Self) -> bool {
+        // For component props, we consider AudioContext instances equal if they're the same Arc
+        Arc::ptr_eq(&self._stream, &other._stream)
+    }
+}
+
 impl AudioContext {
     pub fn new() -> Self {
         let (stream, stream_handle) =

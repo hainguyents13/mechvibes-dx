@@ -1,8 +1,5 @@
-use crate::components::dock::Dock;
-use crate::components::logo::Logo;
-use crate::components::soundpack_selector::SoundpackSelector;
-use crate::components::volume_slider::VolumeSlider;
 use crate::libs::keyboard::start_keyboard_listener;
+use crate::libs::routes::Route;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use dioxus::prelude::*;
@@ -21,7 +18,9 @@ pub fn app() -> Element {
 
     // Create a channel for real-time keyboard event communication
     let (tx, rx) = mpsc::channel::<String>();
-    let rx = Arc::new(rx); // Launch the keyboard event listener in a background task
+    let rx = Arc::new(rx);
+
+    // Launch the keyboard event listener in a background task
     {
         let tx = tx.clone();
         use_future(move || {
@@ -55,7 +54,8 @@ pub fn app() -> Element {
                             // Update keyboard state - key released
                             keyboard_state.write().key_pressed = false;
                         } else if !keycode.is_empty() {
-                            ctx.play_key_event_sound(&keycode, true); // Update keyboard state - key pressed
+                            ctx.play_key_event_sound(&keycode, true);
+                            // Update keyboard state - key pressed
                             let mut state = keyboard_state.write();
                             state.key_pressed = true;
                             state.last_key = keycode.clone();
@@ -67,26 +67,7 @@ pub fn app() -> Element {
         });
     }
 
-    // volume state
-    // Default volume is 1.0 (100%)
-    let volume = use_signal(|| 1.0f32); // Update audio system volume when the volume control changes
-    let ctx = audio_context.clone();
-    use_effect(move || {
-        ctx.set_volume(volume());
-    });
-
-    // Render the main application interface
     rsx! {
-      div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
-        div { class: "mb-12",
-          // Mechvibes logo with animated press effect
-          Logo {}
-        }
-        // Soundpack selector for switching sound packs in real-time
-        SoundpackSelector { audio_ctx: audio_context.clone() }
-        // Volume control slider for sound effects
-        VolumeSlider { volume }
-      }
-      Dock {}
+      Router::<Route> {}
     }
 }
