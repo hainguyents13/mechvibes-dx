@@ -1,32 +1,28 @@
-use crate::components::soundpack_selector::SoundpackSelector;
-use crate::libs::AudioContext;
 use dioxus::prelude::*;
-use std::sync::Arc;
 
 #[component]
-pub fn SoundpacksPage(audio_ctx: Arc<AudioContext>) -> Element {
+pub fn SoundpacksPage() -> Element {
+    use crate::libs::theme::use_effective_theme;
+    let effective_theme = use_effective_theme();
+
     rsx! {
         div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
             // Page header
             div { class: "mb-8",
-                h1 { class: "text-3xl font-bold text-white mb-4", "🎵 Soundpacks" }
-                p { class: "text-gray-300 text-lg",
-                    "Choose your favorite mechanical keyboard sound profile."
+                h1 { class: format!("text-3xl font-bold {} mb-4", effective_theme.text_primary()), "🎵 Soundpacks" }
+                p { class: format!("{} text-lg", effective_theme.text_secondary()),
+                    "Discover and manage your mechanical keyboard sound profiles."
                 }
             }
 
-            // Soundpack selector - main component for this page
-            div { class: "flex-1",
-                SoundpackSelector { audio_ctx: audio_ctx.clone() }
-            }
-
-            // Additional info section
-            div { class: "mt-8 bg-gray-800 p-6 rounded-lg",
-                h3 { class: "text-xl font-semibold text-white mb-3", "About Soundpacks" }
-                div { class: "text-left space-y-2 text-gray-300",
-                    p { "Each soundpack contains unique audio samples recorded from real mechanical keyboards." }
-                    p { "You can switch between soundpacks in real-time to find the perfect sound for your typing experience." }
-                    p { class: "text-blue-400", "💡 Tip: Try different soundpacks while typing to hear the difference!" }
+            // Temporary placeholder content
+            div { class: "flex-1 flex items-center justify-center min-h-96",
+                div { class: "text-center",
+                    div { class: "text-6xl mb-4", "🚧" }
+                    h2 { class: format!("text-2xl font-semibold {} mb-3", effective_theme.text_primary()), "Coming Soon" }
+                    p { class: format!("{} max-w-md", effective_theme.text_tertiary()),
+                        "This page will feature a comprehensive soundpack browser, installation manager, and community soundpack discovery. For now, you can manage your soundpacks from the Home page."
+                    }
                 }
             }
         }

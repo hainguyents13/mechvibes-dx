@@ -4,6 +4,9 @@ use std::path::Path;
 
 #[component]
 pub fn AppInfoDisplay() -> Element {
+    use crate::libs::theme::use_effective_theme;
+    let effective_theme = use_effective_theme();
+
     let mut show_info = use_signal(|| false);
 
     // Get current executable path
@@ -39,70 +42,67 @@ pub fn AppInfoDisplay() -> Element {
     let os = env::consts::OS;
     let arch = env::consts::ARCH;
 
-    rsx! {
-        div { class: "fixed top-4 left-4 z-50",
+    rsx! {        div { class: "fixed top-4 left-4 z-50",
             // Toggle button
             button {
-                class: "bg-gray-800 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors",
+                class: format!("{} {} px-3 py-2 rounded-lg text-sm {} transition-colors",
+                        effective_theme.bg_secondary(),
+                        effective_theme.text_primary(),
+                        effective_theme.bg_hover()),
                 onclick: move |_| show_info.set(!show_info()),
                 if show_info() { "Hide Info" } else { "Show App Info" }
-            }
-
-            // Info panel
+            }            // Info panel
             if show_info() {
                 div {
-                    class: "mt-2 bg-black bg-opacity-90 text-green-400 p-4 rounded-lg text-xs font-mono max-w-lg border border-gray-600",
-
-                    div { class: "mb-3",
-                        h3 { class: "text-yellow-400 font-bold mb-2", "📍 Application Paths" }
+                    class: format!("mt-2 {} {} p-4 rounded-lg text-xs font-mono max-w-lg {}",
+                            effective_theme.bg_secondary(),
+                            effective_theme.text_primary(),
+                            effective_theme.border()),                    div { class: "mb-3",
+                        h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()), "📍 Application Paths" }
                         div { class: "mb-1",
-                            span { class: "text-gray-300", "Executable: " }
-                            span { class: "text-green-300 break-all", "{exe_path}" }
+                            span { class: effective_theme.text_secondary(), "Executable: " }
+                            span { class: format!("{} break-all", effective_theme.text_primary()), "{exe_path}" }
                         }
                         div {
-                            span { class: "text-gray-300", "Working Dir: " }
-                            span { class: "text-green-300 break-all", "{current_dir}" }
+                            span { class: effective_theme.text_secondary(), "Working Dir: " }
+                            span { class: format!("{} break-all", effective_theme.text_primary()), "{current_dir}" }
                         }
-                    }
-
-                    div { class: "mb-3",
-                        h3 { class: "text-yellow-400 font-bold mb-2", "📁 File System Status" }
+                    }                    div { class: "mb-3",
+                        h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()), "📁 File System Status" }
                         div { class: "space-y-1",
                             div {
-                                span { class: if data_dir_exists { "text-green-400" } else { "text-red-400" },
+                                span { class: if data_dir_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
                                     if data_dir_exists { "✅" } else { "❌" }
                                 }
-                                span { class: "ml-2", "./data directory" }
+                                span { class: format!("ml-2 {}", effective_theme.text_secondary()), "./data directory" }
                             }
                             div {
-                                span { class: if config_file_exists { "text-green-400" } else { "text-red-400" },
+                                span { class: if config_file_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
                                     if config_file_exists { "✅" } else { "❌" }
                                 }
-                                span { class: "ml-2", "./data/config.json" }
+                                span { class: format!("ml-2 {}", effective_theme.text_secondary()), "./data/config.json" }
                             }
                             div {
-                                span { class: if soundpacks_dir_exists { "text-green-400" } else { "text-red-400" },
+                                span { class: if soundpacks_dir_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
                                     if soundpacks_dir_exists { "✅" } else { "❌" }
                                 }
-                                span { class: "ml-2", "./soundpacks directory" }
+                                span { class: format!("ml-2 {}", effective_theme.text_secondary()), "./soundpacks directory" }
                             }
                             div {
-                                span { class: "text-blue-400", "🎵" }
-                                span { class: "ml-2", "Found {soundpack_count} soundpack(s)" }
+                                span { class: effective_theme.text_primary(), "🎵" }
+                                span { class: format!("ml-2 {}", effective_theme.text_secondary()), "Found {soundpack_count} soundpack(s)" }
                             }
                         }
-                    }
-
-                    div {
-                        h3 { class: "text-yellow-400 font-bold mb-2", "💻 System Info" }
+                    }                    div {
+                        h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()), "💻 System Info" }
                         div { class: "space-y-1",
                             div {
-                                span { class: "text-gray-300", "OS: " }
-                                span { class: "text-blue-300", "{os}" }
+                                span { class: effective_theme.text_secondary(), "OS: " }
+                                span { class: effective_theme.text_primary(), "{os}" }
                             }
                             div {
-                                span { class: "text-gray-300", "Arch: " }
-                                span { class: "text-blue-300", "{arch}" }
+                                span { class: effective_theme.text_secondary(), "Arch: " }
+                                span { class: effective_theme.text_primary(), "{arch}" }
                             }
                         }
                     }

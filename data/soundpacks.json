@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "last_updated": "2025-05-26T13:43:30.429620900Z",
+  "soundpacks": [
+    {
+      "id": "cherrymx-black",
+      "name": "CherryMX Black - PBT keycaps",
+      "author": "Mechvibes Team",
+      "icon": "./icon.jpg",
+      "description": "Cherry MX Black switches with PBT keycaps sound pack"
+    },
+    {
+      "id": "pack-01",
+      "name": "Oreo by Ryan",
+      "author": "Ryan",
+      "icon": "./icon.avif",
+      "description": "A sound pack for the Oreo keyboard by Ryan."
+    }
+  ]
+}

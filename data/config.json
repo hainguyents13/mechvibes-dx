@@ -1,4 +1,11 @@
 {
-  "current_soundpack": "pack-01",
-  "volume": 1.0
+  "version": "0.1.0",
+  "last_updated": "2025-05-26T13:43:32.762315500Z",
+  "commit": null,
+  "current_soundpack": "cherrymx-black",
+  "volume": 1.0,
+  "enable_sound": true,
+  "theme": "System",
+  "auto_start": false,
+  "show_notifications": true
 }

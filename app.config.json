@@ -1,0 +1,19 @@
+{
+    "app": {
+        "name": "Mechvibes DX",
+        "version": "0.1.0",
+        "description": "Enhanced mechanical keyboard sound simulator"
+    },
+    "compatibility": {
+        "config_version": "1.0",
+        "soundpack_version": "1.0",
+        "cache_version": "1.0",
+        "minimum_app_version": "0.1.0"
+    },
+    "paths": {
+        "config_file": "./data/config.json",
+        "soundpack_cache": "./data/soundpacks.json",
+        "soundpacks_dir": "./soundpacks",
+        "data_dir": "./data"
+    }
+}

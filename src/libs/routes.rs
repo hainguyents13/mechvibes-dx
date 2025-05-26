@@ -13,15 +13,20 @@ pub enum Route {
 
 #[component]
 pub fn Layout() -> Element {
+    use crate::libs::theme::use_effective_theme;
+    let effective_theme = use_effective_theme();
+
     rsx! {
-      // App info display component (debug info)
-      crate::components::app_info::AppInfoDisplay {}
+      div { class: format!("min-h-screen {}", effective_theme.bg_primary()),
+        // App info display component (debug info)
+        crate::components::app_info::AppInfoDisplay {}
 
-      // Main content area
-      Outlet::<Route> {}
+        // Main content area
+        Outlet::<Route> {}
 
-      // Dock at the bottom
-      crate::components::dock::Dock {}
+        // Dock at the bottom
+        crate::components::dock::Dock {}
+      }
     }
 }
 
@@ -38,12 +43,8 @@ pub fn Home() -> Element {
 
 #[component]
 pub fn Soundpacks() -> Element {
-    use crate::libs::AudioContext;
-    use std::sync::Arc;
-
-    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
     rsx! {
-      crate::components::pages::SoundpacksPage { audio_ctx: audio_context }
+      crate::components::pages::SoundpacksPage {}
     }
 }
 

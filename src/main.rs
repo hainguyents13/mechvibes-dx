@@ -9,7 +9,12 @@ use dioxus::prelude::*;
 use libs::ui;
 
 fn main() {
-    env_logger::init();
+    env_logger::init(); // Initialize app manifest first
+    println!("🚀 Initializing Mechvibes DX...");
+    let _manifest = state::AppManifest::load();
+
+    // Preload soundpack cache to improve startup performance
+    let _cache = state::SoundpackCache::load();
 
     // Create a WindowBuilder with fixed size of 600x800
     let window_builder = WindowBuilder::default()
