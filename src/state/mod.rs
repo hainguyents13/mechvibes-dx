@@ -7,4 +7,5 @@ pub mod soundpack_cache;
 
 // Re-export commonly used structs
 pub use manifest::AppManifest;
-pub use soundpack_cache::SoundpackCache;
+// SoundpackCache được import trực tiếp từ module nên không cần re-export
+// pub use soundpack_cache::SoundpackCache;

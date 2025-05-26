@@ -45,37 +45,8 @@ pub fn use_app_state() -> Signal<AppState> {
     })
 }
 
-// Hàm tiện ích để buộc reload config từ file (dùng trong trường hợp config bị thay đổi từ bên ngoài)
-pub fn reload_config() {
-    println!("🔄 Buộc tải lại cấu hình từ file...");
-
-    // Tạo một Arc mới với config mới tải từ file
-    let new_config = Arc::new(AppConfig::load());
-
-    // Update mutex state
-    if let Some(mutex) = APP_STATE.get() {
-        if let Ok(mut app_state) = mutex.lock() {
-            let soundpack_cache = app_state.soundpack_cache.clone();
-            *app_state = AppState {
-                config: new_config.clone(),
-                soundpack_cache,
-            };
-        }
-    }
-
-    // Update signal state
-    if let Some(rwlock) = APP_STATE_SIGNAL.get() {
-        if let Ok(mut signal_state) = rwlock.write() {
-            let soundpack_cache = signal_state.soundpack_cache.clone();
-            *signal_state = AppState {
-                config: new_config,
-                soundpack_cache,
-            };
-        }
-    }
-}
-
 // Hàm tiện ích để reload soundpacks từ bất kỳ đâu
+#[allow(dead_code)]
 pub fn reload_soundpacks() {
     println!("🔄 Reloading global soundpack cache...");
 

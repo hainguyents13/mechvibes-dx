@@ -221,14 +221,17 @@ impl AppManifest {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn is_compatible_config(&self, config_version: &str) -> bool {
         self.compatibility.config_version == config_version
     }
 
+    #[allow(dead_code)]
     pub fn is_compatible_soundpack(&self, soundpack_version: &str) -> bool {
         self.compatibility.soundpack_version == soundpack_version
     }
 
+    #[allow(dead_code)]
     pub fn get_app_info(&self) -> String {
         format!(
             "{} v{} ({})",
