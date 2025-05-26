@@ -8,7 +8,6 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.6.1", features = ["router"] }
-dioxus-desktop = "0.6.1"
 env_logger = "0.11.6"
 futures-timer = "3.0.3"
 lucide-dioxus = { version = "2.1.0" , features = ["all-icons"] }

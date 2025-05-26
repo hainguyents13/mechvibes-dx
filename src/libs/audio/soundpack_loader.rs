@@ -29,7 +29,7 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
 }
 
 fn find_soundpacks() -> Result<Vec<String>, String> {
-    let soundpacks = std::fs::read_dir("./sounds")
+    let soundpacks = std::fs::read_dir("./soundpacks")
         .map_err(|_| "Failed to read soundpacks directory".to_string())?
         .filter_map(|entry| {
             entry.ok().and_then(|e| {
@@ -43,7 +43,7 @@ fn find_soundpacks() -> Result<Vec<String>, String> {
         })
         .collect::<Vec<_>>();
     if soundpacks.is_empty() {
-        Err("No soundpacks found in ./sounds directory".to_string())
+        Err("No soundpacks found in ./soundpacks directory".to_string())
     } else {
         Ok(soundpacks)
     }

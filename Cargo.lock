@@ -2935,7 +2935,6 @@ name = "mechvibes-dx"
 version = "0.1.0"
 dependencies = [
  "dioxus",
- "dioxus-desktop",
  "env_logger",
  "futures-timer",
  "lucide-dioxus",

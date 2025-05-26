@@ -19,7 +19,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     let mut error = use_signal(String::new);
     let paths = use_signal(|| {
         // Load và convert tất cả các soundpack thành (id, name, dirname)
-        std::fs::read_dir("./sounds")
+        std::fs::read_dir("./soundpacks")
             .map(|entries| {
                 entries
                     .filter_map(|entry| {
