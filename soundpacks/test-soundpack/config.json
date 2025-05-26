@@ -1,0 +1,18 @@
+{
+    "id": "test-soundpack",
+    "name": "Test Soundpack",
+    "author": "Test Author",
+    "description": "A test soundpack for verifying refresh functionality",
+    "version": "1.0.0",
+    "tags": ["test"],
+    "keycap": "pbt",
+    "source": "./sound.ogg",
+    "method": "single",
+    "includes_numpad": false,
+    "def": {
+        "KeyA": [
+            [1000.0, 100.0],
+            [1100.0, 100.0]
+        ]
+    }
+}

@@ -4,7 +4,7 @@ mod components;
 mod libs;
 mod state;
 pub use crate::components::header::app as TailwindStylesheet;
-use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
+use dioxus::desktop::{Config, LogicalPosition, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use libs::ui;
 
@@ -21,6 +21,7 @@ fn main() {
         .with_title("Mechvibes DX")
         .with_transparent(true)
         .with_always_on_top(true)
+        .with_position(LogicalPosition::new(1700.0, 300.0))
         .with_inner_size(LogicalSize::new(500.0, 800.0))
         .with_resizable(false);
 

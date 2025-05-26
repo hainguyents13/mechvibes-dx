@@ -1,8 +1,11 @@
 use crate::libs::audio::AudioContext;
 use crate::state::soundpack_cache::SoundpackCache;
+use dioxus::html::u::is;
 use dioxus::prelude::*;
+use futures_timer::Delay;
 use lucide_dioxus::{ChevronDown, Music, RotateCcw, Search};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Clone, Props)]
 pub struct SoundpackSelectorProps {
@@ -28,9 +31,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     let mut soundpack_cache = use_signal(|| SoundpackCache::load());
     let soundpacks = use_memo(move || soundpack_cache().get_soundpacks().clone()); // Get current soundpack from config
     let config = crate::state::config::AppConfig::load();
-    let current = use_signal(|| config.current_soundpack);
-
-    // Filter soundpacks based on search query
+    let current = use_signal(|| config.current_soundpack); // Filter soundpacks based on search query
     let filtered_soundpacks = use_memo(move || {
         let query = search_query().to_lowercase();
         if query.is_empty() {
@@ -39,9 +40,9 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
             soundpacks()
                 .into_iter()
                 .filter(|pack| {
-                    pack.name.to_lowercase().contains(&query)
-                        || pack.author.to_lowercase().contains(&query)
-                        || pack.id.to_lowercase().contains(&query)
+                    pack.soundpack.name.to_lowercase().contains(&query)
+                        || pack.soundpack.author.to_lowercase().contains(&query)
+                        || pack.soundpack.id.to_lowercase().contains(&query)
                 })
                 .collect()
         }
@@ -49,7 +50,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     let current_soundpack = use_memo(move || {
         soundpacks()
             .iter()
-            .find(|pack| pack.id == current())
+            .find(|pack| pack.soundpack.id == current())
+            .map(|item| &item.soundpack)
             .cloned()
     });
 
@@ -62,7 +64,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
               effective_theme.border(),
               effective_theme.bg_hover_secondary(),
           ),
-          onclick: move |_| is_open.set(!is_open()),          // Current selection display
+          onclick: move |_| is_open.set(!is_open()), // Current selection display
           div { class: "flex items-center gap-3 flex-1",
             if let Some(pack) = current_soundpack() {
               // Soundpack icon
@@ -93,7 +95,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
             } else {
               div { class: effective_theme.text_tertiary(), "Select a soundpack..." }
             }
-          } // Dropdown arrow
+          }
+          // Dropdown arrow
           ChevronDown {
             class: format!(
                 "w-4 h-4 {} transition-transform {}",
@@ -101,7 +104,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                 if is_open() { "transform rotate-180" } else { "" },
             ),
           }
-        } // Dropdown panel
+        }
+        // Dropdown panel
         if is_open() {
           div {
             class: format!(
@@ -133,7 +137,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                   autofocus: true,
                 }
               }
-            } // Soundpack list
+            }
+            // Soundpack list
             div { class: "overflow-y-auto max-h-64",
               if filtered_soundpacks.read().is_empty() {
                 div { class: format!("p-4 text-center {}", effective_theme.text_tertiary()),
@@ -142,15 +147,15 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
               } else {
                 for pack in filtered_soundpacks.read().iter() {
                   button {
-                    key: "{pack.id}",
+                    key: "{pack.soundpack.id}",
                     class: format!(
                         "w-full p-3 text-left {} transition-colors border-b {} last:border-b-0 {}",
                         effective_theme.bg_hover_secondary(),
                         effective_theme.border(),
-                        if pack.id == current() { effective_theme.bg_tertiary() } else { "" },
+                        if pack.soundpack.id == current() { effective_theme.bg_tertiary() } else { "" },
                     ),
                     onclick: {
-                        let pack_id = pack.id.clone();
+                        let pack_id = pack.soundpack.id.clone();
                         let mut error = error.clone();
                         let soundpacks = soundpacks.clone();
                         let mut current = current.clone();
@@ -159,7 +164,10 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                         let audio_ctx = props.audio_ctx.clone();
                         move |_| {
                             error.set(String::new());
-                            if let Some(pack) = soundpacks().iter().find(|p| p.id == pack_id) {
+                            if let Some(pack_item) = soundpacks()
+                                .iter()
+                                .find(|p| p.soundpack.id == pack_id)
+                            {
                                 let mut config = crate::state::config::AppConfig::load();
                                 config.current_soundpack = pack_id.clone();
                                 if let Err(e) = config.save() {
@@ -171,7 +179,10 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                                         current.set(pack_id.clone());
                                         is_open.set(false);
                                         search_query.set(String::new());
-                                        println!("✅ Soundpack changed to: {}", pack.name);
+                                        println!(
+                                            "✅ Soundpack changed to: {} (loaded from cache)",
+                                            pack_item.soundpack.name,
+                                        );
                                     }
                                     Err(e) => {
                                         error.set(format!("Failed to load soundpack: {}", e));
@@ -187,7 +198,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                             "flex-shrink-0 w-10 h-10 {} rounded-lg flex items-center justify-center",
                             effective_theme.bg_tertiary(),
                         ),
-                        if pack.icon.is_some() {
+                        if pack.soundpack.icon.is_some() {
                           // TODO: Render actual icon when available
                           span { class: "text-xl", "🎵" }
                         } else {
@@ -197,68 +208,24 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                       // Soundpack info
                       div { class: "flex-1 min-w-0",
                         div { class: format!("{} font-medium truncate", effective_theme.text_primary()),
-                          "{pack.name}"
+                          "{pack.soundpack.name}"
                         }
                         div { class: format!("{} text-sm truncate", effective_theme.text_tertiary()),
-                          "by {pack.author}"
+                          "by {pack.soundpack.author}"
                         }
-                        if let Some(description) = &pack.description {
+                        if let Some(description) = &pack.soundpack.description {
                           div { class: format!("{} text-xs truncate mt-1", effective_theme.text_tertiary()),
                             "{description}"
                           }
                         }
                       }
                       // Selected indicator
-                      if pack.id == current() {
+                      if pack.soundpack.id == current() {
                         div { class: format!("flex-shrink-0 w-2 h-2 {} rounded-full", effective_theme.bg_secondary()) }
                       }
                     }
                   }
                 }
-              }
-            }
-          }        }
-        // Error display
-        if !error().is_empty() {
-          div { class: "text-sm text-red-400 mt-2", "{error}" }
-        }        // Refresh button
-        div { class: "flex justify-center mt-3",
-          div { class: "relative group",
-            button {
-              class: format!(
-                  "flex items-center gap-2 px-3 py-1.5 text-xs {} {} rounded-md transition-all duration-200 {}",
-                  if is_refreshing() { "cursor-not-allowed opacity-50" } else { "hover:scale-105" },
-                  effective_theme.bg_tertiary(),
-                  effective_theme.bg_hover()
-              ),
-              disabled: is_refreshing(),
-              title: "Refresh soundpack list from disk",
-              onclick: move |_| {
-                  if !is_refreshing() {
-                      is_refreshing.set(true);
-                      error.set(String::new());
-
-                      // Rebuild cache in background
-                      let new_cache = SoundpackCache::rebuild();
-                      soundpack_cache.set(new_cache);
-
-                      is_refreshing.set(false);
-                  }
-              },
-              RotateCcw {
-                  class: format!(
-                      "w-3.5 h-3.5 {} {}",
-                      effective_theme.text_secondary(),
-                      if is_refreshing() { "animate-spin" } else { "" }
-                  )
-              }
-              span {
-                  class: format!("font-medium {}", effective_theme.text_secondary()),
-                  if is_refreshing() {
-                      "Refreshing soundpacks..."
-                  } else {
-                      "Refresh soundpacks"
-                  }
               }
             }
           }
@@ -272,6 +239,37 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
               is_open.set(false);
               search_query.set(String::new());
           },
+        }
+      }
+      // Error display
+      if !error().is_empty() {
+        div { class: "text-sm text-red-400 mt-2", "{error}" }
+      }
+      // Refresh button
+      div { class: "",
+        button {
+          class: format!("btn btn-primary {}", if is_refreshing() { "select-none" } else { "" }),
+          title: "Refresh soundpack list from disk",
+          onclick: move |_| {
+              if !is_refreshing() {
+                  is_refreshing.set(true);
+                  error.set(String::new());
+                  let mut is_refreshing = is_refreshing.clone();
+                  let mut soundpack_cache = soundpack_cache.clone();
+                  spawn(async move {
+                      Delay::new(Duration::from_millis(5000)).await;
+                      let new_cache = SoundpackCache::rebuild();
+                      soundpack_cache.set(new_cache);
+                      is_refreshing.set(false);
+                  });
+              }
+          },
+          if is_refreshing() {
+            span { class: "loading loading-spinner" }
+          } else {
+            ""
+          }
+          "Refresh"
         }
       }
     }

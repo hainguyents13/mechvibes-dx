@@ -6,23 +6,19 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SoundpackItem {
-    pub id: String,
-    pub name: String,
-    pub author: String,
-    pub icon: Option<String>,
-    pub description: Option<String>,
+    // Just use the full SoundPack struct directly - no duplication
+    #[serde(flatten)]
+    pub soundpack: SoundPack,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SoundpackCache {
-    pub version: String,
     pub last_updated: DateTime<Utc>,
     pub soundpacks: Vec<SoundpackItem>,
 }
 
 impl SoundpackCache {
     const CACHE_FILE: &'static str = "./data/soundpacks.json";
-
     pub fn load() -> Self {
         // Ensure data directory exists
         if let Err(_) = fs::create_dir_all("./data") {
@@ -33,21 +29,12 @@ impl SoundpackCache {
         if let Ok(contents) = fs::read_to_string(cache_path) {
             match serde_json::from_str::<SoundpackCache>(&contents) {
                 Ok(cache) => {
-                    // Check if cache is still valid (less than 1 hour old or during development)
-                    let age = Utc::now().signed_duration_since(cache.last_updated);
-                    if age.num_hours() < 1 {
-                        println!(
-                            "📦 Loaded soundpack cache with {} soundpacks (age: {} minutes)",
-                            cache.soundpacks.len(),
-                            age.num_minutes()
-                        );
-                        return cache;
-                    } else {
-                        println!(
-                            "⏰ Soundpack cache expired (age: {} hours), rebuilding...",
-                            age.num_hours()
-                        );
-                    }
+                    println!(
+                        "📦 Loaded soundpack cache with {} soundpacks (last updated: {})",
+                        cache.soundpacks.len(),
+                        cache.last_updated.format("%Y-%m-%d %H:%M:%S")
+                    );
+                    return cache;
                 }
                 Err(e) => {
                     eprintln!(
@@ -56,6 +43,8 @@ impl SoundpackCache {
                     );
                 }
             }
+        } else {
+            println!("📦 No soundpack cache found, building initial cache...");
         }
 
         // Build new cache
@@ -64,10 +53,8 @@ impl SoundpackCache {
 
     pub fn rebuild() -> Self {
         println!("🔄 Rebuilding soundpack cache...");
-
         let soundpacks = Self::scan_soundpacks();
         let cache = Self {
-            version: env!("CARGO_PKG_VERSION").to_string(),
             last_updated: Utc::now(),
             soundpacks,
         };
@@ -81,7 +68,6 @@ impl SoundpackCache {
         );
         cache
     }
-
     fn scan_soundpacks() -> Vec<SoundpackItem> {
         std::fs::read_dir("./soundpacks")
             .map(|entries| {
@@ -94,13 +80,7 @@ impl SoundpackCache {
                                     std::fs::read_to_string(path.join("config.json"))
                                 {
                                     if let Ok(pack) = serde_json::from_str::<SoundPack>(&content) {
-                                        return Some(SoundpackItem {
-                                            id: pack.id,
-                                            name: pack.name,
-                                            author: pack.author,
-                                            icon: pack.icon,
-                                            description: pack.description,
-                                        });
+                                        return Some(SoundpackItem { soundpack: pack });
                                     }
                                 }
                             }
@@ -119,9 +99,14 @@ impl SoundpackCache {
             .map_err(|e| format!("Failed to write soundpack cache file: {}", e))?;
         Ok(())
     }
-
     pub fn get_soundpacks(&self) -> &Vec<SoundpackItem> {
         &self.soundpacks
+    }
+    pub fn get_soundpack_by_id(&self, id: &str) -> Option<&SoundPack> {
+        self.soundpacks
+            .iter()
+            .find(|item| item.soundpack.id == id)
+            .map(|item| &item.soundpack)
     }
 }
 

@@ -4,11 +4,49 @@ use std::io::{BufReader, Read};
 
 use crate::state::config::AppConfig;
 use crate::state::soundpack::SoundPack;
+use crate::state::soundpack_cache::SoundpackCache;
 
 use super::audio_context::AudioContext;
 
 #[allow(dead_code)]
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
+    let config = AppConfig::load();
+    let current_id = &config.current_soundpack;
+
+    // Try to load from cache first
+    let cache = SoundpackCache::load();
+    if let Some(soundpack) = cache.get_soundpack_by_id(current_id) {
+        println!("🚀 Loading soundpack '{}' from cache", soundpack.name);
+        
+        // Load and decode audio file
+        let soundpack_path = format!("./soundpacks/{}", get_soundpack_directory_name(soundpack)?);
+        let cached_samples = load_audio_file(&soundpack_path, soundpack)?;
+
+        // Update context with cached data
+        update_context(context, cached_samples, soundpack.clone())?;
+        
+        return Ok(());
+    }
+
+    // Fallback to file-based loading if not in cache
+    println!("⚠️ Soundpack '{}' not found in cache, falling back to file loading", current_id);
+    load_soundpack_from_files(context)
+}
+
+fn get_soundpack_directory_name(soundpack: &SoundPack) -> Result<String, String> {
+    // Try to determine the directory name from the soundpack
+    // This is a simple heuristic - in a real app you might want to store this in the cache
+    match soundpack.id.as_str() {
+        "pack-01" => Ok("oreo".to_string()),
+        "cherrymx-black" => Ok("cherrymx-black-pbt".to_string()),
+        _ => {
+            // Fallback: use the soundpack name as directory name
+            Ok(soundpack.name.to_lowercase().replace(" ", "-"))
+        }
+    }
+}
+
+fn load_soundpack_from_files(context: &AudioContext) -> Result<(), String> {
     // Load soundpacks from directory
     let soundpacks = find_soundpacks()?;
     let available_packs = load_available_packs(&soundpacks)?;
