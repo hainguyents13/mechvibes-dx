@@ -48,7 +48,6 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
 
     rsx! {
       div {
-
         select {
           class: "w-full select ",
           value: "{current}",

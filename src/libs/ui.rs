@@ -5,17 +5,16 @@ use crate::components::volume_slider::VolumeSlider;
 use crate::libs::keyboard::start_keyboard_listener;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
-use crate::KeyboardChannel;
 use dioxus::prelude::*;
-use dioxus::prelude::{use_effect, use_future, use_hook, use_signal};
-use dioxus_radio::prelude::*;
 use std::sync::mpsc;
 use std::sync::Arc;
 
 pub fn app() -> Element {
-    // Set up the global keyboard state management
-    use_init_radio_station::<KeyboardState, KeyboardChannel>(|| KeyboardState::new());
-    let radio = use_radio::<KeyboardState, KeyboardChannel>(KeyboardChannel::Main);
+    // Create global keyboard state using signals
+    let keyboard_state = use_signal(|| KeyboardState::new());
+
+    // Provide the keyboard state context to all child components
+    use_context_provider(|| keyboard_state);
 
     // Initialize the audio system for mechvibes sounds
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
@@ -39,12 +38,11 @@ pub fn app() -> Element {
     {
         let ctx = audio_context.clone();
         let rx = rx.clone();
-        let radio = radio.clone();
+        let mut keyboard_state = keyboard_state;
 
         use_future(move || {
             let ctx = ctx.clone();
             let rx = rx.clone();
-            let mut radio = radio;
 
             async move {
                 loop {
@@ -55,10 +53,10 @@ pub fn app() -> Element {
                             ctx.play_key_event_sound(key, false);
 
                             // Update keyboard state - key released
-                            radio.write().key_pressed = false;
+                            keyboard_state.write().key_pressed = false;
                         } else if !keycode.is_empty() {
                             ctx.play_key_event_sound(&keycode, true); // Update keyboard state - key pressed
-                            let mut state = radio.write();
+                            let mut state = keyboard_state.write();
                             state.key_pressed = true;
                             state.last_key = keycode.clone();
                         }

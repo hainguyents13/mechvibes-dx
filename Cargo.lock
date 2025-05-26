@@ -1334,17 +1334,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dioxus-radio"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20be50737ae4d15bb73c0dbda847f2e78cc5fe1491f7a127c3dc841c0e450f2c"
-dependencies = [
- "dioxus-lib",
- "generational-box",
- "warnings",
-]
-
-[[package]]
 name = "dioxus-router"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2947,7 +2936,6 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "dioxus-desktop",
- "dioxus-radio",
  "env_logger",
  "futures-timer",
  "lucide-dioxus",

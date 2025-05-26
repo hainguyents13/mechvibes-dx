@@ -4,19 +4,8 @@ mod components;
 mod libs;
 mod state;
 pub use crate::components::header::app as TailwindStylesheet;
-use crate::state::keyboard::KeyboardState;
 use dioxus::prelude::*;
-use dioxus_radio::prelude::*;
 use libs::ui;
-
-// Định nghĩa kênh radio để các component có thể lắng nghe sự kiện
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum KeyboardChannel {
-    Main,
-}
-
-// Triển khai RadioChannel cho KeyboardState
-impl RadioChannel<KeyboardState> for KeyboardChannel {}
 
 fn main() {
     env_logger::init();
