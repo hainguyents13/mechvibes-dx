@@ -1,11 +1,11 @@
 {
   "version": "0.1.0",
-  "last_updated": "2025-05-27T15:59:15.753190300Z",
+  "last_updated": "2025-05-27T16:06:05.019926800Z",
   "commit": null,
   "current_soundpack": "pack-01",
   "volume": 0.55,
   "enable_sound": true,
-  "theme": "Dark",
+  "theme": "Light",
   "auto_start": true,
   "show_notifications": true
 }

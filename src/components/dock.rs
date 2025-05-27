@@ -27,11 +27,11 @@ pub fn Dock() -> Element {
           Sparkles { class: "w-5 h-5" }
           span { class: "dock-label mt-1", "Effects" }
         }
-        // Button Soundpacks
+        // Button Themes
         button {
-          class: if matches!(route, crate::libs::routes::Route::Soundpacks {}) { "dock-active" } else { "" },
+          class: if matches!(route, crate::libs::routes::Route::Themes {}) { "dock-active" } else { "" },
           onclick: move |_| {
-              nav.push("/soundpacks");
+              nav.push("/themes");
           },
           Palette { class: "w-5 h-5" }
           span { class: "dock-label mt-1", "Themes" }

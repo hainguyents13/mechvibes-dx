@@ -23,6 +23,8 @@ fn main() {
         .with_always_on_top(true)
         .with_position(LogicalPosition::new(1700.0, 300.0))
         .with_inner_size(LogicalSize::new(500.0, 800.0))
+        .with_fullscreen(None)
+        .with_decorations(false)
         .with_resizable(false);
 
     // Create config with our window settings

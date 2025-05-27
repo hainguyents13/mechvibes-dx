@@ -56,8 +56,7 @@ pub fn SettingsPage() -> Element {
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Customize" }
             div { class: "collapse-content text-sm",
-              div { class: "space-y-6",
-                // Theme Settings
+              div { class: "space-y-6", // Theme Settings
                 div { class: "form-control",
                   label { class: "label",
                     span { class: "label-text text-base", "Theme" }
@@ -67,52 +66,8 @@ pub fn SettingsPage() -> Element {
                       "Choose your preferred color scheme"
                     }
                   }
-                  div { class: "btn-group btn-group-horizontal w-full mt-2",
-                    button {
-                      class: if matches!(*theme.read(), Theme::Dark) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: {
-                          let update_config = update_config.clone();
-                          move |_| {
-                              theme.set(Theme::Dark);
-                              update_config(
-                                  Box::new(|config| {
-                                      config.theme = Theme::Dark;
-                                  }),
-                              );
-                          }
-                      },
-                      "🌙 Dark"
-                    }
-                    button {
-                      class: if matches!(*theme.read(), Theme::Light) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: {
-                          let update_config = update_config.clone();
-                          move |_| {
-                              theme.set(Theme::Light);
-                              update_config(
-                                  Box::new(|config| {
-                                      config.theme = Theme::Light;
-                                  }),
-                              );
-                          }
-                      },
-                      "☀️ Light"
-                    }
-                    button {
-                      class: if matches!(*theme.read(), Theme::System) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: {
-                          let update_config = update_config.clone();
-                          move |_| {
-                              theme.set(Theme::System);
-                              update_config(
-                                  Box::new(|config| {
-                                      config.theme = Theme::System;
-                                  }),
-                              );
-                          }
-                      },
-                      "🖥️ System"
-                    }
+                  div { class: "mt-2",
+                    crate::components::theme_toggler::ThemeToggler {}
                   }
                 }
                 // Auto Start
