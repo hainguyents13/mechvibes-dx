@@ -8,7 +8,7 @@ pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
     rsx! {
-      div { class: "dock",
+      div { class: "dock dock-lg",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },

@@ -3,9 +3,17 @@ use rodio::Sink;
 use std::collections::HashMap;
 
 use super::audio_context::AudioContext;
+use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
+        // Kiểm tra enable_sound từ config trước khi phát âm thanh
+        let config = AppConfig::load();
+        if !config.enable_sound {
+            println!("🔕 Sound disabled in config, skipping key event: '{}'", key);
+            return;
+        }
+
         println!(
             "🔍 Handling key event: '{}' ({})",
             key,

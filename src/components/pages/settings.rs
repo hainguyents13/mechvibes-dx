@@ -21,12 +21,10 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
     // Initialize theme from config on first load
     use_effect(move || {
         theme.set(config().theme.clone());
-    });
-
-    // Update audio system volume
+    }); // Update audio system volume (only when volume changes, enable_sound is handled by sound_manager)
     let ctx = audio_ctx.clone();
     use_effect(move || {
-        ctx.set_volume(if enable_sound() { volume() } else { 0.0 });
+        ctx.set_volume(volume());
     });
     rsx! {
       div { class: "container mx-auto p-8 mb-16",
@@ -190,10 +188,7 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
           }
           // App Info Section as DaisyUI collapse
           div { class: "collapse collapse-arrow bg-base-100 border border-primary",
-            input {
-              r#type: "checkbox",
-              name: "setting-accordion-appinfo",
-            }
+            input { r#type: "checkbox", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "App Info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}

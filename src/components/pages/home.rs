@@ -7,17 +7,13 @@ use dioxus::prelude::*;
 use std::sync::Arc;
 
 #[component]
-pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
-    // Use shared config hook
+pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {    // Use shared config hook
     let (config, update_config) = use_config();
     // Volume state from config
-    let mut volume = use_signal(|| config().volume);
-    let enable_sound = use_signal(|| config().enable_sound);
-
-    // Update audio system volume when the volume control changes
+    let mut volume = use_signal(|| config().volume);// Update audio system volume when the volume control changes (enable_sound is handled by sound_manager)
     let ctx = audio_ctx.clone();
     use_effect(move || {
-        ctx.set_volume(if enable_sound() { volume() } else { 0.0 });
+        ctx.set_volume(volume());
     });
 
     rsx! {
@@ -30,18 +26,20 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         // Soundpack selector
         SoundpackSelector { audio_ctx: audio_ctx.clone() }
         // divider
-        div { class: "divider" }        // Volume control slider
+        div { class: "divider" } // Volume control slider
         VolumeSlider {
-            volume,
-            on_change: move |new_volume: f32| {
-                volume.set(new_volume);
-                update_config(Box::new(move |config| {
-                    config.volume = new_volume;
-                }));
-            }
+          volume,
+          on_change: move |new_volume: f32| {
+              volume.set(new_volume);
+              update_config(
+                  Box::new(move |config| {
+                      config.volume = new_volume;
+                  }),
+              );
+          },
         }
         // divider
-        div { class: "divider" }        // Version
+        div { class: "divider" } // Version
         div { class: "text-sm text-base-content font-bold", "MechvibesDX (Beta)" }
         // Footer with credits
         div { class: "text-sm text-base-content/70 mt-4",
