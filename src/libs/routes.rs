@@ -24,17 +24,17 @@ pub fn Layout() -> Element {
     });
 
     // Convert theme to DaisyUI theme name
-    let daisy_theme = theme().to_daisy_theme();
+    let daisy_theme = match theme() {
+        crate::libs::theme::Theme::Dark => "dark",
+        crate::libs::theme::Theme::Light => "light",
+        crate::libs::theme::Theme::System => "light", // Default to light for now
+    };
 
     rsx! {
-      div {
-        class: "h-screen flex flex-col",
-        "data-theme": daisy_theme,
+      div { class: "h-screen flex flex-col", "data-theme": daisy_theme,
 
-        div { class: "container mx-auto py-16 flex flex-col h-full",
-          // Main content area
-          Outlet::<Route> {}
-        }
+        // Main content area
+        Outlet::<Route> {}
 
         // Dock at the bottom
         crate::components::dock::Dock {}

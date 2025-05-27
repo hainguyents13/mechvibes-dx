@@ -70,8 +70,8 @@ pub fn app() -> Element {
             }
         });
     }
-
     rsx! {
+      // Main application Router
       Router::<Route> {}
     }
 }

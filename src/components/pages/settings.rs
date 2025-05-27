@@ -13,14 +13,15 @@ pub fn SettingsPage() -> Element {
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
     rsx! {
-      div { class: "px-12",        // Page header
+      div { class: "p-12 pb-32",
+        // Page header
         div { class: "text-center mb-8",
           h1 { class: "text-4xl font-bold mb-4 text-base-content", "Settings" }
-          p { class: "text-lg opacity-70 text-base-content", "Customize your Mechvibes DX experience." }
+          p { class: "text-lg text-base-content", "Customize your Mechvibes DX experience." }
         }
         // Settings sections
         div { class: "space-y-4",
-          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
+          div { class: "collapse collapse-arrow border text-base-content",
             input {
               r#type: "radio",
               name: "setting-accordion",
@@ -51,7 +52,7 @@ pub fn SettingsPage() -> Element {
               }
             }
           }
-          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
+          div { class: "collapse collapse-arrow border text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Customize" }
             div { class: "collapse-content text-sm",
@@ -62,7 +63,7 @@ pub fn SettingsPage() -> Element {
                     span { class: "label-text text-base", "Theme" }
                   }
                   div { class: "label",
-                    span { class: "label-text-alt opacity-70",
+                    span { class: "label-text-alt",
                       "Choose your preferred color scheme"
                     }
                   }
@@ -119,7 +120,7 @@ pub fn SettingsPage() -> Element {
                   label { class: "label cursor-pointer",
                     div {
                       div { class: "label-text text-sm", "Start with Windows" }
-                      div { class: "label-text-alt text-xs opacity-70 truncate",
+                      div { class: "label-text-alt text-xs truncate",
                         "Automatically start Mechvibes DX when Windows boots"
                       }
                     }
@@ -146,7 +147,7 @@ pub fn SettingsPage() -> Element {
                   label { class: "label cursor-pointer",
                     div {
                       div { class: "label-text text-base", "Show Notifications" }
-                      div { class: "label-text-alt opacity-70",
+                      div { class: "label-text-alt",
                         "Display system notifications for important events"
                       }
                     }
@@ -171,18 +172,18 @@ pub fn SettingsPage() -> Element {
               }
             }
           } // App Info Section as DaisyUI collapse
-          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
+          div { class: "collapse collapse-arrow border bg-base-300 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "App Info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}
             }
           }
-          div { class: "collapse collapse-arrow border border-base-300 text-error-content",
+          div { class: "collapse collapse-arrow border bg-base-300 text-error",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Danger zone" }
             div { class: "collapse-content text-sm",
-              p { class: "opacity-80 mb-4",
+              p { class: "mb-4",
                 "Reset all settings to their default values. This action cannot be undone."
               }
               div { class: " justify-start",

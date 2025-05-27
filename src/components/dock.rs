@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::{navigator, use_route};
-use lucide_dioxus::{House, Music, Palette, Settings, Sparkles};
+use lucide_dioxus::{House, Palette, Settings, Sparkles};
 
 #[allow(non_snake_case)]
 #[component]
@@ -8,7 +8,7 @@ pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
     rsx! {
-      div { class: "dock dock-xl bg-base-200 border-top border-gray-300",
+      div { class: "dock dock-xl bg-base-200",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },

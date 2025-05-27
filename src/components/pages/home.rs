@@ -18,7 +18,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     });
 
     rsx! {
-      div { class: "flex flex-col gap-10 px-16",
+      div { class: "flex flex-col gap-10 p-16",
         div { class: "mb-2",
           // Mechvibes logo with animated press effect
           Logo {}
