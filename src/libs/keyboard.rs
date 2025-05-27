@@ -2,26 +2,119 @@ use rdev::{listen, Event, EventType, Key};
 use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
+
+/// Make a static table of key codes for optimized lookups
+static KEY_CODE_MAP: Lazy<HashMap<Key, &'static str>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+
+    // Common keys across all platforms
+    map.insert(Key::Space, "Space");
+    map.insert(Key::Backspace, "Backspace");
+    map.insert(Key::CapsLock, "CapsLock");
+    map.insert(Key::Tab, "Tab");
+    map.insert(Key::Return, "Enter");
+    map.insert(Key::Escape, "Escape");
+    map.insert(Key::Delete, "Delete");
+
+    // Modifier keys with left/right variants
+    map.insert(Key::Alt, "AltLeft");
+    map.insert(Key::AltGr, "AltRight");
+    map.insert(Key::ShiftLeft, "ShiftLeft");
+    map.insert(Key::ShiftRight, "ShiftRight");
+    map.insert(Key::ControlLeft, "ControlLeft");
+    map.insert(Key::ControlRight, "ControlRight");
+
+    // Platform-specific meta keys handled in function due to conditional logic
+
+    // Arrow keys
+    map.insert(Key::UpArrow, "ArrowUp");
+    map.insert(Key::DownArrow, "ArrowDown");
+    map.insert(Key::LeftArrow, "ArrowLeft");
+    map.insert(Key::RightArrow, "ArrowRight");
+
+    // Navigation keys
+    map.insert(Key::Home, "Home");
+    map.insert(Key::End, "End");
+    map.insert(Key::PageUp, "PageUp");
+    map.insert(Key::PageDown, "PageDown");
+
+    // Function keys
+    map.insert(Key::F1, "F1");
+    map.insert(Key::F2, "F2");
+    map.insert(Key::F3, "F3");
+    map.insert(Key::F4, "F4");
+    map.insert(Key::F5, "F5");
+    map.insert(Key::F6, "F6");
+    map.insert(Key::F7, "F7");
+    map.insert(Key::F8, "F8");
+    map.insert(Key::F9, "F9");
+    map.insert(Key::F10, "F10");
+    map.insert(Key::F11, "F11");
+    map.insert(Key::F12, "F12");
+
+    // Alpha keys A-Z
+    map.insert(Key::KeyA, "KeyA");
+    map.insert(Key::KeyB, "KeyB");
+    map.insert(Key::KeyC, "KeyC");
+    map.insert(Key::KeyD, "KeyD");
+    map.insert(Key::KeyE, "KeyE");
+    map.insert(Key::KeyF, "KeyF");
+    map.insert(Key::KeyG, "KeyG");
+    map.insert(Key::KeyH, "KeyH");
+    map.insert(Key::KeyI, "KeyI");
+    map.insert(Key::KeyJ, "KeyJ");
+    map.insert(Key::KeyK, "KeyK");
+    map.insert(Key::KeyL, "KeyL");
+    map.insert(Key::KeyM, "KeyM");
+    map.insert(Key::KeyN, "KeyN");
+    map.insert(Key::KeyO, "KeyO");
+    map.insert(Key::KeyP, "KeyP");
+    map.insert(Key::KeyQ, "KeyQ");
+    map.insert(Key::KeyR, "KeyR");
+    map.insert(Key::KeyS, "KeyS");
+    map.insert(Key::KeyT, "KeyT");
+    map.insert(Key::KeyU, "KeyU");
+    map.insert(Key::KeyV, "KeyV");
+    map.insert(Key::KeyW, "KeyW");
+    map.insert(Key::KeyX, "KeyX");
+    map.insert(Key::KeyY, "KeyY");
+    map.insert(Key::KeyZ, "KeyZ");
+
+    // Number keys
+    map.insert(Key::Num0, "Digit0");
+    map.insert(Key::Num1, "Digit1");
+    map.insert(Key::Num2, "Digit2");
+    map.insert(Key::Num3, "Digit3");
+    map.insert(Key::Num4, "Digit4");
+    map.insert(Key::Num5, "Digit5");
+    map.insert(Key::Num6, "Digit6");
+    map.insert(Key::Num7, "Digit7");
+    map.insert(Key::Num8, "Digit8");
+    map.insert(Key::Num9, "Digit9");
+
+    // Special characters and punctuation
+    map.insert(Key::BackQuote, "Backquote");
+    map.insert(Key::Minus, "Minus");
+    map.insert(Key::Equal, "Equal");
+    map.insert(Key::Quote, "Quote");
+    map.insert(Key::Comma, "Comma");
+    map.insert(Key::Slash, "Slash");
+
+    map
+});
 
 /// Maps a keyboard key to its standardized code across different platforms
 fn map_key_to_code(key: Key) -> &'static str {
-    let code = match key {
-        // Common keys across all platforms
-        Key::Space => "Space",
-        Key::Backspace => "Backspace",
-        Key::CapsLock => "CapsLock",
-        Key::Tab => "Tab",
-        Key::Return => "Enter",
-        Key::Escape => "Escape",
-        Key::Delete => "Delete",
+    // Check static map first for most common keys
+    if let Some(&code) = KEY_CODE_MAP.get(&key) {
+        println!("🔍 Mapping key {:?} to code '{}'", key, code);
+        return code;
+    }
 
-        // Modifier keys with left/right variants
-        Key::Alt => "AltLeft",
-        Key::AltGr => "AltRight",
-        Key::ShiftLeft => "ShiftLeft",
-        Key::ShiftRight => "ShiftRight",
-        Key::ControlLeft => "ControlLeft",
-        Key::ControlRight => "ControlRight",
+    // Handle platform-specific meta keys that need conditional logic
+    let code = match key {
         Key::MetaLeft => {
             if cfg!(target_os = "macos") {
                 "MetaLeft"
@@ -36,97 +129,10 @@ fn map_key_to_code(key: Key) -> &'static str {
                 "OSRight"
             }
         }
-
-        // Arrow keys
-        Key::UpArrow => "ArrowUp",
-        Key::DownArrow => "ArrowDown",
-        Key::LeftArrow => "ArrowLeft",
-        Key::RightArrow => "ArrowRight",
-
-        // Navigation keys
-        Key::Home => "Home",
-        Key::End => "End",
-        Key::PageUp => "PageUp",
-        Key::PageDown => "PageDown",
-
-        // Function keys
-        Key::F1 => "F1",
-        Key::F2 => "F2",
-        Key::F3 => "F3",
-        Key::F4 => "F4",
-        Key::F5 => "F5",
-        Key::F6 => "F6",
-        Key::F7 => "F7",
-        Key::F8 => "F8",
-        Key::F9 => "F9",
-        Key::F10 => "F10",
-        Key::F11 => "F11",
-        Key::F12 => "F12",
-
-        // Alpha keys A-Z
-        Key::KeyA => "KeyA",
-        Key::KeyB => "KeyB",
-        Key::KeyC => "KeyC",
-        Key::KeyD => "KeyD",
-        Key::KeyE => "KeyE",
-        Key::KeyF => "KeyF",
-        Key::KeyG => "KeyG",
-        Key::KeyH => "KeyH",
-        Key::KeyI => "KeyI",
-        Key::KeyJ => "KeyJ",
-        Key::KeyK => "KeyK",
-        Key::KeyL => "KeyL",
-        Key::KeyM => "KeyM",
-        Key::KeyN => "KeyN",
-        Key::KeyO => "KeyO",
-        Key::KeyP => "KeyP",
-        Key::KeyQ => "KeyQ",
-        Key::KeyR => "KeyR",
-        Key::KeyS => "KeyS",
-        Key::KeyT => "KeyT",
-        Key::KeyU => "KeyU",
-        Key::KeyV => "KeyV",
-        Key::KeyW => "KeyW",
-        Key::KeyX => "KeyX",
-        Key::KeyY => "KeyY",
-        Key::KeyZ => "KeyZ",
-
-        // Number keys
-        Key::Num0 => "Digit0",
-        Key::Num1 => "Digit1",
-        Key::Num2 => "Digit2",
-        Key::Num3 => "Digit3",
-        Key::Num4 => "Digit4",
-        Key::Num5 => "Digit5",
-        Key::Num6 => "Digit6",
-        Key::Num7 => "Digit7",
-        Key::Num8 => "Digit8",
-        Key::Num9 => "Digit9", // Special characters and punctuation
-        // These can vary by keyboard layout
-        Key::BackQuote => "Backquote", // `
-        Key::Minus => "Minus",         // -
-        Key::Equal => "Equal",         // =
-        Key::Quote => "Quote",         // '
-        Key::Comma => "Comma",         // ,
-        Key::Slash => "Slash",         // /
-
-        // Reserved for future rdev updates
-        /*
-        Key::BracketLeft => "BracketLeft", // [
-        Key::BracketRight => "BracketRight", // ]
-        Key::Backslash => "Backslash", // \
-        Key::Semicolon => "Semicolon", // ;
-        Key::Period => "Period", // .
-        Key::MediaVolumeDown => "AudioVolumeDown",
-        Key::MediaVolumeUp => "AudioVolumeUp",
-        Key::MediaVolumeMute => "AudioVolumeMute",
-        Key::MediaPlayPause => "MediaPlayPause",
-        Key::MediaPreviousTrack => "MediaTrackPrevious",
-        Key::MediaNextTrack => "MediaTrackNext",
-        */
         // Unknown or unmapped keys
         _ => "",
     };
+
     println!("🔍 Mapping key {:?} to code '{}'", key, code);
     code
 }
