@@ -1,5 +1,3 @@
-use std::alloc::System;
-
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::config::AppConfig;
 use crate::state::config_utils::use_config;
