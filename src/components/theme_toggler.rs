@@ -12,9 +12,9 @@ pub fn ThemeToggler() -> Element {
     let mut theme = use_theme();
 
     rsx! {
-      div { class: "btn-group btn-group-horizontal w-full",
+      div { class: "flex items-center justify-between gap-2 w-full",
         button {
-          class: if matches!(*theme.read(), Theme::Dark) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
+          class: if matches!(*theme.read(), Theme::Dark) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
           onclick: {
               let update_fn = update_config.clone();
               move |_| {
@@ -29,7 +29,7 @@ pub fn ThemeToggler() -> Element {
           "🌙 Dark"
         }
         button {
-          class: if matches!(*theme.read(), Theme::Light) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
+          class: if matches!(*theme.read(), Theme::Light) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
           onclick: {
               let update_fn = update_config.clone();
               move |_| {
@@ -44,7 +44,7 @@ pub fn ThemeToggler() -> Element {
           "☀️ Light"
         }
         button {
-          class: if matches!(*theme.read(), Theme::System) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
+          class: if matches!(*theme.read(), Theme::System) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
           onclick: {
               let update_fn = update_config.clone();
               move |_| {

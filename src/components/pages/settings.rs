@@ -30,103 +30,101 @@ pub fn SettingsPage() -> Element {
             div { class: "collapse-title font-semibold", "General" }
             div { class: "collapse-content text-sm",
               div { class: "form-control",
-                label { class: "label cursor-pointer",
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-base-100",
-                    checked: enable_sound(),
-                    onchange: {
-                        let update_config = update_config.clone();
-                        move |evt: Event<FormData>| {
-                            enable_sound.set(evt.value() == "true");
-                            update_config(
-                                Box::new(move |config| {
-                                    config.enable_sound = evt.value() == "true";
-                                }),
-                            );
-                        }
-                    },
+                div { class: "space-y-6",
+                  // Theme Settings
+                  div { class: "form-control",
+                    div { class: "label",
+                      span { class: "label-text text-base", "Theme" }
+                    }
+                    div { class: "mt-2",
+                      crate::components::theme_toggler::ThemeToggler {}
+                    }
                   }
-                  span { class: "label-text text-base", "Enable all sounds" }
+                  label { class: "label cursor-pointer flex items-center justify-between",
+                    div {
+                      div { class: "label-text text-base", "Enable all sounds" }
+                      div { class: "label-text-alt text-xs truncate",
+                        "Turn all keyboard sounds on or off"
+                      }
+                    }
+                    input {
+                      r#type: "checkbox",
+                      class: "toggle toggle-sm toggle-base-100",
+                      checked: enable_sound(),
+                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              enable_sound.set(evt.value() == "true");
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.enable_sound = evt.value() == "true";
+                                  }),
+                              );
+                          }
+                      },
+                    }
+                  }
+                  // Auto Start
+                  div { class: "form-control",
+                    label { class: "label cursor-pointer flex items-center justify-between",
+                      div {
+                        div { class: "label-text text-sm", "Start with Windows" }
+                        div { class: "label-text-alt text-xs truncate",
+                          "Automatically start Mechvibes DX when Windows boots"
+                        }
+                      }
+                      input {
+                        r#type: "checkbox",
+                        class: "toggle toggle-sm toggle-base-100",
+                        checked: auto_start(),
+                        onchange: {
+                            let update_config = update_config.clone();
+                            move |evt: Event<FormData>| {
+                                auto_start.set(evt.value() == "true");
+                                update_config(
+                                    Box::new(move |config| {
+                                        config.auto_start = evt.value() == "true";
+                                    }),
+                                );
+                            }
+                        },
+                      }
+                    }
+                  }
+                  // Notifications
+                  div { class: "form-control",
+                    label { class: "label cursor-pointer flex items-center justify-between",
+                      div {
+                        div { class: "label-text text-base",
+                          "Show Notifications"
+                        }
+                        div { class: "label-text-alt",
+                          "Display system notifications for important events"
+                        }
+                      }
+                      input {
+                        r#type: "checkbox",
+                        class: "toggle toggle-sm toggle-base-100",
+                        checked: show_notifications(),
+                        onchange: {
+                            let update_config = update_config.clone();
+                            move |evt: Event<FormData>| {
+                                show_notifications.set(evt.value() == "true");
+                                update_config(
+                                    Box::new(move |config| {
+                                        config.show_notifications = evt.value() == "true";
+                                    }),
+                                );
+                            }
+                        },
+                      }
+                    }
+                  }
                 }
               }
             }
           }
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "Customize" }
-            div { class: "collapse-content text-sm",
-              div { class: "space-y-6", // Theme Settings
-                div { class: "form-control",
-                  label { class: "label",
-                    span { class: "label-text text-base", "Theme" }
-                  }
-                  div { class: "label",
-                    span { class: "label-text-alt",
-                      "Choose your preferred color scheme"
-                    }
-                  }
-                  div { class: "mt-2",
-                    crate::components::theme_toggler::ThemeToggler {}
-                  }
-                }
-                // Auto Start
-                div { class: "form-control",
-                  label { class: "label cursor-pointer",
-                    div {
-                      div { class: "label-text text-sm", "Start with Windows" }
-                      div { class: "label-text-alt text-xs truncate",
-                        "Automatically start Mechvibes DX when Windows boots"
-                      }
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-primary",
-                      checked: auto_start(),
-                      onchange: {
-                          let update_config = update_config.clone();
-                          move |evt: Event<FormData>| {
-                              auto_start.set(evt.value() == "true");
-                              update_config(
-                                  Box::new(move |config| {
-                                      config.auto_start = evt.value() == "true";
-                                  }),
-                              );
-                          }
-                      },
-                    }
-                  }
-                }
-                // Notifications
-                div { class: "form-control",
-                  label { class: "label cursor-pointer",
-                    div {
-                      div { class: "label-text text-base", "Show Notifications" }
-                      div { class: "label-text-alt",
-                        "Display system notifications for important events"
-                      }
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-primary",
-                      checked: show_notifications(),
-                      onchange: {
-                          let update_config = update_config.clone();
-                          move |evt: Event<FormData>| {
-                              show_notifications.set(evt.value() == "true");
-                              update_config(
-                                  Box::new(move |config| {
-                                      config.show_notifications = evt.value() == "true";
-                                  }),
-                              );
-                          }
-                      },
-                    }
-                  }
-                }
-              }
-            }
-          } // App Info Section as DaisyUI collapse
+          // App Info Section as DaisyUI collapse
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "App Info" }
