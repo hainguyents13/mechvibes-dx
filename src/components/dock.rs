@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::{navigator, use_route};
-use lucide_dioxus::{House, Music, Settings};
+use lucide_dioxus::{House, Music, Palette, Settings, Sparkles};
 
 #[allow(non_snake_case)]
 #[component]
@@ -8,7 +8,7 @@ pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
     rsx! {
-      div { class: "dock dock-lg",
+      div { class: "dock dock-xl bg-base-200 border-top border-gray-300",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },
@@ -16,7 +16,7 @@ pub fn Dock() -> Element {
               nav.push("/");
           },
           House { class: "w-5 h-5" }
-          span { class: "dock-label", "Home" }
+          span { class: "dock-label mt-1", "Home" }
         }
         // Button Soundpacks
         button {
@@ -24,8 +24,17 @@ pub fn Dock() -> Element {
           onclick: move |_| {
               nav.push("/soundpacks");
           },
-          Music { class: "w-5 h-5" }
-          span { class: "dock-label", "Soundpacks" }
+          Sparkles { class: "w-5 h-5" }
+          span { class: "dock-label mt-1", "Effects" }
+        }
+        // Button Soundpacks
+        button {
+          class: if matches!(route, crate::libs::routes::Route::Soundpacks {}) { "dock-active" } else { "" },
+          onclick: move |_| {
+              nav.push("/soundpacks");
+          },
+          Palette { class: "w-5 h-5" }
+          span { class: "dock-label mt-1", "Themes" }
         }
         // Button Settings
         button {
@@ -34,7 +43,7 @@ pub fn Dock() -> Element {
               nav.push("/settings");
           },
           Settings { class: "w-5 h-5" }
-          span { class: "dock-label", "Settings" }
+          span { class: "dock-label mt-1", "Settings" }
         }
       }
     }

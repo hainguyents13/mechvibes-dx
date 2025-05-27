@@ -134,7 +134,8 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                       class: format!(
                           "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16 {}",
                           if pack.soundpack.id == current() { " btn-disabled" } else { "" },
-                      ),                      onclick: {
+                      ),
+                      onclick: {
                           let pack_id = pack.soundpack.id.clone();
                           let mut error = error.clone();
                           let soundpacks = soundpacks.clone();
@@ -143,20 +144,20 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                           let audio_ctx = props.audio_ctx.clone();
                           let update_config = update_config.clone();
                           move |_| {
+                              is_open.set(false);
                               error.set(String::new());
                               if let Some(pack_item) = soundpacks()
                                   .iter()
                                   .find(|p| p.soundpack.id == pack_id)
                               {
-                                  // Update config using shared utility
                                   let pack_id_clone = pack_id.clone();
-                                  update_config(Box::new(move |config| {
-                                      config.current_soundpack = pack_id_clone;
-                                  }));
-
+                                  update_config(
+                                      Box::new(move |config| {
+                                          config.current_soundpack = pack_id_clone;
+                                      }),
+                                  );
                                   match crate::libs::audio::load_soundpack(&audio_ctx) {
                                       Ok(_) => {
-                                          is_open.set(false);
                                           search_query.set(String::new());
                                           println!(
                                               "✅ Soundpack changed to: {} (loaded from cache)",

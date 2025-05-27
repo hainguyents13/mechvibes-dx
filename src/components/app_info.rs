@@ -4,9 +4,6 @@ use std::path::Path;
 
 #[component]
 pub fn AppInfoDisplay() -> Element {
-    use crate::libs::theme::use_effective_theme;
-    let effective_theme = use_effective_theme();
-
     // Get current executable path
     let exe_path = env::current_exe()
         .map(|p| p.to_string_lossy().to_string())
@@ -41,91 +38,69 @@ pub fn AppInfoDisplay() -> Element {
     let arch = env::consts::ARCH;
 
     rsx! {
-      div {
-        class: format!(
-            "mt-2 {} {} p-4 rounded-lg text-xs font-mono max-w-lg {}",
-            effective_theme.bg_secondary(),
-            effective_theme.text_primary(),
-            effective_theme.border(),
-        ),
+      div { class: "mt-2 bg-base-200 text-base-content p-4 rounded-lg text-xs font-mono max-w-lg border border-base-300",
         div { class: "mb-3",
-          h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()),
-            "📍 Application Paths"
-          }
+          h3 { class: "text-base-content font-bold mb-2", "📍 Application Paths" }
           div { class: "mb-1",
-            span { class: effective_theme.text_secondary(), "Executable: " }
-            span { class: format!("{} break-all", effective_theme.text_primary()),
-              "{exe_path}"
-            }
+            span { class: "text-base-content/70", "Executable: " }
+            span { class: "text-base-content break-all", "{exe_path}" }
           }
           div {
-            span { class: effective_theme.text_secondary(), "Working Dir: " }
-            span { class: format!("{} break-all", effective_theme.text_primary()),
-              "{current_dir}"
-            }
+            span { class: "text-base-content/70", "Working Dir: " }
+            span { class: "text-base-content break-all", "{current_dir}" }
           }
         }
         div { class: "mb-3",
-          h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()),
-            "📁 File System Status"
-          }
+          h3 { class: "text-base-content font-bold mb-2", "📁 File System Status" }
           div { class: "space-y-1",
             div {
-              span { class: if data_dir_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
+              span { class: if data_dir_exists { "text-base-content" } else { "text-error" },
                 if data_dir_exists {
                   "✅"
                 } else {
                   "❌"
                 }
               }
-              span { class: format!("ml-2 {}", effective_theme.text_secondary()),
-                "./data directory"
-              }
+              span { class: "ml-2 text-base-content/70", "./data directory" }
             }
             div {
-              span { class: if config_file_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
+              span { class: if config_file_exists { "text-base-content" } else { "text-error" },
                 if config_file_exists {
                   "✅"
                 } else {
                   "❌"
                 }
               }
-              span { class: format!("ml-2 {}", effective_theme.text_secondary()),
-                "./data/config.json"
-              }
+              span { class: "ml-2 text-base-content/70", "./data/config.json" }
             }
             div {
-              span { class: if soundpacks_dir_exists { format!("{}", effective_theme.text_primary()) } else { "text-red-400" },
+              span { class: if soundpacks_dir_exists { "text-base-content" } else { "text-error" },
                 if soundpacks_dir_exists {
                   "✅"
                 } else {
                   "❌"
                 }
               }
-              span { class: format!("ml-2 {}", effective_theme.text_secondary()),
-                "./soundpacks directory"
-              }
+              span { class: "ml-2 text-base-content/70", "./soundpacks directory" }
             }
             div {
-              span { class: effective_theme.text_primary(), "🎵" }
-              span { class: format!("ml-2 {}", effective_theme.text_secondary()),
+              span { class: "text-base-content", "🎵" }
+              span { class: "ml-2 text-base-content/70",
                 "Found {soundpack_count} soundpack(s)"
               }
             }
           }
         }
         div {
-          h3 { class: format!("{} font-bold mb-2", effective_theme.text_primary()),
-            "💻 System Info"
-          }
+          h3 { class: "text-base-content font-bold mb-2", "💻 System Info" }
           div { class: "space-y-1",
             div {
-              span { class: effective_theme.text_secondary(), "OS: " }
-              span { class: effective_theme.text_primary(), "{os}" }
+              span { class: "text-base-content/70", "OS: " }
+              span { class: "text-base-content", "{os}" }
             }
             div {
-              span { class: effective_theme.text_secondary(), "Arch: " }
-              span { class: effective_theme.text_primary(), "{arch}" }
+              span { class: "text-base-content/70", "Arch: " }
+              span { class: "text-base-content", "{arch}" }
             }
           }
         }

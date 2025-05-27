@@ -1,5 +1,7 @@
 use dioxus::prelude::*;
 
+use crate::{libs::theme::use_theme, state::config_utils::use_config};
+
 #[derive(Clone, Routable, Debug, PartialEq)]
 pub enum Route {
     #[layout(Layout)]
@@ -13,10 +15,26 @@ pub enum Route {
 
 #[component]
 pub fn Layout() -> Element {
+    let (config_signal, _set_config) = use_config();
+
+    // Theme state - use theme context and initialize from config
+    let mut theme = use_theme(); // Initialize theme from config on first load
+    use_effect(move || {
+        theme.set(config_signal.read().theme.clone());
+    });
+
+    // Convert theme to DaisyUI theme name
+    let daisy_theme = theme().to_daisy_theme();
+
     rsx! {
-      div { class: "min-h-screen bg-base-200",
-        // Main content area
-        Outlet::<Route> {}
+      div {
+        class: "h-screen flex flex-col",
+        "data-theme": daisy_theme,
+
+        div { class: "container mx-auto py-16 flex flex-col h-full",
+          // Main content area
+          Outlet::<Route> {}
+        }
 
         // Dock at the bottom
         crate::components::dock::Dock {}
@@ -44,11 +62,7 @@ pub fn Soundpacks() -> Element {
 
 #[component]
 pub fn Settings() -> Element {
-    use crate::libs::AudioContext;
-    use std::sync::Arc;
-
-    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
     rsx! {
-      crate::components::pages::SettingsPage { audio_ctx: audio_context }
+      crate::components::pages::SettingsPage {}
     }
 }

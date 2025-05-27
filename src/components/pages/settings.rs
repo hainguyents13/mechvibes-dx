@@ -1,44 +1,29 @@
-use crate::libs::audio::AudioContext;
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
-use std::sync::Arc;
 
 #[component]
-pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
+pub fn SettingsPage() -> Element {
     // Use shared config hook
     let (config, update_config) = use_config();
-
-    // Settings state - initialize from config
-    let mut volume = use_signal(|| config().volume);
     let mut enable_sound = use_signal(|| config().enable_sound);
     let mut auto_start = use_signal(|| config().auto_start);
     let mut show_notifications = use_signal(|| config().show_notifications);
 
-    // Theme state - use theme context and initialize from config
+    // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
-
-    // Initialize theme from config on first load
-    use_effect(move || {
-        theme.set(config().theme.clone());
-    }); // Update audio system volume (only when volume changes, enable_sound is handled by sound_manager)
-    let ctx = audio_ctx.clone();
-    use_effect(move || {
-        ctx.set_volume(volume());
-    });
     rsx! {
-      div { class: "container mx-auto p-8 mb-16",
-        // Page header
+      div { class: "px-12",        // Page header
         div { class: "text-center mb-8",
-          h1 { class: "text-4xl font-bold mb-4", "Settings" }
-          p { class: "text-lg opacity-70", "Customize your Mechvibes DX experience." }
+          h1 { class: "text-4xl font-bold mb-4 text-base-content", "Settings" }
+          p { class: "text-lg opacity-70 text-base-content", "Customize your Mechvibes DX experience." }
         }
         // Settings sections
         div { class: "space-y-4",
-          div { class: "collapse collapse-arrow bg-base-100 border border-primary",
+          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
             input {
               r#type: "radio",
-              name: "setting-accodion",
+              name: "setting-accordion",
               checked: true,
             }
             div { class: "collapse-title font-semibold", "General" }
@@ -47,7 +32,7 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                 label { class: "label cursor-pointer",
                   input {
                     r#type: "checkbox",
-                    class: "toggle toggle-primary",
+                    class: "toggle toggle-neutral",
                     checked: enable_sound(),
                     onchange: {
                         let update_config = update_config.clone();
@@ -66,8 +51,8 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
               }
             }
           }
-          div { class: "collapse collapse-arrow bg-base-100 border border-primary",
-            input { r#type: "radio", name: "setting-accodion" }
+          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
+            input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Customize" }
             div { class: "collapse-content text-sm",
               div { class: "space-y-6",
@@ -133,8 +118,8 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                 div { class: "form-control",
                   label { class: "label cursor-pointer",
                     div {
-                      div { class: "label-text text-base", "Start with Windows" }
-                      div { class: "label-text-alt opacity-70",
+                      div { class: "label-text text-sm", "Start with Windows" }
+                      div { class: "label-text-alt text-xs opacity-70 truncate",
                         "Automatically start Mechvibes DX when Windows boots"
                       }
                     }
@@ -185,17 +170,16 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                 }
               }
             }
-          }
-          // App Info Section as DaisyUI collapse
-          div { class: "collapse collapse-arrow bg-base-100 border border-primary",
-            input { r#type: "checkbox", name: "setting-accordion" }
+          } // App Info Section as DaisyUI collapse
+          div { class: "collapse collapse-arrow border border-base-300 text-base-content",
+            input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "App Info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}
             }
           }
-          div { class: "collapse collapse-arrow bg-base-100 border border-red-500",
-            input { r#type: "radio", name: "setting-accodion" }
+          div { class: "collapse collapse-arrow border border-base-300 text-error-content",
+            input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Danger zone" }
             div { class: "collapse-content text-sm",
               p { class: "opacity-80 mb-4",
@@ -207,7 +191,6 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                   onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          volume.set(1.0);
                           enable_sound.set(true);
                           auto_start.set(false);
                           show_notifications.set(true);
