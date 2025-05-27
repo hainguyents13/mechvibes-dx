@@ -68,7 +68,9 @@ pub fn SettingsPage() -> Element {
                   div { class: "form-control",
                     label { class: "label cursor-pointer flex items-center justify-between",
                       div {
-                        div { class: "label-text text-sm", "Start with Windows" }
+                        div { class: "label-text text-base",
+                          "Start with Windows"
+                        }
                         div { class: "label-text-alt text-xs truncate",
                           "Automatically start Mechvibes DX when Windows boots"
                         }
