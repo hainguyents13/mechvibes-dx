@@ -102,6 +102,21 @@ static KEY_CODE_MAP: Lazy<HashMap<Key, &'static str>> = Lazy::new(|| {
     map.insert(Key::Comma, "Comma");
     map.insert(Key::Slash, "Slash");
 
+    // Reserved for future rdev updates
+    /*
+    map.insert(Key::BracketLeft, "BracketLeft");
+    map.insert(Key::BracketRight, "BracketRight");
+    map.insert(Key::Backslash, "Backslash");
+    map.insert(Key::Semicolon, "Semicolon");
+    map.insert(Key::Period, "Period");
+    map.insert(Key::MediaVolumeDown, "AudioVolumeDown");
+    map.insert(Key::MediaVolumeUp, "AudioVolumeUp");
+    map.insert(Key::MediaVolumeMute, "AudioVolumeMute");
+    map.insert(Key::MediaPlayPause, "MediaPlayPause");
+    map.insert(Key::MediaPreviousTrack, "MediaTrackPrevious");
+    map.insert(Key::MediaNextTrack, "MediaTrackNext");
+    */
+
     map
 });
 
