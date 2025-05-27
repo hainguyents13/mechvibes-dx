@@ -1,7 +1,10 @@
+use std::alloc::System;
+
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::config::AppConfig;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
+use lucide_dioxus::{Computer, Moon, Sun};
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -26,7 +29,8 @@ pub fn ThemeToggler() -> Element {
                   );
               }
           },
-          "🌙 Dark"
+          Moon { class: "w-4 h-4 mr-1" }
+          " Dark"
         }
         button {
           class: if matches!(*theme.read(), Theme::Light) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
@@ -41,7 +45,8 @@ pub fn ThemeToggler() -> Element {
                   );
               }
           },
-          "☀️ Light"
+          Sun { class: "w-4 h-4 mr-1" }
+          "Light"
         }
         button {
           class: if matches!(*theme.read(), Theme::System) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
@@ -56,7 +61,8 @@ pub fn ThemeToggler() -> Element {
                   );
               }
           },
-          "🖥️ System"
+          Computer { class: "w-4 h-4 mr-1" }
+          "Sytem"
         }
       }
     }
