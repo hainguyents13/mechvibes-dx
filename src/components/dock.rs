@@ -7,7 +7,6 @@ use lucide_dioxus::{House, Music, Settings};
 pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
-
     rsx! {
       div { class: "dock",
         // Button Home
@@ -16,7 +15,7 @@ pub fn Dock() -> Element {
           onclick: move |_| {
               nav.push("/");
           },
-          House { class: "" }
+          House { class: "w-5 h-5" }
           span { class: "dock-label", "Home" }
         }
         // Button Soundpacks
@@ -25,7 +24,7 @@ pub fn Dock() -> Element {
           onclick: move |_| {
               nav.push("/soundpacks");
           },
-          Music { class: "" }
+          Music { class: "w-5 h-5" }
           span { class: "dock-label", "Soundpacks" }
         }
         // Button Settings
@@ -34,7 +33,7 @@ pub fn Dock() -> Element {
           onclick: move |_| {
               nav.push("/settings");
           },
-          Settings { class: "" }
+          Settings { class: "w-5 h-5" }
           span { class: "dock-label", "Settings" }
         }
       }

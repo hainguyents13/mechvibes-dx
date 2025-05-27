@@ -1,5 +1,6 @@
 pub mod app;
 pub mod config;
+pub mod config_utils;
 pub mod keyboard;
 pub mod manifest;
 pub mod soundpack;

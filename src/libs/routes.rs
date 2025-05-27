@@ -13,11 +13,8 @@ pub enum Route {
 
 #[component]
 pub fn Layout() -> Element {
-    use crate::libs::theme::use_effective_theme;
-    let effective_theme = use_effective_theme();
-
     rsx! {
-      div { class: format!("min-h-screen {}", effective_theme.bg_primary()),
+      div { class: "min-h-screen bg-base-200",
         // Main content area
         Outlet::<Route> {}
 

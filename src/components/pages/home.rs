@@ -2,18 +2,22 @@ use crate::components::logo::Logo;
 use crate::components::soundpack_selector::SoundpackSelector;
 use crate::components::volume_slider::VolumeSlider;
 use crate::libs::AudioContext;
+use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use std::sync::Arc;
 
 #[component]
 pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
-    // volume state
-    let volume = use_signal(|| 1.0f32);
+    // Use shared config hook
+    let (config, update_config) = use_config();
+    // Volume state from config
+    let mut volume = use_signal(|| config().volume);
+    let enable_sound = use_signal(|| config().enable_sound);
 
     // Update audio system volume when the volume control changes
     let ctx = audio_ctx.clone();
     use_effect(move || {
-        ctx.set_volume(volume());
+        ctx.set_volume(if enable_sound() { volume() } else { 0.0 });
     });
 
     rsx! {
@@ -26,15 +30,21 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         // Soundpack selector
         SoundpackSelector { audio_ctx: audio_ctx.clone() }
         // divider
-        div { class: "divider" }
-        // Volume control slider
-        VolumeSlider { volume, on_change: None }
+        div { class: "divider" }        // Volume control slider
+        VolumeSlider {
+            volume,
+            on_change: move |new_volume: f32| {
+                volume.set(new_volume);
+                update_config(Box::new(move |config| {
+                    config.volume = new_volume;
+                }));
+            }
+        }
         // divider
-        div { class: "divider" }
-        // Version
-        div { class: "text-sm text-gray-800 font-bold", "Mechvibes v3.0.6" }
+        div { class: "divider" }        // Version
+        div { class: "text-sm text-base-content font-bold", "MechvibesDX (Beta)" }
         // Footer with credits
-        div { class: "text-sm text-gray-500 mt-4",
+        div { class: "text-sm text-base-content/70 mt-4",
           "Made with ❤️ by "
           a {
             href: "https://github.com/hainguyents13/mechvibes-dx",

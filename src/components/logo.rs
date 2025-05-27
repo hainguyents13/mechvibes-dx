@@ -18,6 +18,6 @@ pub fn Logo() -> Element {
     };
 
     rsx! {
-      div { class, "Mechvibes 3" }
+      div { class, "MechvibesDX" }
     }
 }

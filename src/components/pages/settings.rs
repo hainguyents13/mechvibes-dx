@@ -1,13 +1,13 @@
 use crate::libs::audio::AudioContext;
 use crate::libs::theme::{use_theme, Theme};
-use crate::state::config::AppConfig;
+use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use std::sync::Arc;
 
 #[component]
 pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
-    // Load settings from config file
-    let mut config = use_signal(|| AppConfig::load());
+    // Use shared config hook
+    let (config, update_config) = use_config();
 
     // Settings state - initialize from config
     let mut volume = use_signal(|| config().volume);
@@ -51,17 +51,16 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                     r#type: "checkbox",
                     class: "toggle toggle-primary",
                     checked: enable_sound(),
-                    onchange: move |evt| {
-                        enable_sound.set(evt.value() == "true");
-                        let mut new_config = config();
-                        new_config.enable_sound = enable_sound();
-                        new_config.volume = volume();
-                        new_config.auto_start = auto_start();
-                        new_config.show_notifications = show_notifications();
-                        new_config.theme = theme.read().clone();
-                        new_config.last_updated = chrono::Utc::now();
-                        let _ = new_config.save();
-                        config.set(new_config);
+                    onchange: {
+                        let update_config = update_config.clone();
+                        move |evt: Event<FormData>| {
+                            enable_sound.set(evt.value() == "true");
+                            update_config(
+                                Box::new(move |config| {
+                                    config.enable_sound = evt.value() == "true";
+                                }),
+                            );
+                        }
                     },
                   }
                   span { class: "label-text text-base", "Enable all sounds" }
@@ -87,49 +86,46 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                   div { class: "btn-group btn-group-horizontal w-full mt-2",
                     button {
                       class: if matches!(*theme.read(), Theme::Dark) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: move |_| {
-                          theme.set(Theme::Dark);
-                          let mut new_config = config();
-                          new_config.enable_sound = enable_sound();
-                          new_config.volume = volume();
-                          new_config.auto_start = auto_start();
-                          new_config.show_notifications = show_notifications();
-                          new_config.theme = Theme::Dark;
-                          new_config.last_updated = chrono::Utc::now();
-                          let _ = new_config.save();
-                          config.set(new_config);
+                      onclick: {
+                          let update_config = update_config.clone();
+                          move |_| {
+                              theme.set(Theme::Dark);
+                              update_config(
+                                  Box::new(|config| {
+                                      config.theme = Theme::Dark;
+                                  }),
+                              );
+                          }
                       },
                       "🌙 Dark"
                     }
                     button {
                       class: if matches!(*theme.read(), Theme::Light) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: move |_| {
-                          theme.set(Theme::Light);
-                          let mut new_config = config();
-                          new_config.enable_sound = enable_sound();
-                          new_config.volume = volume();
-                          new_config.auto_start = auto_start();
-                          new_config.show_notifications = show_notifications();
-                          new_config.theme = Theme::Light;
-                          new_config.last_updated = chrono::Utc::now();
-                          let _ = new_config.save();
-                          config.set(new_config);
+                      onclick: {
+                          let update_config = update_config.clone();
+                          move |_| {
+                              theme.set(Theme::Light);
+                              update_config(
+                                  Box::new(|config| {
+                                      config.theme = Theme::Light;
+                                  }),
+                              );
+                          }
                       },
                       "☀️ Light"
                     }
                     button {
                       class: if matches!(*theme.read(), Theme::System) { "btn btn-primary flex-1" } else { "btn btn-outline flex-1" },
-                      onclick: move |_| {
-                          theme.set(Theme::System);
-                          let mut new_config = config();
-                          new_config.enable_sound = enable_sound();
-                          new_config.volume = volume();
-                          new_config.auto_start = auto_start();
-                          new_config.show_notifications = show_notifications();
-                          new_config.theme = Theme::System;
-                          new_config.last_updated = chrono::Utc::now();
-                          let _ = new_config.save();
-                          config.set(new_config);
+                      onclick: {
+                          let update_config = update_config.clone();
+                          move |_| {
+                              theme.set(Theme::System);
+                              update_config(
+                                  Box::new(|config| {
+                                      config.theme = Theme::System;
+                                  }),
+                              );
+                          }
                       },
                       "🖥️ System"
                     }
@@ -148,17 +144,16 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                       r#type: "checkbox",
                       class: "toggle toggle-primary",
                       checked: auto_start(),
-                      onchange: move |evt| {
-                          auto_start.set(evt.value() == "true");
-                          let mut new_config = config();
-                          new_config.enable_sound = enable_sound();
-                          new_config.volume = volume();
-                          new_config.auto_start = auto_start();
-                          new_config.show_notifications = show_notifications();
-                          new_config.theme = theme.read().clone();
-                          new_config.last_updated = chrono::Utc::now();
-                          let _ = new_config.save();
-                          config.set(new_config);
+                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              auto_start.set(evt.value() == "true");
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.auto_start = evt.value() == "true";
+                                  }),
+                              );
+                          }
                       },
                     }
                   }
@@ -176,17 +171,16 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
                       r#type: "checkbox",
                       class: "toggle toggle-primary",
                       checked: show_notifications(),
-                      onchange: move |evt| {
-                          show_notifications.set(evt.value() == "true");
-                          let mut new_config = config();
-                          new_config.enable_sound = enable_sound();
-                          new_config.volume = volume();
-                          new_config.auto_start = auto_start();
-                          new_config.show_notifications = show_notifications();
-                          new_config.theme = theme.read().clone();
-                          new_config.last_updated = chrono::Utc::now();
-                          let _ = new_config.save();
-                          config.set(new_config);
+                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              show_notifications.set(evt.value() == "true");
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.show_notifications = evt.value() == "true";
+                                  }),
+                              );
+                          }
                       },
                     }
                   }
@@ -215,21 +209,24 @@ pub fn SettingsPage(audio_ctx: Arc<AudioContext>) -> Element {
               div { class: " justify-start",
                 button {
                   class: "btn btn-error btn-sm",
-                  onclick: move |_| {
-                      volume.set(1.0);
-                      enable_sound.set(true);
-                      auto_start.set(false);
-                      show_notifications.set(true);
-                      theme.set(Theme::System);
-                      let mut new_config = config();
-                      new_config.volume = 1.0;
-                      new_config.enable_sound = true;
-                      new_config.auto_start = false;
-                      new_config.show_notifications = true;
-                      new_config.theme = Theme::System;
-                      new_config.last_updated = chrono::Utc::now();
-                      let _ = new_config.save();
-                      config.set(new_config);
+                  onclick: {
+                      let update_config = update_config.clone();
+                      move |_| {
+                          volume.set(1.0);
+                          enable_sound.set(true);
+                          auto_start.set(false);
+                          show_notifications.set(true);
+                          theme.set(Theme::System);
+                          update_config(
+                              Box::new(|config| {
+                                  config.volume = 1.0;
+                                  config.enable_sound = true;
+                                  config.auto_start = false;
+                                  config.show_notifications = true;
+                                  config.theme = Theme::System;
+                              }),
+                          );
+                      }
                   },
                   "Reset to Defaults"
                 }

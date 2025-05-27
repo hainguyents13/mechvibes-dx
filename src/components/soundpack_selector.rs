@@ -1,8 +1,8 @@
 use crate::libs::audio::AudioContext;
-use dioxus::html::div;
+use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{Check, ChevronDown, Music, Music2, Search};
+use lucide_dioxus::{Check, ChevronDown, Music, Search};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,17 +21,20 @@ impl PartialEq for SoundpackSelectorProps {
 pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     use crate::state::app::use_app_state;
 
-    // Get global app state
+    // Get global app state and shared config
     let app_state = use_app_state();
+    let (config, update_config) = use_config();
 
     // UI state
     let mut error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let mut is_refreshing = use_signal(|| false); // Use global app state for soundpacks and current soundpack
+    let mut is_refreshing = use_signal(|| false);
+
+    // Use global app state for soundpacks and get current soundpack from config
     let soundpacks =
         use_memo(move || app_state.with(|state| state.soundpack_cache.get_soundpacks().clone()));
-    let current = use_signal(|| app_state.with(|state| state.config.current_soundpack.clone()));
+    let current = use_memo(move || config().current_soundpack.clone());
 
     // Filter soundpacks based on search query
     let filtered_soundpacks = use_memo(move || {
@@ -72,15 +75,16 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
-                  if let Some(icon) = &pack.icon {
-                    img {
-                      class: "w-6 h-6 rounded",
-                      src: format!("./soundpacks/{}/{}", pack.name, icon),
-                      alt: "icon",
-                    }
-                  } else {
-                    Music { class: "w-4 h-4 text-base-content/50" }
-                  }
+                  // if let Some(icon) = &pack.icon {
+                  //   img {
+                  //     class: "w-6 h-6 rounded",
+                  //     src: format!("./soundpacks/{}/{}", pack.name, icon),
+                  //     alt: "icon",
+                  //   }
+                  // } else {
+                  //   Music { class: "w-4 h-4 text-base-content/50" }
+                  // }
+                  Music { class: "w-6 h-6 text-base-content/50" }
                 }
                 div { class: "flex-1 min-w-0 text-left",
                   div { class: "font-medium truncate text-base-content",
@@ -130,30 +134,28 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
                       class: format!(
                           "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16 {}",
                           if pack.soundpack.id == current() { " btn-disabled" } else { "" },
-                      ),
-                      onclick: {
+                      ),                      onclick: {
                           let pack_id = pack.soundpack.id.clone();
                           let mut error = error.clone();
                           let soundpacks = soundpacks.clone();
-                          let mut current = current.clone();
                           let mut is_open = is_open.clone();
                           let mut search_query = search_query.clone();
                           let audio_ctx = props.audio_ctx.clone();
+                          let update_config = update_config.clone();
                           move |_| {
                               error.set(String::new());
                               if let Some(pack_item) = soundpacks()
                                   .iter()
                                   .find(|p| p.soundpack.id == pack_id)
                               {
-                                  let mut config = app_state.with(|state| (*state.config).clone());
-                                  config.current_soundpack = pack_id.clone();
-                                  if let Err(e) = crate::state::app::save_config(config) {
-                                      error.set(format!("Failed to save config: {}", e));
-                                      return;
-                                  }
+                                  // Update config using shared utility
+                                  let pack_id_clone = pack_id.clone();
+                                  update_config(Box::new(move |config| {
+                                      config.current_soundpack = pack_id_clone;
+                                  }));
+
                                   match crate::libs::audio::load_soundpack(&audio_ctx) {
                                       Ok(_) => {
-                                          current.set(pack_id.clone());
                                           is_open.set(false);
                                           search_query.set(String::new());
                                           println!(
