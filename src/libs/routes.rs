@@ -7,6 +7,8 @@ pub enum Route {
     #[layout(Layout)]
     #[route("/")]
     Home {},
+    #[route("/themes")]
+    Themes {},
     #[route("/soundpacks")]
     Soundpacks {},
     #[route("/settings")]
@@ -21,14 +23,8 @@ pub fn Layout() -> Element {
     let mut theme = use_theme(); // Initialize theme from config on first load
     use_effect(move || {
         theme.set(config_signal.read().theme.clone());
-    });
-
-    // Convert theme to DaisyUI theme name
-    let daisy_theme = match theme() {
-        crate::libs::theme::Theme::Dark => "dark",
-        crate::libs::theme::Theme::Light => "light",
-        crate::libs::theme::Theme::System => "light", // Default to light for now
-    };
+    }); // Convert theme to DaisyUI theme name
+    let daisy_theme = theme().to_daisy_theme();
 
     rsx! {
       div { class: "h-screen flex flex-col", "data-theme": daisy_theme,
@@ -57,6 +53,13 @@ pub fn Home() -> Element {
 pub fn Soundpacks() -> Element {
     rsx! {
       crate::components::pages::SoundpacksPage {}
+    }
+}
+
+#[component]
+pub fn Themes() -> Element {
+    rsx! {
+      crate::components::pages::ThemesPage {}
     }
 }
 
