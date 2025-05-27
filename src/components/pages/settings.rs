@@ -21,7 +21,7 @@ pub fn SettingsPage() -> Element {
         }
         // Settings sections
         div { class: "space-y-4",
-          div { class: "collapse collapse-arrow border text-base-content",
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input {
               r#type: "radio",
               name: "setting-accordion",
@@ -33,7 +33,7 @@ pub fn SettingsPage() -> Element {
                 label { class: "label cursor-pointer",
                   input {
                     r#type: "checkbox",
-                    class: "toggle toggle-neutral",
+                    class: "toggle toggle-base-100",
                     checked: enable_sound(),
                     onchange: {
                         let update_config = update_config.clone();
@@ -52,7 +52,7 @@ pub fn SettingsPage() -> Element {
               }
             }
           }
-          div { class: "collapse collapse-arrow border text-base-content",
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Customize" }
             div { class: "collapse-content text-sm",
@@ -172,23 +172,23 @@ pub fn SettingsPage() -> Element {
               }
             }
           } // App Info Section as DaisyUI collapse
-          div { class: "collapse collapse-arrow border bg-base-300 text-base-content",
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "App Info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}
             }
           }
-          div { class: "collapse collapse-arrow border bg-base-300 text-error",
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200",
             input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "Danger zone" }
+            div { class: "collapse-title font-semibold  text-error", "Danger zone" }
             div { class: "collapse-content text-sm",
-              p { class: "mb-4",
+              p { class: "mb-4 text-base-content/70",
                 "Reset all settings to their default values. This action cannot be undone."
               }
               div { class: " justify-start",
                 button {
-                  class: "btn btn-error btn-sm",
+                  class: "btn btn-error btn-soft btn-sm",
                   onclick: {
                       let update_config = update_config.clone();
                       move |_| {

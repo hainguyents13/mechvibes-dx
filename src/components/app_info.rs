@@ -38,70 +38,68 @@ pub fn AppInfoDisplay() -> Element {
     let arch = env::consts::ARCH;
 
     rsx! {
-      div { class: "mt-2 bg-base-200 text-base-content p-4 rounded-lg text-xs font-mono max-w-lg border border-base-300",
-        div { class: "mb-3",
-          h3 { class: "text-base-content font-bold mb-2", "📍 Application Paths" }
-          div { class: "mb-1",
-            span { class: "text-base-content/70", "Executable: " }
-            span { class: "text-base-content break-all", "{exe_path}" }
-          }
-          div {
-            span { class: "text-base-content/70", "Working Dir: " }
-            span { class: "text-base-content break-all", "{current_dir}" }
-          }
-        }
-        div { class: "mb-3",
-          h3 { class: "text-base-content font-bold mb-2", "📁 File System Status" }
-          div { class: "space-y-1",
-            div {
-              span { class: if data_dir_exists { "text-base-content" } else { "text-error" },
-                if data_dir_exists {
-                  "✅"
-                } else {
-                  "❌"
-                }
-              }
-              span { class: "ml-2 text-base-content/70", "./data directory" }
-            }
-            div {
-              span { class: if config_file_exists { "text-base-content" } else { "text-error" },
-                if config_file_exists {
-                  "✅"
-                } else {
-                  "❌"
-                }
-              }
-              span { class: "ml-2 text-base-content/70", "./data/config.json" }
-            }
-            div {
-              span { class: if soundpacks_dir_exists { "text-base-content" } else { "text-error" },
-                if soundpacks_dir_exists {
-                  "✅"
-                } else {
-                  "❌"
-                }
-              }
-              span { class: "ml-2 text-base-content/70", "./soundpacks directory" }
-            }
-            div {
-              span { class: "text-base-content", "🎵" }
-              span { class: "ml-2 text-base-content/70",
-                "Found {soundpack_count} soundpack(s)"
-              }
-            }
-          }
+      div { class: "mb-3",
+        h3 { class: "text-base-content font-bold mb-2", "📍 Application Paths" }
+        div { class: "mb-1",
+          span { class: "text-base-content/70", "Executable: " }
+          span { class: "text-base-content break-all", "{exe_path}" }
         }
         div {
-          h3 { class: "text-base-content font-bold mb-2", "💻 System Info" }
-          div { class: "space-y-1",
-            div {
-              span { class: "text-base-content/70", "OS: " }
-              span { class: "text-base-content", "{os}" }
+          span { class: "text-base-content/70", "Working Dir: " }
+          span { class: "text-base-content break-all", "{current_dir}" }
+        }
+      }
+      div { class: "mb-3",
+        h3 { class: "text-base-content font-bold mb-2", "📁 File System Status" }
+        div { class: "space-y-1",
+          div {
+            span { class: if data_dir_exists { "text-base-content" } else { "text-error" },
+              if data_dir_exists {
+                "✅"
+              } else {
+                "❌"
+              }
             }
-            div {
-              span { class: "text-base-content/70", "Arch: " }
-              span { class: "text-base-content", "{arch}" }
+            span { class: "ml-2 text-base-content/70", "./data directory" }
+          }
+          div {
+            span { class: if config_file_exists { "text-base-content" } else { "text-error" },
+              if config_file_exists {
+                "✅"
+              } else {
+                "❌"
+              }
             }
+            span { class: "ml-2 text-base-content/70", "./data/config.json" }
+          }
+          div {
+            span { class: if soundpacks_dir_exists { "text-base-content" } else { "text-error" },
+              if soundpacks_dir_exists {
+                "✅"
+              } else {
+                "❌"
+              }
+            }
+            span { class: "ml-2 text-base-content/70", "./soundpacks directory" }
+          }
+          div {
+            span { class: "text-base-content", "🎵" }
+            span { class: "ml-2 text-base-content/70",
+              "Found {soundpack_count} soundpack(s)"
+            }
+          }
+        }
+      }
+      div {
+        h3 { class: "text-base-content font-bold mb-2", "💻 System Info" }
+        div { class: "space-y-1",
+          div {
+            span { class: "text-base-content/70", "OS: " }
+            span { class: "text-base-content", "{os}" }
+          }
+          div {
+            span { class: "text-base-content/70", "Arch: " }
+            span { class: "text-base-content", "{arch}" }
           }
         }
       }

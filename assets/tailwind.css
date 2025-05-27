@@ -2453,6 +2453,9 @@
       border-color: color-mix(in oklab, var(--color-base-300) 50%, transparent);
     }
   }
+  .border-black {
+    border-color: var(--color-black);
+  }
   .border-gray-300 {
     border-color: var(--color-gray-300);
   }
@@ -2652,6 +2655,12 @@
   }
   .text-error-content {
     color: var(--color-error-content);
+  }
+  .text-error\/50 {
+    color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-error) 50%, transparent);
+    }
   }
   .text-gray-300 {
     color: var(--color-gray-300);
