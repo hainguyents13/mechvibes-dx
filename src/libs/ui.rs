@@ -2,6 +2,7 @@ use crate::libs::keyboard::start_keyboard_listener;
 use crate::libs::routes::Route;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
+use crate::Header;
 use dioxus::prelude::*;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -71,6 +72,7 @@ pub fn app() -> Element {
         });
     }
     rsx! {
+      Header {}
       // Main application Router
       Router::<Route> {}
     }

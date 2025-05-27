@@ -25,12 +25,15 @@ pub fn Layout() -> Element {
         theme.set(config_signal.read().theme.clone());
     }); // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
-
     rsx! {
       div { class: "h-screen flex flex-col", "data-theme": daisy_theme,
+        // Custom title bar for window controls
+        crate::components::titlebar::TitleBar {}
 
-        // Main content area
-        Outlet::<Route> {}
+        // Main content area with padding to account for title bar
+        div { class: "flex-1 overflow-auto",
+          Outlet::<Route> {}
+        }
 
         // Dock at the bottom
         crate::components::dock::Dock {}
