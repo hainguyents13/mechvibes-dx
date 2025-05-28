@@ -33,23 +33,28 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed);
-
-        // Lấy timestamp và duration
+        drop(pressed); // Lấy timestamp và duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {
-                println!("✅ Found mapping for key '{}'", key);
+                println!("✅ Found mapping for key '{}': {:?}", key, arr);
                 let idx = if is_keydown { 0 } else { 1 };
                 let arr = arr[idx];
                 (arr[0] / 1000.0, arr[1] / 1000.0)
             }
-            _ => {
+            Some(arr) => {
                 println!(
-                    "❌ Available key mappings: {:?}",
-                    key_map.keys().collect::<Vec<_>>()
+                    "⚠️ Invalid mapping for key '{}': {:?} (expected 2 elements)",
+                    key, arr
                 );
-                eprintln!("❌ No mapping for key '{}' in config.json", key);
+                return;
+            }
+            None => {
+                println!("❌ No mapping for key '{}' in current soundpack", key);
+                println!(
+                    "   Available keys: {:?}",
+                    key_map.keys().take(10).collect::<Vec<_>>()
+                );
                 return;
             }
         };

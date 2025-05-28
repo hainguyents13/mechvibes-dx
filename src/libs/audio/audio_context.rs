@@ -26,6 +26,7 @@ impl PartialEq for AudioContext {
 
 impl AudioContext {
     pub fn new() -> Self {
+        println!("🎵 Creating new AudioContext...");
         let (stream, stream_handle) =
             rodio::OutputStream::try_default().expect("Failed to create audio output stream");
 
@@ -41,7 +42,8 @@ impl AudioContext {
 
         // Khởi tạo volume từ config
         let config = AppConfig::load();
-        AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume)); // Load soundpack từ config với cache optimization
+        AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
+        // Load soundpack từ config với cache optimization
         println!("🔍 Loading initial soundpack from cache...");
         match super::soundpack_loader::load_soundpack(&context) {
             Ok(_) => println!("✅ Initial soundpack loaded successfully from cache"),

@@ -13,13 +13,14 @@ pub fn app() -> Element {
     use_context_provider(|| app_state);
 
     // Create global keyboard state using signals
-    let keyboard_state = use_signal(|| KeyboardState::new());
-
-    // Provide the keyboard state context to all child components
+    let keyboard_state = use_signal(|| KeyboardState::new()); // Provide the keyboard state context to all child components
     use_context_provider(|| keyboard_state);
 
-    // Initialize the audio system for mechvibes sounds
+    // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
+
+    // Provide audio context to all child components (this will be used by Layout and other components)
+    use_context_provider(|| audio_context.clone());
 
     // Create a channel for real-time keyboard event communication
     let (tx, rx) = mpsc::channel::<String>();
@@ -71,6 +72,7 @@ pub fn app() -> Element {
             }
         });
     }
+
     rsx! {
       Header {}
       // Main application Router

@@ -46,7 +46,8 @@ pub fn Home() -> Element {
     use crate::libs::AudioContext;
     use std::sync::Arc;
 
-    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
+    // Use audio context from the layout provider instead of creating new one
+    let audio_context: Arc<AudioContext> = use_context();
     rsx! {
       crate::components::pages::HomePage { audio_ctx: audio_context }
     }

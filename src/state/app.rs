@@ -45,6 +45,23 @@ pub fn use_app_state() -> Signal<AppState> {
     })
 }
 
+//让我也add一个函数来重新加载当前soundpack
+pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
+    let config = crate::state::config::AppConfig::load();
+    let current_id = &config.current_soundpack;
+
+    match crate::libs::audio::load_soundpack_by_id(audio_ctx, current_id) {
+        Ok(_) => println!(
+            "✅ Current soundpack '{}' reloaded successfully",
+            current_id
+        ),
+        Err(e) => eprintln!(
+            "❌ Failed to reload current soundpack '{}': {}",
+            current_id, e
+        ),
+    }
+}
+
 // Hàm tiện ích để reload soundpacks từ bất kỳ đâu
 #[allow(dead_code)]
 pub fn reload_soundpacks() {

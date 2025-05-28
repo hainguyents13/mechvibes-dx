@@ -25,10 +25,9 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         }
         // Main content for home page
         div {
-          // Soundpack selector
-          // div { class: "divider", "Keyboard" } // Version
+          // Soundpack selector          // div { class: "divider", "Keyboard" } // Version
           class: "flex flex-col gap-6",
-          SoundpackSelector { audio_ctx: audio_ctx.clone() }
+          SoundpackSelector {}
           VolumeSlider {
             volume,
             on_change: move |new_volume: f32| {

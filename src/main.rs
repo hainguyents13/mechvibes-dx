@@ -14,7 +14,8 @@ fn main() {
     let _manifest = state::AppManifest::load();
 
     // Initialize global app state before rendering
-    state::app::init_app_state(); // Create a WindowBuilder with custom appearance
+    state::app::init_app_state();
+    // Create a WindowBuilder with custom appearance
     let window_builder = WindowBuilder::default()
         .with_title("Mechvibes DX")
         .with_transparent(false) // Disable transparency for better performance

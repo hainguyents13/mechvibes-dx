@@ -8,12 +8,16 @@ use crate::state::soundpack_cache::SoundpackCache;
 
 use super::audio_context::AudioContext;
 
-#[allow(dead_code)]
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
     let config = AppConfig::load();
-    let current_id = &config.current_soundpack; // Try to load from cache first
+    let current_id = &config.current_soundpack;
+    load_soundpack_by_id(context, current_id)
+}
+
+pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    // Try to load from cache first
     let cache = SoundpackCache::load();
-    if let Some(pack_item) = cache.get_soundpack_by_id(current_id) {
+    if let Some(pack_item) = cache.get_soundpack_by_id(soundpack_id) {
         println!(
             "🚀 Loading soundpack '{}' from cache",
             pack_item.soundpack.name
@@ -26,24 +30,35 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
         // Update context with cached data
         update_context(context, cached_samples, pack_item.soundpack.clone())?;
 
+        // Update config
+        update_config(&pack_item.soundpack)?;
+
         return Ok(());
     }
 
     // Fallback to file-based loading if not in cache
     println!(
         "⚠️ Soundpack '{}' not found in cache, falling back to file loading",
-        current_id
+        soundpack_id
     );
-    load_soundpack_from_files(context)
+    load_soundpack_from_files_by_id(context, soundpack_id)
 }
 
 fn load_soundpack_from_files(context: &AudioContext) -> Result<(), String> {
+    let config = AppConfig::load();
+    load_soundpack_from_files_by_id(context, &config.current_soundpack)
+}
+
+fn load_soundpack_from_files_by_id(
+    context: &AudioContext,
+    soundpack_id: &str,
+) -> Result<(), String> {
     // Load soundpacks from directory
     let soundpacks = find_soundpacks()?;
     let available_packs = load_available_packs(&soundpacks)?;
 
-    // Get current or default soundpack
-    let (soundpack_path, soundpack) = get_current_soundpack(&available_packs)?;
+    // Get specified soundpack or fallback to default
+    let (soundpack_path, soundpack) = get_soundpack_by_id(&available_packs, soundpack_id)?;
 
     // Load and decode audio file
     let cached_samples = load_audio_file(&soundpack_path, &soundpack)?;
@@ -99,26 +114,32 @@ fn load_available_packs(soundpacks: &[String]) -> Result<Vec<(String, SoundPack)
     }
 }
 
-fn get_current_soundpack(
+fn get_soundpack_by_id(
     available_packs: &[(String, SoundPack)],
+    soundpack_id: &str,
 ) -> Result<(String, SoundPack), String> {
-    let config = AppConfig::load();
-    let current_id = &config.current_soundpack;
-
     match available_packs
         .iter()
-        .find(|(_, pack)| pack.id == *current_id)
+        .find(|(_, pack)| pack.id == soundpack_id)
     {
         Some((path, pack)) => Ok((path.clone(), pack.clone())),
         None => {
             let (path, pack) = available_packs[0].clone();
             println!(
                 "⚠️ Soundpack '{}' not found, using '{}' instead",
-                current_id, pack.name
+                soundpack_id, pack.name
             );
             Ok((path, pack))
         }
     }
+}
+
+fn get_current_soundpack(
+    available_packs: &[(String, SoundPack)],
+) -> Result<(String, SoundPack), String> {
+    let config = AppConfig::load();
+    let current_id = &config.current_soundpack;
+    get_soundpack_by_id(available_packs, current_id)
 }
 
 fn load_audio_file(
@@ -167,33 +188,60 @@ fn update_context(
     (samples, channels, sample_rate): (Vec<f32>, u16, u32),
     soundpack: SoundPack,
 ) -> Result<(), String> {
+    println!(
+        "🔄 Updating audio context for soundpack: {}",
+        soundpack.name
+    );
+
     // Update samples
     if let Ok(mut cached) = context.cached_samples.lock() {
-        *cached = Some((samples, channels, sample_rate));
+        *cached = Some((samples.clone(), channels, sample_rate));
+        println!(
+            "✅ Updated cached samples: {} samples, {} channels, {} Hz",
+            samples.len(),
+            channels,
+            sample_rate
+        );
+    } else {
+        return Err("Failed to acquire lock on cached_samples".to_string());
     }
-
-    // Log key mappings
-    println!("🔍 Loaded soundpack: {}", soundpack.name,);
 
     // Update key mappings
     if let Ok(mut key_map) = context.key_map.lock() {
+        let old_count = key_map.len();
         key_map.clear();
-        key_map.extend(soundpack.def);
+        key_map.extend(soundpack.def.clone());
+        println!(
+            "🗝️ Updated key mappings: {} -> {} keys",
+            old_count,
+            key_map.len()
+        );
+
+        // Log first few key mappings for verification
+        for (key, mapping) in key_map.iter().take(3) {
+            println!("   {} -> {:?}", key, mapping);
+        }
     } else {
         return Err("Failed to acquire lock on key_map".to_string());
     }
 
     // Clear state
     if let Ok(mut sinks) = context.key_sinks.lock() {
+        let old_sinks = sinks.len();
         sinks.clear();
+        println!("🔇 Cleared {} active sinks", old_sinks);
     }
     if let Ok(mut pressed) = context.key_pressed.lock() {
+        let old_pressed = pressed.len();
         pressed.clear();
+        println!("⌨️ Cleared {} pressed keys", old_pressed);
     }
 
     println!(
-        "✅ Loaded soundpack: {} by {}",
-        soundpack.name, soundpack.author
+        "✅ Successfully loaded soundpack: {} by {} ({} key mappings)",
+        soundpack.name,
+        soundpack.author,
+        soundpack.def.len()
     );
     Ok(())
 }

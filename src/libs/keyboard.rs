@@ -1,9 +1,16 @@
 use rdev::{listen, Event, EventType, Key};
+use std::collections::HashSet;
 use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Maps a keyboard key to its standardized code across different platforms
+// Maps a keyboard key to its standardized code across different platforms
+// This mapping is used to ensure consistent key codes for audio playback
+// and UI updates regardless of the underlying OS or keyboard layout.
+// Sources:
+// - WebAPI keycodes: https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
+// - rdev keycodes: https://docs.rs/rdev/latest/rdev/enum.Key.html
+
 fn map_key_to_code(key: Key) -> &'static str {
     let code = match key {
         // Common keys across all platforms
@@ -22,20 +29,8 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::ShiftRight => "ShiftRight",
         Key::ControlLeft => "ControlLeft",
         Key::ControlRight => "ControlRight",
-        Key::MetaLeft => {
-            if cfg!(target_os = "macos") {
-                "MetaLeft"
-            } else {
-                "OSLeft"
-            }
-        }
-        Key::MetaRight => {
-            if cfg!(target_os = "macos") {
-                "MetaRight"
-            } else {
-                "OSRight"
-            }
-        }
+        Key::MetaLeft => "MetaLeft",
+        Key::MetaRight => "MetaRight",
 
         // Arrow keys
         Key::UpArrow => "ArrowUp",
@@ -101,7 +96,9 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::Num6 => "Digit6",
         Key::Num7 => "Digit7",
         Key::Num8 => "Digit8",
-        Key::Num9 => "Digit9", // Special characters and punctuation
+        Key::Num9 => "Digit9",
+
+        // Special characters and punctuation
         // These can vary by keyboard layout
         Key::BackQuote => "Backquote", // `
         Key::Minus => "Minus",         // -
@@ -133,6 +130,8 @@ fn map_key_to_code(key: Key) -> &'static str {
 
 pub fn start_keyboard_listener(play_sound_tx: Sender<String>) {
     let last_press = Arc::new(Mutex::new(Instant::now()));
+    // Track currently pressed keys to avoid processing repeated press events
+    let pressed_keys = Arc::new(Mutex::new(HashSet::<String>::new()));
 
     thread::spawn(move || {
         println!("🎹 Keyboard listener started...");
@@ -141,7 +140,17 @@ pub fn start_keyboard_listener(play_sound_tx: Sender<String>) {
             EventType::KeyPress(key) => {
                 let key_code = map_key_to_code(key);
                 if !key_code.is_empty() {
-                    println!("🛠 Key Pressed: {}", key_code);
+                    // Check if key is already pressed to improve performance
+                    let mut pressed = pressed_keys.lock().unwrap();
+                    if pressed.contains(&key_code.to_string()) {
+                        // Key is already pressed, ignore this event for better performance
+                        return;
+                    }
+
+                    // Mark key as pressed
+                    pressed.insert(key_code.to_string());
+                    drop(pressed); // Release lock early
+
                     let now = Instant::now();
                     let mut last = last_press.lock().unwrap();
                     if now.duration_since(*last) > Duration::from_millis(1) {
@@ -153,6 +162,11 @@ pub fn start_keyboard_listener(play_sound_tx: Sender<String>) {
             EventType::KeyRelease(key) => {
                 let key_code = map_key_to_code(key);
                 if !key_code.is_empty() {
+                    // Remove key from pressed set
+                    let mut pressed = pressed_keys.lock().unwrap();
+                    pressed.remove(&key_code.to_string());
+                    drop(pressed); // Release lock early
+
                     println!("🛠 Key Released: {}", key_code);
                     let _ = play_sound_tx.send(format!("UP:{}", key_code));
                 }
