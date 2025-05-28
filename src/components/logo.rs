@@ -11,6 +11,8 @@ pub fn Logo() -> Element {
 
     // Apply dynamic styling based on whether a key is pressed
     let base = "border-black border-4 font-black block py-6 px-8 pt-7 text-5xl rounded-2xl transition-all duration-150 ease-in-out bg-base-300";
+
+    // Determine the class based on key press state
     let class = if key_pressed {
         format!("{} logo-pressed", base)
     } else {

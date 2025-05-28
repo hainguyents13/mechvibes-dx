@@ -14,13 +14,14 @@ pub fn VolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -
         }
         div { class: "col-span-8",
           input {
-            class: "range range-neutral range-xs",
+            class: "range range-xs",
             r#type: "range",
             min: 0.0,
             max: 1.0,
             step: 0.05,
             id: "volume-slider",
-            value: volume(),            oninput: move |evt| {
+            value: volume(),
+            oninput: move |evt| {
                 if let Ok(val) = evt.value().parse::<f32>() {
                     volume.set(val);
                     if let Some(handler) = on_change {

@@ -25,10 +25,10 @@ pub fn TitleBar() -> Element {
         window_close.close();
     };
     rsx! {
-      div { class: "flex justify-between items-center px-3 py-2 select-none hover:bg-base-200 transition-all focus:bg-base-200",
+      div { class: "flex justify-between items-center select-none bg-transparent hover:bg-gradient-to-b from-base-300 to-transparent transition-all focus:bg-base-200",
         // Left side - app title and draggable area
         div {
-          class: "flex items-center flex-1 cursor-move",
+          class: "flex items-center flex-1 cursor-move  px-3 py-2",
           onmousedown: start_drag,
           // App title
           span { class: "text-sm font-semibold text-base-content", "Mechvibes DX" }
@@ -38,19 +38,19 @@ pub fn TitleBar() -> Element {
           }
         }
         // Right side - window controls
-        div { class: "flex items-center space-x-2", // Minimize button
+        div { class: "flex items-center space-x-2 px-3 py-2", // Minimize button
           button {
-            class: "p-1.5 rounded-md hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors",
+            class: "p-1.5 rounded-md hover:bg-neutral/70 text-base-content/70 hover:text-neutral-content transition-colors",
             title: "Minimize",
             onclick: minimize,
-            Minus { class: "w-3.5 h-3.5" }
+            Minus { class: "w-4 h-4" }
           }
           // Close button
           button {
             class: "p-1.5 rounded-md hover:bg-error text-base-content/70 hover:text-error-content transition-colors",
             title: "Close",
             onclick: close,
-            X { class: "w-3.5 h-3.5" }
+            X { class: "w-4 h-4" }
           }
         }
       }

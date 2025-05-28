@@ -9,6 +9,7 @@ module.exports = {
     'bg-base-100',
     'bg-base-200',
     'bg-base-300',
+    'bg-neutral',
     'border-base-100',
     'border-base-200',
     'border-base-300',

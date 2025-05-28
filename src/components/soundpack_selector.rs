@@ -107,7 +107,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
           }
           // Dropdown panel
           if is_open() {
-            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-200 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
+            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
               // Search input
               div { class: "p-3 border-b border-base-200",
                 div { class: "relative",
