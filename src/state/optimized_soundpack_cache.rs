@@ -8,6 +8,7 @@ use std::time::UNIX_EPOCH;
 pub struct SoundpackMetadata {
     pub id: String,
     pub name: String,
+    pub author: Option<String>,
     pub description: Option<String>,
     pub version: String,
     pub tags: Vec<String>,
@@ -32,8 +33,10 @@ impl OptimizedSoundpackCache {
         // Create cache directory if it doesn't exist
         if let Err(e) = fs::create_dir_all(Self::CACHE_DIR) {
             eprintln!("⚠️  Failed to create cache directory: {}", e);
-        } // Load metadata cache
-        match fs::read_to_string(Self::CACHE_FILE) {
+        }
+
+        // Load metadata cache
+        let mut cache = match fs::read_to_string(Self::CACHE_FILE) {
             Ok(content) => match serde_json::from_str::<OptimizedSoundpackCache>(&content) {
                 Ok(cache) => {
                     println!(
@@ -51,7 +54,16 @@ impl OptimizedSoundpackCache {
                 println!("📦 Creating new soundpack metadata cache");
                 Self::new()
             }
+        };
+
+        // Auto-refresh if cache is empty or outdated
+        if cache.soundpacks.is_empty() || cache.last_scan == 0 {
+            println!("🔄 Cache is empty or outdated, refreshing from directory...");
+            cache.refresh_from_directory();
+            cache.save();
         }
+
+        cache
     }
 
     pub fn new() -> Self {
@@ -291,6 +303,10 @@ impl OptimizedSoundpackCache {
         Ok(SoundpackMetadata {
             id: soundpack_id.to_string(),
             name,
+            author: config
+                .get("author")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             description: config
                 .get("description")
                 .and_then(|v| v.as_str())

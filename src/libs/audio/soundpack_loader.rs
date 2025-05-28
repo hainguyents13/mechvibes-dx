@@ -407,6 +407,7 @@ fn create_soundpack_metadata(
     Ok(SoundpackMetadata {
         id,
         name: soundpack.name.clone(),
+        author: Some(soundpack.author.clone()),
         description: soundpack.description.clone(),
         version: soundpack
             .version

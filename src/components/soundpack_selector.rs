@@ -77,7 +77,11 @@ pub fn SoundpackSelector() -> Element {
                     "{pack.name}"
                   }
                   div { class: "text-sm truncate text-base-content/60",
-                    "v{pack.version}"
+                    if let Some(author) = &pack.author {
+                      "v{pack.version} by {author}"
+                    } else {
+                      "v{pack.version}"
+                    }
                   }
                 }
               } else {
@@ -192,7 +196,11 @@ pub fn SoundpackSelector() -> Element {
                             "{pack.name}"
                           }
                           div { class: "text-xs truncate text-base-content/60",
-                            "v{pack.version}"
+                            if let Some(author) = &pack.author {
+                              "v{pack.version} by {author}"
+                            } else {
+                              "v{pack.version}"
+                            }
                           }
                         }
                       }
