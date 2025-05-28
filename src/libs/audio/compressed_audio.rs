@@ -97,7 +97,9 @@ impl CompressedAudioData {
 pub struct CompressionStats {
     pub original_size: u64,
     pub compressed_size: u64,
+    #[allow(dead_code)]
     pub samples_count: usize,
+    #[allow(dead_code)]
     pub key_mappings_count: usize,
     pub compression_ratio: f64,
 }
