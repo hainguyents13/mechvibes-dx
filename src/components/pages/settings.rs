@@ -21,6 +21,7 @@ pub fn SettingsPage() -> Element {
         }
         // Settings sections
         div { class: "space-y-4",
+          // General Settings Section
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input {
               r#type: "radio",
@@ -124,23 +125,19 @@ pub fn SettingsPage() -> Element {
                   }
                 }
               }
-            }          }
-          // Cache Management Section
+            }
+          }
+          // App info Section
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "Cache Management" }
+            div { class: "collapse-title font-semibold", "App info" }
             div { class: "collapse-content text-sm",
+              crate::components::app_info::AppInfoDisplay {}
               crate::components::cache_manager::CacheManager {}
             }
           }
-          // App Info Section as DaisyUI collapse
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "App Info" }
-            div { class: "collapse-content text-sm",
-              crate::components::app_info::AppInfoDisplay {}
-            }
-          }
+          // Danger Zone Section
+          // Reset Settings
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold  text-error", "Danger zone" }

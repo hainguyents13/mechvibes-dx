@@ -5,9 +5,6 @@ pub mod keyboard;
 pub mod manifest;
 pub mod optimized_soundpack_cache;
 pub mod soundpack;
-pub mod soundpack_cache;
 
-// Re-export commonly used structs
+// Re-exports for convenience (only used ones)
 pub use manifest::AppManifest;
-// SoundpackCache is imported directly from module, no need to re-export
-// pub use soundpack_cache::SoundpackCache;

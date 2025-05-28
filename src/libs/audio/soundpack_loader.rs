@@ -6,7 +6,6 @@ use crate::libs::audio::compressed_audio::CompressedAudioData;
 use crate::state::config::AppConfig;
 use crate::state::optimized_soundpack_cache::{OptimizedSoundpackCache, SoundpackMetadata};
 use crate::state::soundpack::SoundPack;
-use crate::state::soundpack_cache::SoundpackCache;
 
 use super::audio_context::AudioContext;
 
@@ -17,33 +16,8 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
 }
 
 pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
-    // Try to load from cache first
-    let cache = SoundpackCache::load();
-    if let Some(pack_item) = cache.get_soundpack_by_id(soundpack_id) {
-        println!(
-            "🚀 Loading soundpack '{}' from cache",
-            pack_item.soundpack.name
-        );
-
-        // Use relative path from cache
-        let soundpack_path = &pack_item.relative_path;
-        let cached_samples = load_audio_file(soundpack_path, &pack_item.soundpack)?;
-
-        // Update context with cached data
-        update_context(context, cached_samples, pack_item.soundpack.clone())?;
-
-        // Update config
-        update_config(&pack_item.soundpack)?;
-
-        return Ok(());
-    }
-
-    // Fallback to file-based loading if not in cache
-    println!(
-        "⚠️ Soundpack '{}' not found in cache, falling back to file loading",
-        soundpack_id
-    );
-    load_soundpack_from_files_by_id(context, soundpack_id)
+    // Use optimized cache for loading
+    load_soundpack_optimized(context, soundpack_id)
 }
 
 fn load_soundpack_from_files_by_id(
@@ -276,17 +250,22 @@ fn load_and_cache_soundpack_optimized(
     soundpack_id: &str,
     mut cache: OptimizedSoundpackCache,
 ) -> Result<(), String> {
-    // Load soundpack from cache using existing logic
-    let soundpack_cache = SoundpackCache::load();
-    let soundpack_item = soundpack_cache
-        .get_soundpack_by_id(soundpack_id)
-        .ok_or_else(|| format!("Soundpack '{}' not found", soundpack_id))?;
+    // Load soundpack directly from filesystem
+    let soundpack_path = format!("./soundpacks/{}", soundpack_id);
 
-    // Load audio samples using existing function
-    let samples = load_audio_file(&soundpack_item.relative_path, &soundpack_item.soundpack)?;
+    // Load config.json
+    let config_path = format!("{}/config.json", soundpack_path);
+    let config_content = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read config: {}", e))?;
+
+    let soundpack: SoundPack = serde_json::from_str(&config_content)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+
+    // Load audio samples
+    let samples = load_audio_file(&soundpack_path, &soundpack)?;
 
     // Create key mappings
-    let key_mappings = create_key_mappings(&soundpack_item.soundpack, &samples.0);
+    let key_mappings = create_key_mappings(&soundpack, &samples.0);
 
     // Create compressed audio data for caching
     let compressed_data = CompressedAudioData::new(
@@ -295,9 +274,8 @@ fn load_and_cache_soundpack_optimized(
         samples.1, // Use actual channels
         key_mappings.clone(),
         soundpack_id.to_string(),
-        soundpack_item.soundpack.name.clone(),
-        soundpack_item
-            .soundpack
+        soundpack.name.clone(),
+        soundpack
             .version
             .clone()
             .unwrap_or_else(|| "1.0".to_string()),
@@ -309,10 +287,7 @@ fn load_and_cache_soundpack_optimized(
             cache.save_audio_cache(soundpack_id, &serialized);
 
             // Update metadata cache
-            let metadata = create_soundpack_metadata(
-                &soundpack_item.relative_path,
-                &soundpack_item.soundpack,
-            )?;
+            let metadata = create_soundpack_metadata(&soundpack_path, &soundpack)?;
             cache.add_soundpack(metadata);
             cache.save();
 
@@ -473,8 +448,7 @@ pub fn get_cache_statistics() -> Result<String, String> {
     let stats = cache.get_cache_stats();
 
     Ok(format!(
-        "📊 Cache Statistics:\n\
-         • Metadata entries: {}\n\
+        "• Metadata entries: {}\n\
          • Audio cache files: {}\n\
          • Total cache size: {}\n",
         stats.metadata_count,

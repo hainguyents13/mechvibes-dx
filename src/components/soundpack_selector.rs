@@ -23,8 +23,7 @@ pub fn SoundpackSelector() -> Element {
     let mut is_refreshing = use_signal(|| false);
 
     // Use global app state for soundpacks and get current soundpack from config
-    let soundpacks =
-        use_memo(move || app_state.with(|state| state.soundpack_cache.get_soundpacks().clone()));
+    let soundpacks = use_memo(move || app_state.with(|state| state.get_soundpacks()));
     let current = use_memo(move || config().current_soundpack.clone());
 
     // Filter soundpacks based on search query
@@ -36,22 +35,18 @@ pub fn SoundpackSelector() -> Element {
             soundpacks()
                 .into_iter()
                 .filter(|pack| {
-                    pack.soundpack.name.to_lowercase().contains(&query)
-                        || pack.soundpack.author.to_lowercase().contains(&query)
-                        || pack.soundpack.id.to_lowercase().contains(&query)
+                    pack.name.to_lowercase().contains(&query)
+                        || pack.id.to_lowercase().contains(&query)
+                        || pack
+                            .tags
+                            .iter()
+                            .any(|tag| tag.to_lowercase().contains(&query))
                 })
                 .collect()
         }
-    });
-
-    // Find current soundpack info
-    let current_soundpack = use_memo(move || {
-        soundpacks()
-            .iter()
-            .find(|pack| pack.soundpack.id == current())
-            .map(|item| &item.soundpack)
-            .cloned()
-    });
+    }); // Find current soundpack details
+    let current_soundpack =
+        use_memo(move || soundpacks().into_iter().find(|pack| pack.id == current()));
 
     rsx! {
       div { class: "space-y-2",
@@ -82,7 +77,7 @@ pub fn SoundpackSelector() -> Element {
                     "{pack.name}"
                   }
                   div { class: "text-sm truncate text-base-content/60",
-                    "by {pack.author}"
+                    "v{pack.version}"
                   }
                 }
               } else {
@@ -121,12 +116,14 @@ pub fn SoundpackSelector() -> Element {
                 } else {
                   for pack in filtered_soundpacks.read().iter() {
                     button {
-                      key: "{pack.soundpack.id}",
+                      key: "{pack.id}",
                       class: format!(
                           "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16 {}",
-                          if pack.soundpack.id == current() { " btn-disabled" } else { "" },
+                          if pack.id == current() { " btn-disabled" } else { "" },
                       ),
-                      onclick: {                          let pack_id = pack.soundpack.id.clone();                          let mut error = error.clone();
+                      onclick: {
+                          let pack_id = pack.id.clone();
+                          let mut error = error.clone();
                           let soundpacks = soundpacks.clone();
                           let mut is_open = is_open.clone();
                           let mut search_query = search_query.clone();
@@ -136,23 +133,28 @@ pub fn SoundpackSelector() -> Element {
                               println!("🎯 User selected soundpack: {}", pack_id);
                               is_open.set(false);
                               error.set(String::new());
-                              if let Some(pack_item) = soundpacks()
-                                  .iter()
-                                  .find(|p| p.soundpack.id == pack_id)
-                              {
-                                  println!("📦 Found soundpack in cache: {}", pack_item.soundpack.name);
+                              if let Some(pack_item) = soundpacks().iter().find(|p| p.id == pack_id) {
+                                  println!("📦 Found soundpack in cache: {}", pack_item.name);
                                   let pack_id_clone = pack_id.clone();
                                   update_config(
                                       Box::new(move |config| {
-                                          println!("💾 Updating config: {} -> {}", config.current_soundpack, pack_id_clone);
+                                          println!(
+                                              "💾 Updating config: {} -> {}",
+                                              config.current_soundpack,
+                                              pack_id_clone,
+                                          );
                                           config.current_soundpack = pack_id_clone;
                                       }),
-                                  );                                  match crate::libs::audio::load_soundpack_optimized(&audio_ctx, &pack_id) {
+                                  );
+                                  match crate::libs::audio::load_soundpack_optimized(
+                                      &audio_ctx,
+                                      &pack_id,
+                                  ) {
                                       Ok(_) => {
                                           search_query.set(String::new());
                                           println!(
                                               "✅ Soundpack changed to: {} (optimized loading)",
-                                              pack_item.soundpack.name,
+                                              pack_item.name,
                                           );
                                       }
                                       Err(e) => {
@@ -169,13 +171,13 @@ pub fn SoundpackSelector() -> Element {
                         div {
                           class: format!(
                               "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center {}",
-                              if pack.soundpack.id == current() { "bg-black" } else { "" },
+                              if pack.id == current() { "bg-black" } else { "" },
                           ),
-                          if pack.soundpack.id != current() {
-                            if let Some(icon) = &pack.full_icon_path {
+                          if pack.id != current() {
+                            if let Some(icon) = &pack.icon {
                               img {
                                 class: "w-6 h-6 rounded",
-                                src: icon.to_string(),
+                                src: format!("./soundpacks/{}/{}", pack.id, icon),
                                 alt: "icon",
                               }
                             } else {
@@ -187,13 +189,10 @@ pub fn SoundpackSelector() -> Element {
                         }
                         div { class: "flex-1 min-w-0",
                           div { class: "text-sm font-medium truncate text-base-content",
-                            "{pack.soundpack.name}"
+                            "{pack.name}"
                           }
                           div { class: "text-xs truncate text-base-content/60",
-                            if let Some(version) = &pack.soundpack.version {
-                              "v{version} "
-                            }
-                            "by {pack.soundpack.author}"
+                            "v{pack.version}"
                           }
                         }
                       }
@@ -232,15 +231,16 @@ pub fn SoundpackSelector() -> Element {
             }
             button {
               class: "btn btn-white btn-sm ",
-              title: "Refresh soundpack list from disk and reload current soundpack",              onclick: move |_| {
+              title: "Refresh soundpack list from disk and reload current soundpack",
+              onclick: move |_| {
                   if !is_refreshing() {
                       is_refreshing.set(true);
-                      error.set(String::new());                      let mut is_refreshing = is_refreshing.clone();
+                      error.set(String::new());
+                      let mut is_refreshing = is_refreshing.clone();
                       let audio_ctx = audio_ctx.clone();
                       spawn(async move {
                           Delay::new(Duration::from_millis(1000)).await;
                           crate::state::app::reload_soundpacks();
-                          // Also reload the current soundpack in memory
                           crate::state::app::reload_current_soundpack(&audio_ctx);
                           is_refreshing.set(false);
                       });

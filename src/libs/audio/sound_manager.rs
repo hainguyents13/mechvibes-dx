@@ -20,7 +20,6 @@ impl AudioContext {
             if is_keydown { "down" } else { "up" }
         );
 
-        // Xử lý trạng thái phím
         let mut pressed = self.key_pressed.lock().unwrap();
         if is_keydown {
             if *pressed.get(key).unwrap_or(&false) {
@@ -33,7 +32,8 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Get timestamp and duration
+        drop(pressed);
+        // Get timestamp and duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {

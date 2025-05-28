@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundpackMetadata {
     pub id: String,
     pub name: String,
@@ -222,6 +222,117 @@ impl OptimizedSoundpackCache {
             metadata_count: self.soundpacks.len(),
         }
     }
+
+    // Refresh cache by scanning soundpacks directory
+    pub fn refresh_from_directory(&mut self) {
+        println!("📂 Scanning soundpacks directory...");
+
+        match std::fs::read_dir("./soundpacks") {
+            Ok(entries) => {
+                self.soundpacks.clear();
+
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if let Some(soundpack_id) = entry.file_name().to_str() {
+                        if let Ok(metadata) = self.load_soundpack_metadata(soundpack_id) {
+                            self.soundpacks.insert(soundpack_id.to_string(), metadata);
+                        }
+                    }
+                }
+
+                self.last_scan = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+
+                println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
+            }
+            Err(e) => {
+                eprintln!("⚠️  Failed to read soundpacks directory: {}", e);
+            }
+        }
+    }
+
+    // Load soundpack metadata from config.json
+    fn load_soundpack_metadata(&self, soundpack_id: &str) -> Result<SoundpackMetadata, String> {
+        let config_path = format!("./soundpacks/{}/config.json", soundpack_id);
+
+        let content = std::fs::read_to_string(&config_path)
+            .map_err(|e| format!("Failed to read config: {}", e))?;
+
+        let config: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))?;
+
+        let name = config
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(soundpack_id)
+            .to_string();
+
+        let version = config
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1.0.0")
+            .to_string();
+
+        let tags = config
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Get file stats
+        let metadata = std::fs::metadata(&config_path)
+            .map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+        Ok(SoundpackMetadata {
+            id: soundpack_id.to_string(),
+            name,
+            description: config
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            version,
+            tags,
+            keycap: config
+                .get("keycap")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            icon: config
+                .get("icon")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            last_modified: metadata
+                .modified()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            file_size: metadata.len(),
+            last_accessed: 0, // Will be updated when accessed
+        })
+    }
+
+    // Background cache cleanup task
+    pub fn start_cache_cleanup_task() {
+        std::thread::spawn(|| {
+            println!("🧹 Starting background cache cleanup task...");
+
+            loop {
+                // Sleep for 1 hour
+                std::thread::sleep(std::time::Duration::from_secs(3600));
+
+                let mut cache = OptimizedSoundpackCache::load();
+                cache.cleanup_old_caches(10); // Keep 10 most recent
+                cache.save();
+
+                println!("🧹 Performed automatic cache cleanup");
+            }
+        });
+    }
 }
 
 #[derive(Debug)]
@@ -251,12 +362,17 @@ impl CacheStats {
 // Background cache cleanup task
 pub fn start_cache_cleanup_task() {
     std::thread::spawn(|| {
+        println!("🧹 Starting background cache cleanup task...");
+
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(300)); // 5 minutes
+            // Sleep for 1 hour
+            std::thread::sleep(std::time::Duration::from_secs(3600));
 
             let mut cache = OptimizedSoundpackCache::load();
             cache.cleanup_old_caches(10); // Keep 10 most recent
             cache.save();
+
+            println!("🧹 Performed automatic cache cleanup");
         }
     });
 }
