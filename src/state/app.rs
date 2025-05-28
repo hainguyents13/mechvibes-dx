@@ -3,7 +3,7 @@ use crate::state::soundpack_cache::SoundpackCache;
 use dioxus::prelude::*;
 use std::sync::Arc;
 
-// Global app state để chia sẻ giữa các component
+// Global app state for sharing between components
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub config: Arc<AppConfig>,
@@ -26,7 +26,7 @@ use std::sync::RwLock;
 
 static APP_STATE_SIGNAL: OnceCell<RwLock<AppState>> = OnceCell::new();
 
-// Hook để dễ dàng truy cập state từ component
+// Hook for easy access to state from components
 pub fn use_app_state() -> Signal<AppState> {
     // Initialize the global signal if needed
     if APP_STATE_SIGNAL.get().is_none() {
@@ -62,8 +62,7 @@ pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
     }
 }
 
-// Hàm tiện ích để reload soundpacks từ bất kỳ đâu
-#[allow(dead_code)]
+// Utility function to reload soundpacks from anywhere
 pub fn reload_soundpacks() {
     println!("🔄 Reloading global soundpack cache...");
 
@@ -93,43 +92,6 @@ pub fn reload_soundpacks() {
 }
 
 pub static APP_STATE: OnceCell<Mutex<AppState>> = OnceCell::new();
-
-pub fn save_config(config: AppConfig) -> Result<(), String> {
-    // Đảm bảo update version và timestamp khi lưu
-    let mut config = config;
-    config.version = env!("CARGO_PKG_VERSION").to_string();
-    config.last_updated = chrono::Utc::now();
-
-    // Lưu config
-    config.save().map_err(|e| e.to_string())?;
-
-    // Cập nhật config trong bộ nhớ một cách hiệu quả
-    let new_config = Arc::new(config);
-
-    // Update mutex state
-    if let Some(mutex) = APP_STATE.get() {
-        if let Ok(mut app_state) = mutex.lock() {
-            let soundpack_cache = app_state.soundpack_cache.clone();
-            *app_state = AppState {
-                config: new_config.clone(),
-                soundpack_cache,
-            };
-        }
-    }
-
-    // Update signal state
-    if let Some(rwlock) = APP_STATE_SIGNAL.get() {
-        if let Ok(mut signal_state) = rwlock.write() {
-            let soundpack_cache = signal_state.soundpack_cache.clone();
-            *signal_state = AppState {
-                config: new_config,
-                soundpack_cache,
-            };
-        }
-    }
-
-    Ok(())
-}
 
 // Call this function once at the start of your application to initialize APP_STATE
 pub fn init_app_state() {

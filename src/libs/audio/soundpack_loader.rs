@@ -20,10 +20,9 @@ pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Resul
     if let Some(pack_item) = cache.get_soundpack_by_id(soundpack_id) {
         println!(
             "🚀 Loading soundpack '{}' from cache",
-            pack_item.soundpack.name
-        );
+            pack_item.soundpack.name        );
 
-        // Sử dụng đường dẫn tương đối từ cache
+        // Use relative path from cache
         let soundpack_path = &pack_item.relative_path;
         let cached_samples = load_audio_file(soundpack_path, &pack_item.soundpack)?;
 
@@ -42,11 +41,6 @@ pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Resul
         soundpack_id
     );
     load_soundpack_from_files_by_id(context, soundpack_id)
-}
-
-fn load_soundpack_from_files(context: &AudioContext) -> Result<(), String> {
-    let config = AppConfig::load();
-    load_soundpack_from_files_by_id(context, &config.current_soundpack)
 }
 
 fn load_soundpack_from_files_by_id(
@@ -132,14 +126,6 @@ fn get_soundpack_by_id(
             Ok((path, pack))
         }
     }
-}
-
-fn get_current_soundpack(
-    available_packs: &[(String, SoundPack)],
-) -> Result<(String, SoundPack), String> {
-    let config = AppConfig::load();
-    let current_id = &config.current_soundpack;
-    get_soundpack_by_id(available_packs, current_id)
 }
 
 fn load_audio_file(

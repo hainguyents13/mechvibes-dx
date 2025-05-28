@@ -33,10 +33,9 @@ impl AppConfig {
 
         let config_path = PathBuf::from("./data/config.json");
         if let Ok(contents) = fs::read_to_string(config_path) {
-            match serde_json::from_str::<AppConfig>(&contents) {
-                Ok(config) => {
-                    // Không cập nhật version và last_updated khi chỉ đọc config
-                    // Không lưu lại file khi chỉ đọc config
+            match serde_json::from_str::<AppConfig>(&contents) {                Ok(config) => {
+                    // Don't update version and last_updated when only reading config
+                    // Don't save file when only reading config
                     config
                 }
                 Err(e) => {

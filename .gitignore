@@ -8,4 +8,4 @@
 node_modules
 
 # Generated manifest (keep app.config.json in git)
-/data/manifest.json
+/data

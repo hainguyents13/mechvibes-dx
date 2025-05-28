@@ -7,7 +7,7 @@ use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
-        // Kiểm tra enable_sound từ config trước khi phát âm thanh
+        // Check enable_sound from config before playing audio
         let config = AppConfig::load();
         if !config.enable_sound {
             println!("🔕 Sound disabled in config, skipping key event: '{}'", key);
@@ -33,7 +33,7 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Lấy timestamp và duration
+        drop(pressed); // Get timestamp and duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {

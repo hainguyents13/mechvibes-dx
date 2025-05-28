@@ -11,14 +11,13 @@ pub struct SoundpackItem {
     pub soundpack: SoundPack,
 
     // Đường dẫn tương đối
-    #[serde(default)]
-    pub relative_path: String,
+    #[serde(default)]    pub relative_path: String,
 
-    // Đường dẫn đầy đủ đến icon (nếu có)
+    // Full path to icon (if available)
     #[serde(default)]
     pub full_icon_path: Option<String>,
 
-    // Đường dẫn đầy đủ đến file sound
+    // Full path to sound file
     #[serde(default)]
     pub full_sound_path: Option<String>,
 }
@@ -95,15 +94,14 @@ impl SoundpackCache {
                                         // Lấy tên thư mục (đường dẫn tương đối)
                                         let dir_name = path
                                             .file_name()
-                                            .and_then(|name| name.to_str())
-                                            .unwrap_or("unknown");
+                                            .and_then(|name| name.to_str())                                            .unwrap_or("unknown");
 
-                                        // Tạo đường dẫn đầy đủ cho icon nếu có
+                                        // Create full path for icon if available
                                         let full_icon_path = pack.icon.as_ref().map(|icon_path| {
                                             format!("./soundpacks/{}/{}", dir_name, icon_path)
                                         });
 
-                                        // Tạo đường dẫn đầy đủ cho file sound nếu có
+                                        // Create full path for sound file if available
                                         let full_sound_path =
                                             pack.source.as_ref().map(|sound_path| {
                                                 format!("./soundpacks/{}/{}", dir_name, sound_path)
