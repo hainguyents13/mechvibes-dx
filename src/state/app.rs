@@ -45,7 +45,7 @@ pub fn use_app_state() -> Signal<AppState> {
     })
 }
 
-//让我也add一个函数来重新加载当前soundpack
+// Reload the current soundpack from configuration
 pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
     let config = crate::state::config::AppConfig::load();
     let current_id = &config.current_soundpack;
