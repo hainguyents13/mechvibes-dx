@@ -3,6 +3,7 @@ pub mod config;
 pub mod config_utils;
 pub mod keyboard;
 pub mod manifest;
+pub mod optimized_soundpack_cache;
 pub mod soundpack;
 pub mod soundpack_cache;
 

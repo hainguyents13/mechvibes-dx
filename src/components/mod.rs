@@ -1,4 +1,5 @@
 pub mod app_info;
+pub mod cache_manager;
 pub mod dock;
 pub mod header;
 pub mod logo;

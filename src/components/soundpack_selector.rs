@@ -147,12 +147,11 @@ pub fn SoundpackSelector() -> Element {
                                           println!("💾 Updating config: {} -> {}", config.current_soundpack, pack_id_clone);
                                           config.current_soundpack = pack_id_clone;
                                       }),
-                                  );
-                                  match crate::libs::audio::load_soundpack_by_id(&audio_ctx, &pack_id) {
+                                  );                                  match crate::libs::audio::load_soundpack_optimized(&audio_ctx, &pack_id) {
                                       Ok(_) => {
                                           search_query.set(String::new());
                                           println!(
-                                              "✅ Soundpack changed to: {} (loaded from cache)",
+                                              "✅ Soundpack changed to: {} (optimized loading)",
                                               pack_item.soundpack.name,
                                           );
                                       }

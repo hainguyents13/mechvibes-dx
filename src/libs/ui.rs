@@ -14,13 +14,20 @@ pub fn app() -> Element {
 
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new()); // Provide the keyboard state context to all child components
-    use_context_provider(|| keyboard_state);
-
-    // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
+    use_context_provider(|| keyboard_state); // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
     use_context_provider(|| audio_context.clone());
+
+    // Load current soundpack on startup
+    {
+        let ctx = audio_context.clone();
+        use_effect(move || {
+            println!("🎵 Loading current soundpack on startup...");
+            crate::state::app::reload_current_soundpack(&ctx);
+        });
+    }
 
     // Create a channel for real-time keyboard event communication
     let (tx, rx) = mpsc::channel::<String>();

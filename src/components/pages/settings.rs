@@ -124,6 +124,13 @@ pub fn SettingsPage() -> Element {
                   }
                 }
               }
+            }          }
+          // Cache Management Section
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
+            input { r#type: "radio", name: "setting-accordion" }
+            div { class: "collapse-title font-semibold", "Cache Management" }
+            div { class: "collapse-content text-sm",
+              crate::components::cache_manager::CacheManager {}
             }
           }
           // App Info Section as DaisyUI collapse

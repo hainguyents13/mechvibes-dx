@@ -28,6 +28,8 @@
     --text-base--line-height: calc(1.5 / 1);
     --text-lg: 1.125rem;
     --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
     --text-2xl: 1.5rem;
     --text-2xl--line-height: calc(2 / 1.5);
     --text-3xl: 1.875rem;
@@ -1700,6 +1702,13 @@
       height: calc(0.25rem * 8);
     }
   }
+  .stats {
+    position: relative;
+    display: inline-grid;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    border-radius: var(--radius-box);
+  }
   .progress {
     position: relative;
     height: calc(0.25rem * 2);
@@ -2064,6 +2073,9 @@
   .mr-1 {
     margin-right: calc(var(--spacing) * 1);
   }
+  .mr-2 {
+    margin-right: calc(var(--spacing) * 2);
+  }
   .mb-1 {
     margin-bottom: calc(var(--spacing) * 1);
   }
@@ -2127,6 +2139,59 @@
       @supports (color: color-mix(in lab, red, red)) {
         border-color: color-mix( in oklab, var(--badge-color, var(--color-base-content)) 10%, var(--color-base-100) );
       }
+      background-image: none;
+    }
+  }
+  .alert {
+    display: grid;
+    align-items: center;
+    gap: calc(0.25rem * 4);
+    border-radius: var(--radius-box);
+    padding-inline: calc(0.25rem * 4);
+    padding-block: calc(0.25rem * 3);
+    color: var(--color-base-content);
+    background-color: var(--alert-color, var(--color-base-200));
+    justify-content: start;
+    justify-items: start;
+    grid-auto-flow: column;
+    grid-template-columns: auto;
+    text-align: start;
+    border: var(--border) solid var(--color-base-200);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    background-size: auto, calc(var(--noise) * 100%);
+    background-image: none, var(--fx-noise);
+    box-shadow: 0 3px 0 -2px oklch(100% 0 0 / calc(var(--depth) * 0.08)) inset, 0 1px #000, 0 4px 3px -2px oklch(0% 0 0 / calc(var(--depth) * 0.08));
+    @supports (color: color-mix(in lab, red, red)) {
+      box-shadow: 0 3px 0 -2px oklch(100% 0 0 / calc(var(--depth) * 0.08)) inset, 0 1px color-mix( in oklab, color-mix(in oklab, #000 20%, var(--alert-color, var(--color-base-200))) calc(var(--depth) * 20%), #0000 ), 0 4px 3px -2px oklch(0% 0 0 / calc(var(--depth) * 0.08));
+    }
+    &:has(:nth-child(2)) {
+      grid-template-columns: auto minmax(auto, 1fr);
+    }
+    &.alert-outline {
+      background-color: transparent;
+      color: var(--alert-color);
+      box-shadow: none;
+      background-image: none;
+    }
+    &.alert-dash {
+      background-color: transparent;
+      color: var(--alert-color);
+      border-style: dashed;
+      box-shadow: none;
+      background-image: none;
+    }
+    &.alert-soft {
+      color: var(--alert-color, var(--color-base-content));
+      background: var(--alert-color, var(--color-base-content));
+      @supports (color: color-mix(in lab, red, red)) {
+        background: color-mix( in oklab, var(--alert-color, var(--color-base-content)) 8%, var(--color-base-100) );
+      }
+      border-color: var(--alert-color, var(--color-base-content));
+      @supports (color: color-mix(in lab, red, red)) {
+        border-color: color-mix( in oklab, var(--alert-color, var(--color-base-content)) 10%, var(--color-base-100) );
+      }
+      box-shadow: none;
       background-image: none;
     }
   }
@@ -2462,9 +2527,18 @@
     border-style: var(--tw-border-style);
     border-width: 4px;
   }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
   .border-b {
     border-bottom-style: var(--tw-border-style);
     border-bottom-width: 1px;
+  }
+  .alert-info {
+    border-color: var(--color-info);
+    color: var(--color-info-content);
+    --alert-color: var(--color-info);
   }
   .border-base-100 {
     border-color: var(--color-base-100);
@@ -2537,6 +2611,9 @@
   .p-4 {
     padding: calc(var(--spacing) * 4);
   }
+  .p-6 {
+    padding: calc(var(--spacing) * 6);
+  }
   .p-12 {
     padding: calc(var(--spacing) * 12);
   }
@@ -2566,6 +2643,9 @@
   }
   .py-6 {
     padding-block: calc(var(--spacing) * 6);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
   }
   .pt-7 {
     padding-top: calc(var(--spacing) * 7);
@@ -2614,6 +2694,10 @@
     font-size: var(--text-sm);
     line-height: var(--tw-leading, var(--text-sm--line-height));
   }
+  .text-xl {
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
   .text-xs {
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
@@ -2639,6 +2723,9 @@
   }
   .break-all {
     word-break: break-all;
+  }
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
   }
   .range-neutral {
     color: var(--color-neutral);
@@ -2677,6 +2764,9 @@
   .text-error {
     color: var(--color-error);
   }
+  .text-info {
+    color: var(--color-info);
+  }
   .text-neutral-content {
     color: var(--color-neutral-content);
   }
@@ -2685,6 +2775,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       color: color-mix(in oklab, var(--color-neutral-content) 70%, transparent);
     }
+  }
+  .text-primary {
+    color: var(--color-primary);
   }
   .text-white {
     color: var(--color-white);
@@ -2756,6 +2849,24 @@
     --tw-ease: var(--ease-out);
     transition-timing-function: var(--ease-out);
   }
+  .btn-outline {
+    &:not( .btn-active, :hover, :active:focus, :focus-visible, :disabled, [disabled], .btn-disabled, :checked ) {
+      --btn-shadow: "";
+      --btn-bg: #0000;
+      --btn-fg: var(--btn-color);
+      --btn-border: var(--btn-color);
+      --btn-noise: none;
+    }
+    @media (hover: none) {
+      &:hover:not( .btn-active, :active, :focus-visible, :disabled, [disabled], .btn-disabled, :checked ) {
+        --btn-shadow: "";
+        --btn-bg: #0000;
+        --btn-fg: var(--btn-color);
+        --btn-border: var(--btn-color);
+        --btn-noise: none;
+      }
+    }
+  }
   .btn-soft {
     &:not(.btn-active, :hover, :active:focus, :focus-visible, :disabled, [disabled], .btn-disabled) {
       --btn-shadow: "";
@@ -2819,6 +2930,10 @@
   .btn-neutral {
     --btn-color: var(--color-neutral);
     --btn-fg: var(--color-neutral-content);
+  }
+  .btn-warning {
+    --btn-color: var(--color-warning);
+    --btn-fg: var(--color-warning-content);
   }
   .select-none {
     -webkit-user-select: none;

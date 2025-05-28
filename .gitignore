@@ -7,5 +7,5 @@
 **/*.rs.bk
 node_modules
 
-# Generated manifest (keep app.config.json in git)
+# cache
 /data

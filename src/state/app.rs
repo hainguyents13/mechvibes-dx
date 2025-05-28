@@ -1,28 +1,37 @@
-use crate::state::config::AppConfig;
-use crate::state::soundpack_cache::SoundpackCache;
+// Standard library imports
+use std::sync::{Arc, Mutex, RwLock};
+
+// External crate imports
 use dioxus::prelude::*;
-use std::sync::Arc;
+use once_cell::sync::OnceCell;
+
+// Internal crate imports
+use crate::state::config::AppConfig;
+use crate::state::optimized_soundpack_cache::OptimizedSoundpackCache;
+use crate::state::soundpack_cache::SoundpackCache;
 
 // Global app state for sharing between components
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub config: Arc<AppConfig>,
     pub soundpack_cache: Arc<SoundpackCache>,
+    pub optimized_cache: Arc<OptimizedSoundpackCache>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         println!("🌍 Initializing global AppState...");
+
+        // Start background cache maintenance
+        crate::libs::audio::start_cache_maintenance();
+
         Self {
             config: Arc::new(AppConfig::load()),
             soundpack_cache: Arc::new(SoundpackCache::load()),
+            optimized_cache: Arc::new(OptimizedSoundpackCache::load()),
         }
     }
 }
-
-use once_cell::sync::OnceCell;
-use std::sync::Mutex;
-use std::sync::RwLock;
 
 static APP_STATE_SIGNAL: OnceCell<RwLock<AppState>> = OnceCell::new();
 
@@ -50,9 +59,9 @@ pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
     let config = crate::state::config::AppConfig::load();
     let current_id = &config.current_soundpack;
 
-    match crate::libs::audio::load_soundpack_by_id(audio_ctx, current_id) {
+    match crate::libs::audio::load_soundpack_optimized(audio_ctx, current_id) {
         Ok(_) => println!(
-            "✅ Current soundpack '{}' reloaded successfully",
+            "✅ Current soundpack '{}' reloaded successfully (optimized)",
             current_id
         ),
         Err(e) => eprintln!(
@@ -71,9 +80,11 @@ pub fn reload_soundpacks() {
         if let Ok(mut app_state) = mutex.lock() {
             let config = app_state.config.clone();
             let soundpack_cache = Arc::new(SoundpackCache::rebuild());
+            let optimized_cache = Arc::new(OptimizedSoundpackCache::load());
             *app_state = AppState {
                 config,
                 soundpack_cache,
+                optimized_cache,
             };
         }
     }
@@ -83,9 +94,11 @@ pub fn reload_soundpacks() {
         if let Ok(mut signal_state) = rwlock.write() {
             let config = signal_state.config.clone();
             let soundpack_cache = Arc::new(SoundpackCache::rebuild());
+            let optimized_cache = Arc::new(OptimizedSoundpackCache::load());
             *signal_state = AppState {
                 config,
                 soundpack_cache,
+                optimized_cache,
             };
         }
     }
