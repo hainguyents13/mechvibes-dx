@@ -14,13 +14,12 @@ pub fn SoundpackSelector() -> Element {
 
     // Get global app state and shared config
     let app_state = use_app_state();
-    let (config, update_config) = use_config();
-
-    // UI state
+    let (config, update_config) = use_config(); // UI state
     let mut error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
     let mut is_refreshing = use_signal(|| false);
+    let is_loading = use_signal(|| false);
 
     // Use global app state for soundpacks and get current soundpack from config
     let soundpacks = use_memo(move || app_state.with(|state| state.get_soundpacks()));
@@ -57,20 +56,16 @@ pub fn SoundpackSelector() -> Element {
                 "w-full btn btn-soft justify-start gap-3 h-18 rounded-lg {}",
                 if is_open() { "btn-active" } else { "" },
             ),
+            disabled: is_loading(),
             onclick: move |_| is_open.set(!is_open()),
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
-                  // if let Some(icon) = &pack.icon {
-                  //   img {
-                  //     class: "w-6 h-6 rounded",
-                  //     src: format!("./soundpacks/{}/{}", pack.name, icon),
-                  //     alt: "icon",
-                  //   }
-                  // } else {
-                  //   Music { class: "w-4 h-4 text-base-content/50" }
-                  // }
-                  Music { class: "w-6 h-6 text-base-content/50" }
+                  if is_loading() {
+                    span { class: "loading loading-spinner loading-sm" }
+                  } else {
+                    Music { class: "w-6 h-6 text-base-content/50" }
+                  }
                 }
                 div { class: "flex-1 min-w-0 text-left",
                   div { class: "font-medium truncate text-base-content",
@@ -131,11 +126,12 @@ pub fn SoundpackSelector() -> Element {
                           let soundpacks = soundpacks.clone();
                           let mut is_open = is_open.clone();
                           let mut search_query = search_query.clone();
+                          let is_loading = is_loading.clone();
                           let audio_ctx = audio_ctx.clone();
                           let update_config = update_config.clone();
                           move |_| {
-                              println!("🎯 User selected soundpack: {}", pack_id);
                               is_open.set(false);
+                              search_query.set(String::new());
                               error.set(String::new());
                               if let Some(pack_item) = soundpacks().iter().find(|p| p.id == pack_id) {
                                   println!("📦 Found soundpack in cache: {}", pack_item.name);
@@ -150,22 +146,37 @@ pub fn SoundpackSelector() -> Element {
                                           config.current_soundpack = pack_id_clone;
                                       }),
                                   );
-                                  match crate::libs::audio::load_soundpack_optimized(
-                                      &audio_ctx,
-                                      &pack_id,
-                                  ) {
-                                      Ok(_) => {
-                                          search_query.set(String::new());
-                                          println!(
-                                              "✅ Soundpack changed to: {} (optimized loading)",
-                                              pack_item.name,
-                                          );
+                                  let pack_id_async = pack_id.clone();
+                                  let pack_name = pack_item.name.clone();
+                                  let audio_ctx_async = audio_ctx.clone();
+                                  let mut error_async = error.clone();
+                                  let mut is_loading_async = is_loading.clone();
+                                  spawn(async move {
+                                      println!("🔄 Setting loading to true for: {}", pack_name);
+                                      is_loading_async.set(true);
+                                      match crate::libs::audio::load_soundpack_optimized(
+                                          &audio_ctx_async,
+                                          &pack_id_async,
+                                      ) {
+                                          Ok(_) => {
+                                              println!(
+                                                  "✅ Soundpack changed to: {} (background loading)",
+                                                  pack_name,
+                                              );
+                                          }
+                                          Err(e) => {
+                                              error_async.set(format!("Failed to load soundpack: {}", e));
+                                              println!(
+                                                  "❌ Failed to load soundpack {}: {}",
+                                                  pack_id_async,
+                                                  e,
+                                              );
+                                          }
                                       }
-                                      Err(e) => {
-                                          error.set(format!("Failed to load soundpack: {}", e));
-                                          println!("❌ Failed to load soundpack {}: {}", pack_id, e);
-                                      }
-                                  }
+                                      println!("🏁 Setting loading to false for: {}", pack_name);
+                                      is_loading_async.set(false);
+                                      println!("🏁 Finished loading: {}", pack_name);
+                                  });
                               } else {
                                   println!("❌ Soundpack {} not found in cache", pack_id);
                               }

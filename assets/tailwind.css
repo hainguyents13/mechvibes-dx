@@ -2346,6 +2346,9 @@
       color: currentColor;
     }
   }
+  .loading-sm {
+    width: calc(var(--size-selector, 0.25rem) * 5);
+  }
   .loading-xs {
     width: calc(var(--size-selector, 0.25rem) * 4);
   }
