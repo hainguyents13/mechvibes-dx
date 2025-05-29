@@ -44,8 +44,10 @@ pub fn SoundpackSelector() -> Element {
                 })
                 .collect()
         }
-    }); // Find current soundpack details
-    let current_soundpack =
+    });
+
+    // Find current soundpack info details
+    let current_soundpack = 
         use_memo(move || soundpacks().into_iter().find(|pack| pack.id == current()));
 
     rsx! {
@@ -61,16 +63,15 @@ pub fn SoundpackSelector() -> Element {
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
-                  // if let Some(icon) = &pack.icon {
-                  //   img {
-                  //     class: "w-6 h-6 rounded",
-                  //     src: format!("./soundpacks/{}/{}", pack.name, icon),
-                  //     alt: "icon",
-                  //   }
-                  // } else {
-                  //   Music { class: "w-4 h-4 text-base-content/50" }
-                  // }
-                  Music { class: "w-6 h-6 text-base-content/50" }
+                  if let Some(icon) = &pack.icon {
+                    img {
+                      class: "w-6 h-6 rounded",
+                      src: format!("./soundpacks/{}/{}", &pack.id, icon.to_string()),
+                      alt: "icon",
+                    }
+                  } else {
+                    Music { class: "w-6 h-6 text-base-content/50" }
+                  }
                 }
                 div { class: "flex-1 min-w-0 text-left",
                   div { class: "font-medium truncate text-base-content",
