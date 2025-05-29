@@ -1,148 +1,194 @@
-use crate::state::soundpack::SoundPack;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SoundpackItem {
-    // Just use the full SoundPack struct directly - no duplication
-    #[serde(flatten)]
-    pub soundpack: SoundPack,
-
-    // Đường dẫn tương đối
-    #[serde(default)]
-    pub relative_path: String,
-
-    // Full path to icon (if available)
-    #[serde(default)]
-    pub full_icon_path: Option<String>,
-
-    // Full path to sound file
-    #[serde(default)]
-    pub full_sound_path: Option<String>,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SoundpackMetadata {
+    pub id: String,
+    pub name: String,
+    pub author: Option<String>,
+    pub description: Option<String>,
+    pub version: String,
+    pub tags: Vec<String>,
+    pub keycap: Option<String>,
+    pub icon: Option<String>,
+    pub last_modified: u64,
+    pub file_size: u64,
+    pub last_accessed: u64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SoundpackCache {
-    pub last_updated: DateTime<Utc>,
-    pub soundpacks: Vec<SoundpackItem>,
+    pub soundpacks: HashMap<String, SoundpackMetadata>,
+    pub last_scan: u64,
 }
 
 impl SoundpackCache {
-    const CACHE_FILE: &'static str = "./data/soundpacks.json";
-    pub fn load() -> Self {
-        // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all("./data") {
-            eprintln!("Warning: Could not create data directory");
-        }
+    const CACHE_FILE: &'static str = "data/soundpack_metadata_cache.json";
 
-        let cache_path = PathBuf::from(Self::CACHE_FILE);
-        if let Ok(contents) = fs::read_to_string(cache_path) {
-            match serde_json::from_str::<SoundpackCache>(&contents) {
+    pub fn load() -> Self {
+        // Load metadata cache
+        let mut cache = match fs::read_to_string(Self::CACHE_FILE) {
+            Ok(content) => match serde_json::from_str::<SoundpackCache>(&content) {
                 Ok(cache) => {
                     println!(
-                        "📦 Loaded soundpack cache with {} soundpacks (last updated: {})",
-                        cache.soundpacks.len(),
-                        cache.last_updated.format("%Y-%m-%d %H:%M:%S")
+                        "📦 Loaded soundpack metadata cache with {} entries",
+                        cache.soundpacks.len()
                     );
-                    return cache;
+                    cache
                 }
                 Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse soundpack cache: {}. Rebuilding.",
-                        e
+                    eprintln!("⚠️  Failed to parse cache file: {}", e);
+                    Self::new()
+                }
+            },
+            Err(_) => {
+                println!("📦 Creating new soundpack metadata cache");
+                Self::new()
+            }
+        };
+
+        // Auto-refresh if cache is empty or outdated
+        if cache.soundpacks.is_empty() || cache.last_scan == 0 {
+            println!("🔄 Cache is empty or outdated, refreshing from directory...");
+            cache.refresh_from_directory();
+            cache.save();
+        }
+
+        cache
+    }
+
+    pub fn new() -> Self {
+        Self {
+            soundpacks: HashMap::new(),
+            last_scan: 0,
+        }
+    }
+
+    pub fn save(&self) {
+        // Ensure parent directory exists
+        if let Some(parent) = Path::new(Self::CACHE_FILE).parent() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                eprintln!("⚠️  Failed to create cache directory: {}", e);
+                return;
+            }
+        }
+
+        match serde_json::to_string_pretty(self) {
+            Ok(content) => {
+                if let Err(e) = fs::write(Self::CACHE_FILE, content) {
+                    eprintln!("⚠️  Failed to save metadata cache: {}", e);
+                } else {
+                    println!(
+                        "💾 Saved soundpack metadata cache with {} entries",
+                        self.soundpacks.len()
                     );
                 }
             }
-        } else {
-            println!("📦 No soundpack cache found, building initial cache...");
+            Err(e) => eprintln!("⚠️  Failed to serialize cache: {}", e),
         }
-
-        // Build new cache
-        Self::rebuild()
     }
 
-    pub fn rebuild() -> Self {
-        println!("🔄 Rebuilding soundpack cache...");
-        let soundpacks = Self::scan_soundpacks();
-        let cache = Self {
-            last_updated: Utc::now(),
-            soundpacks,
-        };
-
-        // Save cache to disk
-        let _ = cache.save();
-
-        println!(
-            "✅ Soundpack cache rebuilt with {} soundpacks",
-            cache.soundpacks.len()
-        );
-        cache
+    // Add or update soundpack metadata
+    pub fn add_soundpack(&mut self, metadata: SoundpackMetadata) {
+        self.soundpacks.insert(metadata.id.clone(), metadata);
     }
-    fn scan_soundpacks() -> Vec<SoundpackItem> {
-        std::fs::read_dir("./soundpacks")
-            .map(|entries| {
-                entries
-                    .filter_map(|entry| {
-                        entry.ok().and_then(|e| {
-                            let path = e.path();
-                            if path.join("config.json").exists() {
-                                if let Ok(content) =
-                                    std::fs::read_to_string(path.join("config.json"))
-                                {
-                                    if let Ok(pack) = serde_json::from_str::<SoundPack>(&content) {
-                                        // Lấy tên thư mục (đường dẫn tương đối)
-                                        let dir_name = path
-                                            .file_name()
-                                            .and_then(|name| name.to_str())
-                                            .unwrap_or("unknown");
 
-                                        // Create full path for icon if available
-                                        let full_icon_path = pack.icon.as_ref().map(|icon_path| {
-                                            format!("./soundpacks/{}/{}", dir_name, icon_path)
-                                        });
+    // Refresh cache by scanning soundpacks directory
+    pub fn refresh_from_directory(&mut self) {
+        println!("📂 Scanning soundpacks directory...");
 
-                                        // Create full path for sound file if available
-                                        let full_sound_path =
-                                            pack.source.as_ref().map(|sound_path| {
-                                                format!("./soundpacks/{}/{}", dir_name, sound_path)
-                                            });
+        match std::fs::read_dir("./soundpacks") {
+            Ok(entries) => {
+                self.soundpacks.clear();
 
-                                        return Some(SoundpackItem {
-                                            soundpack: pack,
-                                            relative_path: format!("./soundpacks/{}", dir_name),
-                                            full_icon_path,
-                                            full_sound_path,
-                                        });
-                                    }
-                                }
-                            }
-                            None
-                        })
-                    })
-                    .collect::<Vec<_>>()
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if let Some(soundpack_id) = entry.file_name().to_str() {
+                        if let Ok(metadata) = self.load_soundpack_metadata(soundpack_id) {
+                            self.soundpacks.insert(soundpack_id.to_string(), metadata);
+                        }
+                    }
+                }
+
+                self.last_scan = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+
+                println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
+            }
+            Err(e) => {
+                eprintln!("⚠️  Failed to read soundpacks directory: {}", e);
+            }
+        }
+    }
+
+    // Load soundpack metadata from config.json
+    fn load_soundpack_metadata(&self, soundpack_id: &str) -> Result<SoundpackMetadata, String> {
+        let config_path = format!("./soundpacks/{}/config.json", soundpack_id);
+
+        let content = std::fs::read_to_string(&config_path)
+            .map_err(|e| format!("Failed to read config: {}", e))?;
+
+        let config: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))?;
+
+        let name = config
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(soundpack_id)
+            .to_string();
+
+        let version = config
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1.0.0")
+            .to_string();
+
+        let tags = config
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
             })
-            .unwrap_or_default()
-    }
+            .unwrap_or_default();
 
-    fn save(&self) -> Result<(), String> {
-        let contents = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize soundpack cache: {}", e))?;
-        fs::write(Self::CACHE_FILE, contents)
-            .map_err(|e| format!("Failed to write soundpack cache file: {}", e))?;
-        Ok(())
-    }
-    pub fn get_soundpacks(&self) -> &Vec<SoundpackItem> {
-        &self.soundpacks
-    }
-    pub fn get_soundpack_by_id(&self, id: &str) -> Option<&SoundpackItem> {
-        self.soundpacks.iter().find(|item| item.soundpack.id == id)
-    }
-}
+        // Get file stats
+        let metadata = std::fs::metadata(&config_path)
+            .map_err(|e| format!("Failed to get metadata: {}", e))?;
 
-impl Default for SoundpackCache {
-    fn default() -> Self {
-        Self::rebuild()
+        Ok(SoundpackMetadata {
+            id: soundpack_id.to_string(),
+            name,
+            author: config
+                .get("author")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            description: config
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            version,
+            tags,
+            keycap: config
+                .get("keycap")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            icon: config
+                .get("icon")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            last_modified: metadata
+                .modified()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            file_size: metadata.len(),
+            last_accessed: 0, // Will be updated when accessed
+        })
     }
 }

@@ -7,13 +7,13 @@ use once_cell::sync::OnceCell;
 
 // Internal crate imports
 use crate::state::config::AppConfig;
-use crate::state::optimized_soundpack_cache::OptimizedSoundpackCache;
+use crate::state::soundpack_cache::SoundpackCache;
 
 // Global app state for sharing between components
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub config: Arc<AppConfig>,
-    pub optimized_cache: Arc<OptimizedSoundpackCache>,
+    pub optimized_cache: Arc<SoundpackCache>,
 }
 
 impl AppState {
@@ -22,12 +22,12 @@ impl AppState {
 
         Self {
             config: Arc::new(AppConfig::load()),
-            optimized_cache: Arc::new(OptimizedSoundpackCache::load()),
+            optimized_cache: Arc::new(SoundpackCache::load()),
         }
-    } // Load soundpack list from optimized cache
-    pub fn get_soundpacks(
-        &self,
-    ) -> Vec<crate::state::optimized_soundpack_cache::SoundpackMetadata> {
+    }
+
+    // Load soundpack list from optimized cache
+    pub fn get_soundpacks(&self) -> Vec<crate::state::soundpack_cache::SoundpackMetadata> {
         self.optimized_cache.soundpacks.values().cloned().collect()
     }
 }
@@ -78,7 +78,7 @@ pub fn reload_soundpacks() {
     if let Some(mutex) = APP_STATE.get() {
         if let Ok(mut app_state) = mutex.lock() {
             let config = app_state.config.clone();
-            let optimized_cache = Arc::new(OptimizedSoundpackCache::load());
+            let optimized_cache = Arc::new(SoundpackCache::load());
             *app_state = AppState {
                 config,
                 optimized_cache,
@@ -90,7 +90,7 @@ pub fn reload_soundpacks() {
     if let Some(rwlock) = APP_STATE_SIGNAL.get() {
         if let Ok(mut signal_state) = rwlock.write() {
             let config = signal_state.config.clone();
-            let optimized_cache = Arc::new(OptimizedSoundpackCache::load());
+            let optimized_cache = Arc::new(SoundpackCache::load());
             *signal_state = AppState {
                 config,
                 optimized_cache,

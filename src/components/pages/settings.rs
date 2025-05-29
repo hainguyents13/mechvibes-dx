@@ -133,7 +133,6 @@ pub fn SettingsPage() -> Element {
             div { class: "collapse-title font-semibold", "App info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}
-              crate::components::cache_manager::CacheManager {}
             }
           }
           // Danger Zone Section

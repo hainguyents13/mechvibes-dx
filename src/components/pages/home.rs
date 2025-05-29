@@ -70,9 +70,9 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
           // divider
           div { class: "divider" }
           // Version
-          div { class: "text-sm text-base-content font-bold", "MechvibesDX (Beta)" }
+          div { class: "text-sm text-base-content/70 font-bold", "MechvibesDX (Beta)" }
           // Footer with credits
-          div { class: "text-sm text-base-content/70 mt-4",
+          div { class: "text-sm text-base-content/50 mt-4",
             "Made with ❤️ by "
             a {
               href: "https://github.com/hainguyents13/mechvibes-dx",

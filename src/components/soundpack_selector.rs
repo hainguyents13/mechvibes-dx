@@ -145,15 +145,15 @@ pub fn SoundpackSelector() -> Element {
                                           );
                                           config.current_soundpack = pack_id_clone;
                                       }),
-                                  );
-                                  let pack_id_async = pack_id.clone();
+                                  );                                  let pack_id_async = pack_id.clone();
                                   let pack_name = pack_item.name.clone();
                                   let audio_ctx_async = audio_ctx.clone();
                                   let mut error_async = error.clone();
                                   let mut is_loading_async = is_loading.clone();
                                   spawn(async move {
-                                      println!("🔄 Setting loading to true for: {}", pack_name);
                                       is_loading_async.set(true);
+                                      // Add delay to make loading spinner visible
+                                      Delay::new(Duration::from_millis(300)).await;
                                       match crate::libs::audio::load_soundpack_optimized(
                                           &audio_ctx_async,
                                           &pack_id_async,
@@ -173,9 +173,7 @@ pub fn SoundpackSelector() -> Element {
                                               );
                                           }
                                       }
-                                      println!("🏁 Setting loading to false for: {}", pack_name);
                                       is_loading_async.set(false);
-                                      println!("🏁 Finished loading: {}", pack_name);
                                   });
                               } else {
                                   println!("❌ Soundpack {} not found in cache", pack_id);
