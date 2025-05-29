@@ -65,7 +65,8 @@ pub fn SoundpackSelector() -> Element {
                 div { class: "flex-shrink-0 w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
                   if let Some(icon) = &pack.icon {
                     img {
-                      class: "w-6 h-6 rounded",
+                      class: "rounded-lg",
+                      style: "width: 48px; height: 48px;",
                       src: format!("./soundpacks/{}/{}", &pack.id, icon.to_string()),
                       alt: "icon",
                     }
