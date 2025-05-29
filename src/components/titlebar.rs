@@ -31,7 +31,7 @@ pub fn TitleBar() -> Element {
           class: "flex items-center flex-1 cursor-move  px-3 py-2",
           onmousedown: start_drag,
           // App title
-          span { class: "text-sm font-semibold text-base-content", "Mechvibes DX" }
+          span { class: "text-sm font-semibold text-base-content", "MechvibesDX" }
           // Optional version badge
           span { class: "ml-2 text-xs bg-base-300 text-base-content/50 px-1.5 py-0.5 rounded",
             "Beta"

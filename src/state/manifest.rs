@@ -146,7 +146,7 @@ impl AppManifest {
     fn create_default_config() -> AppConfig {
         AppConfig {
             app: AppConfigInfo {
-                name: "Mechvibes DX".to_string(),
+                name: "MechvibesDX".to_string(),
                 version: "0.1.0".to_string(),
                 description: "Enhanced mechanical keyboard sound simulator".to_string(),
             },

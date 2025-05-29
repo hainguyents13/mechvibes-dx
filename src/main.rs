@@ -10,14 +10,14 @@ use libs::ui;
 
 fn main() {
     env_logger::init(); // Initialize app manifest first
-    println!("🚀 Initializing Mechvibes DX...");
+    println!("🚀 Initializing MechvibesDX...");
     let _manifest = state::AppManifest::load();
 
     // Initialize global app state before rendering
     state::app::init_app_state();
     // Create a WindowBuilder with custom appearance
     let window_builder = WindowBuilder::default()
-        .with_title("Mechvibes DX")
+        .with_title("MechvibesDX")
         .with_transparent(false) // Disable transparency for better performance
         .with_always_on_top(true) // Don't keep always on top by default
         .with_position(LogicalPosition::new(1700.0, 300.0))

@@ -60,11 +60,18 @@ pub fn SoundpackSelector() -> Element {
             onclick: move |_| is_open.set(!is_open()),
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
-                div { class: "flex-shrink-0 w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
+                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
-                    Music { class: "w-6 h-6 text-base-content/50" }
+                    if let Some(icon) = &pack.icon {
+                      img {
+                        class: "w-full h-full object-cover",
+                        src: format!("./soundpacks/{}/{}", pack.id, icon),
+                      }
+                    } else {
+                      Music { class: "w-6 h-6 text-base-content/50" }
+                    }
                   }
                 }
                 div { class: "flex-1 min-w-0 text-left",
@@ -145,14 +152,14 @@ pub fn SoundpackSelector() -> Element {
                                           );
                                           config.current_soundpack = pack_id_clone;
                                       }),
-                                  );                                  let pack_id_async = pack_id.clone();
+                                  );
+                                  let pack_id_async = pack_id.clone();
                                   let pack_name = pack_item.name.clone();
                                   let audio_ctx_async = audio_ctx.clone();
                                   let mut error_async = error.clone();
                                   let mut is_loading_async = is_loading.clone();
                                   spawn(async move {
                                       is_loading_async.set(true);
-                                      // Add delay to make loading spinner visible
                                       Delay::new(Duration::from_millis(300)).await;
                                       match crate::libs::audio::load_soundpack_optimized(
                                           &audio_ctx_async,
@@ -183,15 +190,14 @@ pub fn SoundpackSelector() -> Element {
                       div { class: "flex items-center justify-between gap-3",
                         div {
                           class: format!(
-                              "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center {}",
+                              "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center overflow-hidden bg-blend-multiply {}",
                               if pack.id == current() { "bg-black" } else { "" },
                           ),
                           if pack.id != current() {
                             if let Some(icon) = &pack.icon {
                               img {
-                                class: "w-6 h-6 rounded",
+                                class: "w-full h-full object-cover",
                                 src: format!("./soundpacks/{}/{}", pack.id, icon),
-                                alt: "icon",
                               }
                             } else {
                               Music { class: "w-5 h-5 text-base-content/50" }

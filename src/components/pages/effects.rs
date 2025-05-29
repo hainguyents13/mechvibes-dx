@@ -1,14 +1,14 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn SoundpacksPage() -> Element {
+pub fn EffectsPage() -> Element {
     rsx! {
       div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
         // Page header
         div { class: "mb-8",
-          h1 { class: "text-3xl font-bold text-base-content mb-4", "🎵 Soundpacks" }
+          h1 { class: "text-3xl font-bold text-base-content mb-4", "🎵 Effects" }
           p { class: "text-base-content/70 text-lg",
-            "Discover and manage your mechanical keyboard sound profiles."
+            "Discover and manage your sound effects."
           }
         }
 
@@ -20,7 +20,7 @@ pub fn SoundpacksPage() -> Element {
               "Coming Soon"
             }
             p { class: "text-base-content/60 max-w-md",
-              "This page will feature a comprehensive soundpack browser, installation manager, and community soundpack discovery. For now, you can manage your soundpacks from the Home page."
+              "This page will feature a comprehensive effects browser, installation manager, and community effects discovery. For now, you can manage your effects from the Home page."
             }
           }
         }

@@ -18,23 +18,23 @@ pub fn Dock() -> Element {
           House { class: "w-5 h-5" }
           span { class: "dock-label mt-1", "Home" }
         }
-        // Button Soundpacks
+        // Button Effects
         button {
-          class: if matches!(route, crate::libs::routes::Route::Soundpacks {}) { "dock-active" } else { "" },
+          class: if matches!(route, crate::libs::routes::Route::Effects {}) { "dock-active" } else { "" },
           onclick: move |_| {
-              nav.push("/soundpacks");
+              nav.push("/effects");
           },
           Sparkles { class: "w-5 h-5" }
           span { class: "dock-label mt-1", "Effects" }
         }
-        // Button Themes
+        // Button Customize
         button {
-          class: if matches!(route, crate::libs::routes::Route::Themes {}) { "dock-active" } else { "" },
+          class: if matches!(route, crate::libs::routes::Route::Customize {}) { "dock-active" } else { "" },
           onclick: move |_| {
-              nav.push("/themes");
+              nav.push("/customize");
           },
           Palette { class: "w-5 h-5" }
-          span { class: "dock-label mt-1", "Themes" }
+          span { class: "dock-label mt-1", "Customize" }
         }
         // Button Settings
         button {

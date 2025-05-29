@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn ThemesPage() -> Element {
+pub fn CustomizePage() -> Element {
     rsx! {
       div { class: "container mx-auto p-16 text-center flex flex-col gap-6",
         // Page header
