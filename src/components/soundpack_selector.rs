@@ -175,7 +175,7 @@ pub fn SoundpackSelector() -> Element {
                       },
                       div { class: "flex items-center justify-between gap-3",
                         div {
-                          class: "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center",
+                          class: "flex-shrink-0 w-10 h-10 bg-base-300 rounded flex items-center justify-center",
                           if let Some(icon) = &pack.icon {
                               img {
                                 class: "rounded",
