@@ -20,32 +20,15 @@ impl AppState {
     pub fn new() -> Self {
         println!("🌍 Initializing global AppState...");
 
-        // Start background cache maintenance
-        crate::libs::audio::start_cache_maintenance();
-
         Self {
             config: Arc::new(AppConfig::load()),
             optimized_cache: Arc::new(OptimizedSoundpackCache::load()),
         }
-    }
-
-    // Load soundpack list from optimized cache
-    pub fn get_soundpacks(&self) -> Vec<crate::state::optimized_soundpack_cache::SoundpackMetadata> {
+    } // Load soundpack list from optimized cache
+    pub fn get_soundpacks(
+        &self,
+    ) -> Vec<crate::state::optimized_soundpack_cache::SoundpackMetadata> {
         self.optimized_cache.soundpacks.values().cloned().collect()
-    }    // Reload soundpacks and refresh cache
-    pub fn reload_soundpacks(&self) {
-        println!("🔄 Reloading soundpacks from optimized cache...");
-        
-        // Trigger cache refresh
-        let mut cache = OptimizedSoundpackCache::load();
-        cache.refresh_from_directory();
-        cache.save();
-          // Reload current soundpack if any  
-        let current_id = &self.config.current_soundpack;
-        if !current_id.is_empty() {
-            // This will be handled by the audio context
-            println!("🎵 Current soundpack to reload: {}", current_id);
-        }
     }
 }
 

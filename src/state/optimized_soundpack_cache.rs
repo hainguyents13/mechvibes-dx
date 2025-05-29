@@ -331,24 +331,6 @@ impl OptimizedSoundpackCache {
             last_accessed: 0, // Will be updated when accessed
         })
     }
-
-    // Background cache cleanup task
-    pub fn start_cache_cleanup_task() {
-        std::thread::spawn(|| {
-            println!("🧹 Starting background cache cleanup task...");
-
-            loop {
-                // Sleep for 1 hour
-                std::thread::sleep(std::time::Duration::from_secs(3600));
-
-                let mut cache = OptimizedSoundpackCache::load();
-                cache.cleanup_old_caches(10); // Keep 10 most recent
-                cache.save();
-
-                println!("🧹 Performed automatic cache cleanup");
-            }
-        });
-    }
 }
 
 #[derive(Debug)]
@@ -373,22 +355,4 @@ impl CacheStats {
             )
         }
     }
-}
-
-// Background cache cleanup task
-pub fn start_cache_cleanup_task() {
-    std::thread::spawn(|| {
-        println!("🧹 Starting background cache cleanup task...");
-
-        loop {
-            // Sleep for 1 hour
-            std::thread::sleep(std::time::Duration::from_secs(3600));
-
-            let mut cache = OptimizedSoundpackCache::load();
-            cache.cleanup_old_caches(10); // Keep 10 most recent
-            cache.save();
-
-            println!("🧹 Performed automatic cache cleanup");
-        }
-    });
 }
