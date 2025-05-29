@@ -174,22 +174,19 @@ pub fn SoundpackSelector() -> Element {
                       },
                       div { class: "flex items-center justify-between gap-3",
                         div {
-                          class: format!(
-                              "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center {}",
-                              if pack.id == current() { "bg-black" } else { "" },
-                          ),
-                          if pack.id != current() {
-                            if let Some(icon) = &pack.icon {
+                          class: "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center",
+                          if let Some(icon) = &pack.icon {
                               img {
-                                class: "w-6 h-6 rounded",
+                                class: "rounded",
+                                style: "width: 40px; height: 40px;",
                                 src: format!("./soundpacks/{}/{}", pack.id, icon),
                                 alt: "icon",
                               }
                             } else {
                               Music { class: "w-5 h-5 text-base-content/50" }
                             }
-                          } else {
-                            Check { class: "w-5 h-5 text-white" }
+                          if pack.id == current() {
+                            Check { class: "text-white rounded-lg", style: "position: absolute; width: 40px; height: 40px; padding: 7px; background: rgba(0, 0, 0, 0.525)" }
                           }
                         }
                         div { class: "flex-1 min-w-0",
