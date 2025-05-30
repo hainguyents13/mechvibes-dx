@@ -7,10 +7,10 @@ pub enum Route {
     #[layout(Layout)]
     #[route("/")]
     Home {},
-    #[route("/themes")]
-    Themes {},
-    #[route("/soundpacks")]
-    Soundpacks {},
+    #[route("/customize")]
+    Customize {},
+    #[route("/effects")]
+    Effects {},
     #[route("/settings")]
     Settings {},
 }
@@ -31,9 +31,7 @@ pub fn Layout() -> Element {
         crate::components::titlebar::TitleBar {}
 
         // Main content area with padding to account for title bar
-        div { class: "flex-1 overflow-auto",
-          Outlet::<Route> {}
-        }
+        div { class: "flex-1 overflow-auto", Outlet::<Route> {} }
 
         // Dock at the bottom
         crate::components::dock::Dock {}
@@ -54,16 +52,16 @@ pub fn Home() -> Element {
 }
 
 #[component]
-pub fn Soundpacks() -> Element {
+pub fn Effects() -> Element {
     rsx! {
-      crate::components::pages::SoundpacksPage {}
+      crate::components::pages::EffectsPage {}
     }
 }
 
 #[component]
-pub fn Themes() -> Element {
+pub fn Customize() -> Element {
     rsx! {
-      crate::components::pages::ThemesPage {}
+      crate::components::pages::CustomizePage {}
     }
 }
 

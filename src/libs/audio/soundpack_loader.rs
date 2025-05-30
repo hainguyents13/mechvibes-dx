@@ -2,9 +2,8 @@ use rodio::{Decoder, Source};
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use crate::libs::audio::compressed_audio::CompressedAudioData;
 use crate::state::config::AppConfig;
-use crate::state::optimized_soundpack_cache::{OptimizedSoundpackCache, SoundpackMetadata};
+use crate::state::soundpack_cache::{SoundpackCache, SoundpackMetadata};
 use crate::state::soundpack::SoundPack;
 
 use super::audio_context::AudioContext;
@@ -18,91 +17,6 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
 pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
     // Use optimized cache for loading
     load_soundpack_optimized(context, soundpack_id)
-}
-
-fn load_soundpack_from_files_by_id(
-    context: &AudioContext,
-    soundpack_id: &str,
-) -> Result<(), String> {
-    // Load soundpacks from directory
-    let soundpacks = find_soundpacks()?;
-    let available_packs = load_available_packs(&soundpacks)?;
-
-    // Get specified soundpack or fallback to default
-    let (soundpack_path, soundpack) = get_soundpack_by_id(&available_packs, soundpack_id)?;
-
-    // Load and decode audio file
-    let cached_samples = load_audio_file(&soundpack_path, &soundpack)?;
-
-    // Update configuration
-    update_config(&soundpack)?;
-
-    // Update context
-    update_context(context, cached_samples, soundpack)?;
-
-    Ok(())
-}
-
-fn find_soundpacks() -> Result<Vec<String>, String> {
-    let soundpacks = std::fs::read_dir("./soundpacks")
-        .map_err(|_| "Failed to read soundpacks directory".to_string())?
-        .filter_map(|entry| {
-            entry.ok().and_then(|e| {
-                let path = e.path();
-                if path.join("config.json").exists() {
-                    Some(path.to_string_lossy().into_owned())
-                } else {
-                    None
-                }
-            })
-        })
-        .collect::<Vec<_>>();
-    if soundpacks.is_empty() {
-        Err("No soundpacks found in ./soundpacks directory".to_string())
-    } else {
-        Ok(soundpacks)
-    }
-}
-
-fn load_available_packs(soundpacks: &[String]) -> Result<Vec<(String, SoundPack)>, String> {
-    let packs: Vec<_> = soundpacks
-        .iter()
-        .filter_map(|path| {
-            std::fs::read_to_string(format!("{}/config.json", path))
-                .ok()
-                .and_then(|content| {
-                    serde_json::from_str::<SoundPack>(&content)
-                        .ok()
-                        .map(|pack| (path.clone(), pack))
-                })
-        })
-        .collect();
-
-    if packs.is_empty() {
-        Err("No valid soundpacks found".to_string())
-    } else {
-        Ok(packs)
-    }
-}
-
-fn get_soundpack_by_id(
-    available_packs: &[(String, SoundPack)],
-    soundpack_id: &str,
-) -> Result<(String, SoundPack), String> {
-    match available_packs
-        .iter()
-        .find(|(_, pack)| pack.id == soundpack_id)
-    {
-        Some((path, pack)) => Ok((path.clone(), pack.clone())),
-        None => {
-            let (path, pack) = available_packs[0].clone();
-            println!(
-                "⚠️ Soundpack '{}' not found, using '{}' instead",
-                soundpack_id, pack.name
-            );
-            Ok((path, pack))
-        }
-    }
 }
 
 fn load_audio_file(
@@ -138,118 +52,10 @@ fn load_audio_file(
     Ok((samples, channels, sample_rate))
 }
 
-fn update_config(soundpack: &SoundPack) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    config.current_soundpack = soundpack.id.clone();
-    config
-        .save()
-        .map_err(|e| format!("Failed to save config: {}", e))
-}
-
-fn update_context(
-    context: &AudioContext,
-    (samples, channels, sample_rate): (Vec<f32>, u16, u32),
-    soundpack: SoundPack,
-) -> Result<(), String> {
-    println!(
-        "🔄 Updating audio context for soundpack: {}",
-        soundpack.name
-    );
-
-    // Update samples
-    if let Ok(mut cached) = context.cached_samples.lock() {
-        *cached = Some((samples.clone(), channels, sample_rate));
-        println!(
-            "✅ Updated cached samples: {} samples, {} channels, {} Hz",
-            samples.len(),
-            channels,
-            sample_rate
-        );
-    } else {
-        return Err("Failed to acquire lock on cached_samples".to_string());
-    }
-
-    // Update key mappings
-    if let Ok(mut key_map) = context.key_map.lock() {
-        let old_count = key_map.len();
-        key_map.clear();
-        key_map.extend(soundpack.def.clone());
-        println!(
-            "🗝️ Updated key mappings: {} -> {} keys",
-            old_count,
-            key_map.len()
-        );
-
-        // Log first few key mappings for verification
-        for (key, mapping) in key_map.iter().take(3) {
-            println!("   {} -> {:?}", key, mapping);
-        }
-    } else {
-        return Err("Failed to acquire lock on key_map".to_string());
-    }
-
-    // Clear state
-    if let Ok(mut sinks) = context.key_sinks.lock() {
-        let old_sinks = sinks.len();
-        sinks.clear();
-        println!("🔇 Cleared {} active sinks", old_sinks);
-    }
-    if let Ok(mut pressed) = context.key_pressed.lock() {
-        let old_pressed = pressed.len();
-        pressed.clear();
-        println!("⌨️ Cleared {} pressed keys", old_pressed);
-    }
-
-    println!(
-        "✅ Successfully loaded soundpack: {} by {} ({} key mappings)",
-        soundpack.name,
-        soundpack.author,
-        soundpack.def.len()
-    );
-    Ok(())
-}
-
-/// Optimized soundpack loading with individual caching
+/// Direct soundpack loading (no audio caching)
 pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
-    let cache = OptimizedSoundpackCache::load();
+    println!("📂 Direct loading soundpack: {}", soundpack_id);
 
-    // Check if audio cache exists
-    if cache.has_audio_cache(soundpack_id) {
-        println!("🚀 Loading {} from optimized audio cache", soundpack_id);
-
-        if let Some(cached_data) = cache.load_audio_cache(soundpack_id) {
-            // Deserialize compressed audio data
-            match CompressedAudioData::decompress(&cached_data) {
-                Ok(audio_data) => {
-                    // Capture data before moving it
-                    let sample_count = audio_data.samples.len();
-
-                    // Update audio context with cached data
-                    update_context_optimized(context, audio_data)?;
-                    println!(
-                        "✅ Loaded {} from cache ({} samples)",
-                        soundpack_id, sample_count
-                    );
-                    return Ok(());
-                }
-                Err(e) => {
-                    eprintln!("⚠️  Failed to deserialize audio cache: {}", e);
-                    // Fall through to fresh load
-                }
-            }
-        }
-    }
-
-    // Fresh load if cache miss or invalid
-    println!("📂 Fresh loading soundpack: {}", soundpack_id);
-    load_and_cache_soundpack_optimized(context, soundpack_id, cache)
-}
-
-fn load_and_cache_soundpack_optimized(
-    context: &AudioContext,
-    soundpack_id: &str,
-    mut cache: OptimizedSoundpackCache,
-) -> Result<(), String> {
     // Load soundpack directly from filesystem
     let soundpack_path = format!("./soundpacks/{}", soundpack_id);
 
@@ -261,72 +67,43 @@ fn load_and_cache_soundpack_optimized(
     let soundpack: SoundPack = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
 
-    // Load audio samples
+    // Load audio samples directly from file
     let samples = load_audio_file(&soundpack_path, &soundpack)?;
 
     // Create key mappings
     let key_mappings = create_key_mappings(&soundpack, &samples.0);
 
-    // Create compressed audio data for caching
-    let compressed_data = CompressedAudioData::new(
-        samples.0.clone(),
-        samples.2, // Use actual sample rate
-        samples.1, // Use actual channels
-        key_mappings.clone(),
-        soundpack_id.to_string(),
-        soundpack.name.clone(),
-        soundpack
-            .version
-            .clone()
-            .unwrap_or_else(|| "1.0".to_string()),
+    // Update audio context with new data (this replaces old data automatically)
+    update_context_direct(context, samples, key_mappings, &soundpack)?;
+
+    // Update metadata cache only (no audio caching)
+    let mut cache = SoundpackCache::load();
+    let metadata = create_soundpack_metadata(&soundpack_path, &soundpack)?;
+    cache.add_soundpack(metadata);
+    cache.save();
+
+    println!(
+        "✅ Successfully loaded soundpack: {} (direct from files)",
+        soundpack.name
     );
-
-    // Serialize and save to individual cache file
-    match compressed_data.compress() {
-        Ok(serialized) => {
-            cache.save_audio_cache(soundpack_id, &serialized);
-
-            // Update metadata cache
-            let metadata = create_soundpack_metadata(&soundpack_path, &soundpack)?;
-            cache.add_soundpack(metadata);
-            cache.save();
-
-            let stats = compressed_data.get_stats();
-            println!(
-                "💾 Cached {} - Original: {}, Compressed: {}, Savings: {}",
-                soundpack_id,
-                stats.format_original_size(),
-                stats.format_compressed_size(),
-                stats.format_savings()
-            );
-        }
-        Err(e) => {
-            eprintln!("⚠️  Failed to cache audio data: {}", e);
-        }
-    }
-
-    // Update audio context
-    update_context_optimized(context, compressed_data)?;
-
     Ok(())
 }
 
-fn update_context_optimized(
+fn update_context_direct(
     context: &AudioContext,
-    audio_data: CompressedAudioData,
+    samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
+    key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
+    soundpack: &SoundPack,
 ) -> Result<(), String> {
-    // Capture data before moving it
-    let sample_count = audio_data.samples.len();
-    let key_mapping_count = audio_data.key_mappings.len();
-    let soundpack_name = audio_data.soundpack_info.name.clone();
+    let (audio_samples, channels, sample_rate) = samples;
+    let sample_count = audio_samples.len();
+    let key_mapping_count = key_mappings.len();
+    let soundpack_name = soundpack.name.clone();
 
-    // Update cached samples (using the existing field structure)
+    // Update cached samples (replaces old data automatically for memory cleanup)
     if let Ok(mut cached) = context.cached_samples.lock() {
-        *cached = Some((
-            audio_data.samples,
-            audio_data.channels,
-            audio_data.sample_rate,
-        ));
+        // This assignment automatically drops the old Vec<f32> data
+        *cached = Some((audio_samples, channels, sample_rate));
         println!("🎵 Updated cached samples: {} samples", sample_count);
     } else {
         return Err("Failed to acquire lock on cached_samples".to_string());
@@ -335,10 +112,11 @@ fn update_context_optimized(
     // Update key mappings (convert from HashMap<String, Vec<(f64, f64)>> to HashMap<String, Vec<[f32; 2]>>)
     if let Ok(mut key_map) = context.key_map.lock() {
         let old_count = key_map.len();
+        // Clear old mappings to free memory
         key_map.clear();
 
         // Convert key mappings to the expected format
-        for (key, mappings) in audio_data.key_mappings {
+        for (key, mappings) in key_mappings {
             let converted_mappings: Vec<[f32; 2]> = mappings
                 .into_iter()
                 .map(|(start, end)| [start as f32, end as f32])
@@ -360,20 +138,26 @@ fn update_context_optimized(
         return Err("Failed to acquire lock on key_map".to_string());
     }
 
-    // Clear state
+    // Clear active audio state to prevent memory leaks
     if let Ok(mut sinks) = context.key_sinks.lock() {
         let old_sinks = sinks.len();
+        // Drop all existing sinks to free audio resources
         sinks.clear();
-        println!("🔇 Cleared {} active sinks", old_sinks);
+        if old_sinks > 0 {
+            println!("🔇 Cleared {} active sinks", old_sinks);
+        }
     }
+
     if let Ok(mut pressed) = context.key_pressed.lock() {
         let old_pressed = pressed.len();
         pressed.clear();
-        println!("⌨️ Cleared {} pressed keys", old_pressed);
+        if old_pressed > 0 {
+            println!("⌨️ Cleared {} pressed keys", old_pressed);
+        }
     }
 
     println!(
-        "✅ Successfully loaded optimized soundpack: {} ({} key mappings)",
+        "✅ Successfully loaded soundpack: {} ({} key mappings) - Memory properly cleaned",
         soundpack_name, key_mapping_count
     );
     Ok(())
@@ -441,37 +225,4 @@ fn create_key_mappings(
     }
 
     key_mappings
-}
-
-/// Get cache statistics for display
-pub fn get_cache_statistics() -> Result<String, String> {
-    let cache = OptimizedSoundpackCache::load();
-    let stats = cache.get_cache_stats();
-
-    Ok(format!(
-        "• Metadata entries: {}\n\
-         • Audio cache files: {}\n\
-         • Total cache size: {}\n",
-        stats.metadata_count,
-        stats.file_count,
-        stats.format_size()
-    ))
-}
-
-/// Clean up old cache files manually
-pub fn cleanup_cache(keep_recent: usize) -> Result<String, String> {
-    let mut cache = OptimizedSoundpackCache::load();
-    cache.cleanup_old_caches(keep_recent);
-    cache.save();
-
-    Ok(format!(
-        "🧹 Cache cleanup completed, kept {} most recent files",
-        keep_recent
-    ))
-}
-
-/// Start background cache cleanup task
-pub fn start_cache_maintenance() {
-    crate::state::optimized_soundpack_cache::start_cache_cleanup_task();
-    println!("🔄 Started background cache maintenance task");
 }

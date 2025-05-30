@@ -83,7 +83,7 @@ fn generate_manifest_for_production() {
 fn create_default_config() {
     let default_config = serde_json::json!({
         "app": {
-            "name": "Mechvibes DX",
+            "name": "MechvibesDX",
             "version": "0.1.0",
             "description": "Enhanced mechanical keyboard sound simulator"
         },

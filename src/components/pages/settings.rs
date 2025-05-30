@@ -17,7 +17,7 @@ pub fn SettingsPage() -> Element {
         // Page header
         div { class: "text-center mb-8",
           h1 { class: "text-4xl font-bold mb-4 text-base-content", "Settings" }
-          p { class: "text-lg text-base-content", "Customize your Mechvibes DX experience." }
+          p { class: "text-lg text-base-content", "Customize your MechvibesDX experience." }
         }
         // Settings sections
         div { class: "space-y-4",
@@ -73,7 +73,7 @@ pub fn SettingsPage() -> Element {
                           "Start with Windows"
                         }
                         div { class: "label-text-alt text-xs truncate",
-                          "Automatically start Mechvibes DX when Windows boots"
+                          "Automatically start MechvibesDX when Windows boots"
                         }
                       }
                       input {
@@ -133,7 +133,6 @@ pub fn SettingsPage() -> Element {
             div { class: "collapse-title font-semibold", "App info" }
             div { class: "collapse-content text-sm",
               crate::components::app_info::AppInfoDisplay {}
-              crate::components::cache_manager::CacheManager {}
             }
           }
           // Danger Zone Section

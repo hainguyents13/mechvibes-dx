@@ -28,6 +28,14 @@ serde_json = "1.0.140"
 default = ["dioxus/desktop"]
 desktop = ["dioxus/desktop"]
 
+[package.metadata.bundle]
+name = "MechvibesDX"
+identifier = "com.example.mechvibesdx"
+version = "0.1.0"
+category = "Productivity"
+short_description = "MechvibesDX"
+long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards, inspired by the original Mechvibes project. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
+
 [profile]
 
 [profile.wasm-dev]
