@@ -126,8 +126,7 @@ pub fn SoundpackSelector() -> Element {
                     button {
                       key: "{pack.id}",
                       class: format!(
-                          "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16 {}",
-                          if pack.id == current() { " btn-disabled" } else { "" },
+                          "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16",
                       ),
                       onclick: {
                           let pack_id = pack.id.clone();
@@ -192,27 +191,28 @@ pub fn SoundpackSelector() -> Element {
                       div { class: "flex items-center justify-between gap-3",
                         div {
                           class: format!(
-                              "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center overflow-hidden bg-blend-multiply {}",
-                              if pack.id == current() { "bg-black" } else { "" },
+                              "flex-shrink-0 w-10 h-10 bg-base-300 rounded flex items-center justify-center overflow-hidden bg-blend-multiply",
                           ),
-                          if pack.id != current() {
-                            if let Some(icon) = &pack.icon {
-                              img {
-                                class: "w-full h-full object-cover",
-                                src: format!("./soundpacks/{}/{}", pack.id, icon),
-                              }
-                            } else {
-                              Music { class: "w-5 h-5 text-base-content/50" }
+                          if let Some(icon) = &pack.icon {
+                            img {
+                              class: "w-full h-full object-cover",
+                              src: format!("./soundpacks/{}/{}", pack.id, icon),
                             }
-                          if pack.id == current() {
-                            Check { class: "text-white rounded-lg", style: "position: absolute; width: 40px; height: 40px; padding: 7px; background: rgba(0, 0, 0, 0.525)" }
+                          } else {
+                            Music { class: "w-5 h-5 text-base-content/50" }
                           }
-                        }
-                        div { class: "flex-1 min-w-0",
-                          div { class: "text-sm font-medium truncate text-base-content",
+                          if pack.id == current() {
+                            Check { class: "text-white rounded", style: "position: absolute; width: 40px; height: 40px; padding: 7px; background: rgba(0, 0, 0, 0.525)" }
+                          }
+                        },
+                        div {
+                          class: "flex-1 min-w-0",
+                          div {
+                            class: "text-sm font-medium truncate text-base-content",
                             "{pack.name}"
                           }
-                          div { class: "text-xs truncate text-base-content/60",
+                          div {
+                            class: "text-xs truncate text-base-content/60",
                             if let Some(author) = &pack.author {
                               "v{pack.version} by {author}"
                             } else {
