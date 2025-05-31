@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 #![allow(non_snake_case)]
 
 mod components;
@@ -38,7 +39,7 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-      // Use the UI root component directly - Header component is already included in ui::app
-      ui::app {}
+        // Use the UI root component directly - Header component is already included in ui::app
+        ui::app {}
     }
 }
