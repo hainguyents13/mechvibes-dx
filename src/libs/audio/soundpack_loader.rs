@@ -3,20 +3,29 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 
 use crate::state::config::AppConfig;
+use crate::state::paths;
 use crate::state::soundpack::SoundPack;
 use crate::state::soundpack_cache::{SoundpackCache, SoundpackMetadata};
-use crate::state::paths;
 
 use super::audio_context::AudioContext;
 
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
     let config = AppConfig::load();
-    let current_id = &config.current_soundpack;
-    load_soundpack_by_id(context, current_id)
+    // Load both keyboard and mouse soundpacks
+    load_keyboard_soundpack(context, &config.keyboard_soundpack)?;
+    load_mouse_soundpack(context, &config.mouse_soundpack)?;
+    Ok(())
 }
 
-pub fn load_soundpack_by_id(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
-    // Use optimized cache for loading
+pub fn load_keyboard_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    println!("🎹 Loading keyboard soundpack: {}", soundpack_id);
+    load_soundpack_optimized(context, soundpack_id)
+}
+
+pub fn load_mouse_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    println!("🖱️ Loading mouse soundpack: {}", soundpack_id);
+    // For now, we'll load the mouse soundpack the same way as keyboard
+    // In the future, we could optimize this to only load mouse definitions
     load_soundpack_optimized(context, soundpack_id)
 }
 
@@ -263,7 +272,7 @@ fn create_key_mappings(
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
     let mut key_mappings = std::collections::HashMap::new();
 
-    for (key, sound_def) in &soundpack.def {
+    for (key, sound_def) in &soundpack.defs {
         // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
         let converted_mappings: Vec<(f64, f64)> = sound_def
             .iter()
@@ -282,8 +291,8 @@ fn create_mouse_mappings(
     let mut mouse_mappings = std::collections::HashMap::new();
 
     // Check if soundpack has mouse definitions
-    if let Some(mouse_def) = &soundpack.mouse_def {
-        for (button, sound_def) in mouse_def {
+    if let Some(mouse_defs) = &soundpack.mouse_defs {
+        for (button, sound_def) in mouse_defs {
             // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
             let converted_mappings: Vec<(f64, f64)> = sound_def
                 .iter()
@@ -294,8 +303,10 @@ fn create_mouse_mappings(
     } else {
         // If no mouse definitions, create default mappings using keyboard sounds
         // This allows mouse clicks to work even with keyboard-only soundpacks
-        println!("🖱️ No mouse definitions found, creating default mouse mappings from keyboard sounds");
-        
+        println!(
+            "🖱️ No mouse definitions found, creating default mouse mappings from keyboard sounds"
+        );
+
         // Use common keyboard keys as fallback for mouse buttons
         let fallback_mappings = [
             ("MouseLeft", "Space"),
@@ -305,10 +316,13 @@ fn create_mouse_mappings(
             ("MouseWheelDown", "ArrowDown"),
             ("Mouse4", "Backspace"),
             ("Mouse5", "Delete"),
+            ("Mouse6", "Home"),
+            ("Mouse7", "End"),
+            ("Mouse8", "PageUp"),
         ];
 
         for (mouse_button, keyboard_key) in &fallback_mappings {
-            if let Some(key_mapping) = soundpack.def.get(*keyboard_key) {
+            if let Some(key_mapping) = soundpack.defs.get(*keyboard_key) {
                 let converted_mappings: Vec<(f64, f64)> = key_mapping
                     .iter()
                     .map(|pair| (pair[0] as f64, pair[1] as f64))

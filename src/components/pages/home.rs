@@ -1,5 +1,6 @@
+use crate::components::keyboard_soundpack_selector::KeyboardSoundpackSelector;
 use crate::components::logo::Logo;
-use crate::components::soundpack_selector::SoundpackSelector;
+use crate::components::mouse_soundpack_selector::MouseSoundpackSelector;
 use crate::components::volume_slider::VolumeSlider;
 use crate::libs::AudioContext;
 use crate::state::config_utils::use_config;
@@ -49,16 +50,17 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     });
 
     rsx! {
-      div { class: "flex flex-col gap-10 p-16",
-        div { class: "mb-2",
+      div { class: "flex flex-col gap-10 p-16",        div { class: "mb-2",
           // Mechvibes logo with animated press effect
           Logo {}
-        }
-        // Main content for home page
+        }        // Main content for home page
         div {
-          // Soundpack selector          // div { class: "divider", "Keyboard" } // Version
           class: "flex flex-col gap-6",
-          SoundpackSelector {}
+          div {
+            class: "space-y-4",
+            KeyboardSoundpackSelector {}
+            MouseSoundpackSelector {}
+          }
           VolumeSlider {
             volume,
             on_change: move |new_volume: f32| {

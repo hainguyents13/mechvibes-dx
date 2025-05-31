@@ -19,16 +19,14 @@ pub fn app() -> Element {
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
-    use_context_provider(|| audio_context.clone());
-
-    // Load current soundpack on startup
+    use_context_provider(|| audio_context.clone());    // Load current soundpacks on startup
     {
         let ctx = audio_context.clone();
         use_effect(move || {
-            println!("🎵 Loading current soundpack on startup...");
-            crate::state::app::reload_current_soundpack(&ctx);
+            println!("🎵 Loading current soundpacks on startup...");
+            crate::state::app::reload_current_soundpacks(&ctx);
         });
-    } // Create a channel for real-time keyboard event communication
+    }// Create a channel for real-time keyboard event communication
     let (tx, rx) = mpsc::channel::<String>();
     let rx = Arc::new(rx);
 
@@ -61,7 +59,9 @@ pub fn app() -> Element {
                 });
             }
         });
-    } // Process keyboard events and update both audio and UI state
+    }
+
+    // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
         let rx = rx.clone();

@@ -1,4 +1,4 @@
-use rdev::{listen, Event, EventType, Button};
+use rdev::{listen, Button, Event, EventType};
 use std::collections::HashSet;
 use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::thread;
@@ -10,16 +10,16 @@ use std::time::{Duration, Instant};
 fn map_button_to_code(button: Button) -> &'static str {
     match button {
         Button::Left => "MouseLeft",
-        Button::Right => "MouseRight", 
+        Button::Right => "MouseRight",
         Button::Middle => "MouseMiddle",
         Button::Unknown(code) => {
             // Handle additional mouse buttons (side buttons, etc.)
             match code {
-                4 => "MouseButton4", // Back/Previous
-                5 => "MouseButton5", // Forward/Next
-                6 => "MouseButton6", // Extra button 1
-                7 => "MouseButton7", // Extra button 2
-                8 => "MouseButton8", // Extra button 3
+                4 => "Mouse4", // Back/Previous
+                5 => "Mouse5", // Forward/Next
+                6 => "Mouse6", // Extra button 1
+                7 => "Mouse7", // Extra button 2
+                8 => "Mouse8", // Extra button 3
                 _ => "MouseUnknown",
             }
         }
@@ -34,7 +34,8 @@ pub fn start_mouse_listener(
     println!("🖱️ Starting mouse listener...");
 
     thread::spawn(move || {
-        let last_press: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));        let result = listen(move |event: Event| {
+        let last_press: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));
+        let result = listen(move |event: Event| {
             match event.event_type {
                 EventType::ButtonPress(button) => {
                     let button_code = map_button_to_code(button);
@@ -70,7 +71,10 @@ pub fn start_mouse_listener(
                         let _ = play_sound_tx.send(format!("UP:{}", button_code));
                     }
                 }
-                EventType::Wheel { delta_x: _, delta_y } => {
+                EventType::Wheel {
+                    delta_x: _,
+                    delta_y,
+                } => {
                     // Handle mouse wheel events
                     let wheel_event = if delta_y > 0 {
                         "MouseWheelUp"
@@ -81,10 +85,11 @@ pub fn start_mouse_listener(
                     };
 
                     println!("🖱️ Mouse Wheel: {}", wheel_event);
-                    
+
                     let now = Instant::now();
                     let mut last = last_press.lock().unwrap();
-                    if now.duration_since(*last) > Duration::from_millis(50) { // Longer delay for wheel
+                    if now.duration_since(*last) > Duration::from_millis(50) {
+                        // Longer delay for wheel
                         *last = now;
                         let _ = play_sound_tx.send(wheel_event.to_string());
                     }

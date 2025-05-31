@@ -53,54 +53,32 @@ pub fn use_app_state() -> Signal<AppState> {
     })
 }
 
-// Reload the current soundpack from configuration
-pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
+// Reload the current soundpacks from configuration
+pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
     let config = crate::state::config::AppConfig::load();
-    let current_id = &config.current_soundpack;
 
-    match crate::libs::audio::load_soundpack_optimized(audio_ctx, current_id) {
+    // Load keyboard soundpack
+    match crate::libs::audio::load_keyboard_soundpack(audio_ctx, &config.keyboard_soundpack) {
         Ok(_) => println!(
-            "✅ Current soundpack '{}' reloaded successfully (optimized)",
-            current_id
+            "✅ Keyboard soundpack '{}' reloaded successfully",
+            config.keyboard_soundpack
         ),
         Err(e) => eprintln!(
-            "❌ Failed to reload current soundpack '{}': {}",
-            current_id, e
+            "❌ Failed to reload keyboard soundpack '{}': {}",
+            config.keyboard_soundpack, e
         ),
     }
-}
 
-// Utility function to reload soundpacks from anywhere
-pub fn reload_soundpacks() {
-    println!("🔄 Reloading global soundpack cache...");
-
-    // Create a fresh cache and refresh from directory
-    let mut fresh_cache = SoundpackCache::load();
-    fresh_cache.refresh_from_directory();
-    fresh_cache.save();
-
-    // Update mutex state
-    if let Some(mutex) = APP_STATE.get() {
-        if let Ok(mut app_state) = mutex.lock() {
-            let config = app_state.config.clone();
-            let optimized_cache = Arc::new(fresh_cache.clone());
-            *app_state = AppState {
-                config,
-                optimized_cache,
-            };
-        }
-    }
-
-    // Update signal state
-    if let Some(rwlock) = APP_STATE_SIGNAL.get() {
-        if let Ok(mut signal_state) = rwlock.write() {
-            let config = signal_state.config.clone();
-            let optimized_cache = Arc::new(fresh_cache);
-            *signal_state = AppState {
-                config,
-                optimized_cache,
-            };
-        }
+    // Load mouse soundpack
+    match crate::libs::audio::load_mouse_soundpack(audio_ctx, &config.mouse_soundpack) {
+        Ok(_) => println!(
+            "✅ Mouse soundpack '{}' reloaded successfully",
+            config.mouse_soundpack
+        ),
+        Err(e) => eprintln!(
+            "❌ Failed to reload mouse soundpack '{}': {}",
+            config.mouse_soundpack, e
+        ),
     }
 }
 

@@ -31,31 +31,34 @@ The codebase is now available for inspection and learning purposes. MechvibesDX 
 
 MechvibesDX supports the following mouse buttons:
 
-| Button        | Code             | Description                                  |
-| ------------- | ---------------- | -------------------------------------------- |
-| Left Click    | `MouseLeft`      | Primary mouse button                         |
-| Right Click   | `MouseRight`     | Secondary mouse button (context menu)        |
-| Middle Click  | `MouseMiddle`    | Scroll wheel button                          |
-| Scroll Up     | `MouseWheelUp`   | Mouse wheel scroll up                        |
-| Scroll Down   | `MouseWheelDown` | Mouse wheel scroll down                      |
-| Side Button 1 | `Mouse4`         | Forward/Back button (typically thumb button) |
-| Side Button 2 | `Mouse5`         | Forward/Back button (typically thumb button) |
+| Button         | Code             | Description                                  |
+| -------------- | ---------------- | -------------------------------------------- |
+| Left Click     | `MouseLeft`      | Primary mouse button                         |
+| Right Click    | `MouseRight`     | Secondary mouse button (context menu)        |
+| Middle Click   | `MouseMiddle`    | Scroll wheel button                          |
+| Scroll Up      | `MouseWheelUp`   | Mouse wheel scroll up                        |
+| Scroll Down    | `MouseWheelDown` | Mouse wheel scroll down                      |
+| Side Button 1  | `Mouse4`         | Forward/Back button (typically thumb button) |
+| Side Button 2  | `Mouse5`         | Forward/Back button (typically thumb button) |
+| Extra Button 1 | `Mouse6`         | Additional button (gaming mice)              |
+| Extra Button 2 | `Mouse7`         | Additional button (gaming mice)              |
+| Extra Button 3 | `Mouse8`         | Additional button (gaming mice)              |
 
 ## Creating Mouse-Compatible Soundpacks
 
-To add mouse support to your soundpacks, include a `mouse_def` section in your `config.json`:
+To add mouse support to your soundpacks, include a `mouse_defs` section in your `config.json`:
 
 ```json
 {
     "name": "My Soundpack",
     "author": "Your Name",
-    "def": {
+    "defs": {
         "Space": [
             [1000, 80],
             [1080, 80]
         ]
     },
-    "mouse_def": {
+    "mouse_defs": {
         "MouseLeft": [
             [1000, 80],
             [1080, 80]
@@ -83,12 +86,26 @@ To add mouse support to your soundpacks, include a `mouse_def` section in your `
         "Mouse5": [
             [7000, 60],
             [7060, 60]
+        ],
+        "Mouse6": [
+            [8000, 60],
+            [8060, 60]
+        ],
+        "Mouse7": [
+            [9000, 60],
+            [9060, 60]
+        ],
+        "Mouse8": [
+            [10000, 60],
+            [10060, 60]
         ]
     }
 }
 ```
 
 Each mouse button definition uses the same format as keyboard keys: `[start_ms, duration_ms]` for press and release sounds.
+
+**Note:** If your soundpack doesn't include `mouse_defs`, the system will automatically create fallback mappings using keyboard sounds from the `defs` section.
 
 ## Quick Start
 

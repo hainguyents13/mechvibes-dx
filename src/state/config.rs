@@ -13,7 +13,8 @@ pub struct AppConfig {
     pub commit: Option<String>,
 
     // Audio settings
-    pub current_soundpack: String,
+    pub keyboard_soundpack: String,
+    pub mouse_soundpack: String,
     pub volume: f32,
     pub enable_sound: bool,
 
@@ -71,7 +72,8 @@ impl Default for AppConfig {
             version: env!("CARGO_PKG_VERSION").to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-            current_soundpack: "oreo".to_string(),
+            keyboard_soundpack: "oreo".to_string(),
+            mouse_soundpack: "test-mouse".to_string(),
             volume: 1.0,
             enable_sound: true,
             theme: Theme::System, // Default to System theme

@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SoundpackType {
+    Keyboard,
+    Mouse,
+    Both,
+}
+
+impl SoundpackType {}
+
+impl SoundPack {}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundPack {
     pub id: String,
     pub name: String,
@@ -19,9 +30,12 @@ pub struct SoundPack {
     #[serde(default)]
     pub source: Option<String>,
     #[serde(default)]
-    pub method: Option<String>,    #[serde(default)]
-    pub includes_numpad: Option<bool>,
-    pub def: HashMap<String, Vec<[f32; 2]>>,
+    pub method: Option<String>,
     #[serde(default)]
-    pub mouse_def: Option<HashMap<String, Vec<[f32; 2]>>>,
+    pub includes_numpad: Option<bool>,
+    #[serde(default)]
+    pub for_device: Option<String>, // "keyboard", "mouse", or "both"
+    pub defs: HashMap<String, Vec<[f32; 2]>>,
+    #[serde(default)]
+    pub mouse_defs: Option<HashMap<String, Vec<[f32; 2]>>>,
 }
