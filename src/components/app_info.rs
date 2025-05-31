@@ -1,6 +1,6 @@
+use crate::state::paths;
 use dioxus::prelude::*;
 use std::env;
-use std::path::Path;
 
 #[component]
 pub fn AppInfoDisplay() -> Element {
@@ -12,26 +12,13 @@ pub fn AppInfoDisplay() -> Element {
     // Get current working directory
     let current_dir = env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "Unknown".to_string());
-
-    // Check file/directory existence
-    let data_dir_exists = Path::new("./data").exists();
-    let config_file_exists = Path::new("./data/config.json").exists();
-    let soundpacks_dir_exists = Path::new("./soundpacks").exists();
+        .unwrap_or_else(|_| "Unknown".to_string());    // Check file/directory existence
+    let data_dir_exists = paths::utils::data_dir_exists();
+    let config_file_exists = paths::utils::config_file_exists();
+    let soundpacks_dir_exists = paths::utils::soundpacks_dir_exists();
 
     // Count soundpacks
-    let soundpack_count = if soundpacks_dir_exists {
-        std::fs::read_dir("./soundpacks")
-            .map(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .count()
-            })
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let soundpack_count = paths::utils::count_soundpacks();
 
     // Get OS info
     let os = env::consts::OS;
@@ -70,7 +57,7 @@ pub fn AppInfoDisplay() -> Element {
                 "❌"
               }
             }
-            span { class: "ml-2 text-base-content/70", "./data/config.json" }
+            span { class: "ml-2 text-base-content/70", "{paths::data::CONFIG_JSON}" }
           }
           div {
             span { class: if soundpacks_dir_exists { "text-base-content" } else { "text-error" },

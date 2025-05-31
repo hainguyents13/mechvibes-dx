@@ -1,3 +1,4 @@
+use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -62,12 +63,12 @@ pub struct AppManifest {
 }
 
 impl AppManifest {
-    const MANIFEST_FILE: &'static str = "./data/manifest.json";
+    const MANIFEST_FILE: &'static str = paths::data::MANIFEST_JSON;
     const CONFIG_FILE: &'static str = "./app.config.json";
 
     pub fn load() -> Self {
         // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all("./data") {
+        if let Err(_) = fs::create_dir_all(paths::data::DIR) {
             eprintln!("Warning: Could not create data directory");
         }
 
@@ -157,10 +158,10 @@ impl AppManifest {
                 minimum_app_version: "0.1.0".to_string(),
             },
             paths: AppPaths {
-                config_file: "./data/config.json".to_string(),
-                soundpack_cache: "./data/soundpacks.json".to_string(),
-                soundpacks_dir: "./soundpacks".to_string(),
-                data_dir: "./data".to_string(),
+                config_file: paths::data::CONFIG_JSON.to_string(),
+                soundpack_cache: paths::data::SOUNDPACK_METADATA_CACHE_JSON.to_string(),
+                soundpacks_dir: paths::soundpacks::DIR.to_string(),
+                data_dir: paths::data::DIR.to_string(),
             },
         }
     }

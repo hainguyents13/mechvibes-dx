@@ -3,6 +3,13 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+// Build-time path constants (must be kept in sync with src/state/paths.rs)
+const DATA_DIR: &str = "data";
+const MANIFEST_JSON: &str = "data/manifest.json";
+const CONFIG_JSON: &str = "./data/config.json";
+const SOUNDPACK_METADATA_CACHE_JSON: &str = "data/soundpack_metadata_cache.json";
+const SOUNDPACKS_DIR: &str = "./soundpacks";
+
 fn main() {
     println!("cargo:rerun-if-changed=app.config.json");
     println!("cargo:rerun-if-changed=build.rs");
@@ -69,13 +76,11 @@ fn generate_manifest_for_production() {
             "last_updated": chrono::Utc::now().to_rfc3339(),
             "platform": get_target_platform()
         }
-    });
-
-    // Write manifest
+    }); // Write manifest
     let manifest_content =
         serde_json::to_string_pretty(&manifest).expect("Failed to serialize manifest");
 
-    fs::write("data/manifest.json", manifest_content).expect("Failed to write manifest file");
+    fs::write(MANIFEST_JSON, manifest_content).expect("Failed to write manifest file");
 
     println!("✅ Production manifest generated");
 }
@@ -91,13 +96,11 @@ fn create_default_config() {
             "config_version": "1.0",
             "soundpack_version": "1.0",
             "cache_version": "1.0",
-            "minimum_app_version": "0.1.0"
-        },
-        "paths": {
-            "config_file": "./data/config.json",
-            "soundpack_cache": "./data/soundpacks.json",
-            "soundpacks_dir": "./soundpacks",
-            "data_dir": "./data"
+            "minimum_app_version": "0.1.0"        },        "paths": {
+            "config_file": CONFIG_JSON,
+            "soundpack_cache": SOUNDPACK_METADATA_CACHE_JSON,
+            "soundpacks_dir": SOUNDPACKS_DIR,
+            "data_dir": DATA_DIR
         }
     });
 

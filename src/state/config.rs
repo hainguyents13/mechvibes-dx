@@ -1,4 +1,5 @@
 use crate::libs::theme::Theme;
+use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -27,11 +28,11 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn load() -> Self {
         // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all("./data") {
+        if let Err(_) = fs::create_dir_all(paths::data::DIR) {
             eprintln!("Warning: Could not create data directory");
         }
 
-        let config_path = PathBuf::from("./data/config.json");
+        let config_path = PathBuf::from(paths::data::CONFIG_JSON);
         if let Ok(contents) = fs::read_to_string(config_path) {
             match serde_json::from_str::<AppConfig>(&contents) {
                 Ok(config) => {
@@ -55,7 +56,7 @@ impl AppConfig {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let config_path = PathBuf::from("./data/config.json");
+        let config_path = PathBuf::from(paths::data::CONFIG_JSON);
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
         fs::write(config_path, contents)

@@ -1,5 +1,6 @@
 use crate::libs::audio::AudioContext;
 use crate::state::config_utils::use_config;
+use crate::state::paths;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use lucide_dioxus::{Check, ChevronDown, Music, Search};
@@ -62,12 +63,11 @@ pub fn SoundpackSelector() -> Element {
               if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
-                    span { class: "loading loading-spinner loading-sm" }
-                  } else {
+                    span { class: "loading loading-spinner loading-sm" }                  } else {
                     if let Some(icon) = &pack.icon {
                       img {
                         class: "w-full h-full object-cover",
-                        src: format!("./soundpacks/{}/{}", pack.id, icon),
+                        src: paths::soundpacks::icon_path(&pack.id, icon),
                       }
                     } else {
                       Music { class: "w-6 h-6 text-base-content/50" }
@@ -192,12 +192,11 @@ pub fn SoundpackSelector() -> Element {
                           class: format!(
                               "flex-shrink-0 w-10 h-10 bg-base-300 rounded-lg flex items-center justify-center overflow-hidden bg-blend-multiply {}",
                               if pack.id == current() { "bg-black" } else { "" },
-                          ),
-                          if pack.id != current() {
+                          ),                          if pack.id != current() {
                             if let Some(icon) = &pack.icon {
                               img {
                                 class: "w-full h-full object-cover",
-                                src: format!("./soundpacks/{}/{}", pack.id, icon),
+                                src: paths::soundpacks::icon_path(&pack.id, icon),
                               }
                             } else {
                               Music { class: "w-5 h-5 text-base-content/50" }

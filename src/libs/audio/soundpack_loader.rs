@@ -3,8 +3,9 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 
 use crate::state::config::AppConfig;
-use crate::state::soundpack_cache::{SoundpackCache, SoundpackMetadata};
 use crate::state::soundpack::SoundPack;
+use crate::state::soundpack_cache::{SoundpackCache, SoundpackMetadata};
+use crate::state::paths;
 
 use super::audio_context::AudioContext;
 
@@ -57,10 +58,10 @@ pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> R
     println!("📂 Direct loading soundpack: {}", soundpack_id);
 
     // Load soundpack directly from filesystem
-    let soundpack_path = format!("./soundpacks/{}", soundpack_id);
+    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
 
     // Load config.json
-    let config_path = format!("{}/config.json", soundpack_path);
+    let config_path = paths::soundpacks::config_json(soundpack_id);
     let config_content = std::fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
 
@@ -175,17 +176,14 @@ fn create_soundpack_metadata(
         .to_string();
 
     // Get file metadata
-    let (last_modified, file_size) = match std::fs::metadata(soundpack_path) {
-        Ok(metadata) => {
-            let modified = metadata
-                .modified()
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            (modified, metadata.len())
-        }
-        Err(_) => (0, 0),
+    let last_modified = match std::fs::metadata(soundpack_path) {
+        Ok(metadata) => metadata
+            .modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        Err(_) => 0,
     };
 
     Ok(SoundpackMetadata {
@@ -201,7 +199,6 @@ fn create_soundpack_metadata(
         keycap: soundpack.keycap.clone(),
         icon: soundpack.icon.clone(),
         last_modified,
-        file_size,
         last_accessed: std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()

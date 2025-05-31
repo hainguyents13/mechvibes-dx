@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use crate::state::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundpackMetadata {
@@ -14,7 +15,6 @@ pub struct SoundpackMetadata {
     pub keycap: Option<String>,
     pub icon: Option<String>,
     pub last_modified: u64,
-    pub file_size: u64,
     pub last_accessed: u64,
 }
 
@@ -25,7 +25,7 @@ pub struct SoundpackCache {
 }
 
 impl SoundpackCache {
-    const CACHE_FILE: &'static str = "data/soundpack_metadata_cache.json";
+    const CACHE_FILE: &'static str = paths::data::SOUNDPACK_METADATA_CACHE_JSON;
 
     pub fn load() -> Self {
         // Load metadata cache
@@ -99,7 +99,7 @@ impl SoundpackCache {
     pub fn refresh_from_directory(&mut self) {
         println!("📂 Scanning soundpacks directory...");
 
-        match std::fs::read_dir("./soundpacks") {
+        match std::fs::read_dir(paths::soundpacks::DIR) {
             Ok(entries) => {
                 self.soundpacks.clear();
 
@@ -126,7 +126,7 @@ impl SoundpackCache {
 
     // Load soundpack metadata from config.json
     fn load_soundpack_metadata(&self, soundpack_id: &str) -> Result<SoundpackMetadata, String> {
-        let config_path = format!("./soundpacks/{}/config.json", soundpack_id);
+        let config_path = paths::soundpacks::config_json(soundpack_id);
 
         let content = std::fs::read_to_string(&config_path)
             .map_err(|e| format!("Failed to read config: {}", e))?;
@@ -187,7 +187,6 @@ impl SoundpackCache {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            file_size: metadata.len(),
             last_accessed: 0, // Will be updated when accessed
         })
     }
