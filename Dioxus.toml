@@ -1,5 +1,6 @@
 [application]
 name = "mechvibes-dx"
+out_dir = "bundles"
 
 [web.app]
 # HTML title tag content
@@ -21,3 +22,19 @@ script = []
 [application.desktop]
 # Include assets directory for desktop builds
 bundle_assets = true
+
+# bundle configuration
+[bundle]
+identifier = "com.mechvibesdx"
+publisher = "Hai Nguyen"
+icon = [
+  "icons/256x256.ico",
+  "icons/256x256.icns",
+  "icons/256x256.png",
+  "icons/icon.ico",
+  "icons/icon.icns"
+]
+category = "Utility"
+short_description = "A digital mechanical keyboard simulator"
+long_description = "This is an application to simulate mechanical keyboard sounds digitally via key detection"
+resources = ["./soundpacks"]
