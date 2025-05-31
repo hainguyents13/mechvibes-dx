@@ -19,8 +19,9 @@ pub struct SoundPack {
     #[serde(default)]
     pub source: Option<String>,
     #[serde(default)]
-    pub method: Option<String>,
-    #[serde(default)]
+    pub method: Option<String>,    #[serde(default)]
     pub includes_numpad: Option<bool>,
     pub def: HashMap<String, Vec<[f32; 2]>>,
+    #[serde(default)]
+    pub mouse_def: Option<HashMap<String, Vec<[f32; 2]>>>,
 }

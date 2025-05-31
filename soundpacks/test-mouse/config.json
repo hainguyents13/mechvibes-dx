@@ -1,0 +1,56 @@
+{
+    "id": "test-mouse",
+    "name": "Test Mouse Soundpack",
+    "author": "Mechvibes Team",
+    "description": "Test soundpack with mouse button definitions",
+    "version": "1.0.0",
+    "tags": ["test", "mouse", "mechanical"],
+    "icon": "icon.jpg",
+    "source": "sound.ogg",
+    "method": "single",
+    "includes_numpad": false,
+    "def": {
+        "Space": [
+            [1000, 80.0],
+            [1080, 80.0]
+        ],
+        "Enter": [
+            [2000, 80.0],
+            [2080, 80.0]
+        ],
+        "Tab": [
+            [3000, 80.0],
+            [3080, 80.0]
+        ]
+    },
+    "mouse_def": {
+        "MouseLeft": [
+            [1000, 80.0],
+            [1080, 80.0]
+        ],
+        "MouseRight": [
+            [2000, 80.0],
+            [2080, 80.0]
+        ],
+        "MouseMiddle": [
+            [3000, 80.0],
+            [3080, 80.0]
+        ],
+        "MouseWheelUp": [
+            [4000, 40.0],
+            [4040, 40.0]
+        ],
+        "MouseWheelDown": [
+            [5000, 40.0],
+            [5040, 40.0]
+        ],
+        "Mouse4": [
+            [6000, 60.0],
+            [6060, 60.0]
+        ],
+        "Mouse5": [
+            [7000, 60.0],
+            [7060, 60.0]
+        ]
+    }
+}

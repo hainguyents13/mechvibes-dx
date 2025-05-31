@@ -11,9 +11,12 @@ pub struct AudioContext {
     pub(crate) stream_handle: OutputStreamHandle,
     pub(crate) cached_samples: Arc<Mutex<Option<(Vec<f32>, u16, u32)>>>,
     pub(crate) key_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
+    pub(crate) mouse_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
     pub(crate) max_voices: usize,
     pub(crate) key_pressed: Arc<Mutex<HashMap<String, bool>>>,
+    pub(crate) mouse_pressed: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) key_sinks: Arc<Mutex<HashMap<String, Sink>>>,
+    pub(crate) mouse_sinks: Arc<Mutex<HashMap<String, Sink>>>,
 }
 
 // Manual PartialEq implementation for component compatibility
@@ -28,16 +31,17 @@ impl AudioContext {
     pub fn new() -> Self {
         println!("🎵 Creating new AudioContext...");
         let (stream, stream_handle) =
-            rodio::OutputStream::try_default().expect("Failed to create audio output stream");
-
-        let context = Self {
+            rodio::OutputStream::try_default().expect("Failed to create audio output stream");        let context = Self {
             _stream: Arc::new(stream),
             stream_handle,
             cached_samples: Arc::new(Mutex::new(None)),
             key_map: Arc::new(Mutex::new(HashMap::new())),
+            mouse_map: Arc::new(Mutex::new(HashMap::new())),
             max_voices: 5,
             key_pressed: Arc::new(Mutex::new(HashMap::new())),
+            mouse_pressed: Arc::new(Mutex::new(HashMap::new())),
             key_sinks: Arc::new(Mutex::new(HashMap::new())),
+            mouse_sinks: Arc::new(Mutex::new(HashMap::new())),
         };
 
         // Initialize volume from config
@@ -51,11 +55,16 @@ impl AudioContext {
         }
 
         context
-    }
-    pub fn set_volume(&self, volume: f32) {
+    }    pub fn set_volume(&self, volume: f32) {
         // Update volume for current keys
         let key_sinks = self.key_sinks.lock().unwrap();
         for sink in key_sinks.values() {
+            sink.set_volume(volume);
+        }
+
+        // Update volume for current mouse events
+        let mouse_sinks = self.mouse_sinks.lock().unwrap();
+        for sink in mouse_sinks.values() {
             sink.set_volume(volume);
         }
 

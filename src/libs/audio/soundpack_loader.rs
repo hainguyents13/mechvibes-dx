@@ -74,8 +74,11 @@ pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> R
     // Create key mappings
     let key_mappings = create_key_mappings(&soundpack, &samples.0);
 
+    // Create mouse mappings
+    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0);
+
     // Update audio context with new data (this replaces old data automatically)
-    update_context_direct(context, samples, key_mappings, &soundpack)?;
+    update_context_direct(context, samples, key_mappings, mouse_mappings, &soundpack)?;
 
     // Update metadata cache only (no audio caching)
     let mut cache = SoundpackCache::load();
@@ -94,11 +97,13 @@ fn update_context_direct(
     context: &AudioContext,
     samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
     key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
+    mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
     soundpack: &SoundPack,
 ) -> Result<(), String> {
     let (audio_samples, channels, sample_rate) = samples;
     let sample_count = audio_samples.len();
     let key_mapping_count = key_mappings.len();
+    let mouse_mapping_count = mouse_mappings.len();
     let soundpack_name = soundpack.name.clone();
 
     // Update cached samples (replaces old data automatically for memory cleanup)
@@ -139,13 +144,51 @@ fn update_context_direct(
         return Err("Failed to acquire lock on key_map".to_string());
     }
 
+    // Update mouse mappings (convert from HashMap<String, Vec<(f64, f64)>> to HashMap<String, Vec<[f32; 2]>>)
+    if let Ok(mut mouse_map) = context.mouse_map.lock() {
+        let old_count = mouse_map.len();
+        // Clear old mappings to free memory
+        mouse_map.clear();
+
+        // Convert mouse mappings to the expected format
+        for (button, mappings) in mouse_mappings {
+            let converted_mappings: Vec<[f32; 2]> = mappings
+                .into_iter()
+                .map(|(start, end)| [start as f32, end as f32])
+                .collect();
+            mouse_map.insert(button.clone(), converted_mappings);
+        }
+
+        println!(
+            "🖱️ Updated mouse mappings: {} -> {} buttons",
+            old_count,
+            mouse_map.len()
+        );
+
+        // Log first few mouse mappings for verification
+        for (button, mapping) in mouse_map.iter().take(3) {
+            println!("   {} -> {:?}", button, mapping);
+        }
+    } else {
+        return Err("Failed to acquire lock on mouse_map".to_string());
+    }
+
     // Clear active audio state to prevent memory leaks
     if let Ok(mut sinks) = context.key_sinks.lock() {
         let old_sinks = sinks.len();
         // Drop all existing sinks to free audio resources
         sinks.clear();
         if old_sinks > 0 {
-            println!("🔇 Cleared {} active sinks", old_sinks);
+            println!("🔇 Cleared {} active key sinks", old_sinks);
+        }
+    }
+
+    if let Ok(mut mouse_sinks) = context.mouse_sinks.lock() {
+        let old_sinks = mouse_sinks.len();
+        // Drop all existing mouse sinks to free audio resources
+        mouse_sinks.clear();
+        if old_sinks > 0 {
+            println!("🔇 Cleared {} active mouse sinks", old_sinks);
         }
     }
 
@@ -157,9 +200,17 @@ fn update_context_direct(
         }
     }
 
+    if let Ok(mut mouse_pressed) = context.mouse_pressed.lock() {
+        let old_pressed = mouse_pressed.len();
+        mouse_pressed.clear();
+        if old_pressed > 0 {
+            println!("🖱️ Cleared {} pressed mouse buttons", old_pressed);
+        }
+    }
+
     println!(
-        "✅ Successfully loaded soundpack: {} ({} key mappings) - Memory properly cleaned",
-        soundpack_name, key_mapping_count
+        "✅ Successfully loaded soundpack: {} ({} key mappings, {} mouse mappings) - Memory properly cleaned",
+        soundpack_name, key_mapping_count, mouse_mapping_count
     );
     Ok(())
 }
@@ -222,4 +273,50 @@ fn create_key_mappings(
     }
 
     key_mappings
+}
+
+fn create_mouse_mappings(
+    soundpack: &SoundPack,
+    _samples: &[f32],
+) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
+    let mut mouse_mappings = std::collections::HashMap::new();
+
+    // Check if soundpack has mouse definitions
+    if let Some(mouse_def) = &soundpack.mouse_def {
+        for (button, sound_def) in mouse_def {
+            // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
+            let converted_mappings: Vec<(f64, f64)> = sound_def
+                .iter()
+                .map(|pair| (pair[0] as f64, pair[1] as f64))
+                .collect();
+            mouse_mappings.insert(button.clone(), converted_mappings);
+        }
+    } else {
+        // If no mouse definitions, create default mappings using keyboard sounds
+        // This allows mouse clicks to work even with keyboard-only soundpacks
+        println!("🖱️ No mouse definitions found, creating default mouse mappings from keyboard sounds");
+        
+        // Use common keyboard keys as fallback for mouse buttons
+        let fallback_mappings = [
+            ("MouseLeft", "Space"),
+            ("MouseRight", "Enter"),
+            ("MouseMiddle", "Tab"),
+            ("MouseWheelUp", "ArrowUp"),
+            ("MouseWheelDown", "ArrowDown"),
+            ("Mouse4", "Backspace"),
+            ("Mouse5", "Delete"),
+        ];
+
+        for (mouse_button, keyboard_key) in &fallback_mappings {
+            if let Some(key_mapping) = soundpack.def.get(*keyboard_key) {
+                let converted_mappings: Vec<(f64, f64)> = key_mapping
+                    .iter()
+                    .map(|pair| (pair[0] as f64, pair[1] as f64))
+                    .collect();
+                mouse_mappings.insert(mouse_button.to_string(), converted_mappings);
+            }
+        }
+    }
+
+    mouse_mappings
 }

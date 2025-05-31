@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod keyboard;
+pub mod mouse;
 pub mod routes;
 pub mod theme;
 pub mod ui;

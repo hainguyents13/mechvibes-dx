@@ -122,9 +122,7 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::MediaNextTrack => "MediaTrackNext",
         */
         // Unknown or unmapped keys
-        _ => "",
-    };
-    println!("🔍 Mapping key {:?} to code '{}'", key, code);
+        _ => "",    };
     code
 }
 
@@ -164,10 +162,8 @@ pub fn start_keyboard_listener(play_sound_tx: Sender<String>) {
                 if !key_code.is_empty() {
                     // Remove key from pressed set
                     let mut pressed = pressed_keys.lock().unwrap();
-                    pressed.remove(&key_code.to_string());
-                    drop(pressed); // Release lock early
+                    pressed.remove(&key_code.to_string());                    drop(pressed); // Release lock early
 
-                    println!("🛠 Key Released: {}", key_code);
                     let _ = play_sound_tx.send(format!("UP:{}", key_code));
                 }
             }
