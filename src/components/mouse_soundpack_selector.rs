@@ -113,9 +113,7 @@ fn MouseSelector() -> Element {
                   }
                   div { class: "text-xs truncate text-base-content/60",
                     if let Some(author) = &pack.author {
-                      "v{pack.version} by {author}"
-                    } else {
-                      "v{pack.version}"
+                      "by {author}"
                     }
                   }
                 }
