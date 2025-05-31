@@ -10,7 +10,7 @@
     "source": "oreo.ogg",
     "method": "single",
     "includes_numpad": true,
-    "for": "keyboard",
+    "mouse": false,
     "defs": {
         "Digit1": [
             [971, 71.0],

@@ -43,18 +43,22 @@ fn MouseSelector() -> Element {
     let current = use_memo(move || {
         let config = config();
         config.mouse_soundpack.clone()
-    });
-
-    // Filter soundpacks based on search query
+    });    // Filter soundpacks based on search query and mouse type
     let filtered_soundpacks = use_memo(move || {
         let query = search_query().to_lowercase();
         let all_packs = soundpacks();
 
-        // Filter by search query
+        // First filter to only mouse soundpacks (mouse: true)
+        let mouse_packs: Vec<_> = all_packs
+            .into_iter()
+            .filter(|pack| pack.mouse) // Only include mouse soundpacks
+            .collect();
+
+        // Then filter by search query
         if query.is_empty() {
-            all_packs
+            mouse_packs
         } else {
-            all_packs
+            mouse_packs
                 .into_iter()
                 .filter(|pack| {
                     pack.name.to_lowercase().contains(&query)

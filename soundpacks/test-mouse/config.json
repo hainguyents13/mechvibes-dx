@@ -8,22 +8,8 @@
     "icon": "icon.jpg",
     "source": "sound.ogg",
     "method": "single",
-    "includes_numpad": false,
+    "mouse": true,
     "defs": {
-        "Space": [
-            [1000, 80.0],
-            [1080, 80.0]
-        ],
-        "Enter": [
-            [2000, 80.0],
-            [2080, 80.0]
-        ],
-        "Tab": [
-            [3000, 80.0],
-            [3080, 80.0]
-        ]
-    },
-    "mouse_defs": {
         "MouseLeft": [
             [1000, 80.0],
             [1080, 80.0]

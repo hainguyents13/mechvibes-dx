@@ -1,8 +1,8 @@
+use crate::state::paths;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use crate::state::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundpackMetadata {
@@ -14,6 +14,7 @@ pub struct SoundpackMetadata {
     pub tags: Vec<String>,
     pub keycap: Option<String>,
     pub icon: Option<String>,
+    pub mouse: bool, // true for mouse soundpacks, false for keyboard
     pub last_modified: u64,
     pub last_accessed: u64,
 }
@@ -181,6 +182,10 @@ impl SoundpackCache {
                 .get("icon")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
+            mouse: config
+                .get("mouse")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false), // Default to false (keyboard soundpack)
             last_modified: metadata
                 .modified()
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH)

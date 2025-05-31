@@ -258,6 +258,7 @@ fn create_soundpack_metadata(
         tags: soundpack.tags.clone().unwrap_or_default(),
         keycap: soundpack.keycap.clone(),
         icon: soundpack.icon.clone(),
+        mouse: soundpack.mouse, // Include the mouse field
         last_modified,
         last_accessed: std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -272,13 +273,17 @@ fn create_key_mappings(
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
     let mut key_mappings = std::collections::HashMap::new();
 
-    for (key, sound_def) in &soundpack.defs {
-        // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
-        let converted_mappings: Vec<(f64, f64)> = sound_def
-            .iter()
-            .map(|pair| (pair[0] as f64, pair[1] as f64))
-            .collect();
-        key_mappings.insert(key.clone(), converted_mappings);
+    // For keyboard soundpacks, use the defs field for keyboard mappings
+    // For mouse soundpacks, return empty key mappings
+    if !soundpack.mouse {
+        for (key, sound_def) in &soundpack.defs {
+            // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
+            let converted_mappings: Vec<(f64, f64)> = sound_def
+                .iter()
+                .map(|pair| (pair[0] as f64, pair[1] as f64))
+                .collect();
+            key_mappings.insert(key.clone(), converted_mappings);
+        }
     }
 
     key_mappings
@@ -290,9 +295,10 @@ fn create_mouse_mappings(
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
     let mut mouse_mappings = std::collections::HashMap::new();
 
-    // Check if soundpack has mouse definitions
-    if let Some(mouse_defs) = &soundpack.mouse_defs {
-        for (button, sound_def) in mouse_defs {
+    // For mouse soundpacks, use the defs field directly
+    if soundpack.mouse {
+        // This is a mouse soundpack, use defs field for mouse mappings
+        for (button, sound_def) in &soundpack.defs {
             // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
             let converted_mappings: Vec<(f64, f64)> = sound_def
                 .iter()
@@ -301,8 +307,7 @@ fn create_mouse_mappings(
             mouse_mappings.insert(button.clone(), converted_mappings);
         }
     } else {
-        // If no mouse definitions, create default mappings using keyboard sounds
-        // This allows mouse clicks to work even with keyboard-only soundpacks
+        // This is a keyboard soundpack, create default mouse mappings from keyboard sounds
         println!(
             "🖱️ No mouse definitions found, creating default mouse mappings from keyboard sounds"
         );

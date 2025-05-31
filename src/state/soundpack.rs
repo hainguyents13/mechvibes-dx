@@ -34,8 +34,6 @@ pub struct SoundPack {
     #[serde(default)]
     pub includes_numpad: Option<bool>,
     #[serde(default)]
-    pub for_device: Option<String>, // "keyboard", "mouse", or "both"
+    pub mouse: bool, // true for mouse soundpacks, false for keyboard soundpacks
     pub defs: HashMap<String, Vec<[f32; 2]>>,
-    #[serde(default)]
-    pub mouse_defs: Option<HashMap<String, Vec<[f32; 2]>>>,
 }
