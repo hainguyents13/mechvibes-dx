@@ -4,60 +4,96 @@
 /// - `data/` - Application data and configuration files
 /// - `soundpacks/` - Soundpack directories containing audio files and metadata
 ///
-/// All paths are relative to the application root directory unless specified otherwise.
+/// All paths are relative to the application executable directory unless specified otherwise.
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// Get the application root directory (current working directory where data and soundpacks are located)
+fn get_app_root() -> &'static PathBuf {
+    static APP_ROOT: OnceLock<PathBuf> = OnceLock::new();
+    APP_ROOT.get_or_init(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
 
 /// Application data directory paths
 pub mod data {
-    /// Main data directory
-    pub const DIR: &str = "./data";
+    use super::get_app_root;
+    use std::path::PathBuf;
 
     /// Application configuration file
-    pub const CONFIG_JSON: &str = "./data/config.json";
+    pub fn config_json() -> PathBuf {
+        get_app_root().join("data").join("config.json")
+    }
 
     /// Application manifest file  
-    pub const MANIFEST_JSON: &str = "./data/manifest.json";
+    pub fn manifest_json() -> PathBuf {
+        get_app_root().join("data").join("manifest.json")
+    }
+
     /// Soundpack metadata cache file
+    pub fn soundpack_metadata_cache_json() -> PathBuf {
+        get_app_root()
+            .join("data")
+            .join("soundpack_metadata_cache.json")
+    }
+
+    /// For backward compatibility with build.rs and other external usage
+    pub const DIR: &str = "./data";
+    pub const CONFIG_JSON: &str = "./data/config.json";
+    pub const MANIFEST_JSON: &str = "./data/manifest.json";
     pub const SOUNDPACK_METADATA_CACHE_JSON: &str = "data/soundpack_metadata_cache.json";
 }
 
 /// Soundpack directory paths
 pub mod soundpacks {
-    /// Main soundpacks directory
-    pub const DIR: &str = "./soundpacks";
+    use super::get_app_root;
 
     /// Get soundpack directory path for a specific soundpack ID
     pub fn soundpack_dir(soundpack_id: &str) -> String {
-        format!("./soundpacks/{}", soundpack_id)
+        get_app_root()
+            .join("soundpacks")
+            .join(soundpack_id)
+            .to_string_lossy()
+            .to_string()
     }
+
     /// Get config.json path for a specific soundpack
     pub fn config_json(soundpack_id: &str) -> String {
-        format!("./soundpacks/{}/config.json", soundpack_id)
+        get_app_root()
+            .join("soundpacks")
+            .join(soundpack_id)
+            .join("config.json")
+            .to_string_lossy()
+            .to_string()
     }
+
+    /// For backward compatibility
+    pub const DIR: &str = "./soundpacks";
 }
 
 /// Utility functions for path operations
 pub mod utils {
-    use std::path::Path;
+    use super::get_app_root;
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
-        Path::new(super::data::DIR).exists()
+        get_app_root().join("data").exists()
     }
 
     /// Check if config file exists
     pub fn config_file_exists() -> bool {
-        Path::new(super::data::CONFIG_JSON).exists()
+        get_app_root().join("data").join("config.json").exists()
     }
 
     /// Check if soundpacks directory exists
     pub fn soundpacks_dir_exists() -> bool {
-        Path::new(super::soundpacks::DIR).exists()
+        get_app_root().join("soundpacks").exists()
     }
 
     /// Count soundpacks in the soundpacks directory
     pub fn count_soundpacks() -> usize {
-        if soundpacks_dir_exists() {
-            std::fs::read_dir(super::soundpacks::DIR)
+        let soundpacks_dir = get_app_root().join("soundpacks");
+        if soundpacks_dir.exists() {
+            std::fs::read_dir(&soundpacks_dir)
                 .map(|entries| {
                     entries
                         .filter_map(|e| e.ok())
@@ -68,5 +104,27 @@ pub mod utils {
         } else {
             0
         }
+    }
+
+    /// Get absolute path for data directory
+    pub fn get_data_dir_absolute() -> String {
+        get_app_root().join("data").to_string_lossy().to_string()
+    }
+
+    /// Get absolute path for config file
+    pub fn get_config_file_absolute() -> String {
+        get_app_root()
+            .join("data")
+            .join("config.json")
+            .to_string_lossy()
+            .to_string()
+    }
+
+    /// Get absolute path for soundpacks directory
+    pub fn get_soundpacks_dir_absolute() -> String {
+        get_app_root()
+            .join("soundpacks")
+            .to_string_lossy()
+            .to_string()
     }
 }

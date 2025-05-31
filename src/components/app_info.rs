@@ -12,7 +12,12 @@ pub fn AppInfoDisplay() -> Element {
     // Get current working directory
     let current_dir = env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "Unknown".to_string());    // Check file/directory existence
+        .unwrap_or_else(|_| "Unknown".to_string());    // Get absolute paths for directories and files
+    let data_dir_absolute = paths::utils::get_data_dir_absolute();
+    let config_file_absolute = paths::utils::get_config_file_absolute();
+    let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
+
+    // Check file/directory existence
     let data_dir_exists = paths::utils::data_dir_exists();
     let config_file_exists = paths::utils::config_file_exists();
     let soundpacks_dir_exists = paths::utils::soundpacks_dir_exists();
@@ -47,7 +52,7 @@ pub fn AppInfoDisplay() -> Element {
                 "❌"
               }
             }
-            span { class: "ml-2 text-base-content/70", "./data directory" }
+            span { class: "ml-2 text-base-content/70 break-all", "{data_dir_absolute}" }
           }
           div {
             span { class: if config_file_exists { "text-base-content" } else { "text-error" },
@@ -57,7 +62,7 @@ pub fn AppInfoDisplay() -> Element {
                 "❌"
               }
             }
-            span { class: "ml-2 text-base-content/70", "{paths::data::CONFIG_JSON}" }
+            span { class: "ml-2 text-base-content/70 break-all", "{config_file_absolute}" }
           }
           div {
             span { class: if soundpacks_dir_exists { "text-base-content" } else { "text-error" },
@@ -67,7 +72,7 @@ pub fn AppInfoDisplay() -> Element {
                 "❌"
               }
             }
-            span { class: "ml-2 text-base-content/70", "./soundpacks directory" }
+            span { class: "ml-2 text-base-content/70 break-all", "{soundpacks_dir_absolute}" }
           }
           div {
             span { class: "text-base-content", "🎵" }

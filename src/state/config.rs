@@ -30,11 +30,12 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn load() -> Self {
         // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all(paths::data::DIR) {
+        let data_dir = paths::data::config_json().parent().unwrap().to_path_buf();
+        if let Err(_) = fs::create_dir_all(&data_dir) {
             eprintln!("Warning: Could not create data directory");
         }
 
-        let config_path = PathBuf::from(paths::data::CONFIG_JSON);
+        let config_path = paths::data::config_json();
         if let Ok(contents) = fs::read_to_string(config_path) {
             match serde_json::from_str::<AppConfig>(&contents) {
                 Ok(config) => {
@@ -58,7 +59,7 @@ impl AppConfig {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let config_path = PathBuf::from(paths::data::CONFIG_JSON);
+        let config_path = paths::data::config_json();
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
         fs::write(config_path, contents)

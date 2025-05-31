@@ -26,11 +26,16 @@ pub struct SoundpackCache {
 }
 
 impl SoundpackCache {
-    const CACHE_FILE: &'static str = paths::data::SOUNDPACK_METADATA_CACHE_JSON;
+    fn cache_file() -> String {
+        paths::data::soundpack_metadata_cache_json()
+            .to_string_lossy()
+            .to_string()
+    }
 
     pub fn load() -> Self {
+        let cache_file = Self::cache_file();
         // Load metadata cache
-        let mut cache = match fs::read_to_string(Self::CACHE_FILE) {
+        let mut cache = match fs::read_to_string(&cache_file) {
             Ok(content) => match serde_json::from_str::<SoundpackCache>(&content) {
                 Ok(cache) => {
                     println!(
@@ -68,8 +73,9 @@ impl SoundpackCache {
     }
 
     pub fn save(&self) {
+        let cache_file = Self::cache_file();
         // Ensure parent directory exists
-        if let Some(parent) = Path::new(Self::CACHE_FILE).parent() {
+        if let Some(parent) = Path::new(&cache_file).parent() {
             if let Err(e) = fs::create_dir_all(parent) {
                 eprintln!("⚠️  Failed to create cache directory: {}", e);
                 return;
@@ -78,7 +84,7 @@ impl SoundpackCache {
 
         match serde_json::to_string_pretty(self) {
             Ok(content) => {
-                if let Err(e) = fs::write(Self::CACHE_FILE, content) {
+                if let Err(e) = fs::write(&cache_file, content) {
                     eprintln!("⚠️  Failed to save metadata cache: {}", e);
                 } else {
                     println!(
@@ -100,7 +106,8 @@ impl SoundpackCache {
     pub fn refresh_from_directory(&mut self) {
         println!("📂 Scanning soundpacks directory...");
 
-        match std::fs::read_dir(paths::soundpacks::DIR) {
+        let soundpacks_dir = paths::utils::get_soundpacks_dir_absolute();
+        match std::fs::read_dir(&soundpacks_dir) {
             Ok(entries) => {
                 self.soundpacks.clear();
 
