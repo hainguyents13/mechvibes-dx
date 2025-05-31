@@ -48,8 +48,11 @@ pub fn SoundpackSelector() -> Element {
         use_memo(move || soundpacks().into_iter().find(|pack| pack.id == current()));
 
     rsx! {
-      div { class: "space-y-2",
-        div { class: "relative w-full",
+      div {
+        class: "space-y-2",
+        div {
+          class: "relative w-full",
+          
           // DaisyUI dropdown button
           button {
             class: format!(
@@ -58,9 +61,11 @@ pub fn SoundpackSelector() -> Element {
             ),
             disabled: is_loading(),
             onclick: move |_| is_open.set(!is_open()),
-            div { class: "flex items-center gap-3 flex-1",
+            div {
+              class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
-                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
+                div {
+                  class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
@@ -74,11 +79,14 @@ pub fn SoundpackSelector() -> Element {
                     }
                   }
                 }
-                div { class: "flex-1 min-w-0 text-left",
-                  div { class: "font-medium truncate text-base-content",
+                div {
+                  class: "flex-1 min-w-0 text-left",
+                  div {
+                    class: "font-medium truncate text-base-content",
                     "{pack.name}"
                   }
-                  div { class: "text-sm truncate text-base-content/60",
+                  div {
+                    class: "text-sm truncate text-base-content/60",
                     if let Some(author) = &pack.author {
                       "v{pack.version} by {author}"
                     } else {
@@ -87,7 +95,10 @@ pub fn SoundpackSelector() -> Element {
                   }
                 }
               } else {
-                div { class: "text-base-content/50", "Select a soundpack..." }
+                div {
+                  class: "text-base-content/50",
+                  "Select a soundpack..."
+                }
               }
             }
             ChevronDown {
@@ -99,9 +110,12 @@ pub fn SoundpackSelector() -> Element {
           }
           // Dropdown panel
           if is_open() {
-            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
+            div {
+              class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
+              
               // Search input
-              div { class: "p-3 border-b border-base-200",
+              div {
+                class: "p-3 border-b border-base-200",
                 div { class: "relative",
                   Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" }
                   input {
@@ -114,18 +128,18 @@ pub fn SoundpackSelector() -> Element {
                 }
               }
               // Soundpack list
-              div { class: "overflow-y-auto max-h-300",
+              div {
+                class: "overflow-y-auto max-h-300",
                 if filtered_soundpacks.read().is_empty() {
-                  div { class: "p-4 text-center text-base-content/50",
+                  div {
+                    class: "p-4 text-center text-base-content/50",
                     "No soundpacks found"
                   }
                 } else {
                   for pack in filtered_soundpacks.read().iter() {
                     button {
                       key: "{pack.id}",
-                      class: format!(
-                          "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16",
-                      ),
+                      class: "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-5 border-b border-base-200 last:border-b-0 h-16",
                       onclick: {
                           let pack_id = pack.id.clone();
                           let mut error = error.clone();
@@ -186,7 +200,8 @@ pub fn SoundpackSelector() -> Element {
                               }
                           }
                       },
-                      div { class: "flex items-center justify-between gap-3",
+                      div {
+                        class: "flex items-center justify-between gap-3",
                         div {
                           class: "flex-shrink-0 w-10 h-10 bg-base-300 rounded flex items-center justify-center overflow-hidden bg-blend-multiply",
                           if let Some(icon) = &pack.icon {
@@ -197,7 +212,9 @@ pub fn SoundpackSelector() -> Element {
                           } else {
                             Music { class: "w-5 h-5 text-base-content/50" }
                           }
-                          Check { class: "w-full h-full object-cover text-white rounded absolute", style: "padding: 7px; background: rgba(0, 0, 0, 0.525)" }
+                          if pack.id == current() {
+                            Check { class: "text-white rounded absolute", style: "width: 40px; height: 40px; padding: 7px; background: rgba(0, 0, 0, 0.525)" }
+                          }
                         },
                         div {
                           class: "flex-1 min-w-0",
@@ -237,9 +254,14 @@ pub fn SoundpackSelector() -> Element {
           div { class: "text-sm text-error mt-2", "{error}" }
         }
         // Refresh button
-        div { class: "flex justify-between items-center",
-          div { class: "text-sm text-base-content/60 ", "{soundpacks().len()} soundpacks" }
-          div { class: "flex items-center gap-2",
+        div {
+          class: "flex justify-between items-center",
+          div {
+            class: "text-sm text-base-content/60 ",
+            "{soundpacks().len()} soundpacks"
+          }
+          div {
+            class: "flex items-center gap-2",
             a {
               href: "https://mechvibes.com/soundpacks",
               target: "_blank",
