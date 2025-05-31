@@ -12,23 +12,28 @@ pub fn app() -> Element {
     use_context_provider(|| app_state);
 
     // Create global keyboard state using signals
-    let keyboard_state = use_signal(|| KeyboardState::new()); // Provide the keyboard state context to all child components
-    use_context_provider(|| keyboard_state); // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
+    let keyboard_state = use_signal(|| KeyboardState::new());
+    // Provide the keyboard state context to all child components
+    use_context_provider(|| keyboard_state);
+    // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
-    use_context_provider(|| audio_context.clone());    // Load current soundpacks on startup
+    use_context_provider(|| audio_context.clone());
+    // Load current soundpacks on startup
     {
         let ctx = audio_context.clone();
         use_effect(move || {
             println!("🎵 Loading current soundpacks on startup...");
             crate::state::app::reload_current_soundpacks(&ctx);
         });
-    }    // Create channels for real-time input event communication
+    }
+    // Create channels for real-time input event communication
     let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
     let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
     let keyboard_rx = Arc::new(keyboard_rx);
-    let mouse_rx = Arc::new(mouse_rx);    // Launch the unified input listener (handles both keyboard and mouse)
+    let mouse_rx = Arc::new(mouse_rx);
+    // Launch the unified input listener (handles both keyboard and mouse)
     {
         use_effect(move || {
             let keyboard_tx = keyboard_tx.clone();
@@ -37,7 +42,8 @@ pub fn app() -> Element {
                 start_unified_input_listener(keyboard_tx, mouse_tx);
             });
         });
-    }// Process keyboard events and update both audio and UI state
+    }
+    // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
         let keyboard_rx = keyboard_rx.clone();
