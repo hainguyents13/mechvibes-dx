@@ -74,11 +74,16 @@ pub fn reload_current_soundpack(audio_ctx: &crate::libs::audio::AudioContext) {
 pub fn reload_soundpacks() {
     println!("🔄 Reloading global soundpack cache...");
 
+    // Create a fresh cache and refresh from directory
+    let mut fresh_cache = SoundpackCache::load();
+    fresh_cache.refresh_from_directory();
+    fresh_cache.save();
+
     // Update mutex state
     if let Some(mutex) = APP_STATE.get() {
         if let Ok(mut app_state) = mutex.lock() {
             let config = app_state.config.clone();
-            let optimized_cache = Arc::new(SoundpackCache::load());
+            let optimized_cache = Arc::new(fresh_cache.clone());
             *app_state = AppState {
                 config,
                 optimized_cache,
@@ -90,7 +95,7 @@ pub fn reload_soundpacks() {
     if let Some(rwlock) = APP_STATE_SIGNAL.get() {
         if let Ok(mut signal_state) = rwlock.write() {
             let config = signal_state.config.clone();
-            let optimized_cache = Arc::new(SoundpackCache::load());
+            let optimized_cache = Arc::new(fresh_cache);
             *signal_state = AppState {
                 config,
                 optimized_cache,

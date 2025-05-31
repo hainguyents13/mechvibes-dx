@@ -21,3 +21,15 @@ script = []
 [application.desktop]
 # Include assets directory for desktop builds
 bundle_assets = true
+
+
+[bundle]
+identifier = "com.hainguyents13.mechvibesdx"
+name = "MechvibesDX"
+publisher = "Hải Nguyễn"
+icon = ["/assets/icon.ico"]
+resources = ["assets/"]
+version = "0.1.0"
+category = "Productivity"
+short_description = "MechvibesDX"
+long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards, inspired by the original Mechvibes project. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
