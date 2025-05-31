@@ -30,7 +30,7 @@ desktop = ["dioxus/desktop"]
 
 [package.metadata.bundle]
 name = "MechvibesDX"
-identifier = "com.example.mechvibesdx"
+identifier = "com.hainguyents13.mechvibesdx"
 version = "0.1.0"
 category = "Productivity"
 short_description = "MechvibesDX"

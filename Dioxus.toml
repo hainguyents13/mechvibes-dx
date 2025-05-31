@@ -25,16 +25,15 @@ bundle_assets = true
 
 # bundle configuration
 [bundle]
-identifier = "com.mechvibesdx"
+identifier = "com.hainguyents13.mechvibesdx"
+name = "MechvibesDX"
+version = "0.1.0"
 publisher = "Hai Nguyen"
-icon = [
-  "icons/256x256.ico",
-  "icons/256x256.icns",
-  "icons/256x256.png",
-  "icons/icon.ico",
-  "icons/icon.icns"
-]
-category = "Utility"
+icon = ["/assets/icon.ico"]
+category = "Productivity"
 short_description = "A digital mechanical keyboard simulator"
-long_description = "This is an application to simulate mechanical keyboard sounds digitally via key detection"
-resources = ["./soundpacks"]
+long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards, inspired by the original Mechvibes project. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
+resources = ["./soundpacks", "./assets"]
+
+# contains icons required by macos and linux
+# icon = ["icons/256x256.ico", "icons/256x256.icns", "icons/256x256.png", "icons/icon.ico", "icons/icon.icns"]
