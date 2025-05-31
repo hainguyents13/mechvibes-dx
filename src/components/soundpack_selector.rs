@@ -213,7 +213,7 @@ pub fn SoundpackSelector() -> Element {
                             Music { class: "w-5 h-5 text-base-content/50" }
                           }
                           if pack.id == current() {
-                            Check { class: "text-white rounded absolute", style: "width: 40px; height: 40px; padding: 7px; background: rgba(0, 0, 0, 0.525)" }
+                            Check { class: "text-white rounded absolute w-40 h-40 padding7 tint545" }
                           }
                         },
                         div {
