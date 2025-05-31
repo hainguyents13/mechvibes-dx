@@ -11,4 +11,5 @@ node_modules
 /data
 
 /wix
-create_portable.ps1
+
+/tests

@@ -1,14 +1,53 @@
 use crate::libs::theme::{use_theme, Theme};
+use crate::state::app::use_app_state;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
+use std::sync::Arc;
 
 #[component]
 pub fn SettingsPage() -> Element {
+    // Get access to audio context for reloading soundpacks
+    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
     // Use shared config hook
     let (config, update_config) = use_config();
     let mut enable_sound = use_signal(|| config().enable_sound);
     let mut auto_start = use_signal(|| config().auto_start);
-    let mut show_notifications = use_signal(|| config().show_notifications);
+    let mut show_notifications = use_signal(|| config().show_notifications); // Get access to app state for soundpack operations
+    let app_state = use_app_state();
+    // UI state for notification and loading
+    let mut refreshing_soundpacks = use_signal(|| false);
+
+    // Function to refresh soundpack cache
+    let mut refresh_soundpacks_cache = move || {
+        println!("🔄 Refreshing soundpack cache from settings page...");
+
+        // Set loading state to true
+        refreshing_soundpacks.set(true);
+
+        // Clone necessary variables for the async task
+        let mut refreshing_soundpacks_clone = refreshing_soundpacks.clone();
+        let audio_ctx_clone = audio_ctx.clone();
+        let mut app_state_clone = app_state.clone();
+
+        // Perform the refresh operation in a separate task to not block the UI
+        spawn(async move {
+            // This will create a new SoundpackCache instance that will refresh from directory
+            let mut fresh_cache = crate::state::soundpack_cache::SoundpackCache::load();
+            fresh_cache.refresh_from_directory();
+            fresh_cache.save();
+
+            // Update the app state with new cache
+            app_state_clone.write().optimized_cache = Arc::new(fresh_cache);
+
+            // Reload current soundpacks to apply any changes
+            crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
+
+            // Show success notification and reset loading state
+            refreshing_soundpacks_clone.set(false);
+
+            println!("✅ Soundpack refresh complete");
+        });
+    };
 
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
@@ -127,6 +166,34 @@ pub fn SettingsPage() -> Element {
               }
             }
           }
+          // Soundpack Management Section
+          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
+            input { r#type: "radio", name: "setting-accordion" }
+            div { class: "collapse-title font-semibold", "Soundpack management" }
+            div { class: "collapse-content text-sm",
+              div { class: "space-y-4 mt-2",
+                p { class: "text-base-content/70",
+                  "Refresh soundpack list to detect newly added or removed soundpacks."
+                }
+                div { class: "flex flex-col gap-2",
+                  div { class: "flex items-center gap-2",
+                    button {
+                      class: "btn btn-neutral btn-sm",
+                      onclick: move |_| {
+                          refresh_soundpacks_cache();
+                      },
+                      disabled: refreshing_soundpacks(),
+                      // if refreshing_soundpacks() {
+                      //   span { class: "loading loading-spinner loading-xs mr-1" }
+                      // }
+                      "Refresh soundpacks"
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           // App info Section
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
