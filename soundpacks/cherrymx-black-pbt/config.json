@@ -10,7 +10,8 @@
     "source": "sound.ogg",
     "method": "single",
     "includes_numpad": false,
-    "def": {
+    "mouse": false,
+    "defs": {
         "Digit1": [
             [2078, 88.0],
             [2166, 88.0]

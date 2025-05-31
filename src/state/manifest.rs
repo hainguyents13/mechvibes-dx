@@ -1,3 +1,4 @@
+use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -62,12 +63,10 @@ pub struct AppManifest {
 }
 
 impl AppManifest {
-    const MANIFEST_FILE: &'static str = "./data/manifest.json";
-    const CONFIG_FILE: &'static str = "./app.config.json";
-
-    pub fn load() -> Self {
+    const CONFIG_FILE: &'static str = "./app.config.json";    pub fn load() -> Self {
         // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all("./data") {
+        let data_dir = paths::data::manifest_json().parent().unwrap().to_path_buf();
+        if let Err(_) = fs::create_dir_all(&data_dir) {
             eprintln!("Warning: Could not create data directory");
         }
 
@@ -75,7 +74,7 @@ impl AppManifest {
         let config = Self::load_config();
 
         // Check if manifest exists and load it
-        let manifest_path = PathBuf::from(Self::MANIFEST_FILE);
+        let manifest_path = paths::data::manifest_json();
         if let Ok(contents) = fs::read_to_string(manifest_path) {
             match serde_json::from_str::<AppManifest>(&contents) {
                 Ok(mut manifest) => {
@@ -155,12 +154,11 @@ impl AppManifest {
                 soundpack_version: "1.0".to_string(),
                 cache_version: "1.0".to_string(),
                 minimum_app_version: "0.1.0".to_string(),
-            },
-            paths: AppPaths {
-                config_file: "./data/config.json".to_string(),
-                soundpack_cache: "./data/soundpacks.json".to_string(),
-                soundpacks_dir: "./soundpacks".to_string(),
-                data_dir: "./data".to_string(),
+            },            paths: AppPaths {
+                config_file: paths::utils::get_config_file_absolute(),
+                soundpack_cache: paths::data::soundpack_metadata_cache_json().to_string_lossy().to_string(),
+                soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
+                data_dir: paths::utils::get_data_dir_absolute(),
             },
         }
     }
@@ -211,12 +209,10 @@ impl AppManifest {
         } else {
             "unknown".to_string()
         }
-    }
-
-    pub fn save(&self) -> Result<(), String> {
+    }    pub fn save(&self) -> Result<(), String> {
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
-        fs::write(Self::MANIFEST_FILE, contents)
+        fs::write(paths::data::manifest_json(), contents)
             .map_err(|e| format!("Failed to write manifest file: {}", e))?;
         Ok(())
     }

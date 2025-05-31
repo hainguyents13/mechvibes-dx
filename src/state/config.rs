@@ -1,8 +1,8 @@
 use crate::libs::theme::Theme;
+use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -12,8 +12,10 @@ pub struct AppConfig {
     pub commit: Option<String>,
 
     // Audio settings
-    pub current_soundpack: String,
+    pub keyboard_soundpack: String,
+    pub mouse_soundpack: String,
     pub volume: f32,
+    pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
 
     // UI settings
@@ -27,11 +29,12 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn load() -> Self {
         // Ensure data directory exists
-        if let Err(_) = fs::create_dir_all("./data") {
+        let data_dir = paths::data::config_json().parent().unwrap().to_path_buf();
+        if let Err(_) = fs::create_dir_all(&data_dir) {
             eprintln!("Warning: Could not create data directory");
         }
 
-        let config_path = PathBuf::from("./data/config.json");
+        let config_path = paths::data::config_json();
         if let Ok(contents) = fs::read_to_string(config_path) {
             match serde_json::from_str::<AppConfig>(&contents) {
                 Ok(config) => {
@@ -55,7 +58,7 @@ impl AppConfig {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let config_path = PathBuf::from("./data/config.json");
+        let config_path = paths::data::config_json();
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
         fs::write(config_path, contents)
@@ -70,8 +73,10 @@ impl Default for AppConfig {
             version: env!("CARGO_PKG_VERSION").to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-            current_soundpack: "oreo".to_string(),
+            keyboard_soundpack: "oreo".to_string(),
+            mouse_soundpack: "test-mouse".to_string(),
             volume: 1.0,
+            mouse_volume: 1.0, // Default mouse volume to 100%
             enable_sound: true,
             theme: Theme::System, // Default to System theme
             auto_start: false,
