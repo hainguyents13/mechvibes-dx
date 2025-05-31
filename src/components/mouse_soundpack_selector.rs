@@ -1,6 +1,5 @@
 use crate::libs::audio::AudioContext;
 use crate::state::config_utils::use_config;
-use crate::state::paths;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use lucide_dioxus::{Check, ChevronDown, Mouse, Music, Search};
@@ -93,11 +92,14 @@ fn MouseSelector() -> Element {
                 div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-10 h-10 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
-                  } else {
-                    if let Some(icon) = &pack.icon {
-                      img {
-                        class: "w-full h-full object-cover",
-                        src: paths::soundpacks::icon_path(&pack.id, icon),
+                  } else {                    if let Some(icon) = &pack.icon {
+                      if !icon.is_empty() {
+                        img {
+                          class: "w-full h-full object-cover",
+                          src: "{icon}",
+                        }
+                      } else {
+                        Music { class: "w-5 h-5 text-base-content/50" }
                       }
                     } else {
                       Music { class: "w-5 h-5 text-base-content/50" }
@@ -228,12 +230,14 @@ fn MouseSelector() -> Element {
                           class: format!(
                               "flex-shrink-0 w-8 h-8 bg-base-300 rounded-lg flex items-center justify-center overflow-hidden bg-blend-multiply {}",
                               if pack.id == current() { "bg-black" } else { "" },
-                          ),
-                          if pack.id != current() {
-                            if let Some(icon) = &pack.icon {
-                              img {
-                                class: "w-full h-full object-cover",
-                                src: paths::soundpacks::icon_path(&pack.id, icon),
+                          ),                          if pack.id != current() {                            if let Some(icon) = &pack.icon {
+                              if !icon.is_empty() {
+                                img {
+                                  class: "w-full h-full object-cover",
+                                  src: "{icon}",
+                                }
+                              } else {
+                                Music { class: "w-4 h-4 text-base-content/50" }
                               }
                             } else {
                               Music { class: "w-4 h-4 text-base-content/50" }

@@ -178,10 +178,23 @@ impl SoundpackCache {
                 .get("keycap")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
-            icon: config
-                .get("icon")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            icon: {
+                // Check if icon file exists and set absolute path or empty string
+                if let Some(icon_filename) = config.get("icon").and_then(|v| v.as_str()) {
+                    let icon_path = format!(
+                        "{}/{}",
+                        paths::soundpacks::soundpack_dir(soundpack_id),
+                        icon_filename
+                    );
+                    if std::path::Path::new(&icon_path).exists() {
+                        Some(icon_path)
+                    } else {
+                        Some(String::new()) // Empty string if icon file not found
+                    }
+                } else {
+                    Some(String::new()) // Empty string if no icon specified
+                }
+            },
             mouse: config
                 .get("mouse")
                 .and_then(|v| v.as_bool())

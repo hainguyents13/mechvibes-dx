@@ -29,15 +29,9 @@ pub mod soundpacks {
     pub fn soundpack_dir(soundpack_id: &str) -> String {
         format!("./soundpacks/{}", soundpack_id)
     }
-
     /// Get config.json path for a specific soundpack
     pub fn config_json(soundpack_id: &str) -> String {
         format!("./soundpacks/{}/config.json", soundpack_id)
-    }
-
-    /// Get icon path for a specific soundpack and icon filename
-    pub fn icon_path(soundpack_id: &str, icon_filename: &str) -> String {
-        format!("./soundpacks/{}/{}", soundpack_id, icon_filename)
     }
 }
 
