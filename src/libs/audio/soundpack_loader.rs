@@ -60,10 +60,11 @@ fn load_audio_file(
     Ok((samples, channels, sample_rate))
 }
 
-
-
 /// Direct keyboard soundpack loading
-pub fn load_keyboard_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+pub fn load_keyboard_soundpack_optimized(
+    context: &AudioContext,
+    soundpack_id: &str,
+) -> Result<(), String> {
     println!("📂 Direct loading keyboard soundpack: {}", soundpack_id);
 
     // Load soundpack directly from filesystem
@@ -105,7 +106,10 @@ pub fn load_keyboard_soundpack_optimized(context: &AudioContext, soundpack_id: &
 }
 
 /// Direct mouse soundpack loading
-pub fn load_mouse_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+pub fn load_mouse_soundpack_optimized(
+    context: &AudioContext,
+    soundpack_id: &str,
+) -> Result<(), String> {
     println!("📂 Direct loading mouse soundpack: {}", soundpack_id);
 
     // Load soundpack directly from filesystem
@@ -145,8 +149,6 @@ pub fn load_mouse_soundpack_optimized(context: &AudioContext, soundpack_id: &str
     );
     Ok(())
 }
-
-
 
 fn update_keyboard_context(
     context: &AudioContext,
@@ -311,7 +313,23 @@ fn create_soundpack_metadata(
             .unwrap_or_else(|| "1.0".to_string()),
         tags: soundpack.tags.clone().unwrap_or_default(),
         keycap: soundpack.keycap.clone(),
-        icon: soundpack.icon.clone(),
+        icon: {
+            // Convert icon to base64 data URI, similar to soundpack_cache.rs
+            if let Some(icon_filename) = &soundpack.icon {
+                let icon_path = format!("{}/{}", soundpack_path, icon_filename);
+                if std::path::Path::new(&icon_path).exists() {
+                    // Convert to base64 data URI for Dioxus WebView
+                    match convert_image_to_data_uri(&icon_path) {
+                        Ok(data_uri) => Some(data_uri),
+                        Err(_) => Some(String::new()),
+                    }
+                } else {
+                    Some(String::new()) // Empty string if icon file not found
+                }
+            } else {
+                Some(String::new()) // Empty string if no icon specified
+            }
+        },
         mouse: soundpack.mouse, // Include the mouse field
         last_modified,
         last_accessed: std::time::SystemTime::now()
@@ -319,6 +337,38 @@ fn create_soundpack_metadata(
             .unwrap_or_default()
             .as_secs(),
     })
+}
+
+// Helper function to convert image files to base64 data URIs for WebView compatibility
+fn convert_image_to_data_uri(image_path: &str) -> Result<String, String> {
+    // Read the image file
+    let image_data =
+        std::fs::read(image_path).map_err(|e| format!("Failed to read image file: {}", e))?;
+
+    // Determine MIME type based on file extension
+    let mime_type = match std::path::Path::new(image_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase())
+        .as_deref()
+    {
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("png") => "image/png",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("avif") => "image/avif",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        Some("ico") => "image/x-icon",
+        _ => "image/png", // Default fallback
+    };
+
+    // Convert to base64
+    let base64_data =
+        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_data);
+
+    // Create data URI
+    Ok(format!("data:{};base64,{}", mime_type, base64_data))
 }
 
 fn create_key_mappings(

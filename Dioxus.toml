@@ -22,7 +22,6 @@ script = []
 # Include assets directory for desktop builds
 bundle_assets = true
 
-
 [bundle]
 identifier = "com.hainguyents13.mechvibesdx"
 name = "MechvibesDX"
