@@ -12,25 +12,34 @@ pub fn SettingsPage() -> Element {
     let (config, update_config) = use_config();
     let mut enable_sound = use_signal(|| config().enable_sound);
     let mut auto_start = use_signal(|| config().auto_start);
-    let mut show_notifications = use_signal(|| config().show_notifications); // Get access to app state for soundpack operations
+    let mut show_notifications = use_signal(|| config().show_notifications);
+    // Get access to app state for soundpack operations
     let app_state = use_app_state();
     // UI state for notification and loading
     let mut refreshing_soundpacks = use_signal(|| false);
-
-    // Function to refresh soundpack cache
     let mut refresh_soundpacks_cache = move || {
         println!("🔄 Refreshing soundpack cache from settings page...");
 
-        // Set loading state to true
+        // Set loading state to true - directly update the signal
         refreshing_soundpacks.set(true);
+        println!("🌻 Loading state set to: {}", refreshing_soundpacks());
 
         // Clone necessary variables for the async task
-        let mut refreshing_soundpacks_clone = refreshing_soundpacks.clone();
+        let mut refreshing_signal = refreshing_soundpacks.clone();
         let audio_ctx_clone = audio_ctx.clone();
         let mut app_state_clone = app_state.clone();
 
         // Perform the refresh operation in a separate task to not block the UI
         spawn(async move {
+            // Use async sleep instead of std::thread::sleep
+            use futures_timer::Delay;
+            use std::time::Duration;
+
+            // Add a small artificial delay to make loading state more visible
+            Delay::new(Duration::from_millis(800)).await;
+
+            println!("Starting soundpack refresh operation...");
+
             // This will create a new SoundpackCache instance that will refresh from directory
             let mut fresh_cache = crate::state::soundpack_cache::SoundpackCache::load();
             fresh_cache.refresh_from_directory();
@@ -42,8 +51,12 @@ pub fn SettingsPage() -> Element {
             // Reload current soundpacks to apply any changes
             crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
 
-            // Show success notification and reset loading state
-            refreshing_soundpacks_clone.set(false);
+            // Add another small delay before changing the loading state back
+            Delay::new(Duration::from_millis(200)).await;
+
+            // Reset loading state
+            refreshing_signal.set(false);
+            println!("🌻 Loading state reset to: {}", refreshing_signal());
 
             println!("✅ Soundpack refresh complete");
         });
@@ -176,17 +189,42 @@ pub fn SettingsPage() -> Element {
                   "Refresh soundpack list to detect newly added or removed soundpacks."
                 }
                 div { class: "flex flex-col gap-2",
-                  div { class: "flex items-center gap-2",
+                  div { class: "flex items-center gap-4",
                     button {
-                      class: "btn btn-neutral btn-sm",
+                      class: "btn btn-soft btn-sm",
                       onclick: move |_| {
                           refresh_soundpacks_cache();
                       },
                       disabled: refreshing_soundpacks(),
-                      // if refreshing_soundpacks() {
-                      //   span { class: "loading loading-spinner loading-xs mr-1" }
-                      // }
-                      "Refresh soundpacks"
+                      if refreshing_soundpacks() {
+                        span { class: "loading loading-spinner loading-xs mr-2" }
+                        "Refreshing..."
+                      } else {
+                        "Refresh soundpacks"
+                      }
+                    }
+                    // Last scan info
+                    if app_state.read().optimized_cache.last_scan > 0 {
+                      div { class: "text-xs text-base-content/60",
+                        "Last scan "
+                        {
+                            let last_scan = app_state.read().optimized_cache.last_scan;
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs();
+                            let diff = now.saturating_sub(last_scan);
+                            if diff < 60 {
+                                ": just now".to_string()
+                            } else if diff < 3600 {
+                                format!("{} min ago", diff / 60)
+                            } else if diff < 86400 {
+                                format!("{} hr ago", diff / 3600)
+                            } else {
+                                format!("{} days ago", diff / 86400)
+                            }
+                        }
+                      }
                     }
                   }
                 }

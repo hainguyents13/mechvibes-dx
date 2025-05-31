@@ -190,6 +190,56 @@
   }
 }
 @layer utilities {
+  .diff {
+    position: relative;
+    display: grid;
+    width: 100%;
+    overflow: hidden;
+    webkit-user-select: none;
+    user-select: none;
+    direction: ltr;
+    container-type: inline-size;
+    grid-template-columns: auto 1fr;
+    &:focus-visible, &:has(.diff-item-1:focus-visible) {
+      outline-style: var(--tw-outline-style);
+      outline-width: 2px;
+      outline-offset: 1px;
+      outline-color: var(--color-base-content);
+    }
+    &:focus-visible {
+      outline-style: var(--tw-outline-style);
+      outline-width: 2px;
+      outline-offset: 1px;
+      outline-color: var(--color-base-content);
+      .diff-resizer {
+        min-width: 90cqi;
+        max-width: 90cqi;
+      }
+    }
+    &:has(.diff-item-2:focus-visible) {
+      outline-style: var(--tw-outline-style);
+      outline-width: 2px;
+      outline-offset: 1px;
+      .diff-resizer {
+        min-width: 10cqi;
+        max-width: 10cqi;
+      }
+    }
+    @supports (-webkit-overflow-scrolling: touch) and (overflow: -webkit-paged-x) {
+      &:focus {
+        .diff-resizer {
+          min-width: 10cqi;
+          max-width: 10cqi;
+        }
+      }
+      &:has(.diff-item-1:focus) {
+        .diff-resizer {
+          min-width: 90cqi;
+          max-width: 90cqi;
+        }
+      }
+    }
+  }
   .drawer-side {
     pointer-events: none;
     visibility: hidden;
@@ -1302,6 +1352,25 @@
       }
     }
   }
+  .diff-resizer {
+    position: relative;
+    top: calc(1/2 * 100%);
+    z-index: 1;
+    grid-column-start: 1;
+    grid-row-start: 1;
+    height: calc(0.25rem * 2);
+    width: 50cqi;
+    max-width: calc(100cqi - 1rem);
+    min-width: 1rem;
+    resize: horizontal;
+    overflow: hidden;
+    opacity: 0%;
+    transform: scaleY(3) translate(0.35rem, 0.08rem);
+    cursor: ew-resize;
+    transform-origin: 100% 100%;
+    clip-path: inset(calc(100% - 0.75rem) 0 0 calc(100% - 0.75rem));
+    transition: min-width 0.3s ease-out, max-width 0.3s ease-out;
+  }
   .range {
     appearance: none;
     webkit-appearance: none;
@@ -2058,6 +2127,9 @@
   }
   .mr-1 {
     margin-right: calc(var(--spacing) * 1);
+  }
+  .mr-2 {
+    margin-right: calc(var(--spacing) * 2);
   }
   .mb-1 {
     margin-bottom: calc(var(--spacing) * 1);
