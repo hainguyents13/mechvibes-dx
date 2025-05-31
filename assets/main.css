@@ -62,6 +62,14 @@ body {
     height: 40px;
 }
 
+.w-12 {
+    width: calc(var(--spacing) * 12)
+}
+
+.h-12 {
+    height: calc(var(--spacing) * 12)
+}
+
 /* .logo {
     position: relative;
 } */
