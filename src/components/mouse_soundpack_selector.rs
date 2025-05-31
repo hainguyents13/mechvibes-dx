@@ -2,7 +2,7 @@ use crate::libs::audio::AudioContext;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{Check, ChevronDown, Mouse, Music, Search};
+use lucide_dioxus::{ChevronDown, Mouse, Music, Search};
 use std::sync::Arc;
 use std::time::Duration;
 
