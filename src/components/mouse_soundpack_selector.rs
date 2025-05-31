@@ -92,7 +92,8 @@ fn MouseSelector() -> Element {
                 div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-10 h-10 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
-                  } else {                    if let Some(icon) = &pack.icon {
+                  } else {
+                    if let Some(icon) = &pack.icon {
                       if !icon.is_empty() {
                         img {
                           class: "w-full h-full object-cover",
@@ -160,9 +161,10 @@ fn MouseSelector() -> Element {
                     button {
                       key: "{pack.id}",
                       class: format!(
-                          "w-full px-4 py-2 text-left btn btn-ghost btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
-                          if pack.id == current() { " btn-disabled" } else { "" },
+                          "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
+                          if pack.id == current() { "btn-disabled opacity-70" } else { "btn-ghost" },
                       ),
+                      disabled: pack.id == current(),
                       onclick: {
                           let pack_id = pack.id.clone();
                           let mut error = error.clone();
@@ -226,24 +228,18 @@ fn MouseSelector() -> Element {
                           }
                       },
                       div { class: "flex items-center justify-between gap-3",
-                        div {
-                          class: format!(
-                              "flex-shrink-0 w-8 h-8 bg-base-300 rounded-lg flex items-center justify-center overflow-hidden bg-blend-multiply {}",
-                              if pack.id == current() { "bg-black" } else { "" },
-                          ),                          if pack.id != current() {                            if let Some(icon) = &pack.icon {
-                              if !icon.is_empty() {
-                                img {
-                                  class: "w-full h-full object-cover",
-                                  src: "{icon}",
-                                }
-                              } else {
-                                Music { class: "w-4 h-4 text-base-content/50" }
+                        div { class: "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply ",
+                          if let Some(icon) = &pack.icon {
+                            if !icon.is_empty() {
+                              img {
+                                class: "w-full h-full object-cover",
+                                src: "{icon}",
                               }
                             } else {
-                              Music { class: "w-4 h-4 text-base-content/50" }
+                              Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                             }
                           } else {
-                            Check { class: "w-4 h-4 text-white" }
+                            Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                           }
                         }
                         div { class: "flex-1 min-w-0",
@@ -252,9 +248,7 @@ fn MouseSelector() -> Element {
                           }
                           div { class: "text-xs truncate text-base-content/60",
                             if let Some(author) = &pack.author {
-                              "v{pack.version} by {author}"
-                            } else {
-                              "v{pack.version}"
+                              "by {author}"
                             }
                           }
                         }
