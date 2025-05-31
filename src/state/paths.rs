@@ -35,12 +35,6 @@ pub mod data {
             .join("data")
             .join("soundpack_metadata_cache.json")
     }
-
-    /// For backward compatibility with build.rs and other external usage
-    pub const DIR: &str = "./data";
-    pub const CONFIG_JSON: &str = "./data/config.json";
-    pub const MANIFEST_JSON: &str = "./data/manifest.json";
-    pub const SOUNDPACK_METADATA_CACHE_JSON: &str = "data/soundpack_metadata_cache.json";
 }
 
 /// Soundpack directory paths
@@ -65,9 +59,6 @@ pub mod soundpacks {
             .to_string_lossy()
             .to_string()
     }
-
-    /// For backward compatibility
-    pub const DIR: &str = "./soundpacks";
 }
 
 /// Utility functions for path operations
