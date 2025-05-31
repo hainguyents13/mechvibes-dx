@@ -19,10 +19,9 @@ fn main() {
     let window_builder = WindowBuilder::default()
         .with_title("MechvibesDX")
         .with_transparent(false) // Disable transparency for better performance
-        .with_always_on_top(true) // Don't keep always on top by default
+        .with_always_on_top(true)
         .with_position(LogicalPosition::new(1700.0, 300.0))
-        .with_inner_size(LogicalSize::new(500.0, 800.0))
-        .with_min_inner_size(LogicalSize::new(400.0, 600.0)) // Set minimum size
+        .with_inner_size(LogicalSize::new(500.0, 850.0))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false); // Allow window resizing

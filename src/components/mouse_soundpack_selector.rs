@@ -11,7 +11,8 @@ use std::time::Duration;
 pub fn MouseSoundpackSelector() -> Element {
     rsx! {
       div { class: "space-y-2",
-        div { class: "flex items-center gap-2 text-sm font-medium text-base-content/80",
+
+        div { class: "flex items-center gap-2 text-sm font-bold text-base-content/80",
           Mouse { class: "w-4 h-4" }
           "Mouse"
         }
@@ -137,7 +138,7 @@ fn MouseSelector() -> Element {
                 div { class: "relative",
                   Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" }
                   input {
-                    class: "input input-bordered w-full pl-10 pr-4 py-2 text-base-content placeholder:text-base-content/40",
+                    class: "input input-bordered w-full px-4 py-2 text-base-content placeholder:text-base-content/40",
                     placeholder: "Search mouse soundpacks...",
                     value: "{search_query}",
                     oninput: move |evt| search_query.set(evt.value()),
@@ -157,7 +158,7 @@ fn MouseSelector() -> Element {
                     button {
                       key: "{pack.id}",
                       class: format!(
-                          "w-full p-3 text-left btn btn-ghost btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-14 {}",
+                          "w-full px-4 py-2 text-left btn btn-ghost btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
                           if pack.id == current() { " btn-disabled" } else { "" },
                       ),
                       onclick: {
