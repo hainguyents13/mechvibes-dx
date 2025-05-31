@@ -1,12 +1,10 @@
-use crate::libs::keyboard::start_keyboard_listener;
-use crate::libs::mouse::start_mouse_listener;
+use crate::libs::input_listener::start_unified_input_listener;
 use crate::libs::routes::Route;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::Header;
 use dioxus::prelude::*;
-use std::collections::HashSet;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc};
 
 pub fn app() -> Element {
     // Get global app state from the global signal
@@ -26,54 +24,32 @@ pub fn app() -> Element {
             println!("🎵 Loading current soundpacks on startup...");
             crate::state::app::reload_current_soundpacks(&ctx);
         });
-    }// Create a channel for real-time keyboard event communication
-    let (tx, rx) = mpsc::channel::<String>();
-    let rx = Arc::new(rx);
-
-    // Create a channel for real-time mouse event communication
+    }    // Create channels for real-time input event communication
+    let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
     let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
-    let mouse_rx = Arc::new(mouse_rx);
-
-    // Launch the keyboard event listener in a background task
+    let keyboard_rx = Arc::new(keyboard_rx);
+    let mouse_rx = Arc::new(mouse_rx);    // Launch the unified input listener (handles both keyboard and mouse)
     {
-        let tx = tx.clone();
-        use_future(move || {
-            let tx = tx.clone();
-            async move {
-                spawn(async move {
-                    start_keyboard_listener(tx);
-                });
-            }
-        });
-    }
-
-    // Launch the mouse event listener in a background task
-    {
-        let mouse_tx = mouse_tx.clone();
-        use_future(move || {
+        use_effect(move || {
+            let keyboard_tx = keyboard_tx.clone();
             let mouse_tx = mouse_tx.clone();
-            async move {
-                spawn(async move {
-                    let pressed_buttons = Arc::new(Mutex::new(HashSet::<String>::new()));
-                    start_mouse_listener(mouse_tx, pressed_buttons);
-                });
-            }
+            spawn(async move {
+                start_unified_input_listener(keyboard_tx, mouse_tx);
+            });
         });
-    }
-
-    // Process keyboard events and update both audio and UI state
+    }// Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
-        let rx = rx.clone();
+        let keyboard_rx = keyboard_rx.clone();
         let mut keyboard_state = keyboard_state;
 
         use_future(move || {
             let ctx = ctx.clone();
-            let rx = rx.clone();
+            let keyboard_rx = keyboard_rx.clone();
 
             async move {
                 loop {
-                    if let Ok(keycode) = rx.try_recv() {
+                    if let Ok(keycode) = keyboard_rx.try_recv() {
                         if keycode.starts_with("UP:") {
                             let key = &keycode[3..];
                             ctx.play_key_event_sound(key, false);

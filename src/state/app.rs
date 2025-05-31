@@ -6,13 +6,11 @@ use dioxus::prelude::*;
 use once_cell::sync::OnceCell;
 
 // Internal crate imports
-use crate::state::config::AppConfig;
 use crate::state::soundpack_cache::SoundpackCache;
 
 // Global app state for sharing between components
 #[derive(Clone, Debug)]
 pub struct AppState {
-    pub config: Arc<AppConfig>,
     pub optimized_cache: Arc<SoundpackCache>,
 }
 
@@ -21,7 +19,6 @@ impl AppState {
         println!("🌍 Initializing global AppState...");
 
         Self {
-            config: Arc::new(AppConfig::load()),
             optimized_cache: Arc::new(SoundpackCache::load()),
         }
     }

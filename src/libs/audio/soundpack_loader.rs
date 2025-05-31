@@ -19,14 +19,12 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
 
 pub fn load_keyboard_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
     println!("🎹 Loading keyboard soundpack: {}", soundpack_id);
-    load_soundpack_optimized(context, soundpack_id)
+    load_keyboard_soundpack_optimized(context, soundpack_id)
 }
 
 pub fn load_mouse_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
     println!("🖱️ Loading mouse soundpack: {}", soundpack_id);
-    // For now, we'll load the mouse soundpack the same way as keyboard
-    // In the future, we could optimize this to only load mouse definitions
-    load_soundpack_optimized(context, soundpack_id)
+    load_mouse_soundpack_optimized(context, soundpack_id)
 }
 
 fn load_audio_file(
@@ -62,9 +60,11 @@ fn load_audio_file(
     Ok((samples, channels, sample_rate))
 }
 
-/// Direct soundpack loading (no audio caching)
-pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
-    println!("📂 Direct loading soundpack: {}", soundpack_id);
+
+
+/// Direct keyboard soundpack loading
+pub fn load_keyboard_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    println!("📂 Direct loading keyboard soundpack: {}", soundpack_id);
 
     // Load soundpack directly from filesystem
     let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
@@ -77,17 +77,19 @@ pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> R
     let soundpack: SoundPack = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
 
+    // Verify this is a keyboard soundpack
+    if soundpack.mouse {
+        return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
+    }
+
     // Load audio samples directly from file
     let samples = load_audio_file(&soundpack_path, &soundpack)?;
 
-    // Create key mappings
+    // Create key mappings (only for keyboard soundpacks)
     let key_mappings = create_key_mappings(&soundpack, &samples.0);
 
-    // Create mouse mappings
-    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0);
-
-    // Update audio context with new data (this replaces old data automatically)
-    update_context_direct(context, samples, key_mappings, mouse_mappings, &soundpack)?;
+    // Update audio context with keyboard data
+    update_keyboard_context(context, samples, key_mappings, &soundpack)?;
 
     // Update metadata cache only (no audio caching)
     let mut cache = SoundpackCache::load();
@@ -96,41 +98,80 @@ pub fn load_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> R
     cache.save();
 
     println!(
-        "✅ Successfully loaded soundpack: {} (direct from files)",
+        "✅ Successfully loaded keyboard soundpack: {} (direct from files)",
         soundpack.name
     );
     Ok(())
 }
 
-fn update_context_direct(
+/// Direct mouse soundpack loading
+pub fn load_mouse_soundpack_optimized(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    println!("📂 Direct loading mouse soundpack: {}", soundpack_id);
+
+    // Load soundpack directly from filesystem
+    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
+
+    // Load config.json
+    let config_path = paths::soundpacks::config_json(soundpack_id);
+    let config_content = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read config: {}", e))?;
+
+    let soundpack: SoundPack = serde_json::from_str(&config_content)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+
+    // Verify this is a mouse soundpack
+    if !soundpack.mouse {
+        return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
+    }
+
+    // Load audio samples directly from file
+    let samples = load_audio_file(&soundpack_path, &soundpack)?;
+
+    // Create mouse mappings (only for mouse soundpacks)
+    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0);
+
+    // Update audio context with mouse data
+    update_mouse_context(context, samples, mouse_mappings, &soundpack)?;
+
+    // Update metadata cache only (no audio caching)
+    let mut cache = SoundpackCache::load();
+    let metadata = create_soundpack_metadata(&soundpack_path, &soundpack)?;
+    cache.add_soundpack(metadata);
+    cache.save();
+
+    println!(
+        "✅ Successfully loaded mouse soundpack: {} (direct from files)",
+        soundpack.name
+    );
+    Ok(())
+}
+
+
+
+fn update_keyboard_context(
     context: &AudioContext,
     samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
     key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
-    mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
     soundpack: &SoundPack,
 ) -> Result<(), String> {
     let (audio_samples, channels, sample_rate) = samples;
     let sample_count = audio_samples.len();
     let key_mapping_count = key_mappings.len();
-    let mouse_mapping_count = mouse_mappings.len();
     let soundpack_name = soundpack.name.clone();
 
-    // Update cached samples (replaces old data automatically for memory cleanup)
-    if let Ok(mut cached) = context.cached_samples.lock() {
-        // This assignment automatically drops the old Vec<f32> data
+    // Update keyboard samples
+    if let Ok(mut cached) = context.keyboard_samples.lock() {
         *cached = Some((audio_samples, channels, sample_rate));
-        println!("🎵 Updated cached samples: {} samples", sample_count);
+        println!("🎹 Updated keyboard samples: {} samples", sample_count);
     } else {
-        return Err("Failed to acquire lock on cached_samples".to_string());
+        return Err("Failed to acquire lock on keyboard_samples".to_string());
     }
 
-    // Update key mappings (convert from HashMap<String, Vec<(f64, f64)>> to HashMap<String, Vec<[f32; 2]>>)
+    // Update key mappings
     if let Ok(mut key_map) = context.key_map.lock() {
         let old_count = key_map.len();
-        // Clear old mappings to free memory
         key_map.clear();
 
-        // Convert key mappings to the expected format
         for (key, mappings) in key_mappings {
             let converted_mappings: Vec<[f32; 2]> = mappings
                 .into_iter()
@@ -144,22 +185,58 @@ fn update_context_direct(
             old_count,
             key_map.len()
         );
-
-        // Log first few key mappings for verification
-        for (key, mapping) in key_map.iter().take(3) {
-            println!("   {} -> {:?}", key, mapping);
-        }
     } else {
         return Err("Failed to acquire lock on key_map".to_string());
     }
 
-    // Update mouse mappings (convert from HashMap<String, Vec<(f64, f64)>> to HashMap<String, Vec<[f32; 2]>>)
+    // Clear active keyboard audio state
+    if let Ok(mut sinks) = context.key_sinks.lock() {
+        let old_sinks = sinks.len();
+        sinks.clear();
+        if old_sinks > 0 {
+            println!("🔇 Cleared {} active key sinks", old_sinks);
+        }
+    }
+
+    if let Ok(mut pressed) = context.key_pressed.lock() {
+        let old_pressed = pressed.len();
+        pressed.clear();
+        if old_pressed > 0 {
+            println!("⌨️ Cleared {} pressed keys", old_pressed);
+        }
+    }
+
+    println!(
+        "✅ Successfully loaded keyboard soundpack: {} ({} key mappings) - Memory properly cleaned",
+        soundpack_name, key_mapping_count
+    );
+    Ok(())
+}
+
+fn update_mouse_context(
+    context: &AudioContext,
+    samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
+    mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
+    soundpack: &SoundPack,
+) -> Result<(), String> {
+    let (audio_samples, channels, sample_rate) = samples;
+    let sample_count = audio_samples.len();
+    let mouse_mapping_count = mouse_mappings.len();
+    let soundpack_name = soundpack.name.clone();
+
+    // Update mouse samples
+    if let Ok(mut cached) = context.mouse_samples.lock() {
+        *cached = Some((audio_samples, channels, sample_rate));
+        println!("🖱️ Updated mouse samples: {} samples", sample_count);
+    } else {
+        return Err("Failed to acquire lock on mouse_samples".to_string());
+    }
+
+    // Update mouse mappings
     if let Ok(mut mouse_map) = context.mouse_map.lock() {
         let old_count = mouse_map.len();
-        // Clear old mappings to free memory
         mouse_map.clear();
 
-        // Convert mouse mappings to the expected format
         for (button, mappings) in mouse_mappings {
             let converted_mappings: Vec<[f32; 2]> = mappings
                 .into_iter()
@@ -173,39 +250,16 @@ fn update_context_direct(
             old_count,
             mouse_map.len()
         );
-
-        // Log first few mouse mappings for verification
-        for (button, mapping) in mouse_map.iter().take(3) {
-            println!("   {} -> {:?}", button, mapping);
-        }
     } else {
         return Err("Failed to acquire lock on mouse_map".to_string());
     }
 
-    // Clear active audio state to prevent memory leaks
-    if let Ok(mut sinks) = context.key_sinks.lock() {
-        let old_sinks = sinks.len();
-        // Drop all existing sinks to free audio resources
-        sinks.clear();
-        if old_sinks > 0 {
-            println!("🔇 Cleared {} active key sinks", old_sinks);
-        }
-    }
-
+    // Clear active mouse audio state
     if let Ok(mut mouse_sinks) = context.mouse_sinks.lock() {
         let old_sinks = mouse_sinks.len();
-        // Drop all existing mouse sinks to free audio resources
         mouse_sinks.clear();
         if old_sinks > 0 {
             println!("🔇 Cleared {} active mouse sinks", old_sinks);
-        }
-    }
-
-    if let Ok(mut pressed) = context.key_pressed.lock() {
-        let old_pressed = pressed.len();
-        pressed.clear();
-        if old_pressed > 0 {
-            println!("⌨️ Cleared {} pressed keys", old_pressed);
         }
     }
 
@@ -218,8 +272,8 @@ fn update_context_direct(
     }
 
     println!(
-        "✅ Successfully loaded soundpack: {} ({} key mappings, {} mouse mappings) - Memory properly cleaned",
-        soundpack_name, key_mapping_count, mouse_mapping_count
+        "✅ Successfully loaded mouse soundpack: {} ({} mouse mappings) - Memory properly cleaned",
+        soundpack_name, mouse_mapping_count
     );
     Ok(())
 }

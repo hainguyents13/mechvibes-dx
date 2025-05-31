@@ -7,9 +7,16 @@ use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
+        println!(
+            "⌨️ Key event received: {} ({})",
+            key,
+            if is_keydown { "down" } else { "up" }
+        );
+
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
         if !config.enable_sound {
+            println!("🔇 Sound disabled in config, skipping key event");
             return;
         }
 
@@ -51,9 +58,8 @@ impl AudioContext {
 
         self.play_sound_segment(key, start, duration, is_keydown);
     }
-
     fn play_sound_segment(&self, key: &str, start: f32, duration: f32, is_keydown: bool) {
-        let pcm_opt = self.cached_samples.lock().unwrap().clone();
+        let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
 
         if let Some((samples, channels, sample_rate)) = pcm_opt {
             let start_sample = (start * sample_rate as f32 * channels as f32) as usize;
@@ -80,14 +86,13 @@ impl AudioContext {
 
                 let mut key_sinks = self.key_sinks.lock().unwrap();
                 self.manage_active_sinks(&mut key_sinks);
-
                 key_sinks.insert(
                     format!("{}-{}", key, if is_keydown { "down" } else { "up" }),
                     sink,
                 );
             }
         } else {
-            eprintln!("❌ No cached PCM buffer available");
+            eprintln!("❌ No keyboard PCM buffer available");
         }
     }
 
@@ -100,11 +105,17 @@ impl AudioContext {
             }
         }
     }
-
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
+        println!(
+            "🖱️ Mouse event received: {} ({})",
+            button,
+            if is_buttondown { "down" } else { "up" }
+        );
+
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
         if !config.enable_sound {
+            println!("🔇 Sound disabled in config, skipping mouse event");
             return;
         }
 
@@ -155,7 +166,7 @@ impl AudioContext {
         duration: f32,
         is_buttondown: bool,
     ) {
-        let pcm_opt = self.cached_samples.lock().unwrap().clone();
+        let pcm_opt = self.mouse_samples.lock().unwrap().clone();
 
         if let Some((samples, channels, sample_rate)) = pcm_opt {
             let start_sample = (start * sample_rate as f32 * channels as f32) as usize;
@@ -181,14 +192,13 @@ impl AudioContext {
 
                 let mut mouse_sinks = self.mouse_sinks.lock().unwrap();
                 self.manage_active_mouse_sinks(&mut mouse_sinks);
-
                 mouse_sinks.insert(
                     format!("{}-{}", button, if is_buttondown { "down" } else { "up" }),
                     sink,
                 );
             }
         } else {
-            eprintln!("❌ No cached PCM buffer available");
+            eprintln!("❌ No mouse PCM buffer available");
         }
     }
 
