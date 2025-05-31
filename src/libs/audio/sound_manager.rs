@@ -172,12 +172,11 @@ impl AudioContext {
                 );
                 return;
             }
-
             let segment_samples = samples[start_sample..end_sample].to_vec();
             let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
 
             if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                sink.set_volume(self.get_volume() * 5.0);
+                sink.set_volume(self.get_mouse_volume() * 5.0);
                 sink.append(segment);
 
                 let mut mouse_sinks = self.mouse_sinks.lock().unwrap();

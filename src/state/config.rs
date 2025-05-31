@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub keyboard_soundpack: String,
     pub mouse_soundpack: String,
     pub volume: f32,
+    pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
 
     // UI settings
@@ -75,6 +76,7 @@ impl Default for AppConfig {
             keyboard_soundpack: "oreo".to_string(),
             mouse_soundpack: "test-mouse".to_string(),
             volume: 1.0,
+            mouse_volume: 1.0, // Default mouse volume to 100%
             enable_sound: true,
             theme: Theme::System, // Default to System theme
             auto_start: false,
