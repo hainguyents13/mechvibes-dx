@@ -341,7 +341,7 @@ dx build --release
 
 ### Architecture
 
-MechVibesDX is built using modern technologies:
+MechVibesDX is built on Windows 11 using modern technologies:
 
 -   **Rust** - Systems programming language for performance and safety
 -   **Dioxus** - Modern React-like UI framework for Rust
