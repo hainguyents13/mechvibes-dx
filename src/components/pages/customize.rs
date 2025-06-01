@@ -1,6 +1,5 @@
 use crate::components::ui::PageHeader;
 use crate::state::config_utils::use_config;
-use dioxus::html::legend;
 use dioxus::prelude::*;
 use lucide_dioxus::Palette;
 
