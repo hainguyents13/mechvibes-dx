@@ -128,8 +128,12 @@ fn map_button_to_code(button: Button) -> &'static str {
 
 /// Start a unified input listener that handles both keyboard and mouse events
 /// This solves the issue where rdev can only have one global listener at a time
-pub fn start_unified_input_listener(keyboard_tx: Sender<String>, mouse_tx: Sender<String>) {
-    println!("🎮 Starting unified input listener (keyboard + mouse)...");
+pub fn start_unified_input_listener(
+    keyboard_tx: Sender<String>,
+    mouse_tx: Sender<String>,
+    hotkey_tx: Sender<String>,
+) {
+    println!("🎮 Starting unified input listener (keyboard + mouse + hotkeys)...");
 
     thread::spawn(move || {
         println!("🎮 Unified input listener thread started");
@@ -140,6 +144,10 @@ pub fn start_unified_input_listener(keyboard_tx: Sender<String>, mouse_tx: Sende
         let pressed_keys = Arc::new(Mutex::new(HashSet::<String>::new()));
         let pressed_buttons = Arc::new(Mutex::new(HashSet::<String>::new()));
 
+        // Track pressed modifier keys for hotkey detection
+        let mut ctrl_pressed = false;
+        let mut alt_pressed = false;
+
         let result = listen(move |event: Event| {
             match event.event_type {
                 // ===== KEYBOARD EVENTS =====
@@ -147,6 +155,23 @@ pub fn start_unified_input_listener(keyboard_tx: Sender<String>, mouse_tx: Sende
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
                         println!("⌨️ Key Pressed: {}", key_code);
+
+                        // Track modifier keys for hotkey detection
+                        match key_code {
+                            "ControlLeft" | "ControlRight" => ctrl_pressed = true,
+                            "AltLeft" | "AltRight" => alt_pressed = true,
+                            "KeyM" => {
+                                // Check for Ctrl+Alt+M hotkey combination
+                                if ctrl_pressed && alt_pressed {
+                                    println!(
+                                        "🔥 Hotkey detected: Ctrl+Alt+M - Toggling global sound"
+                                    );
+                                    let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
+                                    return; // Don't process this as a regular key event
+                                }
+                            }
+                            _ => {}
+                        }
 
                         // Check if key is already pressed
                         let mut pressed = pressed_keys.lock().unwrap();
@@ -169,6 +194,13 @@ pub fn start_unified_input_listener(keyboard_tx: Sender<String>, mouse_tx: Sende
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
                         println!("⌨️ Key Released: {}", key_code);
+
+                        // Track modifier key releases for hotkey detection
+                        match key_code {
+                            "ControlLeft" | "ControlRight" => ctrl_pressed = false,
+                            "AltLeft" | "AltRight" => alt_pressed = false,
+                            _ => {}
+                        }
 
                         // Remove key from pressed set
                         let mut pressed = pressed_keys.lock().unwrap();
