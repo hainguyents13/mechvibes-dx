@@ -22,13 +22,13 @@ pub struct SoundpackSelectorProps {
 #[component]
 pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     rsx! {
-        div { class: "space-y-2",
-            div { class: "flex items-center gap-2 text-sm font-bold text-base-content/80",
-                {props.icon}
-                "{props.label}"
-            }
-            SoundpackDropdown { soundpack_type: props.soundpack_type }
+      div { class: "space-y-2",
+        div { class: "flex items-center gap-2 text-sm font-bold text-base-content/80",
+          {props.icon}
+          "{props.label}"
         }
+        SoundpackDropdown { soundpack_type: props.soundpack_type }
+      }
     }
 }
 
@@ -111,238 +111,255 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     };
 
     rsx! {
-        div { 
-            class: "space-y-2",
-            div {
-                
-                class: "relative w-full",
-                // DaisyUI dropdown button
-                button {
-                    class: format!(
-                        "w-full btn btn-soft justify-start gap-3 h-16 rounded-lg {}",
-                        if is_open() { "btn-active" } else { "" },
-                    ),
-                    disabled: is_loading(),
-                    onclick: move |_| is_open.set(!is_open()),
-                    div {
-                        class: "flex items-center gap-3 flex-1",
-                        if let Some(pack) = current_soundpack() {
-                            div {
-                                class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
-                                if is_loading() {
-                                    span { class: "loading loading-spinner loading-sm" }
-                                } else {
-                                    if let Some(icon) = &pack.icon {
-                                        if !icon.is_empty() {
-                                            img {
-                                                class: "w-full h-full object-cover",
-                                                src: "{icon}",
-                                            }
-                                        } else {
-                                            Music { class: "w-5 h-5 text-base-content/50" }
-                                        }
-                                    } else {
-                                        Music { class: "w-5 h-5 text-base-content/50" }
-                                    }
-                                }
-                            }
-                            div { class: "flex-1 min-w-0 text-left",
-                                div { class: "font-medium truncate text-base-content text-sm",
-                                    "{pack.name}"
-                                }
-                                div { class: "text-xs truncate text-base-content/60",
-                                    if let Some(author) = &pack.author {
-                                        "by {author}"
-                                    }
-                                }
-                            }
-                        } else {
-                            div { class: "text-base-content/50 text-sm",
-                                "{placeholder_text}"
-                            }
+      div { class: "space-y-2",
+        div { class: "relative w-full",
+          // DaisyUI dropdown button
+          button {
+            class: format!(
+                "w-full btn btn-soft justify-start gap-3 h-16 rounded-lg {}",
+                if is_open() { "btn-active" } else { "" },
+            ),
+            disabled: is_loading(),
+            onclick: move |_| is_open.set(!is_open()),
+            div { class: "flex items-center gap-3 flex-1",
+              if let Some(pack) = current_soundpack() {
+                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-10 h-10 bg-base-200 rounded-lg flex items-center justify-center",
+                  if is_loading() {
+                    span { class: "loading loading-spinner loading-sm" }
+                  } else {
+                    if let Some(icon) = &pack.icon {
+                      if !icon.is_empty() {
+                        img {
+                          class: "w-full h-full object-cover",
+                          src: "{icon}",
                         }
+                      } else {
+                        Music { class: "w-5 h-5 text-base-content/50" }
+                      }
+                    } else {
+                      Music { class: "w-5 h-5 text-base-content/50" }
                     }
-                    ChevronDown {
-                        class: format!(
-                            "w-4 h-4 transition-transform {}",
-                            if is_open() { "rotate-180" } else { "" },
-                        ),
-                    }
+                  }
                 }
+                div { class: "flex-1 min-w-0 text-left",
+                  div { class: "font-medium truncate text-base-content text-sm",
+                    "{pack.name}"
+                  }
+                  div { class: "text-xs truncate text-base-content/60",
+                    if let Some(author) = &pack.author {
+                      "by {author}"
+                    }
+                  }
+                }
+              } else {
+                div { class: "text-base-content/50 text-sm", "{placeholder_text}" }
+              }
+            }
+            ChevronDown {
+              class: format!(
+                  "w-4 h-4 transition-transform {}",
+                  if is_open() { "rotate-180" } else { "" },
+              ),
+            }
+          }
 
-                // Dropdown panel
-                if is_open() {
-                    div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
-                        // Search input
-                        div { class: "p-3 border-b border-base-200",
-                            div { class: "relative",
-                                Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" }
-                                input {
-                                    class: "input input-bordered w-full px-4 py-2 text-base-content placeholder:text-base-content/40",
-                                    placeholder: "{search_placeholder}",
-                                    value: "{search_query}",
-                                    oninput: move |evt| search_query.set(evt.value()),
-                                    autofocus: true,
-                                }
-                            }
-                        }
+          // Dropdown panel
+          if is_open() {
+            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
+              // Search input
+              div { class: "p-3 border-b border-base-200",
+                div { class: "relative",
+                  Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" }
+                  input {
+                    class: "input input-bordered w-full px-4 py-2 text-base-content placeholder:text-base-content/40",
+                    placeholder: "{search_placeholder}",
+                    value: "{search_query}",
+                    oninput: move |evt| search_query.set(evt.value()),
+                    autofocus: true,
+                  }
+                }
+              }
 
-                        // Soundpack list
-                        div { class: "overflow-y-auto max-h-60",
-                            if filtered_soundpacks.read().is_empty() {
-                                div { class: "p-4 text-center text-base-content/50",
-                                    "{not_found_text}"
-                                }
+              // Soundpack list
+              div { class: "overflow-y-auto max-h-60",
+                if filtered_soundpacks.read().is_empty() {
+                  div { class: "p-4 text-center text-base-content/50",
+                    "{not_found_text}"
+                  }
+                } else {
+                  for pack in filtered_soundpacks.read().iter() {
+                    button {
+                      key: "{pack.id}",
+                      class: format!(
+                          "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
+                          if pack.id == current() { "btn-disabled" } else { "btn-ghost" },
+                      ),
+                      disabled: pack.id == current(),
+                      onclick: {
+                          let pack_id = pack.id.clone();
+                          let mut error = error.clone();
+                          let soundpacks = soundpacks.clone();
+                          let mut is_open = is_open.clone();
+                          let mut search_query = search_query.clone();
+                          let is_loading = is_loading.clone();
+                          let audio_ctx = audio_ctx.clone();
+                          let update_config = update_config.clone();
+                          let soundpack_type_click = soundpack_type.clone();
+                          move |_| {
+                              is_open.set(false);
+                              search_query.set(String::new());
+                              error.set(String::new());
+                              if let Some(pack_item) = soundpacks().iter().find(|p| p.id == pack_id) {
+                                  let type_str = match soundpack_type_click {
+                                      SelectorType::Keyboard => "keyboard",
+                                      SelectorType::Mouse => "mouse",
+                                  };
+                                  println!(
+                                      "📦 Found {} soundpack in cache: {}",
+                                      type_str,
+                                      pack_item.name,
+                                  );
+                                  let pack_id_clone = pack_id.clone();
+                                  let soundpack_type_clone = soundpack_type_click.clone();
+                                  update_config(
+                                      Box::new(move |config| {
+                                          match soundpack_type_clone {
+                                              SelectorType::Keyboard => {
+                                                  println!(
+                                                      "💾 Updating keyboard soundpack: {} -> {}",
+                                                      config.keyboard_soundpack,
+                                                      pack_id_clone,
+                                                  );
+                                                  config.keyboard_soundpack = pack_id_clone;
+                                              }
+                                              SelectorType::Mouse => {
+                                                  println!(
+                                                      "💾 Updating mouse soundpack: {} -> {}",
+                                                      config.mouse_soundpack,
+                                                      pack_id_clone,
+                                                  );
+                                                  config.mouse_soundpack = pack_id_clone;
+                                              }
+                                          }
+                                      }),
+                                  );
+                                  let pack_id_async = pack_id.clone();
+                                  let pack_name = pack_item.name.clone();
+                                  let audio_ctx_async = audio_ctx.clone();
+                                  let mut error_async = error.clone();
+                                  let mut is_loading_async = is_loading.clone();
+                                  let soundpack_type_async = soundpack_type_click.clone();
+                                  spawn(async move {
+                                      is_loading_async.set(true);
+                                      Delay::new(Duration::from_millis(300)).await;
+                                      let result = match soundpack_type_async {
+                                          SelectorType::Keyboard => {
+                                              crate::libs::audio::load_keyboard_soundpack(
+                                                  &audio_ctx_async,
+                                                  &pack_id_async,
+                                              )
+                                          }
+                                          SelectorType::Mouse => {
+                                              crate::libs::audio::load_mouse_soundpack(
+                                                  &audio_ctx_async,
+                                                  &pack_id_async,
+                                              )
+                                          }
+                                      };
+                                      match result {
+                                          Ok(_) => {
+                                              let type_str = match soundpack_type_async {
+                                                  SelectorType::Keyboard => "Keyboard",
+                                                  SelectorType::Mouse => "Mouse",
+                                              };
+                                              println!(
+                                                  "✅ {} soundpack changed to: {} (background loading)",
+                                                  type_str,
+                                                  pack_name,
+                                              );
+                                          }
+                                          Err(e) => {
+                                              let type_str = match soundpack_type_async {
+                                                  SelectorType::Keyboard => "keyboard",
+                                                  SelectorType::Mouse => "mouse",
+                                              };
+                                              error_async
+                                                  .set(
+                                                      format!("Failed to load {} soundpack: {}", type_str, e),
+                                                  );
+                                              println!(
+                                                  "❌ Failed to load {} soundpack {}: {}",
+                                                  type_str,
+                                                  pack_id_async,
+                                                  e,
+                                              );
+                                          }
+                                      }
+                                      is_loading_async.set(false);
+                                  });
+                              } else {
+                                  let type_str = match soundpack_type_click {
+                                      SelectorType::Keyboard => "Keyboard",
+                                      SelectorType::Mouse => "Mouse",
+                                  };
+                                  println!("❌ {} soundpack {} not found in cache", type_str, pack_id);
+                              }
+                          }
+                      },
+                      div { class: "flex items-center justify-between gap-3",
+                        div { class: "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply relative",
+                          if let Some(icon) = &pack.icon {
+                            if !icon.is_empty() {
+                              img {
+                                class: "w-full h-full object-cover",
+                                src: "{icon}",
+                              }
                             } else {
-                                for pack in filtered_soundpacks.read().iter() {
-                                    button {
-                                        key: "{pack.id}",
-                                        class: format!(
-                                            "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
-                                            if pack.id == current() { "btn-disabled" } else { "btn-ghost" },
-                                        ),
-                                        disabled: pack.id == current(),
-                                        onclick: {
-                                            let pack_id = pack.id.clone();
-                                            let mut error = error.clone();
-                                            let soundpacks = soundpacks.clone();
-                                            let mut is_open = is_open.clone();
-                                            let mut search_query = search_query.clone();
-                                            let is_loading = is_loading.clone();
-                                            let audio_ctx = audio_ctx.clone();
-                                            let update_config = update_config.clone();
-                                            let soundpack_type_click = soundpack_type.clone();
-                                            move |_| {
-                                                is_open.set(false);
-                                                search_query.set(String::new());
-                                                error.set(String::new());
-                                                
-                                                if let Some(pack_item) = soundpacks().iter().find(|p| p.id == pack_id) {
-                                                    let type_str = match soundpack_type_click {
-                                                        SelectorType::Keyboard => "keyboard",
-                                                        SelectorType::Mouse => "mouse",
-                                                    };
-                                                    println!("📦 Found {} soundpack in cache: {}", type_str, pack_item.name);
-                                                    
-                                                    let pack_id_clone = pack_id.clone();
-                                                    let soundpack_type_clone = soundpack_type_click.clone();
-                                                    update_config(
-                                                        Box::new(move |config| {
-                                                            match soundpack_type_clone {
-                                                                SelectorType::Keyboard => {
-                                                                    println!("💾 Updating keyboard soundpack: {} -> {}", config.keyboard_soundpack, pack_id_clone);
-                                                                    config.keyboard_soundpack = pack_id_clone;
-                                                                }
-                                                                SelectorType::Mouse => {
-                                                                    println!("💾 Updating mouse soundpack: {} -> {}", config.mouse_soundpack, pack_id_clone);
-                                                                    config.mouse_soundpack = pack_id_clone;
-                                                                }
-                                                            }
-                                                        }),
-                                                    );
-                                                    
-                                                    let pack_id_async = pack_id.clone();
-                                                    let pack_name = pack_item.name.clone();
-                                                    let audio_ctx_async = audio_ctx.clone();
-                                                    let mut error_async = error.clone();
-                                                    let mut is_loading_async = is_loading.clone();
-                                                    let soundpack_type_async = soundpack_type_click.clone();
-                                                    
-                                                    spawn(async move {
-                                                        is_loading_async.set(true);
-                                                        Delay::new(Duration::from_millis(300)).await;
-                                                        
-                                                        let result = match soundpack_type_async {
-                                                            SelectorType::Keyboard => {
-                                                                crate::libs::audio::load_keyboard_soundpack(&audio_ctx_async, &pack_id_async)
-                                                            }
-                                                            SelectorType::Mouse => {
-                                                                crate::libs::audio::load_mouse_soundpack(&audio_ctx_async, &pack_id_async)
-                                                            }
-                                                        };
-                                                        
-                                                        match result {
-                                                            Ok(_) => {
-                                                                let type_str = match soundpack_type_async {
-                                                                    SelectorType::Keyboard => "Keyboard",
-                                                                    SelectorType::Mouse => "Mouse",
-                                                                };
-                                                                println!("✅ {} soundpack changed to: {} (background loading)", type_str, pack_name);
-                                                            }
-                                                            Err(e) => {
-                                                                let type_str = match soundpack_type_async {
-                                                                    SelectorType::Keyboard => "keyboard",
-                                                                    SelectorType::Mouse => "mouse",
-                                                                };
-                                                                error_async.set(format!("Failed to load {} soundpack: {}", type_str, e));
-                                                                println!("❌ Failed to load {} soundpack {}: {}", type_str, pack_id_async, e);
-                                                            }
-                                                        }
-                                                        is_loading_async.set(false);
-                                                    });
-                                                } else {
-                                                    let type_str = match soundpack_type_click {
-                                                        SelectorType::Keyboard => "Keyboard",
-                                                        SelectorType::Mouse => "Mouse",
-                                                    };
-                                                    println!("❌ {} soundpack {} not found in cache", type_str, pack_id);
-                                                }
-                                            }
-                                        },
-                                        div {
-                                            class: "flex items-center justify-between gap-3",
-                                            div {
-                                                class: "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply ",
-                                                if let Some(icon) = &pack.icon {
-                                                    if !icon.is_empty() {
-                                                        img {
-                                                            class: "w-full h-full object-cover",
-                                                            src: "{icon}",
-                                                        }
-                                                    } else {
-                                                        Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
-                                                    }
-                                                } else {
-                                                    Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
-                                                }
-                                                if pack.id == current() {
-                                                    Check { class: "text-white rounded absolute w-40 h-40 padding7 tint545" }
-                                                }
-                                            }
-                                            div { class: "flex-1 min-w-0",
-                                                div { class: "text-xs font-medium truncate text-base-content",
-                                                    "{pack.name}"
-                                                }
-                                                div { class: "text-xs truncate text-base-content/60",
-                                                    if let Some(author) = &pack.author {
-                                                        "by {author}"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                              Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                             }
+                          } else {
+                            Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
+                          }
+                          if pack.id == current() {
+                            div { class: "absolute inset-0 bg-primary/20 flex items-center justify-center tint545",
+                              Check { class: "text-white w-8 h-8" }
+                            }
+                          }
                         }
+                        div { class: "flex-1 min-w-0",
+                          div { class: "text-xs font-medium truncate text-base-content",
+                            "{pack.name}"
+                          }
+                          div { class: "text-xs truncate text-base-content/60",
+                            if let Some(author) = &pack.author {
+                              "by {author}"
+                            }
+                          }
+                        }
+                      }
                     }
+                  }
                 }
+              }
             }
-
-            // Click outside to close
-            if is_open() {
-                div {
-                    class: "fixed inset-0 z-40",
-                    onclick: move |_| {
-                        is_open.set(false);
-                        search_query.set(String::new());
-                    },
-                }
-            }
-
-            // Error display
-            if !error().is_empty() {
-                div { class: "text-xs text-error mt-1", "{error}" }
-            }
+          }
         }
+
+        // Click outside to close
+        if is_open() {
+          div {
+            class: "fixed inset-0 z-40",
+            onclick: move |_| {
+                is_open.set(false);
+                search_query.set(String::new());
+            },
+          }
+        }
+
+        // Error display
+        if !error().is_empty() {
+          div { class: "text-xs text-error mt-1", "{error}" }
+        }
+      }
     }
 }
