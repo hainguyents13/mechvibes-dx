@@ -27,13 +27,17 @@ pub fn app() -> Element {
             println!("🎵 Loading current soundpacks on startup...");
             crate::state::app::reload_current_soundpacks(&ctx);
         });
-    } // Create channels for real-time input event communication
+    }
+
+    // Create channels for real-time input event communication
     let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
     let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<String>();
     let keyboard_rx = Arc::new(keyboard_rx);
     let mouse_rx = Arc::new(mouse_rx);
-    let hotkey_rx = Arc::new(hotkey_rx); // Launch the unified input listener (handles both keyboard and mouse)
+    let hotkey_rx = Arc::new(hotkey_rx);
+
+    // Launch the unified input listener (handles both keyboard and mouse)
     {
         use_effect(move || {
             let keyboard_tx = keyboard_tx.clone();
@@ -44,6 +48,7 @@ pub fn app() -> Element {
             });
         });
     }
+
     // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
@@ -100,7 +105,9 @@ pub fn app() -> Element {
                 }
             }
         });
-    } // Process hotkey events (like Ctrl+Alt+M to toggle global sound)
+    }
+
+    // Process hotkey Ctrl+Alt+M to toggle global sound
     {
         let hotkey_rx = hotkey_rx.clone();
 
@@ -116,7 +123,6 @@ pub fn app() -> Element {
                             let old_state = config.enable_sound;
                             config.enable_sound = !config.enable_sound;
                             config.last_updated = chrono::Utc::now();
-
                             match config.save() {
                                 Ok(_) => {
                                     let status = if config.enable_sound {
@@ -132,8 +138,6 @@ pub fn app() -> Element {
 
                                     // Show system notification if enabled
                                     if config.show_notifications {
-                                        // Use a simpler approach - just print to console
-                                        // This avoids the PowerShell window popup issue
                                         println!(
                                             "💬 NOTIFICATION: Global sound {}",
                                             if config.enable_sound {

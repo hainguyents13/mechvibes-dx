@@ -9,9 +9,10 @@ pub fn SettingsPage() -> Element {
     // Get access to audio context for reloading soundpacks
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context(); // Use shared config hook
     let (config, update_config) = use_config();
-    let mut enable_sound = use_signal(|| config().enable_sound);
-    let mut auto_start = use_signal(|| config().auto_start);
-    let mut show_notifications = use_signal(|| config().show_notifications);
+    // Use computed signals that always reflect current config state
+    let enable_sound = use_memo(move || config().enable_sound);
+    let auto_start = use_memo(move || config().auto_start);
+    let show_notifications = use_memo(move || config().show_notifications);
     // Get access to app state for soundpack operations
     let app_state = use_app_state();
     // UI state for notification and loading
@@ -102,11 +103,9 @@ pub fn SettingsPage() -> Element {
                     input {
                       r#type: "checkbox",
                       class: "toggle toggle-sm toggle-base-100",
-                      checked: enable_sound(),
-                      onchange: {
+                      checked: enable_sound(),                      onchange: {
                           let update_config = update_config.clone();
                           move |evt: Event<FormData>| {
-                              enable_sound.set(evt.value() == "true");
                               update_config(
                                   Box::new(move |config| {
                                       config.enable_sound = evt.value() == "true";
@@ -130,11 +129,9 @@ pub fn SettingsPage() -> Element {
                       input {
                         r#type: "checkbox",
                         class: "toggle toggle-sm toggle-base-100",
-                        checked: auto_start(),
-                        onchange: {
+                        checked: auto_start(),                        onchange: {
                             let update_config = update_config.clone();
                             move |evt: Event<FormData>| {
-                                auto_start.set(evt.value() == "true");
                                 update_config(
                                     Box::new(move |config| {
                                         config.auto_start = evt.value() == "true";
@@ -159,11 +156,9 @@ pub fn SettingsPage() -> Element {
                       input {
                         r#type: "checkbox",
                         class: "toggle toggle-sm toggle-base-100",
-                        checked: show_notifications(),
-                        onchange: {
+                        checked: show_notifications(),                        onchange: {
                             let update_config = update_config.clone();
                             move |evt: Event<FormData>| {
-                                show_notifications.set(evt.value() == "true");
                                 update_config(
                                     Box::new(move |config| {
                                         config.show_notifications = evt.value() == "true";
@@ -250,13 +245,9 @@ pub fn SettingsPage() -> Element {
               }
               div { class: " justify-start",
                 button {
-                  class: "btn btn-error btn-soft btn-sm",
-                  onclick: {
+                  class: "btn btn-error btn-soft btn-sm",                  onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          enable_sound.set(true);
-                          auto_start.set(false);
-                          show_notifications.set(true);
                           theme.set(Theme::System);
                           update_config(
                               Box::new(|config| {
