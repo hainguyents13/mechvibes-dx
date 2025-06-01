@@ -2558,6 +2558,9 @@
       color: currentColor;
     }
   }
+  .btn-block {
+    width: 100%;
+  }
   .loading-sm {
     width: calc(var(--size-selector, 0.25rem) * 5);
   }

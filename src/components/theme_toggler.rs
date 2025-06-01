@@ -70,7 +70,7 @@ pub fn ThemeToggler() -> Element {
         // Custom themes section
         if !custom_themes.is_empty() {
           div { class: "space-y-2",
-            div { class: "text-sm font-medium text-base-content/70", "Custom Themes" }
+            div { class: "text-sm text-base-content/70", "Custom themes" }
             for theme_name in custom_themes.iter() {
               CustomThemeButton {
                 name: theme_name.clone(),
@@ -120,31 +120,27 @@ struct CustomThemeButtonProps {
 
 #[component]
 fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
-    let mut show_options = use_signal(|| false);
-
     rsx! {
-      div {
-        class: "flex items-center gap-2",
-        onmouseenter: move |_| show_options.set(true),
-        onmouseleave: move |_| show_options.set(false),
-        button {
-          class: if props.is_active { "btn btn-neutral flex-1 justify-start" } else { "btn btn-soft flex-1 justify-start" },
-          onclick: props.on_select,
-          Palette { class: "w-4 h-4 mr-2" }
-          {props.name.clone()}
+      div { class: "flex items-center gap-2",
+        div { class: "flex-1", "data-theme": "custom-{props.name}",
+          button {
+            class: format!(
+                "btn btn-primary btn-sm w-full justify-start gap-1 {}",
+                if props.is_active { "btn-disabled" } else { "" },
+            ),
+            onclick: props.on_select,
+            Palette { class: "w-4 h-4 mr-2" }
+            {props.name.clone()}
+          }
         }
-        if show_options() {
-          div { class: "flex items-center gap-1",
-            button {
-              class: "btn btn-ghost btn-sm w-8 h-8 p-0",
-              onclick: move |_| {},
-              Pencil { class: "w-3 h-3" }
-            }
-            button {
-              class: "btn btn-ghost btn-sm w-8 h-8 p-0 text-error hover:bg-error/20",
-              onclick: props.on_delete,
-              Trash2 { class: "w-3 h-3" }
-            }
+        div { class: "flex items-center gap-1",
+          button { class: "btn btn-ghost btn-sm", onclick: move |_| {},
+            Pencil { class: "w-4 h-4" }
+          }
+          button {
+            class: "btn btn-ghost btn-sm text-error hover:bg-error/20",
+            onclick: props.on_delete,
+            Trash2 { class: "w-4 h-4" }
           }
         }
       }
