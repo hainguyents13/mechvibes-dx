@@ -4,6 +4,7 @@ use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::Header;
 use dioxus::prelude::*;
+use notify_rust::Notification;
 use std::sync::{mpsc, Arc};
 
 pub fn app() -> Element {
@@ -135,17 +136,22 @@ pub fn app() -> Element {
                                         if old_state { "ENABLED" } else { "DISABLED" },
                                         status
                                     );
-
                                     // Show system notification if enabled
                                     if config.show_notifications {
-                                        println!(
-                                            "💬 NOTIFICATION: Global sound {}",
-                                            if config.enable_sound {
-                                                "enabled"
-                                            } else {
-                                                "disabled"
-                                            }
-                                        );
+                                        let message = if config.enable_sound {
+                                            "Global sound enabled"
+                                        } else {
+                                            "Global sound disabled"
+                                        };
+
+                                        if let Err(e) = Notification::new()
+                                            .summary("MechvibesDX")
+                                            .body(message)
+                                            .timeout(3000) // 3 seconds
+                                            .show()
+                                        {
+                                            eprintln!("❌ Failed to show notification: {}", e);
+                                        }
                                     }
                                 }
                                 Err(e) => {
