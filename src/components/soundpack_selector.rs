@@ -2,7 +2,7 @@ use crate::libs::audio::AudioContext;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{ChevronDown, Music, Search};
+use lucide_dioxus::{Check, ChevronDown, Music, Search};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -111,8 +111,11 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     };
 
     rsx! {
-        div { class: "space-y-2",
-            div { class: "relative w-full",
+        div { 
+            class: "space-y-2",
+            div {
+                
+                class: "relative w-full",
                 // DaisyUI dropdown button
                 button {
                     class: format!(
@@ -121,9 +124,11 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                     ),
                     disabled: is_loading(),
                     onclick: move |_| is_open.set(!is_open()),
-                    div { class: "flex items-center gap-3 flex-1",
+                    div {
+                        class: "flex items-center gap-3 flex-1",
                         if let Some(pack) = current_soundpack() {
-                            div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-10 h-10 bg-base-200 rounded-lg flex items-center justify-center",
+                            div {
+                                class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-12 h-12 bg-base-200 rounded-lg flex items-center justify-center",
                                 if is_loading() {
                                     span { class: "loading loading-spinner loading-sm" }
                                 } else {
@@ -194,7 +199,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                         key: "{pack.id}",
                                         class: format!(
                                             "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
-                                            if pack.id == current() { "btn-disabled opacity-70" } else { "btn-ghost" },
+                                            if pack.id == current() { "btn-disabled" } else { "btn-ghost" },
                                         ),
                                         disabled: pack.id == current(),
                                         onclick: {
@@ -284,8 +289,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                                 }
                                             }
                                         },
-                                        div { class: "flex items-center justify-between gap-3",
-                                            div { class: "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply ",
+                                        div {
+                                            class: "flex items-center justify-between gap-3",
+                                            div {
+                                                class: "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply ",
                                                 if let Some(icon) = &pack.icon {
                                                     if !icon.is_empty() {
                                                         img {
@@ -297,6 +304,9 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                                     }
                                                 } else {
                                                     Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
+                                                }
+                                                if pack.id == current() {
+                                                    Check { class: "text-white rounded absolute w-40 h-40 padding7 tint545" }
                                                 }
                                             }
                                             div { class: "flex-1 min-w-0",

@@ -46,6 +46,30 @@ body {
     box-shadow: 0;
 }
 
+.padding7 {
+    padding: 7px;
+}
+
+.tint545 {
+    background: rgba(0, 0, 0, 0.545);
+}
+
+.w-40 {
+    width: 40px;
+}
+
+.h-40 {
+    height: 40px;
+}
+
+.w-12 {
+    width: calc(var(--spacing) * 12)
+}
+
+.h-12 {
+    height: calc(var(--spacing) * 12)
+}
+
 /* .logo {
     position: relative;
 } */
