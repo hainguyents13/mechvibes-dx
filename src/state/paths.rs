@@ -24,7 +24,7 @@ pub mod data {
         get_app_root().join("data").join("config.json")
     }
 
-    /// Application manifest file  
+    /// Application manifest file
     pub fn manifest_json() -> PathBuf {
         get_app_root().join("data").join("manifest.json")
     }
@@ -64,6 +64,9 @@ pub mod soundpacks {
 /// Utility functions for path operations
 pub mod utils {
     use super::get_app_root;
+    use std::fs;
+    use std::io::Read;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
@@ -95,6 +98,76 @@ pub mod utils {
         } else {
             0
         }
+    }
+
+    pub fn count_keyboard_soundpacks() -> usize {
+        use rayon::prelude::*;
+
+        let soundpacks_dir = get_app_root().join("soundpacks");
+        if !soundpacks_dir.exists() {
+            return 0;
+        }
+
+        let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
+            Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+            Err(_) => return 0,
+        };
+
+        entries.par_iter().map(|entry| {
+            let dir_path = entry.path();
+            if dir_path.is_dir() {
+                let config_path = dir_path.join("config.json");
+                if config_path.exists() {
+                    if let Ok(mut file) = fs::File::open(&config_path) {
+                        let mut contents = String::new();
+                        if file.read_to_string(&mut contents).is_ok() {
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                                match json.get("mouse") {
+                                    Some(v) if v.as_bool() == Some(false) => return 1,
+                                    None => return 1,
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            0
+        }).sum()
+    }
+
+    pub fn count_mouse_soundpacks() -> usize {
+        use rayon::prelude::*;
+
+        let soundpacks_dir = get_app_root().join("soundpacks");
+        if !soundpacks_dir.exists() {
+            return 0;
+        }
+
+        let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
+            Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+            Err(_) => return 0,
+        };
+
+        entries.par_iter().map(|entry| {
+            let dir_path = entry.path();
+            if dir_path.is_dir() {
+                let config_path = dir_path.join("config.json");
+                if config_path.exists() {
+                    if let Ok(mut file) = fs::File::open(&config_path) {
+                        let mut contents = String::new();
+                        if file.read_to_string(&mut contents).is_ok() {
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
+                                if json.get("mouse").and_then(|v| v.as_bool()) == Some(true) {
+                                    return 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            0
+        }).sum()
     }
 
     /// Get absolute path for data directory

@@ -24,6 +24,8 @@ pub fn AppInfoDisplay() -> Element {
 
     // Count soundpacks
     let soundpack_count = paths::utils::count_soundpacks();
+    let soundpack_mouse_count = paths::utils::count_mouse_soundpacks();
+    let soundpack_keyboard_count = paths::utils::count_keyboard_soundpacks();
 
     // Get OS info
     let os = env::consts::OS;
@@ -77,7 +79,7 @@ pub fn AppInfoDisplay() -> Element {
           div {
             span { class: "text-base-content", "🎵" }
             span { class: "ml-2 text-base-content/70",
-              "Found {soundpack_count} soundpack(s)"
+              "Found {soundpack_count} soundpack(s) (Keyboard: {soundpack_keyboard_count}, Mouse: {soundpack_mouse_count})"
             }
           }
         }
