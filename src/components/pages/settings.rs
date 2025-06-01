@@ -11,6 +11,8 @@ pub fn SettingsPage() -> Element {
     let (config, update_config) = use_config();
     // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
+    let enable_keyboard_sound = use_memo(move || config().enable_keyboard_sound);
+    let enable_mouse_sound = use_memo(move || config().enable_mouse_sound);
     let auto_start = use_memo(move || config().auto_start);
     let show_notifications = use_memo(move || config().show_notifications);
     // Get access to app state for soundpack operations
@@ -109,6 +111,51 @@ pub fn SettingsPage() -> Element {
                               update_config(
                                   Box::new(move |config| {
                                       config.enable_sound = evt.value() == "true";
+                                  }),
+                              );
+                          }
+                      },
+                    }
+                  }
+                  label { class: "label cursor-pointer flex items-center justify-between",
+                    div {
+                      div { class: "label-text text-base", "Enable keyboard sounds" }
+                      div { class: "label-text-alt text-xs truncate",
+                        "Turn keyboard sounds on or off"
+                      }
+                    }
+                    input {
+                      r#type: "checkbox",
+                      class: "toggle toggle-sm toggle-base-100",
+                      checked: enable_keyboard_sound(),                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.enable_keyboard_sound = evt.value() == "true";
+                                  }),
+                              );
+                          }
+                      },
+                    }
+                  }
+                  label { class: "label cursor-pointer flex items-center justify-between",
+                    div {
+                      div { class: "label-text text-base", "Enable mouse sounds" }
+                      div { class: "label-text-alt text-xs truncate",
+                        "Turn mouse sounds on or off"
+                      }
+                    }
+                    input {
+                      r#type: "checkbox",
+                      class: "toggle toggle-sm toggle-base-100",
+                      checked: enable_mouse_sound(),
+                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.enable_mouse_sound = evt.value() == "true";
                                   }),
                               );
                           }
