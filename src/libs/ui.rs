@@ -77,7 +77,7 @@ pub fn app() -> Element {
                             state.last_key = keycode.clone();
                         }
                     }
-                    futures_timer::Delay::new(std::time::Duration::from_millis(1)).await;
+                    futures_timer::Delay::new(std::time::Duration::from_millis(20)).await;
                 }
             }
         });
@@ -102,7 +102,7 @@ pub fn app() -> Element {
                             ctx.play_mouse_event_sound(&button_code, true);
                         }
                     }
-                    futures_timer::Delay::new(std::time::Duration::from_millis(1)).await;
+                    futures_timer::Delay::new(std::time::Duration::from_millis(20)).await;
                 }
             }
         });

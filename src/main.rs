@@ -16,6 +16,7 @@ fn main() {
 
     // Initialize global app state before rendering
     state::app::init_app_state();
+
     // Create a WindowBuilder with custom appearance
     let window_builder = WindowBuilder::default()
         .with_title("MechvibesDX")
@@ -25,7 +26,7 @@ fn main() {
         .with_inner_size(LogicalSize::new(500.0, 850.0))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
-        .with_resizable(false); // Allow window resizing
+        .with_resizable(false); // Disable window resizing
 
     // Create config with our window settings
     let config = Config::new().with_window(window_builder).with_menu(None);
@@ -38,7 +39,7 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-        // Use the UI root component directly - Header component is already included in ui::app
-        ui::app {}
+      // Use the UI root component directly - Header component is already included in ui::app
+      ui::app {}
     }
 }

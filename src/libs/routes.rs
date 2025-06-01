@@ -20,10 +20,14 @@ pub fn Layout() -> Element {
     let (config_signal, _set_config) = use_config();
 
     // Theme state - use theme context and initialize from config
-    let mut theme = use_theme(); // Initialize theme from config on first load
+    let mut theme = use_theme();
+
+    // Initialize theme from config on first load
     use_effect(move || {
         theme.set(config_signal.read().theme.clone());
-    }); // Convert theme to DaisyUI theme name
+    });
+
+    // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
     rsx! {
       div { class: "h-screen flex flex-col", "data-theme": daisy_theme,

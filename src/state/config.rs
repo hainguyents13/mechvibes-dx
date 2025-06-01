@@ -22,6 +22,7 @@ pub struct AppConfig {
 
     // UI settings
     pub theme: Theme,
+    pub custom_css: String, // New field for custom CSS
 
     // System settings
     pub auto_start: bool,
@@ -83,6 +84,7 @@ impl Default for AppConfig {
             enable_keyboard_sound: true, // Default keyboard sounds enabled
             enable_mouse_sound: true,    // Default mouse sounds enabled
             theme: Theme::System,        // Default to System theme
+            custom_css: String::new(),
             auto_start: false,
             show_notifications: true,
         }

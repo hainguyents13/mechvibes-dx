@@ -1,7 +1,9 @@
+use crate::components::ui::PageHeader;
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::app::use_app_state;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
+use lucide_dioxus::Settings;
 use std::sync::Arc;
 
 #[component]
@@ -67,9 +69,12 @@ pub fn SettingsPage() -> Element {
     rsx! {
       div { class: "p-12 pb-32",
         // Page header
-        div { class: "text-center mb-8",
-          h1 { class: "text-4xl font-bold mb-4 text-base-content", "Settings" }
-          p { class: "text-lg text-base-content", "Customize your MechvibesDX experience." }
+        PageHeader {
+          title: "Settings".to_string(),
+          subtitle: "Config your MechvibesDX experience.".to_string(),
+          icon: Some(rsx! {
+            Settings { class: "w-8 h-8 mx-auto" }
+          }),
         }
         // Settings sections
         div { class: "space-y-4",
@@ -121,8 +126,6 @@ pub fn SettingsPage() -> Element {
                       },
                     }
                   }
-
-                  div { class: "divider" }
                   // Auto Start
                   div { class: "form-control",
                     label { class: "label cursor-pointer flex items-center justify-between",

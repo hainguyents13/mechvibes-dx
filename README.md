@@ -53,12 +53,6 @@ To add mouse support to your soundpacks, include a `mouse_defs` section in your 
     "name": "My Soundpack",
     "author": "Your Name",
     "defs": {
-        "Space": [
-            [1000, 80],
-            [1080, 80]
-        ]
-    },
-    "mouse_defs": {
         "MouseLeft": [
             [1000, 80],
             [1080, 80]
@@ -104,8 +98,6 @@ To add mouse support to your soundpacks, include a `mouse_defs` section in your 
 ```
 
 Each mouse button definition uses the same format as keyboard keys: `[start_ms, duration_ms]` for press and release sounds.
-
-**Note:** If your soundpack doesn't include `mouse_defs`, the system will automatically create fallback mappings using keyboard sounds from the `defs` section.
 
 ## Quick Start
 
