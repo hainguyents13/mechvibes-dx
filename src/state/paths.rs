@@ -24,7 +24,7 @@ pub mod data {
         get_app_root().join("data").join("config.json")
     }
 
-    /// Application manifest file  
+    /// Application manifest file
     pub fn manifest_json() -> PathBuf {
         get_app_root().join("data").join("manifest.json")
     }
@@ -64,6 +64,10 @@ pub mod soundpacks {
 /// Utility functions for path operations
 pub mod utils {
     use super::get_app_root;
+    use std::fs;
+    use std::io::Read;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use serde::Deserialize;
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
@@ -81,20 +85,51 @@ pub mod utils {
     }
 
     /// Count soundpacks in the soundpacks directory
-    pub fn count_soundpacks() -> usize {
+    pub fn count_soundpacks_by_type() -> (usize, usize) {
         let soundpacks_dir = get_app_root().join("soundpacks");
-        if soundpacks_dir.exists() {
-            std::fs::read_dir(&soundpacks_dir)
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .filter(|e| e.path().is_dir())
-                        .count()
-                })
-                .unwrap_or(0)
-        } else {
-            0
+        if !soundpacks_dir.exists() {
+            return (0, 0);
         }
+
+        let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
+            Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+            Err(_) => return (0, 0),
+        };
+
+        let mut keyboard = 0;
+        let mut mouse = 0;
+
+        for entry in entries {
+            let dir_path = entry.path();
+            if !dir_path.is_dir() {
+                continue;
+            }
+
+            let config_path = dir_path.join("config.json");
+            if !config_path.exists() {
+                keyboard += 1; // Assume keyboard if no config
+                continue;
+            }
+
+            if let Ok(mut file) = fs::File::open(&config_path) {
+                let mut contents = String::new();
+                if file.read_to_string(&mut contents).is_ok() {
+                    #[derive(Deserialize)]
+                    struct Config {
+                        mouse: Option<bool>,
+                    }
+
+                    if let Ok(cfg) = serde_json::from_str::<Config>(&contents) {
+                        match cfg.mouse {
+                            Some(true) => mouse += 1,
+                            Some(false) | None => keyboard += 1,
+                        }
+                    }
+                }
+            }
+        }
+
+        (keyboard, mouse)
     }
 
     /// Get absolute path for data directory
