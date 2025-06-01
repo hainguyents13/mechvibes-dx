@@ -20,7 +20,7 @@ pub fn Header() -> Element {
             if let Some(theme_data) = config().get_custom_theme(theme_name) {
                 // Wrap custom theme CSS with proper data-theme selectors
                 format!(
-                    ":root:has(input.theme-controller[value={}]:checked),[data-theme=\"{}\"] {{\n{}\n}}",
+                    ":root:has(input.theme-controller[value=custom-{}]:checked),[data-theme=\"custom-{}\"] {{\n{}\n}}",
                     theme_name,
                     theme_name,
                     theme_data.css
