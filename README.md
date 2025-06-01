@@ -39,7 +39,7 @@ A modern, feature-rich mechanical keyboard sound simulator built with Rust and D
 
 ### Pre-built Releases
 
-1. Download the latest release from the [Releases page](https://github.com/your-username/mechvibes-dx/releases)
+1. Download the latest release from the [Releases page](https://github.com/hainguyents13/mechvibes-dx/releases)
 2. Extract the archive to your desired location
 3. Run `mechvibes-dx.exe`
 
