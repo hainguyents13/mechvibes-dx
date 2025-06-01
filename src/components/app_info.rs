@@ -12,7 +12,9 @@ pub fn AppInfoDisplay() -> Element {
     // Get current working directory
     let current_dir = env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "Unknown".to_string());    // Get absolute paths for directories and files
+        .unwrap_or_else(|_| "Unknown".to_string());
+
+    // Get absolute paths for directories and files
     let data_dir_absolute = paths::utils::get_data_dir_absolute();
     let config_file_absolute = paths::utils::get_config_file_absolute();
     let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
@@ -23,7 +25,8 @@ pub fn AppInfoDisplay() -> Element {
     let soundpacks_dir_exists = paths::utils::soundpacks_dir_exists();
 
     // Count soundpacks
-    let (soundpack_count_keyboard, soundpack_count_mouse) = paths::utils::count_soundpacks_by_type();
+    let (soundpack_count_keyboard, soundpack_count_mouse) =
+        paths::utils::count_soundpacks_by_type();
 
     // Get OS info
     let os = env::consts::OS;
