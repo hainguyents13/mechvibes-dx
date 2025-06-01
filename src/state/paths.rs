@@ -67,6 +67,7 @@ pub mod utils {
     use std::fs;
     use std::io::Read;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use serde::Deserialize;
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
@@ -84,90 +85,51 @@ pub mod utils {
     }
 
     /// Count soundpacks in the soundpacks directory
-    pub fn count_soundpacks() -> usize {
-        let soundpacks_dir = get_app_root().join("soundpacks");
-        if soundpacks_dir.exists() {
-            std::fs::read_dir(&soundpacks_dir)
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .filter(|e| e.path().is_dir())
-                        .count()
-                })
-                .unwrap_or(0)
-        } else {
-            0
-        }
-    }
-
-    pub fn count_keyboard_soundpacks() -> usize {
-        use rayon::prelude::*;
-
+    pub fn count_soundpacks_by_type() -> (usize, usize) {
         let soundpacks_dir = get_app_root().join("soundpacks");
         if !soundpacks_dir.exists() {
-            return 0;
+            return (0, 0);
         }
 
         let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
             Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
-            Err(_) => return 0,
+            Err(_) => return (0, 0),
         };
 
-        entries.par_iter().map(|entry| {
+        let mut keyboard = 0;
+        let mut mouse = 0;
+
+        for entry in entries {
             let dir_path = entry.path();
-            if dir_path.is_dir() {
-                let config_path = dir_path.join("config.json");
-                if config_path.exists() {
-                    if let Ok(mut file) = fs::File::open(&config_path) {
-                        let mut contents = String::new();
-                        if file.read_to_string(&mut contents).is_ok() {
-                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
-                                match json.get("mouse") {
-                                    Some(v) if v.as_bool() == Some(false) => return 1,
-                                    None => return 1,
-                                    _ => {}
-                                }
-                            }
+            if !dir_path.is_dir() {
+                continue;
+            }
+
+            let config_path = dir_path.join("config.json");
+            if !config_path.exists() {
+                keyboard += 1; // Assume keyboard if no config
+                continue;
+            }
+
+            if let Ok(mut file) = fs::File::open(&config_path) {
+                let mut contents = String::new();
+                if file.read_to_string(&mut contents).is_ok() {
+                    #[derive(Deserialize)]
+                    struct Config {
+                        mouse: Option<bool>,
+                    }
+
+                    if let Ok(cfg) = serde_json::from_str::<Config>(&contents) {
+                        match cfg.mouse {
+                            Some(true) => mouse += 1,
+                            Some(false) | None => keyboard += 1,
                         }
                     }
                 }
             }
-            0
-        }).sum()
-    }
-
-    pub fn count_mouse_soundpacks() -> usize {
-        use rayon::prelude::*;
-
-        let soundpacks_dir = get_app_root().join("soundpacks");
-        if !soundpacks_dir.exists() {
-            return 0;
         }
 
-        let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
-            Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
-            Err(_) => return 0,
-        };
-
-        entries.par_iter().map(|entry| {
-            let dir_path = entry.path();
-            if dir_path.is_dir() {
-                let config_path = dir_path.join("config.json");
-                if config_path.exists() {
-                    if let Ok(mut file) = fs::File::open(&config_path) {
-                        let mut contents = String::new();
-                        if file.read_to_string(&mut contents).is_ok() {
-                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
-                                if json.get("mouse").and_then(|v| v.as_bool()) == Some(true) {
-                                    return 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            0
-        }).sum()
+        (keyboard, mouse)
     }
 
     /// Get absolute path for data directory
