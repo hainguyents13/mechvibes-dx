@@ -97,13 +97,19 @@ pub fn SettingsPage() -> Element {
                     div {
                       div { class: "label-text text-base", "Enable all sounds" }
                       div { class: "label-text-alt text-xs truncate",
-                        "Turn all keyboard sounds on or off"
+                        span { "You can also use " }
+                        span { class: "kbd kbd-xs font-mono text-base",
+                          "Ctrl+Alt+M"
+                        }
+                        span { " to toggle sound on/off" }
                       }
                     }
+
                     input {
                       r#type: "checkbox",
                       class: "toggle toggle-sm toggle-base-100",
-                      checked: enable_sound(),                      onchange: {
+                      checked: enable_sound(),
+                      onchange: {
                           let update_config = update_config.clone();
                           move |evt: Event<FormData>| {
                               update_config(
@@ -115,6 +121,8 @@ pub fn SettingsPage() -> Element {
                       },
                     }
                   }
+
+                  div { class: "divider" }
                   // Auto Start
                   div { class: "form-control",
                     label { class: "label cursor-pointer flex items-center justify-between",
@@ -129,7 +137,8 @@ pub fn SettingsPage() -> Element {
                       input {
                         r#type: "checkbox",
                         class: "toggle toggle-sm toggle-base-100",
-                        checked: auto_start(),                        onchange: {
+                        checked: auto_start(),
+                        onchange: {
                             let update_config = update_config.clone();
                             move |evt: Event<FormData>| {
                                 update_config(
@@ -156,7 +165,8 @@ pub fn SettingsPage() -> Element {
                       input {
                         r#type: "checkbox",
                         class: "toggle toggle-sm toggle-base-100",
-                        checked: show_notifications(),                        onchange: {
+                        checked: show_notifications(),
+                        onchange: {
                             let update_config = update_config.clone();
                             move |evt: Event<FormData>| {
                                 update_config(
@@ -245,7 +255,8 @@ pub fn SettingsPage() -> Element {
               }
               div { class: " justify-start",
                 button {
-                  class: "btn btn-error btn-soft btn-sm",                  onclick: {
+                  class: "btn btn-error btn-soft btn-sm",
+                  onclick: {
                       let update_config = update_config.clone();
                       move |_| {
                           theme.set(Theme::System);
