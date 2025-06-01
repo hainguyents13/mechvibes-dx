@@ -36,17 +36,17 @@ pub fn Header() -> Element {
         // Inject CSS using eval (works in Dioxus desktop)
         let script = format!(
             r#"
-            // Remove existing custom style if any
-            const existingStyle = document.getElementById('mechvibes-custom-styles');
-            if (existingStyle) {{
-                existingStyle.remove();
-            }}
-            
-            // Create new style element
-            const style = document.createElement('style');
-            style.id = 'mechvibes-custom-styles';
-            style.textContent = `{}`;
-            document.head.appendChild(style);
+              // Remove existing custom style if any
+              const existingStyle = document.getElementById('mechvibes-custom-styles');
+              if (existingStyle) {{
+                  existingStyle.remove();
+              }}
+              
+              // Create new style element
+              const style = document.createElement('style');
+              style.id = 'mechvibes-custom-styles';
+              style.textContent = `{}`;
+              document.head.appendChild(style);
             "#,
             combined_css.replace('`', r#"\`"#).replace("${", r#"\${"#)
         );
