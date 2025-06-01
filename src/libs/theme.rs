@@ -6,15 +6,27 @@ pub enum Theme {
     Dark,
     Light,
     System,
+    Custom(String), // Custom theme with name
 }
 
 impl Theme {
     /// Convert to DaisyUI theme name
-    pub fn to_daisy_theme(&self) -> &'static str {
+    pub fn to_daisy_theme(&self) -> String {
         match self {
-            Theme::Dark => "dark",
-            Theme::Light => "light",
-            Theme::System => "light", // Default to light for now, could detect system preference
+            Theme::Dark => "dark".to_string(),
+            Theme::Light => "light".to_string(),
+            Theme::System => "light".to_string(), // Default to light for now
+            Theme::Custom(name) => format!("custom-{}", name),
+        }
+    }
+
+    /// Get display name for the theme
+    pub fn display_name(&self) -> String {
+        match self {
+            Theme::Dark => "Dark".to_string(),
+            Theme::Light => "Light".to_string(),
+            Theme::System => "System".to_string(),
+            Theme::Custom(name) => name.clone(),
         }
     }
 }

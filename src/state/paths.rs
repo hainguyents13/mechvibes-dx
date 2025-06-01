@@ -64,10 +64,9 @@ pub mod soundpacks {
 /// Utility functions for path operations
 pub mod utils {
     use super::get_app_root;
+    use serde::Deserialize;
     use std::fs;
     use std::io::Read;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use serde::Deserialize;
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
