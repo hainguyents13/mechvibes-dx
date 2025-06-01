@@ -1,6 +1,6 @@
 use crate::components::logo::Logo;
 use crate::components::soundpack_selector::{KeyboardSoundpackSelector, MouseSoundpackSelector};
-use crate::components::volume_slider::{MouseVolumeSlider, VolumeSlider};
+use crate::components::volume_slider::{KeyboardVolumeSlider, MouseVolumeSlider};
 use crate::libs::AudioContext;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
@@ -95,11 +95,12 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         div { class: "mb-2",
           // Mechvibes logo with animated press effect
           Logo {}
-        } // Main content for home page
+        }
+        // Main content for home page
         div { class: "flex flex-col gap-2",
-          div { class: "space-y-4",
+          div { class: "space-y-3",
             KeyboardSoundpackSelector {}
-            VolumeSlider {
+            KeyboardVolumeSlider {
               volume,
               on_change: move |new_volume: f32| {
                   volume.set(new_volume);
@@ -107,7 +108,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
             }
           }
           div { class: "divider" }
-          div { class: "space-y-4",
+          div { class: "space-y-3",
             // Mouse soundpack selector and volume control
             MouseSoundpackSelector {}
             MouseVolumeSlider {

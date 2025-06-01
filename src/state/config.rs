@@ -17,6 +17,8 @@ pub struct AppConfig {
     pub volume: f32,
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
+    pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
+    pub enable_mouse_sound: bool,    // Enable/disable mouse sounds specifically
 
     // UI settings
     pub theme: Theme,
@@ -78,7 +80,9 @@ impl Default for AppConfig {
             volume: 1.0,
             mouse_volume: 1.0, // Default mouse volume to 100%
             enable_sound: true,
-            theme: Theme::System, // Default to System theme
+            enable_keyboard_sound: true, // Default keyboard sounds enabled
+            enable_mouse_sound: true,    // Default mouse sounds enabled
+            theme: Theme::System,        // Default to System theme
             auto_start: false,
             show_notifications: true,
         }

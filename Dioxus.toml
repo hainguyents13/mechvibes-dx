@@ -30,18 +30,18 @@ name = "MechvibesDX"
 version = "0.1.0"
 publisher = "Hai Nguyen"
 icon = [
-  "./icons/android-chrome-192x192.png", 
-  "./icons/android-chrome-512x512.png", 
-  "./icons/apple-touch-icon.png", 
-  "./icons/favicon.icns", 
-  "./icons/favicon.ico", 
-  "./icons/favicon-16x16.png", 
-  "./icons/favicon-32x32.png"
+  "./icons/android-chrome-192x192.png",
+  "./icons/android-chrome-512x512.png",
+  "./icons/apple-touch-icon.png",
+  "./icons/favicon.icns",
+  "./icons/favicon.ico",
+  "./icons/favicon-16x16.png",
+  "./icons/favicon-32x32.png",
 ]
 category = "Productivity"
 short_description = "MechvibesDX"
 long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards, inspired by the original Mechvibes project. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
-resources = ["./soundpacks"]
+resources = ["./soundpacks", "./assets"]
 
 # configure bundling for windows
 [bundle.windows]
@@ -49,7 +49,7 @@ tsp = true
 icon_path = "./icons/favicon.ico"
 allow_downgrades = true
 [bundle.windows.webview_install_mode]
-EmbedBootstrapper = {silent = true}
+EmbedBootstrapper = { silent = true }
 [bundle.windows.nsis]
 header_image = "./icons/favicon.ico"
 installer_icon = "./icons/favicon.ico"

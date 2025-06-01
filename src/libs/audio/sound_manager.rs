@@ -15,8 +15,8 @@ impl AudioContext {
 
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
-        if !config.enable_sound {
-            println!("🔇 Sound disabled in config, skipping key event");
+        if !config.enable_sound || !config.enable_keyboard_sound {
+            println!("🔇 Keyboard sound disabled in config, skipping key event");
             return;
         }
 
@@ -114,8 +114,8 @@ impl AudioContext {
 
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
-        if !config.enable_sound {
-            println!("🔇 Sound disabled in config, skipping mouse event");
+        if !config.enable_sound || !config.enable_mouse_sound {
+            println!("🔇 Mouse sound disabled in config, skipping mouse event");
             return;
         }
 

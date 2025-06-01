@@ -116,14 +116,14 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
           // DaisyUI dropdown button
           button {
             class: format!(
-                "w-full btn btn-soft justify-start gap-3 h-16 rounded-lg {}",
+                "w-full btn btn-soft justify-start gap-3 h-17 rounded-lg {}",
                 if is_open() { "btn-active" } else { "" },
             ),
             disabled: is_loading(),
             onclick: move |_| is_open.set(!is_open()),
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
-                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-10 h-10 bg-base-200 rounded-lg flex items-center justify-center",
+                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-lg flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
@@ -322,7 +322,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           }
                           if pack.id == current() {
                             div { class: "absolute inset-0 bg-primary/20 flex items-center justify-center tint545",
-                              Check { class: "text-white w-8 h-8" }
+                              Check { class: "text-white w-6 h-6" }
                             }
                           }
                         }

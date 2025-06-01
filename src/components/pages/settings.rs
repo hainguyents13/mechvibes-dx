@@ -7,8 +7,7 @@ use std::sync::Arc;
 #[component]
 pub fn SettingsPage() -> Element {
     // Get access to audio context for reloading soundpacks
-    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
-    // Use shared config hook
+    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context(); // Use shared config hook
     let (config, update_config) = use_config();
     let mut enable_sound = use_signal(|| config().enable_sound);
     let mut auto_start = use_signal(|| config().auto_start);
