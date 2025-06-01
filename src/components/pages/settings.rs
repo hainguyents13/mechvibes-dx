@@ -89,15 +89,7 @@ pub fn SettingsPage() -> Element {
             div { class: "collapse-content text-sm",
               div { class: "form-control",
                 div { class: "space-y-6",
-                  // Theme Settings
-                  div { class: "form-control",
-                    div { class: "label",
-                      span { class: "label-text text-base", "Theme" }
-                    }
-                    div { class: "mt-2",
-                      crate::components::theme_toggler::ThemeToggler {}
-                    }
-                  }
+                  // Volume Control
                   label { class: "label cursor-pointer flex items-center justify-between",
                     div {
                       div { class: "label-text text-base", "Enable all sounds" }

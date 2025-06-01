@@ -198,11 +198,6 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
                 --color-base-200: oklch(95% 0 0);
                 --color-base-300: oklch(90% 0 0);
                 --color-base-content: oklch(20% 0 0);
-                
-                /* You can also override component styles */
-                .btn {
-                  border-radius: 0.5rem;
-                }
               }
           }"#,
         )

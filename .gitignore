@@ -12,5 +12,5 @@ node_modules
 
 /wix
 create_portable.ps1
-bundles/*
+/bundles
 /tests

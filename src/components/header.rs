@@ -3,8 +3,8 @@ use dioxus::document::eval;
 use dioxus::prelude::*;
 
 const FAVICON: Asset = asset!("/assets/icon.ico");
-const MAIN_CSS: &str = include_str!("../../assets/main.css");
-const TAILWIND_CSS: &str = include_str!("../../assets/tailwind.css");
+const MAIN_CSS: Asset = asset!("/assets/main.css");
+const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 #[component]
 pub fn Header() -> Element {
@@ -13,7 +13,7 @@ pub fn Header() -> Element {
     let (config, _) = use_config();
     let theme = use_theme();
 
-    // Use effect to inject CSS when theme or config changes
+    // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
     use_effect(move || {
         let custom_css = config().custom_css.clone();
 
@@ -27,13 +27,10 @@ pub fn Header() -> Element {
             String::new()
         };
 
-        // Combine all CSS
-        let combined_css = format!(
-            "{}\n{}\n{}\n{}",
-            TAILWIND_CSS, MAIN_CSS, custom_theme_css, custom_css
-        );
+        // Only combine dynamic CSS parts
+        let dynamic_css = format!("{}\n{}", custom_theme_css, custom_css);
 
-        // Inject CSS using eval (works in Dioxus desktop)
+        // Inject only dynamic CSS using eval
         let script = format!(
             r#"
               // Remove existing custom style if any
@@ -42,19 +39,20 @@ pub fn Header() -> Element {
                   existingStyle.remove();
               }}
               
-              // Create new style element
+              // Create new style element for dynamic CSS
               const style = document.createElement('style');
               style.id = 'mechvibes-custom-styles';
               style.textContent = `{}`;
               document.head.appendChild(style);
             "#,
-            combined_css.replace('`', r#"\`"#).replace("${", r#"\${"#)
+            dynamic_css.replace('`', r#"\`"#).replace("${", r#"\${"#)
         );
 
         eval(&script);
     });
-
     rsx! {
       document::Link { rel: "icon", href: FAVICON }
+      document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+      document::Link { rel: "stylesheet", href: MAIN_CSS }
     }
 }

@@ -128,98 +128,11 @@ impl AppConfig {
     pub fn list_custom_themes(&self) -> Vec<String> {
         self.custom_themes.keys().cloned().collect()
     }
-
-    /// Create a sample custom theme for demonstration
-    pub fn create_sample_theme(&mut self, name: &str) -> Result<(), String> {
-        let sample_css = match name {
-            "Cyberpunk Neon" => {
-                r#"/* Cyberpunk Neon Theme */
-[data-theme="custom-cyberpunk-neon"] {
-  color-scheme: dark;
-  --color-base-100: oklch(12% 0.02 270);
-  --color-base-200: oklch(8% 0.03 270);
-  --color-base-300: oklch(5% 0.04 270);
-  --color-base-content: oklch(90% 0.1 180);
-  --color-primary: oklch(65% 0.25 240);
-  --color-primary-content: oklch(10% 0.05 240);
-  --color-secondary: oklch(70% 0.3 330);
-  --color-secondary-content: oklch(10% 0.05 330);
-  --color-accent: oklch(75% 0.25 150);
-  --color-accent-content: oklch(10% 0.05 150);
-  --color-neutral: oklch(20% 0.05 280);
-  --color-neutral-content: oklch(85% 0.05 180);
-}
-
-[data-theme="custom-cyberpunk-neon"] .btn {
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  border: 1px solid var(--color-primary);
-}
-
-[data-theme="custom-cyberpunk-neon"] .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-}"#
-            }
-            "Ocean Breeze" => {
-                r#"/* Ocean Breeze Theme */
-[data-theme="custom-ocean-breeze"] {
-  color-scheme: light;
-  --color-base-100: oklch(98% 0.01 220);
-  --color-base-200: oklch(95% 0.02 220);
-  --color-base-300: oklch(90% 0.03 220);
-  --color-base-content: oklch(25% 0.02 220);
-  --color-primary: oklch(55% 0.15 200);
-  --color-primary-content: oklch(98% 0.01 200);
-  --color-secondary: oklch(65% 0.12 180);
-  --color-secondary-content: oklch(98% 0.01 180);
-  --color-accent: oklch(70% 0.14 160);
-  --color-accent-content: oklch(98% 0.01 160);
-  --color-neutral: oklch(40% 0.05 220);
-  --color-neutral-content: oklch(98% 0.01 220);
-}
-
-[data-theme="custom-ocean-breeze"] .btn {
-  border-radius: 1rem;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
-}
-"#
-            }
-            "Sunset Glow" => {
-                r#"/* Sunset Glow Theme */
-[data-theme="custom-sunset-glow"] {
-  color-scheme: dark;
-  --color-base-100: oklch(15% 0.03 30);
-  --color-base-200: oklch(12% 0.04 30);
-  --color-base-300: oklch(8% 0.05 30);
-  --color-base-content: oklch(90% 0.02 50);
-  --color-primary: oklch(70% 0.2 40);
-  --color-primary-content: oklch(15% 0.03 40);
-  --color-secondary: oklch(65% 0.25 350);
-  --color-secondary-content: oklch(15% 0.03 350);
-  --color-accent: oklch(75% 0.18 60);
-  --color-accent-content: oklch(15% 0.03 60);
-  --color-neutral: oklch(25% 0.04 30);
-  --color-neutral-content: oklch(90% 0.02 50);
-}
-
-[data-theme="custom-sunset-glow"] .btn {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  border: none;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-"#
-            }
-            _ => return Err("Unknown sample theme".to_string()),
-        };
-
-        self.save_custom_theme(name.to_string(), sample_css.to_string())
-    }
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let mut config = Self {
+        let config = Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
@@ -236,11 +149,6 @@ impl Default for AppConfig {
             auto_start: false,
             show_notifications: true,
         };
-
-        // Add sample themes on first creation
-        let _ = config.create_sample_theme("Cyberpunk Neon");
-        let _ = config.create_sample_theme("Ocean Breeze");
-        let _ = config.create_sample_theme("Sunset Glow");
 
         config
     }
