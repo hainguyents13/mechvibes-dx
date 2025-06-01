@@ -153,72 +153,62 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
 
 #[component]
 fn CreateThemeButton() -> Element {
-    let mut show_modal = use_signal(|| false);
-
     rsx! {
       div {
         button {
           class: "btn btn-soft btn-sm w-full",
-          onclick: move |_| show_modal.set(true),
+          "onclick": "theme_creator_modal.showModal()",
           Plus { class: "w-4 h-4 mr-1" }
           "Create custom theme"
         }
-        if show_modal() {
-          ThemeCreatorModal { on_close: move |_| show_modal.set(false) }
-        }
+        ThemeCreatorModal {}
       }
     }
 }
 
-#[derive(Props, Clone, PartialEq)]
-struct ThemeCreatorModalProps {
-    on_close: EventHandler<MouseEvent>,
-}
-
 #[component]
-fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
+fn ThemeCreatorModal() -> Element {
     let (_, update_config) = use_config();
     let mut theme_name = use_signal(String::new);
     let mut theme_css = use_signal(|| {
         String::from(
-            r#"
-                /* Define your custom theme variables here */
-                --color-base-100: oklch(98% 0.02 240);
-                --color-base-200: oklch(95% 0.03 240);
-                --color-base-300: oklch(92% 0.04 240);
-                --color-base-content: oklch(20% 0.05 240);
-                --color-primary: oklch(55% 0.3 240);
-                --color-primary-content: oklch(98% 0.01 240);
-                --color-secondary: oklch(70% 0.25 200);
-                --color-secondary-content: oklch(98% 0.01 200);
-                --color-accent: oklch(65% 0.25 160);
-                --color-accent-content: oklch(98% 0.01 160);
-                --color-neutral: oklch(50% 0.05 240);
-                --color-neutral-content: oklch(98% 0.01 240);
-                --color-info: oklch(70% 0.2 220);
-                --color-info-content: oklch(98% 0.01 220);
-                --color-success: oklch(65% 0.25 140);
-                --color-success-content: oklch(98% 0.01 140);
-                --color-warning: oklch(80% 0.25 80);
-                --color-warning-content: oklch(20% 0.05 80);
-                --color-error: oklch(65% 0.3 30);
-                --color-error-content: oklch(98% 0.01 30);
+            r#"/* Define your custom theme variables here */
+--color-base-100: oklch(98% 0.02 240);
+--color-base-200: oklch(95% 0.03 240);
+--color-base-300: oklch(92% 0.04 240);
+--color-base-content: oklch(20% 0.05 240);
+--color-primary: oklch(55% 0.3 240);
+--color-primary-content: oklch(98% 0.01 240);
+--color-secondary: oklch(70% 0.25 200);
+--color-secondary-content: oklch(98% 0.01 200);
+--color-accent: oklch(65% 0.25 160);
+--color-accent-content: oklch(98% 0.01 160);
+--color-neutral: oklch(50% 0.05 240);
+--color-neutral-content: oklch(98% 0.01 240);
+--color-info: oklch(70% 0.2 220);
+--color-info-content: oklch(98% 0.01 220);
+--color-success: oklch(65% 0.25 140);
+--color-success-content: oklch(98% 0.01 140);
+--color-warning: oklch(80% 0.25 80);
+--color-warning-content: oklch(20% 0.05 80);
+--color-error: oklch(65% 0.3 30);
+--color-error-content: oklch(98% 0.01 30);
 
-                /* border radius */
-                --radius-selector: 1rem;
-                --radius-field: 0.25rem;
-                --radius-box: 0.5rem;
+/* border radius */
+--radius-selector: 1rem;
+--radius-field: 0.25rem;
+--radius-box: 0.5rem;
 
-                /* base sizes */
-                --size-selector: 0.25rem;
-                --size-field: 0.25rem;
+/* base sizes */
+--size-selector: 0.25rem;
+--size-field: 0.25rem;
 
-                /* border size */
-                --border: 1px;
+/* border size */
+--border: 1px;
 
-                /* effects */
-                --depth: 1;
-                --noise: 0;
+/* effects */
+--depth: 1;
+--noise: 0;
           "#,
         )
     });
@@ -258,27 +248,21 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
     };
 
     rsx! {
-      div {
-        class: "fixed inset-0 bg-black/50 flex items-center justify-center z-50",
-        onclick: props.on_close,
-        div {
-          class: "bg-base-100 p-6 rounded-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto",
-          onclick: |e| e.stop_propagation(),
-          div { class: "flex items-center justify-between mb-4",
-            h3 { class: "text-lg font-bold", "Create custom theme" }
-            button {
-              class: "btn btn-ghost btn-sm",
-              onclick: props.on_close,
+      dialog { class: "modal", id: "theme_creator_modal",
+        div { class: "modal-box",
+          form { method: "dialog",
+            button { class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2",
               "✕"
             }
           }
+          h3 { class: "font-bold text-lg mb-4", "Create custom theme" }
           div { class: "space-y-4",
-            div { class: "form-control",
-              label { class: "label",
+            fieldset { class: "fieldset",
+              legend { class: "fieldset-legend",
                 span { class: "label-text", "Theme name" }
               }
               input {
-                class: "input input-bordered",
+                class: "input w-full",
                 r#type: "text",
                 placeholder: "My custom theme",
                 value: theme_name(),
@@ -286,10 +270,10 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
               }
             }
             fieldset { class: "fieldset",
-              legend { class: "fieldset-legend", "Custom CSS" }
+              legend { class: "fieldset-legend", "CSS" }
               textarea {
                 class: "textarea w-full h-64 font-mono text-sm",
-                placeholder: "Enter your custom CSS here...",
+                placeholder: "Enter your theme CSS here...",
                 value: theme_css(),
                 oninput: move |e| theme_css.set(e.value()),
               }
@@ -300,17 +284,12 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
             }
             div { class: "flex justify-end gap-2",
               button {
-                class: "btn btn-ghost",
-                onclick: props.on_close,
-                "Cancel"
-              }
-              button {
-                class: "btn btn-primary",
+                class: "btn btn-primary btn-sm",
                 disabled: saving() || theme_name().trim().is_empty(),
                 onclick: on_save,
                 if saving() {
                   span { class: "loading loading-spinner loading-sm mr-2" }
-                  "Saving..."
+                  "Creating..."
                 } else {
                   "Create Theme"
                 }
