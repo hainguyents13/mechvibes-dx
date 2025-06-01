@@ -181,25 +181,45 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
     let mut theme_name = use_signal(String::new);
     let mut theme_css = use_signal(|| {
         String::from(
-            r#"/* Custom theme CSS */
-            @layer base {
-                :root:has(input.theme-controller[value=custom-{theme_name}]:checked),[data-theme=custom-{theme_name}] {
-                color-scheme: light;  
+            r#"
                 /* Define your custom theme variables here */
-                --color-primary: oklch(65% 0.2 260);
-                --color-primary-content: oklch(100% 0 0);
-                --color-secondary: oklch(70% 0.15 330);
-                --color-secondary-content: oklch(100% 0 0);
-                --color-accent: oklch(75% 0.18 150);
-                --color-accent-content: oklch(100% 0 0);
-                --color-neutral: oklch(40% 0.05 200);
-                --color-neutral-content: oklch(100% 0 0);
-                --color-base-100: oklch(100% 0 0);
-                --color-base-200: oklch(95% 0 0);
-                --color-base-300: oklch(90% 0 0);
-                --color-base-content: oklch(20% 0 0);
-              }
-          }"#,
+                --color-base-100: oklch(98% 0.02 240);
+                --color-base-200: oklch(95% 0.03 240);
+                --color-base-300: oklch(92% 0.04 240);
+                --color-base-content: oklch(20% 0.05 240);
+                --color-primary: oklch(55% 0.3 240);
+                --color-primary-content: oklch(98% 0.01 240);
+                --color-secondary: oklch(70% 0.25 200);
+                --color-secondary-content: oklch(98% 0.01 200);
+                --color-accent: oklch(65% 0.25 160);
+                --color-accent-content: oklch(98% 0.01 160);
+                --color-neutral: oklch(50% 0.05 240);
+                --color-neutral-content: oklch(98% 0.01 240);
+                --color-info: oklch(70% 0.2 220);
+                --color-info-content: oklch(98% 0.01 220);
+                --color-success: oklch(65% 0.25 140);
+                --color-success-content: oklch(98% 0.01 140);
+                --color-warning: oklch(80% 0.25 80);
+                --color-warning-content: oklch(20% 0.05 80);
+                --color-error: oklch(65% 0.3 30);
+                --color-error-content: oklch(98% 0.01 30);
+
+                /* border radius */
+                --radius-selector: 1rem;
+                --radius-field: 0.25rem;
+                --radius-box: 0.5rem;
+
+                /* base sizes */
+                --size-selector: 0.25rem;
+                --size-field: 0.25rem;
+
+                /* border size */
+                --border: 1px;
+
+                /* effects */
+                --depth: 1;
+                --noise: 0;
+          "#,
         )
     });
     let mut saving = use_signal(|| false);

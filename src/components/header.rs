@@ -11,18 +11,23 @@ pub fn Header() -> Element {
     use crate::state::config_utils::use_config;
 
     let (config, _) = use_config();
-    let theme = use_theme();
-
-    // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
+    let theme = use_theme(); // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
     use_effect(move || {
         let custom_css = config().custom_css.clone();
 
         // Get custom theme CSS if current theme is custom
         let custom_theme_css = if let Theme::Custom(theme_name) = &theme() {
-            config()
-                .get_custom_theme(theme_name)
-                .map(|theme_data| theme_data.css.clone())
-                .unwrap_or_default()
+            if let Some(theme_data) = config().get_custom_theme(theme_name) {
+                // Wrap custom theme CSS with proper data-theme selectors
+                format!(
+                    ":root:has(input.theme-controller[value={}]:checked),[data-theme=\"{}\"] {{\n{}\n}}",
+                    theme_name,
+                    theme_name,
+                    theme_data.css
+                )
+            } else {
+                String::new()
+            }
         } else {
             String::new()
         };
