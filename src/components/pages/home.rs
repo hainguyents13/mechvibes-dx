@@ -1,8 +1,6 @@
-use crate::components::keyboard_soundpack_selector::KeyboardSoundpackSelector;
 use crate::components::logo::Logo;
-use crate::components::mouse_soundpack_selector::MouseSoundpackSelector;
-use crate::components::mouse_volume_slider::MouseVolumeSlider;
-use crate::components::volume_slider::VolumeSlider;
+use crate::components::soundpack_selector::{KeyboardSoundpackSelector, MouseSoundpackSelector};
+use crate::components::volume_slider::{MouseVolumeSlider, VolumeSlider};
 use crate::libs::AudioContext;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;

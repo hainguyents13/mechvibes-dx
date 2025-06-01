@@ -2,7 +2,7 @@ use crate::libs::audio::AudioContext;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{Check, ChevronDown, Music, Search};
+use lucide_dioxus::{Check, ChevronDown, Keyboard, Mouse, Music, Search};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -360,6 +360,34 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
         if !error().is_empty() {
           div { class: "text-xs text-error mt-1", "{error}" }
         }
+      }
+    }
+}
+
+// Wrapper components for keyboard and mouse soundpack selectors
+
+#[component]
+pub fn KeyboardSoundpackSelector() -> Element {
+    rsx! {
+      SoundpackSelector {
+        soundpack_type: SelectorType::Keyboard,
+        label: "Keyboard".to_string(),
+        icon: rsx! {
+          Keyboard { class: "w-4 h-4" }
+        },
+      }
+    }
+}
+
+#[component]
+pub fn MouseSoundpackSelector() -> Element {
+    rsx! {
+      SoundpackSelector {
+        soundpack_type: SelectorType::Mouse,
+        label: "Mouse".to_string(),
+        icon: rsx! {
+          Mouse { class: "w-4 h-4" }
+        },
       }
     }
 }
