@@ -136,7 +136,7 @@ pub fn SoundpacksPage() -> Element {
             div { class: "space-y-4",
               div { class: "text-base-content",
                 div {
-                  div { class: "font-medium text-sm",
+                  div { class: "font-medium text-sm pb-1",
                     "Found {soundpack_count_keyboard + soundpack_count_mouse} soundpack(s)"
                   }
                   ul { class: "list-disc pl-6",
@@ -149,10 +149,10 @@ pub fn SoundpacksPage() -> Element {
                   }
                 }
               }
-              div { class: "text-base-content/70 text-sm",
-                "Refresh soundpack list to detect newly added or removed soundpacks."
-              }
-              div { class: "flex flex-col gap-2",
+              div { class: "space-y-2",
+                div { class: "text-base-content/70 text-sm",
+                  "Refresh soundpack list to detect newly added or removed soundpacks."
+                }
                 div { class: "flex items-center gap-4",
                   button {
                     class: "btn btn-soft btn-sm",
@@ -191,20 +191,18 @@ pub fn SoundpacksPage() -> Element {
                     }
                   }
                 }
-                div {
-                  div { class: "divider" }
-                  div { class: "space-y-2",
-                    div { class: "text-base-content font-medium text-sm",
-                      "Soundpack folder path"
-                    }
-                    input {
-                      value: "{soundpacks_dir_absolute}",
-                      class: "input input-sm w-full",
-                      readonly: true,
-                    }
-                    button { class: "btn btn-soft btn-sm", "Open soundpack folder" }
-                  }
+              }
+              div { class: "divider" }
+              div { class: "space-y-2",
+                div { class: "text-base-content font-medium text-sm",
+                  "Soundpack folder path"
                 }
+                input {
+                  value: "{soundpacks_dir_absolute}",
+                  class: "input input-sm w-full",
+                  readonly: true,
+                }
+                button { class: "btn btn-soft btn-sm", "Open soundpack folder" }
               }
             }
           }
