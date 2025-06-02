@@ -39,7 +39,7 @@ A modern, feature-rich mechanical keyboard sound simulator built with Rust and D
 
 ### Pre-built Releases
 
-1. Download the latest release from the [Releases page](https://github.com/your-username/mechvibes-dx/releases)
+1. Download the latest release from the [Releases page](https://github.com/hainguyents13/mechvibes-dx/releases)
 2. Extract the archive to your desired location
 3. Run `mechvibes-dx.exe`
 
@@ -341,7 +341,7 @@ dx build --release
 
 ### Architecture
 
-MechVibesDX is built using modern technologies:
+MechVibesDX is built on Windows 11 using modern technologies:
 
 -   **Rust** - Systems programming language for performance and safety
 -   **Dioxus** - Modern React-like UI framework for Rust
