@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 #![allow(non_snake_case)]
 
 mod components;
@@ -16,15 +16,25 @@ fn main() {
 
     // Check for command line arguments (protocol handling)
     let args: Vec<String> = std::env::args().collect();
+    println!("🔍 Command line args: {:?}", args);
+
     if args.len() > 1 {
         // Handle protocol URL if passed as argument
         let url = &args[1];
+        println!("🔗 Processing argument: {}", url);
         if url.starts_with("mechvibes://") {
+            println!("✅ Detected protocol URL: {}", url);
             if let Err(e) = protocol::handle_protocol_url(url) {
-                eprintln!("Failed to handle protocol URL {}: {}", url, e);
+                eprintln!("❌ Failed to handle protocol URL {}: {}", url, e);
+            } else {
+                println!("✅ Protocol URL handled successfully");
             }
             return; // Exit after handling protocol
+        } else {
+            println!("ℹ️ Argument is not a protocol URL: {}", url);
         }
+    } else {
+        println!("ℹ️ No command line arguments provided");
     }
 
     // Register protocol on first run

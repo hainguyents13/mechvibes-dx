@@ -3053,6 +3053,7 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
+ "winapi",
 ]
 
 [[package]]

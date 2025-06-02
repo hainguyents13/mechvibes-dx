@@ -154,7 +154,7 @@ pub fn start_unified_input_listener(
                 EventType::KeyPress(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Pressed: {}", key_code);
+                        // println!("⌨️ Key Pressed: {}", key_code);
 
                         // Track modifier keys for hotkey detection
                         match key_code {
@@ -193,7 +193,7 @@ pub fn start_unified_input_listener(
                 EventType::KeyRelease(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Released: {}", key_code);
+                        // println!("⌨️ Key Released: {}", key_code);
 
                         // Track modifier key releases for hotkey detection
                         match key_code {
@@ -215,7 +215,7 @@ pub fn start_unified_input_listener(
                 EventType::ButtonPress(button) => {
                     let button_code = map_button_to_code(button);
                     if !button_code.is_empty() && button_code != "MouseUnknown" {
-                        println!("🖱️ Mouse Button Pressed: {}", button_code);
+                        // println!("🖱️ Mouse Button Pressed: {}", button_code);
 
                         // Check if button is already pressed
                         let mut pressed = pressed_buttons.lock().unwrap();
@@ -237,7 +237,7 @@ pub fn start_unified_input_listener(
                 EventType::ButtonRelease(button) => {
                     let button_code = map_button_to_code(button);
                     if !button_code.is_empty() && button_code != "MouseUnknown" {
-                        println!("🖱️ Mouse Button Released: {}", button_code);
+                        // println!("🖱️ Mouse Button Released: {}", button_code);
 
                         // Remove button from pressed set
                         let mut pressed = pressed_buttons.lock().unwrap();

@@ -7,11 +7,11 @@ use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
-        println!(
-            "⌨️ Key event received: {} ({})",
-            key,
-            if is_keydown { "down" } else { "up" }
-        );
+        // println!(
+        //     "⌨️ Key event received: {} ({})",
+        //     key,
+        //     if is_keydown { "down" } else { "up" }
+        // );
 
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
@@ -106,11 +106,11 @@ impl AudioContext {
         }
     }
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
-        println!(
-            "🖱️ Mouse event received: {} ({})",
-            button,
-            if is_buttondown { "down" } else { "up" }
-        );
+        // println!(
+        //     "🖱️ Mouse event received: {} ({})",
+        //     button,
+        //     if is_buttondown { "down" } else { "up" }
+        // );
 
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();
