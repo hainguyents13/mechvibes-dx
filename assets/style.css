@@ -3230,8 +3230,16 @@
   .bg-blend-multiply {
     background-blend-mode: multiply;
   }
+  .shadow-\[0_5px_0_var\(--color-base-300\)\] {
+    --tw-shadow: 0 5px 0 var(--tw-shadow-color, var(--color-base-300));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
   .shadow-\[0_5px_0_var\(--color-base-content\)\] {
     --tw-shadow: 0 5px 0 var(--tw-shadow-color, var(--color-base-content));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .shadow-\[0_5px_0_var\(--color-secondary\)\] {
+    --tw-shadow: 0 5px 0 var(--tw-shadow-color, var(--color-secondary));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .shadow-lg {
