@@ -3,26 +3,27 @@ use dioxus::document::eval;
 use dioxus::prelude::*;
 
 const FAVICON: Asset = asset!("/assets/icon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
 
 #[component]
 pub fn Header() -> Element {
     use crate::state::config_utils::use_config;
 
     let (config, _) = use_config();
-    let theme = use_theme(); // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
+    let theme = use_theme();
+
+    // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
     use_effect(move || {
         let custom_css = config().custom_css.clone();
 
         // Get custom theme CSS if current theme is custom
-        let custom_theme_css = if let Theme::Custom(theme_name) = &theme() {
-            if let Some(theme_data) = config().get_custom_theme(theme_name) {
+        let custom_theme_css = if let Theme::Custom(theme_id) = &theme() {
+            if let Some(theme_data) = config().get_custom_theme_by_id(theme_id) {
                 // Wrap custom theme CSS with proper data-theme selectors
                 format!(
                     ":root:has(input.theme-controller[value=custom-{}]:checked),[data-theme=\"custom-{}\"] {{\n{}\n}}",
-                    theme_name,
-                    theme_name,
+                    theme_id,
+                    theme_id,
                     theme_data.css
                 )
             } else {
@@ -57,7 +58,6 @@ pub fn Header() -> Element {
     });
     rsx! {
       document::Link { rel: "icon", href: FAVICON }
-      document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-      document::Link { rel: "stylesheet", href: MAIN_CSS }
+      document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
     }
 }

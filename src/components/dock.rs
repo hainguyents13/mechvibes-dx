@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::{navigator, use_route};
-use lucide_dioxus::{House, Palette, Settings, Sparkles};
+use lucide_dioxus::{House, Music, Palette, Settings, Sparkles};
 
 #[allow(non_snake_case)]
 #[component]
@@ -17,6 +17,15 @@ pub fn Dock() -> Element {
           },
           House { class: "w-5 h-5" }
           span { class: "dock-label mt-1", "Home" }
+        }
+        // Button Soundpacks
+        button {
+          class: if matches!(route, crate::libs::routes::Route::Soundpacks {}) { "dock-active" } else { "" },
+          onclick: move |_| {
+              nav.push("/soundpacks");
+          },
+          Music { class: "w-5 h-5" }
+          span { class: "dock-label mt-1", "Soundpacks" }
         }
         // Button Effects
         button {

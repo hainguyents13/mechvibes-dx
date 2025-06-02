@@ -9,6 +9,8 @@ pub enum Route {
     Home {},
     #[route("/customize")]
     Customize {},
+    #[route("/soundpacks")]
+    Soundpacks {},
     #[route("/effects")]
     Effects {},
     #[route("/settings")]
@@ -20,10 +22,11 @@ pub fn Layout() -> Element {
     let (config_signal, _set_config) = use_config();
 
     // Theme state - use theme context and initialize from config
-    let mut theme = use_theme();    // Initialize theme from config on first load
+    let mut theme = use_theme(); // Initialize theme from config on first load
     use_effect(move || {
         theme.set(config_signal.read().theme.clone());
-    }); // Convert theme to DaisyUI theme name
+    });
+    // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
     rsx! {
       div {
@@ -50,6 +53,13 @@ pub fn Home() -> Element {
     let audio_context: Arc<AudioContext> = use_context();
     rsx! {
       crate::components::pages::HomePage { audio_ctx: audio_context }
+    }
+}
+
+#[component]
+pub fn Soundpacks() -> Element {
+    rsx! {
+      crate::components::pages::SoundpacksPage {}
     }
 }
 

@@ -7,6 +7,7 @@ use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomThemeData {
+    pub id: String, // Unique ID for the theme
     pub name: String,
     pub css: String,
     pub created_at: DateTime<Utc>,
@@ -80,53 +81,61 @@ impl AppConfig {
     }
 
     /// Add or update a custom theme
-    pub fn save_custom_theme(&mut self, name: String, css: String) -> Result<(), String> {
+    pub fn save_custom_theme(
+        &mut self,
+        id: String,
+        name: String,
+        css: String,
+    ) -> Result<(), String> {
         if name.trim().is_empty() {
             return Err("Theme name cannot be empty".to_string());
         }
-
         let now = Utc::now();
-        let theme_data = CustomThemeData {
-            name: name.clone(),
-            css,
-            created_at: self
-                .custom_themes
-                .get(&name)
-                .map(|existing| existing.created_at)
-                .unwrap_or(now),
-            modified_at: now,
-        };
 
-        self.custom_themes.insert(name, theme_data);
+        // If updating, keep the original ID and created_at
+        if let Some(existing) = self.custom_themes.get_mut(&id) {
+            existing.name = name;
+            existing.css = css;
+            existing.modified_at = now;
+        } else {
+            // If new theme, create new theme data
+            let theme_data = CustomThemeData {
+                id: id.clone(),
+                name: name,
+                css: css,
+                created_at: now,
+                modified_at: now,
+            };
+            self.custom_themes.insert(id, theme_data);
+        }
         self.last_updated = now;
         self.save()
     }
 
     /// Remove a custom theme
-    pub fn delete_custom_theme(&mut self, name: &str) -> Result<(), String> {
-        if !self.custom_themes.contains_key(name) {
-            return Err("Theme not found".to_string());
-        }
-
+    pub fn delete_custom_theme(&mut self, id: &str) -> Result<(), String> {
         // If the current theme is the one being deleted, switch to System
-        if let Theme::Custom(current_name) = &self.theme {
-            if current_name == name {
+        if let Theme::Custom(current_id) = &self.theme {
+            if current_id == id {
                 self.theme = Theme::System;
             }
         }
 
-        self.custom_themes.remove(name);
+        self.custom_themes.remove(id);
         self.last_updated = Utc::now();
         self.save()
     }
 
-    /// Get a custom theme by name
-    pub fn get_custom_theme(&self, name: &str) -> Option<&CustomThemeData> {
-        self.custom_themes.get(name)
+    /// Get a custom theme by ID
+    pub fn get_custom_theme_by_id(&self, id: &str) -> Option<&CustomThemeData> {
+        self.custom_themes.values().find(|theme| theme.id == id)
     }
-    /// List all custom theme names
-    pub fn list_custom_themes(&self) -> Vec<String> {
-        self.custom_themes.keys().cloned().collect()
+
+    /// List all custom theme data
+    pub fn list_custom_theme_data(&self) -> Vec<&CustomThemeData> {
+        let mut themes: Vec<_> = self.custom_themes.values().collect();
+        themes.sort_by_key(|theme| theme.created_at);
+        themes
     }
 }
 

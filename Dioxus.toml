@@ -48,8 +48,10 @@ resources = ["./soundpacks", "./assets"]
 tsp = true
 icon_path = "./icons/favicon.ico"
 allow_downgrades = true
+
 [bundle.windows.webview_install_mode]
 EmbedBootstrapper = { silent = true }
+
 [bundle.windows.nsis]
 header_image = "./icons/favicon.ico"
 installer_icon = "./icons/favicon.ico"

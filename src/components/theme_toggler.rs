@@ -1,8 +1,10 @@
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::config::AppConfig;
 use crate::state::config_utils::use_config;
+use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Computer, Moon, Palette, Pencil, Plus, Sun, Trash2};
+use lucide_dioxus::{Check, Computer, Moon, Palette, Pencil, Plus, Sun, Trash2};
+use uuid;
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -12,7 +14,11 @@ pub fn ThemeToggler() -> Element {
     // Theme state - use theme context
     let mut theme = use_theme();
 
-    let custom_themes = config().list_custom_themes();
+    let config_ref = config();
+    let custom_themes = config_ref.list_custom_theme_data();
+
+    // State for editing themes
+    let mut editing_theme = use_signal(|| None::<String>); // Theme ID being edited
 
     rsx! {
       div { class: "space-y-4",
@@ -66,46 +72,53 @@ pub fn ThemeToggler() -> Element {
             Computer { class: "w-4 h-4 mr-1" }
             {Theme::System.display_name()}
           }
-        }
-        // Custom themes section
+        } // Custom themes section
         if !custom_themes.is_empty() {
           div { class: "space-y-2",
-            div { class: "text-sm text-base-content/70", "Custom themes" }
-            for theme_name in custom_themes.iter() {
+            div { class: "text-sm text-base-content", "Custom themes" }
+            for theme_data in custom_themes.iter() {
               CustomThemeButton {
-                name: theme_name.clone(),
-                is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == theme_name),
+                name: theme_data.name.clone(),
+                theme_id: theme_data.id.clone(),
+                theme_css: theme_data.css.clone(),
+                is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == &theme_data.id),
                 on_select: {
-                    let theme_name = theme_name.clone();
+                    let theme_id = theme_data.id.clone();
                     let update_fn = update_config.clone();
                     move |_| {
-                        let name = theme_name.clone();
-                        theme.set(Theme::Custom(name.clone()));
+                        let theme_id = theme_id.clone();
+                        theme.set(Theme::Custom(theme_id.clone()));
                         update_fn(
                             Box::new(move |config: &mut AppConfig| {
-                                config.theme = Theme::Custom(name);
+                                config.theme = Theme::Custom(theme_id);
                             }),
                         );
                     }
                 },
                 on_delete: {
-                    let theme_name = theme_name.clone();
+                    let theme_id = theme_data.id.clone();
                     let update_fn = update_config.clone();
                     move |_| {
-                        let name = theme_name.clone();
+                        let theme_id = theme_id.clone();
                         update_fn(
                             Box::new(move |config: &mut AppConfig| {
-                                let _ = config.delete_custom_theme(&name);
+                                let _ = config.delete_custom_theme(&theme_id);
                             }),
                         );
+                    }
+                },
+                on_edit: {
+                    let theme_id = theme_data.id.clone();
+                    move |_| {
+                        editing_theme.set(Some(theme_id.clone()));
+                        eval("theme_creator_modal.showModal()");
                     }
                 },
               }
             }
           }
-        }
-        // Create new theme button
-        CreateThemeButton {}
+        } // Create new theme button
+        CreateThemeButton { editing_theme_id: editing_theme }
       }
     }
 }
@@ -113,32 +126,57 @@ pub fn ThemeToggler() -> Element {
 #[derive(Props, Clone, PartialEq)]
 struct CustomThemeButtonProps {
     name: String,
+    theme_css: String,
+    theme_id: String,
     is_active: bool,
     on_select: EventHandler<MouseEvent>,
     on_delete: EventHandler<MouseEvent>,
+    on_edit: EventHandler<MouseEvent>,
 }
 
 #[component]
 fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
     rsx! {
-      div { class: "flex items-center gap-2",
-        div { class: "flex-1", "data-theme": "custom-{props.name}",
-          button {
-            class: format!(
-                "btn btn-primary btn-sm w-full justify-start gap-1 {}",
-                if props.is_active { "btn-disabled" } else { "" },
-            ),
-            onclick: props.on_select,
-            Palette { class: "w-4 h-4 mr-2" }
-            {props.name.clone()}
+      div { class: "flex w-full items-center gap-2",
+        button {
+          class: format!(
+              "bg-base-100 overflow-hidden border border-primary rounded-lg text-base-content w-full  font-sans transition-all {}",
+              if props.is_active {
+                  "select-none opacity-20"
+              } else {
+                  "hover:ring-4 cursor-pointer"
+              },
+          ),
+          style: props.theme_css.clone(),
+          disabled: props.is_active,
+          onclick: props.on_select,
+          div { class: "flex bg-base-100 gap-3 h-9 px-2 items-center justify-between relative",
+            div { class: "flex items-center grow-0 justify-center",
+              if props.is_active {
+                Check { class: "w-5 h-5 text-primary" }
+              } else {
+                Palette { class: "w-5 h-5 text-primary" }
+              }
+            }
+            div { class: "bg-base-100 grow text-primary font-bold text-left",
+              {props.name.clone()}
+            }
+            div { class: "flex gap-1 items-center",
+              div { class: "bg-primary flex aspect-square w-3 rounded-full" }
+              div { class: "bg-secondary flex aspect-square w-3 rounded-full" }
+              div { class: "bg-accent flex aspect-square w-3 rounded-full" }
+              div { class: "bg-neutral flex aspect-square w-3 rounded-full" }
+            }
           }
         }
-        div { class: "flex items-center gap-1",
-          button { class: "btn btn-ghost btn-sm", onclick: move |_| {},
+        div { class: "join",
+          button {
+            class: "btn h-9 join-item btn-outline btn-sm",
+            onclick: props.on_edit,
             Pencil { class: "w-4 h-4" }
           }
           button {
-            class: "btn btn-ghost btn-sm text-error hover:bg-error/20",
+            class: "btn h-9 join-item btn-sm btn-outline btn-error",
             onclick: props.on_delete,
             Trash2 { class: "w-4 h-4" }
           }
@@ -147,28 +185,38 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
     }
 }
 
+#[derive(Props, Clone, PartialEq)]
+struct CreateThemeButtonProps {
+    editing_theme_id: Signal<Option<String>>,
+}
+
 #[component]
-fn CreateThemeButton() -> Element {
+fn CreateThemeButton(props: CreateThemeButtonProps) -> Element {
     rsx! {
       div {
         button {
           class: "btn btn-soft btn-sm w-full",
-          "onclick": "theme_creator_modal.showModal()",
+          onclick: {
+              let mut editing_theme_id = props.editing_theme_id;
+              move |_| {
+                  editing_theme_id.set(None);
+                  eval("theme_creator_modal.showModal()");
+              }
+          },
           Plus { class: "w-4 h-4 mr-1" }
           "Create custom theme"
         }
-        ThemeCreatorModal {}
+        ThemeCreatorModal { editing_theme_id: props.editing_theme_id }
       }
     }
 }
 
-#[component]
-fn ThemeCreatorModal() -> Element {
-    let (_, update_config) = use_config();
-    let mut theme_name = use_signal(String::new);
-    let mut theme_css = use_signal(|| {
-        String::from(
-            r#"/* Define your custom theme variables here */
+#[derive(Props, Clone, PartialEq)]
+struct ThemeCreatorModalProps {
+    editing_theme_id: Signal<Option<String>>,
+}
+
+const THEME_DEFAULT_CSS: &str = r#"/* Colors */
 --color-base-100: oklch(98% 0.02 240);
 --color-base-200: oklch(95% 0.03 240);
 --color-base-300: oklch(92% 0.04 240);
@@ -205,15 +253,37 @@ fn ThemeCreatorModal() -> Element {
 /* effects */
 --depth: 1;
 --noise: 0;
-          "#,
-        )
-    });
+          "#;
+
+#[component]
+fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
+    let (config, update_config) = use_config();
+    let mut theme_name = use_signal(String::new);
+    let mut theme_css = use_signal(|| String::from(THEME_DEFAULT_CSS));
     let mut saving = use_signal(|| false);
     let mut error = use_signal(String::new);
+
+    // Load existing theme data when editing
+    use_effect(move || {
+        if let Some(editing_id) = props.editing_theme_id.read().as_ref() {
+            if let Some(theme_data) = config().get_custom_theme_by_id(editing_id) {
+                theme_name.set(theme_data.name.clone());
+                theme_css.set(theme_data.css.clone());
+            }
+        } else {
+            // Reset for new theme
+            theme_name.set(String::new());
+            theme_css.set(String::from(THEME_DEFAULT_CSS));
+        }
+    });
+
+    let is_editing = props.editing_theme_id.read().is_some();
+
     let on_save = {
         let theme_name = theme_name.clone();
         let theme_css = theme_css.clone();
         let update_config = update_config.clone();
+        let mut editing_theme_id = props.editing_theme_id;
 
         move |_| {
             let name = theme_name().trim().to_string();
@@ -228,11 +298,20 @@ fn ThemeCreatorModal() -> Element {
             error.set(String::new());
 
             update_config(Box::new(move |config: &mut AppConfig| {
-                // Replace {theme_name} placeholder in CSS
-                let processed_css = css.replace("{theme_name}", &name);
-                match config.save_custom_theme(name, processed_css) {
+                let result = if let Some(editing_id) = editing_theme_id.read().as_ref() {
+                    // Update existing theme
+                    config.save_custom_theme(editing_id.clone(), name, css)
+                } else {
+                    // Create new theme
+                    let theme_id = uuid::Uuid::new_v4().to_string();
+                    config.save_custom_theme(theme_id, name, css)
+                };
+
+                match result {
                     Ok(()) => {
                         saving.set(false);
+                        editing_theme_id.set(None); // Clear editing state
+                        eval("theme_creator_modal.close()");
                     }
                     Err(e) => {
                         error.set(e);
@@ -251,7 +330,13 @@ fn ThemeCreatorModal() -> Element {
               "✕"
             }
           }
-          h3 { class: "font-bold text-lg mb-4", "Create custom theme" }
+          h3 { class: "font-bold text-lg mb-4",
+            if is_editing {
+              "Edit custom theme"
+            } else {
+              "Create custom theme"
+            }
+          }
           div { class: "space-y-4",
             fieldset { class: "fieldset",
               legend { class: "fieldset-legend",
@@ -285,9 +370,17 @@ fn ThemeCreatorModal() -> Element {
                 onclick: on_save,
                 if saving() {
                   span { class: "loading loading-spinner loading-sm mr-2" }
-                  "Creating..."
+                  if is_editing {
+                    "Updating..."
+                  } else {
+                    "Creating..."
+                  }
                 } else {
-                  "Create Theme"
+                  if is_editing {
+                    "Update theme"
+                  } else {
+                    "Create theme"
+                  }
                 }
               }
             }

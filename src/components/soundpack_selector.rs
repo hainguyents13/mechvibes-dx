@@ -321,7 +321,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                             Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                           }
                           if pack.id == current() {
-                            div { class: "absolute inset-0 bg-primary/20 flex items-center justify-center tint545",
+                            div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
                               Check { class: "text-white w-6 h-6" }
                             }
                           }

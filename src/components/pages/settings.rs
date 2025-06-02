@@ -87,91 +87,85 @@ pub fn SettingsPage() -> Element {
             }
             div { class: "collapse-title font-semibold", "General" }
             div { class: "collapse-content text-sm",
-              div { class: "form-control",
-                div { class: "space-y-6",
-                  // Volume Control
-                  label { class: "label cursor-pointer flex items-center justify-between",
-                    div {
-                      div { class: "label-text text-base", "Enable all sounds" }
-                      div { class: "label-text-alt text-xs truncate",
-                        span { "You can also use " }
-                        span { class: "kbd kbd-xs font-mono text-base",
-                          "Ctrl+Alt+M"
+              div { class: "space-y-6",
+                // Volume Control
+                label { class: " cursor-pointer flex items-center justify-between",
+                  div {
+                    div { class: "", "Enable all sounds" }
+                    div { class: "text-base-content/70 text-xs truncate",
+                      span { "You can also use " }
+                      span { class: "kbd kbd-xs font-mono text-base",
+                        "Ctrl+Alt+M"
+                      }
+                      span { " to toggle sound on/off" }
+                    }
+                  }
+
+                  input {
+                    r#type: "checkbox",
+                    class: "toggle toggle-sm toggle-base-100",
+                    checked: enable_sound(),
+                    onchange: {
+                        let update_config = update_config.clone();
+                        move |evt: Event<FormData>| {
+                            update_config(
+                                Box::new(move |config| {
+                                    config.enable_sound = evt.value() == "true";
+                                }),
+                            );
                         }
-                        span { " to toggle sound on/off" }
+                    },
+                  }
+                }
+                // Auto Start
+                div { class: "",
+                  label { class: " cursor-pointer flex items-center justify-between",
+                    div {
+                      div { class: "", "Start with Windows" }
+                      div { class: "text-xs text-base-content/70 truncate",
+                        "Automatically start MechvibesDX when Windows boots"
                       }
                     }
-
                     input {
                       r#type: "checkbox",
                       class: "toggle toggle-sm toggle-base-100",
-                      checked: enable_sound(),
+                      checked: auto_start(),
                       onchange: {
                           let update_config = update_config.clone();
                           move |evt: Event<FormData>| {
                               update_config(
                                   Box::new(move |config| {
-                                      config.enable_sound = evt.value() == "true";
+                                      config.auto_start = evt.value() == "true";
                                   }),
                               );
                           }
                       },
                     }
                   }
-                  // Auto Start
-                  div { class: "form-control",
-                    label { class: "label cursor-pointer flex items-center justify-between",
-                      div {
-                        div { class: "label-text text-base",
-                          "Start with Windows"
-                        }
-                        div { class: "label-text-alt text-xs truncate",
-                          "Automatically start MechvibesDX when Windows boots"
-                        }
-                      }
-                      input {
-                        r#type: "checkbox",
-                        class: "toggle toggle-sm toggle-base-100",
-                        checked: auto_start(),
-                        onchange: {
-                            let update_config = update_config.clone();
-                            move |evt: Event<FormData>| {
-                                update_config(
-                                    Box::new(move |config| {
-                                        config.auto_start = evt.value() == "true";
-                                    }),
-                                );
-                            }
-                        },
+                }
+                // Notifications
+                div { class: "",
+                  label { class: "cursor-pointer flex items-center justify-between",
+                    div {
+                      div { class: "", "Show Notifications" }
+                      div { class: "text-base-content/70 text-xs truncate",
+                        "Display system notifications for important events"
                       }
                     }
-                  }
-                  // Notifications
-                  div { class: "form-control",
-                    label { class: "label cursor-pointer flex items-center justify-between",
-                      div {
-                        div { class: "label-text text-base",
-                          "Show Notifications"
-                        }
-                        div { class: "label-text-alt",
-                          "Display system notifications for important events"
-                        }
-                      }
-                      input {
-                        r#type: "checkbox",
-                        class: "toggle toggle-sm toggle-base-100",
-                        checked: show_notifications(),
-                        onchange: {
-                            let update_config = update_config.clone();
-                            move |evt: Event<FormData>| {
-                                update_config(
-                                    Box::new(move |config| {
-                                        config.show_notifications = evt.value() == "true";
-                                    }),
-                                );
-                            }
-                        },
-                      }
+                    input {
+                      r#type: "checkbox",
+                      class: "toggle toggle-sm toggle-base-100",
+                      checked: show_notifications(),
+                      onchange: {
+                          let update_config = update_config.clone();
+                          move |evt: Event<FormData>| {
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.show_notifications = evt.value() == "true";
+                                  }),
+                              );
+                          }
+                      },
                     }
                   }
                 }
