@@ -95,13 +95,18 @@ pub mod utils {
             return (0, 0);
         }
 
-        let entries: Vec<_> = match fs::read_dir(&soundpacks_dir) {
-            Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+        let entries = match fs::read_dir(&soundpacks_dir) {
+            Ok(entries) => entries.filter_map(|e| e.ok()),
             Err(_) => return (0, 0),
         };
 
         let mut keyboard = 0;
         let mut mouse = 0;
+
+        #[derive(Deserialize)]
+        struct Config {
+            mouse: Option<bool>,
+        }
 
         for entry in entries {
             let dir_path = entry.path();
@@ -111,22 +116,17 @@ pub mod utils {
 
             let config_path = dir_path.join("config.json");
             if !config_path.exists() {
-                keyboard += 1; // Assume keyboard if no config
-                continue;
+                continue; // Only count soundpacks with config.json, like your state loader
             }
 
+            let mut contents = String::new();
             if let Ok(mut file) = fs::File::open(&config_path) {
-                let mut contents = String::new();
                 if file.read_to_string(&mut contents).is_ok() {
-                    #[derive(Deserialize)]
-                    struct Config {
-                        mouse: Option<bool>,
-                    }
-
                     if let Ok(cfg) = serde_json::from_str::<Config>(&contents) {
-                        match cfg.mouse {
-                            Some(true) => mouse += 1,
-                            Some(false) | None => keyboard += 1,
+                        if cfg.mouse.unwrap_or(false) {
+                            mouse += 1;
+                        } else {
+                            keyboard += 1;
                         }
                     }
                 }
