@@ -7,11 +7,31 @@ mod state;
 pub use crate::components::header::Header;
 use dioxus::desktop::{Config, LogicalPosition, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
+use libs::protocol;
 use libs::ui;
 
 fn main() {
     env_logger::init(); // Initialize app manifest first
     println!("🚀 Initializing MechvibesDX...");
+
+    // Check for command line arguments (protocol handling)
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        // Handle protocol URL if passed as argument
+        let url = &args[1];
+        if url.starts_with("mechvibes://") {
+            if let Err(e) = protocol::handle_protocol_url(url) {
+                eprintln!("Failed to handle protocol URL {}: {}", url, e);
+            }
+            return; // Exit after handling protocol
+        }
+    }
+
+    // Register protocol on first run
+    if let Err(e) = protocol::register_protocol() {
+        eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
+    }
+
     let _manifest = state::AppManifest::load();
 
     // Initialize global app state before rendering

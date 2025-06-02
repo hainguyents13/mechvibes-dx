@@ -1,3 +1,4 @@
+use crate::components::theme_toggler::ThemeToggler;
 use crate::components::ui::PageHeader;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
@@ -42,7 +43,8 @@ pub fn CustomizePage() -> Element {
             div { class: "collapse-title font-semibold", "Themes" }
             div { class: "collapse-content text-sm text-base-content/70",
               div { "Choose your preferred theme or create custom ones" }
-              div { class: "mt-2", crate::components::theme_toggler::ThemeToggler {} }
+              // Built-in theme toggler
+              ThemeToggler {}
             }
           }
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",

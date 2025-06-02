@@ -1,28 +1,33 @@
 use crate::libs::theme::{use_theme, Theme};
 use crate::state::config::AppConfig;
 use crate::state::config_utils::use_config;
+use crate::state::theme_utils::use_themes;
+use crate::state::themes::ThemesConfig;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, Computer, Moon, Palette, Pencil, Plus, Sun, Trash2};
-use uuid;
 
 #[component]
 pub fn ThemeToggler() -> Element {
     // Get the config and update_config function
-    let (config, update_config) = use_config();
+    let (_config, update_config) = use_config();
+
+    // Theme management
+    let (themes, update_themes) = use_themes();
 
     // Theme state - use theme context
     let mut theme = use_theme();
 
-    let config_ref = config();
-    let custom_themes = config_ref.list_custom_theme_data();
+    let themes_config = themes();
+    let custom_themes = themes_config.list_themes();
 
     // State for editing themes
     let mut editing_theme = use_signal(|| None::<String>); // Theme ID being edited
 
     rsx! {
-      div { class: "space-y-4",
+      div { class: "space-y-4 mt-4",
         // Built-in themes
+        div { class: "text-sm text-base-content", "Built-in themes" }
         div { class: "flex items-center justify-between gap-2 w-full",
           button {
             class: if matches!(*theme.read(), Theme::Dark) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
@@ -72,7 +77,8 @@ pub fn ThemeToggler() -> Element {
             Computer { class: "w-4 h-4 mr-1" }
             {Theme::System.display_name()}
           }
-        } // Custom themes section
+        }
+        // Custom themes
         if !custom_themes.is_empty() {
           div { class: "space-y-2",
             div { class: "text-sm text-base-content", "Custom themes" }
@@ -97,12 +103,12 @@ pub fn ThemeToggler() -> Element {
                 },
                 on_delete: {
                     let theme_id = theme_data.id.clone();
-                    let update_fn = update_config.clone();
+                    let update_themes = update_themes.clone();
                     move |_| {
                         let theme_id = theme_id.clone();
-                        update_fn(
-                            Box::new(move |config: &mut AppConfig| {
-                                let _ = config.delete_custom_theme(&theme_id);
+                        update_themes(
+                            Box::new(move |themes: &mut ThemesConfig| {
+                                let _ = themes.delete_theme(&theme_id);
                             }),
                         );
                     }
@@ -257,7 +263,7 @@ const THEME_DEFAULT_CSS: &str = r#"/* Colors */
 
 #[component]
 fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
-    let (config, update_config) = use_config();
+    let (themes, update_themes) = use_themes();
     let mut theme_name = use_signal(String::new);
     let mut theme_css = use_signal(|| String::from(THEME_DEFAULT_CSS));
     let mut saving = use_signal(|| false);
@@ -266,7 +272,7 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
     // Load existing theme data when editing
     use_effect(move || {
         if let Some(editing_id) = props.editing_theme_id.read().as_ref() {
-            if let Some(theme_data) = config().get_custom_theme_by_id(editing_id) {
+            if let Some(theme_data) = themes().get_theme_by_id(editing_id) {
                 theme_name.set(theme_data.name.clone());
                 theme_css.set(theme_data.css.clone());
             }
@@ -278,11 +284,10 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
     });
 
     let is_editing = props.editing_theme_id.read().is_some();
-
     let on_save = {
         let theme_name = theme_name.clone();
         let theme_css = theme_css.clone();
-        let update_config = update_config.clone();
+        let update_themes = update_themes.clone();
         let mut editing_theme_id = props.editing_theme_id;
 
         move |_| {
@@ -297,28 +302,26 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
             saving.set(true);
             error.set(String::new());
 
-            update_config(Box::new(move |config: &mut AppConfig| {
-                let result = if let Some(editing_id) = editing_theme_id.read().as_ref() {
-                    // Update existing theme
-                    config.save_custom_theme(editing_id.clone(), name, css)
-                } else {
-                    // Create new theme
-                    let theme_id = uuid::Uuid::new_v4().to_string();
-                    config.save_custom_theme(theme_id, name, css)
-                };
+            if let Some(editing_id) = editing_theme_id.read().as_ref() {
+                // Update existing theme
+                let editing_id = editing_id.clone();
+                update_themes(Box::new(move |themes: &mut ThemesConfig| {
+                    if let Err(e) = themes.update_theme(&editing_id, name, "".to_string(), css) {
+                        eprintln!("Failed to update theme: {}", e);
+                    }
+                }));
+            } else {
+                // Create new theme
+                update_themes(Box::new(move |themes: &mut ThemesConfig| {
+                    if let Err(e) = themes.add_theme(name, "".to_string(), css) {
+                        eprintln!("Failed to create theme: {}", e);
+                    }
+                }));
+            }
 
-                match result {
-                    Ok(()) => {
-                        saving.set(false);
-                        editing_theme_id.set(None); // Clear editing state
-                        eval("theme_creator_modal.close()");
-                    }
-                    Err(e) => {
-                        error.set(e);
-                        saving.set(false);
-                    }
-                }
-            }));
+            saving.set(false);
+            editing_theme_id.set(None); // Clear editing state
+            eval("theme_creator_modal.close()");
         }
     };
 
@@ -385,6 +388,9 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
               }
             }
           }
+        }
+        form { method: "dialog", class: "modal-backdrop",
+          button { "close" }
         }
       }
     }

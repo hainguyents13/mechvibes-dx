@@ -1,4 +1,5 @@
 use crate::libs::theme::{use_theme, Theme};
+use crate::state::theme_utils::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
@@ -10,15 +11,15 @@ pub fn Header() -> Element {
     use crate::state::config_utils::use_config;
 
     let (config, _) = use_config();
+    let (themes, _) = use_themes();
     let theme = use_theme();
 
     // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
     use_effect(move || {
         let custom_css = config().custom_css.clone();
-
         // Get custom theme CSS if current theme is custom
         let custom_theme_css = if let Theme::Custom(theme_id) = &theme() {
-            if let Some(theme_data) = config().get_custom_theme_by_id(theme_id) {
+            if let Some(theme_data) = themes().get_theme_by_id(theme_id) {
                 // Wrap custom theme CSS with proper data-theme selectors
                 format!(
                     ":root:has(input.theme-controller[value=custom-{}]:checked),[data-theme=\"custom-{}\"] {{\n{}\n}}",

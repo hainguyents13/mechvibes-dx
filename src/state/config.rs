@@ -2,17 +2,7 @@ use crate::libs::theme::Theme;
 use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CustomThemeData {
-    pub id: String, // Unique ID for the theme
-    pub name: String,
-    pub css: String,
-    pub created_at: DateTime<Utc>,
-    pub modified_at: DateTime<Utc>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -23,8 +13,7 @@ pub struct AppConfig {
 
     // Audio settings
     pub keyboard_soundpack: String,
-    pub mouse_soundpack: String,
-    pub volume: f32,
+    pub mouse_soundpack: String,    pub volume: f32,
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
@@ -33,7 +22,6 @@ pub struct AppConfig {
     // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
-    pub custom_themes: HashMap<String, CustomThemeData>, // New field for custom themes
 
     // System settings
     pub auto_start: bool,
@@ -66,8 +54,7 @@ impl AppConfig {
             }
         } else {
             let default_config = Self::default();
-            let _ = default_config.save();
-            default_config
+            let _ = default_config.save();            default_config
         }
     }
 
@@ -79,69 +66,11 @@ impl AppConfig {
             .map_err(|e| format!("Failed to write config file: {}", e))?;
         Ok(())
     }
-
-    /// Add or update a custom theme
-    pub fn save_custom_theme(
-        &mut self,
-        id: String,
-        name: String,
-        css: String,
-    ) -> Result<(), String> {
-        if name.trim().is_empty() {
-            return Err("Theme name cannot be empty".to_string());
-        }
-        let now = Utc::now();
-
-        // If updating, keep the original ID and created_at
-        if let Some(existing) = self.custom_themes.get_mut(&id) {
-            existing.name = name;
-            existing.css = css;
-            existing.modified_at = now;
-        } else {
-            // If new theme, create new theme data
-            let theme_data = CustomThemeData {
-                id: id.clone(),
-                name: name,
-                css: css,
-                created_at: now,
-                modified_at: now,
-            };
-            self.custom_themes.insert(id, theme_data);
-        }
-        self.last_updated = now;
-        self.save()
-    }
-
-    /// Remove a custom theme
-    pub fn delete_custom_theme(&mut self, id: &str) -> Result<(), String> {
-        // If the current theme is the one being deleted, switch to System
-        if let Theme::Custom(current_id) = &self.theme {
-            if current_id == id {
-                self.theme = Theme::System;
-            }
-        }
-
-        self.custom_themes.remove(id);
-        self.last_updated = Utc::now();
-        self.save()
-    }
-
-    /// Get a custom theme by ID
-    pub fn get_custom_theme_by_id(&self, id: &str) -> Option<&CustomThemeData> {
-        self.custom_themes.values().find(|theme| theme.id == id)
-    }
-
-    /// List all custom theme data
-    pub fn list_custom_theme_data(&self) -> Vec<&CustomThemeData> {
-        let mut themes: Vec<_> = self.custom_themes.values().collect();
-        themes.sort_by_key(|theme| theme.created_at);
-        themes
-    }
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let config = Self {
+        Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
@@ -154,11 +83,7 @@ impl Default for AppConfig {
             enable_mouse_sound: true,    // Default mouse sounds enabled
             theme: Theme::System,        // Default to System theme
             custom_css: String::new(),
-            custom_themes: HashMap::new(), // Empty custom themes by default
-            auto_start: false,
-            show_notifications: true,
-        };
-
-        config
+            auto_start: false,            show_notifications: true,
+        }
     }
 }
