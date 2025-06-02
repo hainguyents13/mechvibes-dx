@@ -46,10 +46,6 @@ pub fn AppInfoDisplay() -> Element {
     let config_file_exists = paths::utils::config_file_exists();
     let soundpacks_dir_exists = paths::utils::soundpacks_dir_exists();
 
-    // Count soundpacks
-    let (soundpack_count_keyboard, soundpack_count_mouse) =
-        paths::utils::count_soundpacks_by_type();
-
     // Get OS info
     let os = env::consts::OS;
     let arch = env::consts::ARCH;
@@ -93,18 +89,6 @@ pub fn AppInfoDisplay() -> Element {
                 "❌"
               }
               "{config_file_absolute}"
-            }
-            div { class: "ml-1 text-base-content/70 flex gap-2 items-center break-all",
-              if soundpacks_dir_exists {
-                Check { class: "w-4 h-4" }
-              } else {
-                "❌"
-              }
-              "{soundpacks_dir_absolute}"
-            }
-            div { class: "ml-1 text-base-content/70 flex gap-2 items-center break-all",
-              Check { class: "w-4 h-4" }
-              "Found {soundpack_count_keyboard + soundpack_count_mouse} soundpack(s) (Keyboard: {soundpack_count_keyboard}, Mouse: {soundpack_count_mouse})"
             }
           }
         }

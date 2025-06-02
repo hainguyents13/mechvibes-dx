@@ -1,68 +1,17 @@
 use crate::components::ui::PageHeader;
 use crate::libs::theme::{use_theme, Theme};
-use crate::state::app::use_app_state;
 use crate::state::config_utils::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
-use std::sync::Arc;
 
 #[component]
 pub fn SettingsPage() -> Element {
-    // Get access to audio context for reloading soundpacks
-    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context(); // Use shared config hook
+    // Use shared config hook
     let (config, update_config) = use_config();
     // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
     let auto_start = use_memo(move || config().auto_start);
     let show_notifications = use_memo(move || config().show_notifications);
-    // Get access to app state for soundpack operations
-    let app_state = use_app_state();
-    // UI state for notification and loading
-    let mut refreshing_soundpacks = use_signal(|| false);
-    let mut refresh_soundpacks_cache = move || {
-        println!("🔄 Refreshing soundpack cache from settings page...");
-
-        // Set loading state to true - directly update the signal
-        refreshing_soundpacks.set(true);
-        println!("🌻 Loading state set to: {}", refreshing_soundpacks());
-
-        // Clone necessary variables for the async task
-        let mut refreshing_signal = refreshing_soundpacks.clone();
-        let audio_ctx_clone = audio_ctx.clone();
-        let mut app_state_clone = app_state.clone();
-
-        // Perform the refresh operation in a separate task to not block the UI
-        spawn(async move {
-            // Use async sleep instead of std::thread::sleep
-            use futures_timer::Delay;
-            use std::time::Duration;
-
-            // Add a small artificial delay to make loading state more visible
-            Delay::new(Duration::from_millis(800)).await;
-
-            println!("Starting soundpack refresh operation...");
-
-            // This will create a new SoundpackCache instance that will refresh from directory
-            let mut fresh_cache = crate::state::soundpack_cache::SoundpackCache::load();
-            fresh_cache.refresh_from_directory();
-            fresh_cache.save();
-
-            // Update the app state with new cache
-            app_state_clone.write().optimized_cache = Arc::new(fresh_cache);
-
-            // Reload current soundpacks to apply any changes
-            crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
-
-            // Add another small delay before changing the loading state back
-            Delay::new(Duration::from_millis(200)).await;
-
-            // Reset loading state
-            refreshing_signal.set(false);
-            println!("🌻 Loading state reset to: {}", refreshing_signal());
-
-            println!("✅ Soundpack refresh complete");
-        });
-    };
 
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
@@ -176,53 +125,7 @@ pub fn SettingsPage() -> Element {
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
             div { class: "collapse-title font-semibold", "Soundpack management" }
-            div { class: "collapse-content text-sm",
-              div { class: "space-y-4 mt-2",
-                p { class: "text-base-content/70",
-                  "Refresh soundpack list to detect newly added or removed soundpacks."
-                }
-                div { class: "flex flex-col gap-2",
-                  div { class: "flex items-center gap-4",
-                    button {
-                      class: "btn btn-soft btn-sm",
-                      onclick: move |_| {
-                          refresh_soundpacks_cache();
-                      },
-                      disabled: refreshing_soundpacks(),
-                      if refreshing_soundpacks() {
-                        span { class: "loading loading-spinner loading-xs mr-2" }
-                        "Refreshing..."
-                      } else {
-                        "Refresh soundpacks"
-                      }
-                    }
-                    // Last scan info
-                    if app_state.read().optimized_cache.last_scan > 0 {
-                      div { class: "text-xs text-base-content/60",
-                        "Last scan "
-                        {
-                            let last_scan = app_state.read().optimized_cache.last_scan;
-                            let now = std::time::SystemTime::now()
-                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs();
-                            let diff = now.saturating_sub(last_scan);
-                            if diff < 60 {
-                                ": just now".to_string()
-                            } else if diff < 3600 {
-                                format!("{} min ago", diff / 60)
-                            } else if diff < 86400 {
-                                format!("{} hr ago", diff / 3600)
-                            } else {
-                                format!("{} days ago", diff / 86400)
-                            }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+            div { class: "collapse-content text-sm" }
           }
 
           // App info Section

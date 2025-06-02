@@ -1,6 +1,12 @@
-use crate::{components::ui::PageHeader, state::app::use_app_state};
+use crate::{
+    components::ui::PageHeader,
+    state::{app::use_app_state, paths},
+};
 use dioxus::prelude::*;
-use lucide_dioxus::{ExternalLink, FolderOpen, Keyboard, Mouse, Music, Plus, Trash};
+use lucide_dioxus::{
+    Check, ExternalLink, FolderOpen, Keyboard, Mouse, Music, Plus, Settings2, Trash,
+};
+use std::sync::Arc;
 
 #[component]
 pub fn SoundpacksPage() -> Element {
@@ -23,6 +29,62 @@ pub fn SoundpacksPage() -> Element {
             .collect::<Vec<_>>()
     });
 
+    // UI state for notification and loading
+    // Get access to audio context for reloading soundpacks
+    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+    // Get access to app state for soundpack operations
+    let app_state = use_app_state();
+    let mut refreshing_soundpacks = use_signal(|| false);
+    let mut refresh_soundpacks_cache = move || {
+        println!("🔄 Refreshing soundpack cache from settings page...");
+
+        // Set loading state to true - directly update the signal
+        refreshing_soundpacks.set(true);
+        println!("🌻 Loading state set to: {}", refreshing_soundpacks());
+
+        // Clone necessary variables for the async task
+        let mut refreshing_signal = refreshing_soundpacks.clone();
+        let audio_ctx_clone = audio_ctx.clone();
+        let mut app_state_clone = app_state.clone();
+
+        // Perform the refresh operation in a separate task to not block the UI
+        spawn(async move {
+            // Use async sleep instead of std::thread::sleep
+            use futures_timer::Delay;
+            use std::time::Duration;
+
+            // Add a small artificial delay to make loading state more visible
+            Delay::new(Duration::from_millis(800)).await;
+
+            println!("Starting soundpack refresh operation...");
+
+            // This will create a new SoundpackCache instance that will refresh from directory
+            let mut fresh_cache = crate::state::soundpack_cache::SoundpackCache::load();
+            fresh_cache.refresh_from_directory();
+            fresh_cache.save();
+
+            // Update the app state with new cache
+            app_state_clone.write().optimized_cache = Arc::new(fresh_cache);
+
+            // Reload current soundpacks to apply any changes
+            crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
+
+            // Add another small delay before changing the loading state back
+            Delay::new(Duration::from_millis(200)).await;
+
+            // Reset loading state
+            refreshing_signal.set(false);
+            println!("🌻 Loading state reset to: {}", refreshing_signal());
+
+            println!("✅ Soundpack refresh complete");
+        });
+    };
+
+    // Count soundpacks
+    let (soundpack_count_keyboard, soundpack_count_mouse) =
+        paths::utils::count_soundpacks_by_type();
+    let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
+
     rsx! {
       div { class: "p-12 pb-32",
         // Page header
@@ -34,9 +96,10 @@ pub fn SoundpacksPage() -> Element {
           }),
         }
 
-        // Content based on active tab
+        // Tabs for soundpack types
         div { class: "tabs tabs-lift",
-          label { class: "tab [--tab-border-color:var(--color-base-content)]",
+          // Keyboard tab
+          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
             input {
               r#type: "radio",
               name: "soundpack-tab",
@@ -45,39 +108,104 @@ pub fn SoundpacksPage() -> Element {
             Keyboard { class: "w-5 h-5 mr-2" }
             "Keyboard ({keyboard_soundpacks().len()})"
           }
-          div { class: format!("tab-content  overflow-hidden border-base-content py-4 px-0"),
+          div { class: "tab-content  overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
               soundpacks: keyboard_soundpacks(),
               soundpack_type: "Keyboard",
             }
           }
-          label { class: "tab [--tab-border-color:var(--color-base-content)]",
+          // Mouse tab
+          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
             input { r#type: "radio", name: "soundpack-tab" }
             Mouse { class: "w-5 h-5 mr-2" }
             "Mouse ({mouse_soundpacks().len()})"
           }
-          div { class: format!("tab-content overflow-hidden border-base-content py-4 px-0"),
+          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
               soundpacks: mouse_soundpacks(),
               soundpack_type: "Mouse",
             }
           }
-        }
-
-        div { class: "mt-4",
-          div { class: "text-center",
-            button { class: "btn btn-primary",
-              Plus { class: "w-4 h-4 mr-2" }
-              "Add"
-            }
+          // Manage tab
+          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
+            input { r#type: "radio", name: "soundpack-tab" }
+            Settings2 { class: "w-5 h-5 mr-2" }
+            "Manage"
           }
-          div { class: "text-center mt-2",
-            a {
-              class: "btn btn-ghost btn-sm",
-              href: "https://mechvibes.com/soundpacks",
-              target: "_blank",
-              "Get Soundpacks from website"
-              ExternalLink { class: "w-3 h-3" }
+          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 p-4",
+            div { class: "space-y-4",
+              div { class: "text-base-content",
+                div {
+                  div { class: "font-medium text-sm",
+                    "Found {soundpack_count_keyboard + soundpack_count_mouse} soundpack(s)"
+                  }
+                  ul { class: "list-disc pl-6",
+                    li { class: "text-sm text-base-content/70",
+                      "Keyboard: {soundpack_count_keyboard}"
+                    }
+                    li { class: "text-sm text-base-content/70",
+                      "Mouse: {soundpack_count_mouse}"
+                    }
+                  }
+                }
+              }
+              div { class: "text-base-content/70 text-sm",
+                "Refresh soundpack list to detect newly added or removed soundpacks."
+              }
+              div { class: "flex flex-col gap-2",
+                div { class: "flex items-center gap-4",
+                  button {
+                    class: "btn btn-soft btn-sm",
+                    onclick: move |_| {
+                        refresh_soundpacks_cache();
+                    },
+                    disabled: refreshing_soundpacks(),
+                    if refreshing_soundpacks() {
+                      span { class: "loading loading-spinner loading-xs mr-2" }
+                      "Refreshing..."
+                    } else {
+                      "Refresh soundpacks"
+                    }
+                  }
+                  // Last scan info
+                  if app_state.read().optimized_cache.last_scan > 0 {
+                    div { class: "text-xs text-base-content/60",
+                      "Last scan "
+                      {
+                          let last_scan = app_state.read().optimized_cache.last_scan;
+                          let now = std::time::SystemTime::now()
+                              .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                              .unwrap_or_default()
+                              .as_secs();
+                          let diff = now.saturating_sub(last_scan);
+                          if diff < 60 {
+                              ": just now".to_string()
+                          } else if diff < 3600 {
+                              format!("{} min ago", diff / 60)
+                          } else if diff < 86400 {
+                              format!("{} hr ago", diff / 3600)
+                          } else {
+                              format!("{} days ago", diff / 86400)
+                          }
+                      }
+                    }
+                  }
+                }
+                div {
+                  div { class: "divider" }
+                  div { class: "space-y-2",
+                    div { class: "text-base-content font-medium text-sm",
+                      "Soundpack folder path"
+                    }
+                    input {
+                      value: "{soundpacks_dir_absolute}",
+                      class: "input input-sm w-full",
+                      readonly: true,
+                    }
+                    button { class: "btn btn-soft btn-sm", "Open soundpack folder" }
+                  }
+                }
+              }
             }
           }
         }
@@ -90,6 +218,37 @@ fn SoundpackTable(
     soundpacks: Vec<crate::state::soundpack_cache::SoundpackMetadata>,
     soundpack_type: &'static str,
 ) -> Element {
+    // Search state
+    let mut search_query = use_signal(String::new);
+
+    // Clone soundpacks for use in memo
+    let soundpacks_clone = soundpacks.clone();
+
+    // Filter soundpacks based on search query
+    let filtered_soundpacks = use_memo(move || {
+        let query = search_query().to_lowercase();
+        if query.is_empty() {
+            soundpacks_clone.clone()
+        } else {
+            soundpacks_clone
+                .iter()
+                .filter(|pack| {
+                    pack.name.to_lowercase().contains(&query)
+                        || pack.id.to_lowercase().contains(&query)
+                        || pack
+                            .author
+                            .as_ref()
+                            .map_or(false, |author| author.to_lowercase().contains(&query))
+                        || pack
+                            .tags
+                            .iter()
+                            .any(|tag| tag.to_lowercase().contains(&query))
+                })
+                .cloned()
+                .collect()
+        }
+    });
+
     if soundpacks.is_empty() {
         rsx! {
           div { class: "p-4 text-center text-base-content/70",
@@ -98,11 +257,64 @@ fn SoundpackTable(
         }
     } else {
         rsx! {
-          div { class: "overflow-x-auto",
-            table { class: "table table-sm w-full",
-              tbody {
-                for pack in soundpacks {
-                  SoundpackTableRow { soundpack: pack }
+          div { class: "space-y-4",
+            // Search field
+            div { class: "flex items-center px-3 gap-2",
+              input {
+                class: "input w-full",
+                placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
+                value: "{search_query}",
+                oninput: move |evt| search_query.set(evt.value()),
+              }
+              button { class: "btn btn-primary",
+                Plus { class: "w-4 h-4 mr-2" }
+                "Add"
+              }
+            }
+
+            // Table
+            div { class: "overflow-x-auto",
+              if filtered_soundpacks().is_empty() {
+                div { class: "p-4 text-center text-base-content/70",
+                  "No result match your search!"
+                }
+              } else {
+                table { class: "table table-sm w-full",
+                  tbody {
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                  }
                 }
               }
             }
@@ -114,16 +326,18 @@ fn SoundpackTable(
 #[component]
 fn SoundpackTableRow(soundpack: crate::state::soundpack_cache::SoundpackMetadata) -> Element {
     rsx! {
-      tr { class: "hover:bg-base-200/50",
+      tr { class: "hover:bg-base-100",
         td { class: "flex items-center gap-4",
           // Icon
           div { class: "flex items-center justify-center",
             if let Some(icon) = &soundpack.icon {
               if !icon.is_empty() {
-                img {
-                  class: "w-8 h-8 rounded object-cover",
-                  src: "{icon}",
-                  alt: "{soundpack.name}",
+                div { class: "w-8 h-8 rounded-lg overflow-hidden",
+                  img {
+                    class: "w-full h-full  object-cover",
+                    src: "{icon}",
+                    alt: "{soundpack.name}",
+                  }
                 }
               } else {
                 div { class: "w-8 h-8 rounded bg-base-300 flex items-center justify-center",
@@ -138,7 +352,9 @@ fn SoundpackTableRow(soundpack: crate::state::soundpack_cache::SoundpackMetadata
           }
           // Name
           div {
-            div { class: "font-medium text-sm text-base-content", "{soundpack.name}" }
+            div { class: "font-medium text-sm text-base-content line-clamp-1",
+              "{soundpack.name}"
+            }
             if let Some(author) = &soundpack.author {
               div { class: "text-xs text-base-content/50", "by {author}" }
             }
@@ -149,7 +365,7 @@ fn SoundpackTableRow(soundpack: crate::state::soundpack_cache::SoundpackMetadata
           div { class: "flex items-center justify-end gap-2",
             button {
               class: "btn btn-soft btn-xs",
-              title: "Edit this soundpack",
+              title: "Open soundpack folder",
               FolderOpen { class: "w-4 h-4" }
             }
             button {
