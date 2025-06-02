@@ -106,7 +106,7 @@ pub fn SoundpacksPage() -> Element {
               checked: true,
             }
             Keyboard { class: "w-5 h-5 mr-2" }
-            "Keyboard ({keyboard_soundpacks().len()})"
+            "Keyboard ({soundpack_count_keyboard})"
           }
           div { class: "tab-content  overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
@@ -118,7 +118,7 @@ pub fn SoundpacksPage() -> Element {
           label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
             input { r#type: "radio", name: "soundpack-tab" }
             Mouse { class: "w-5 h-5 mr-2" }
-            "Mouse ({mouse_soundpacks().len()})"
+            "Mouse ({soundpack_count_mouse})"
           }
           div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
