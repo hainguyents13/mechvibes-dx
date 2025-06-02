@@ -26,12 +26,6 @@ pub fn Logo() -> Element {
     };
 
     rsx! {
-      div { class,
-        if !enable_sound() {
-          ""
-        } else {
-          "Mechvibes"
-        }
-      }
+      div { class, "Mechvibes" }
     }
 }

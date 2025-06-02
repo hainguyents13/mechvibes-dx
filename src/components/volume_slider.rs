@@ -102,7 +102,7 @@ fn VolumeSliderBase(
               if enable_sound() {
                 Volume2 { class: "w-5 h-5" }
               } else {
-                VolumeOff { class: "w-5 h-5 text-error" }
+                VolumeOff { class: "w-5 h-5" }
               }
             }
           }
