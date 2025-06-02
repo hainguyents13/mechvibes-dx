@@ -39,12 +39,10 @@ pub fn AppInfoDisplay() -> Element {
     // Get absolute paths for directories and files
     let data_dir_absolute = paths::utils::get_data_dir_absolute();
     let config_file_absolute = paths::utils::get_config_file_absolute();
-    let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
 
     // Check file/directory existence
     let data_dir_exists = paths::utils::data_dir_exists();
     let config_file_exists = paths::utils::config_file_exists();
-    let soundpacks_dir_exists = paths::utils::soundpacks_dir_exists();
 
     // Get OS info
     let os = env::consts::OS;

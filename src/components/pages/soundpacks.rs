@@ -4,7 +4,7 @@ use crate::{
 };
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Check, ExternalLink, FolderOpen, Keyboard, Mouse, Music, Plus, Settings2, Trash,
+    ExternalLink, FolderOpen, Keyboard, Mouse, Music, Plus, RefreshCcw, Settings2, Trash,
 };
 use std::sync::Arc;
 
@@ -164,7 +164,8 @@ pub fn SoundpacksPage() -> Element {
                       span { class: "loading loading-spinner loading-xs mr-2" }
                       "Refreshing..."
                     } else {
-                      "Refresh soundpacks"
+                      RefreshCcw { class: "w-4 h-4 mr-1" }
+                      "Refresh"
                     }
                   }
                   // Last scan info
@@ -202,7 +203,23 @@ pub fn SoundpacksPage() -> Element {
                   class: "input input-sm w-full",
                   readonly: true,
                 }
-                button { class: "btn btn-soft btn-sm", "Open soundpack folder" }
+                button { class: "btn btn-soft btn-sm",
+                  FolderOpen { class: "w-4 h-4 mr-1" }
+                  "Open soundpack folder"
+                }
+              }
+              div { class: "divider" }
+              div { class: "space-y-2",
+                div { class: "text-base-content font-medium text-sm",
+                  "Need more soundpacks?"
+                }
+                a {
+                  class: "btn btn-soft btn-sm",
+                  href: "https://mechvibes.com/soundpacks",
+                  target: "_blank",
+                  "Browse soundpacks"
+                  ExternalLink { class: "w-4 h-4 ml-1" }
+                }
               }
             }
           }
@@ -271,7 +288,7 @@ fn SoundpackTable(
             }
 
             // Table
-            div { class: "overflow-x-auto",
+            div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
               if filtered_soundpacks().is_empty() {
                 div { class: "p-4 text-center text-base-content/70",
                   "No result match your search!"
@@ -279,36 +296,6 @@ fn SoundpackTable(
               } else {
                 table { class: "table table-sm w-full",
                   tbody {
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
-                    for pack in filtered_soundpacks() {
-                      SoundpackTableRow { soundpack: pack }
-                    }
                     for pack in filtered_soundpacks() {
                       SoundpackTableRow { soundpack: pack }
                     }
