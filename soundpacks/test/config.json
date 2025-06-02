@@ -1,8 +1,0 @@
-{
-  "name": "Test Soundpack - test",
-  "author": "Protocol Test",
-  "version": "1.0.0",
-  "key_define": {
-    "default": "sound.ogg"
-  }
-}

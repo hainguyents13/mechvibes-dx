@@ -38,9 +38,9 @@ fn main() {
     }
 
     // Register protocol on first run
-    if let Err(e) = protocol::register_protocol() {
-        eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
-    }
+    // if let Err(e) = protocol::register_protocol() {
+    //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
+    // }
 
     let _manifest = state::AppManifest::load();
 
