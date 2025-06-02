@@ -8,6 +8,33 @@ use lucide_dioxus::{
 };
 use std::sync::Arc;
 
+use std::path::Path;
+use std::io;
+
+#[cfg(target_os = "windows")]
+pub fn open_directory<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    std::process::Command::new("explorer")
+        .arg(path.as_ref())
+        .status()
+        .map(|_| ())
+}
+
+#[cfg(target_os = "macos")]
+pub fn open_directory<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    std::process::Command::new("open")
+        .arg(path.as_ref())
+        .status()
+        .map(|_| ())
+}
+
+#[cfg(target_os = "linux")]
+pub fn open_directory<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    std::process::Command::new("xdg-open")
+        .arg(path.as_ref())
+        .status()
+        .map(|_| ())
+}
+
 #[component]
 pub fn SoundpacksPage() -> Element {
     // Get global app state for soundpacks
@@ -203,7 +230,14 @@ pub fn SoundpacksPage() -> Element {
                   class: "input input-sm w-full",
                   readonly: true,
                 }
-                button { class: "btn btn-soft btn-sm",
+                button {
+                  class: "btn btn-soft btn-sm",
+                  onclick: move |_| {
+                    // Open the soundpack directory in the file explorer
+                    if let Err(e) = open_directory(&soundpacks_dir_absolute) {
+                        eprintln!("Failed to open soundpack directory: {}", e);
+                    }
+                  },
                   FolderOpen { class: "w-4 h-4 mr-1" }
                   "Open soundpack folder"
                 }
