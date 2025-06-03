@@ -1,6 +1,6 @@
 use crate::{
     components::ui::{PageHeader, SoundpackManager, SoundpackTable, SoundpackUploadModal},
-    state::app::use_app_state,
+    state::{app::use_app_state, paths},
 };
 use dioxus::prelude::*;
 use lucide_dioxus::{Keyboard, Mouse, Music, Settings2};
@@ -275,69 +275,71 @@ pub fn Soundpacks() -> Element {
     };
 
     rsx! {
-      div { class: "p-12 pb-32",
-        // Page header
-        PageHeader {
-          title: "Soundpacks".to_string(),
-          subtitle: "Manage your soundpacks".to_string(),
-          icon: Some(rsx! {
-            Music { class: "w-8 h-8 mx-auto" }
-          }),
-        }
-
-        // Tabs for soundpack types
-        div { class: "tabs tabs-lift",
-          // Keyboard tab
-          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
-            input {
-              r#type: "radio",
-              name: "soundpack-tab",
-              checked: true,
+        div { class: "p-12 pb-32",
+            // Page header
+            PageHeader {
+                title: "Soundpacks".to_string(),
+                subtitle: "Manage your soundpacks".to_string(),
+                icon: Some(rsx! {
+                    Music { class: "w-8 h-8 mx-auto" }
+                }),
             }
-            Keyboard { class: "w-5 h-5 mr-2" }
-            "Keyboard ({keyboard_soundpacks().len()})"
-          }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
-            SoundpackTable {
-              soundpacks: keyboard_soundpacks(),
-              soundpack_type: "Keyboard",
-              on_add_click: Some(EventHandler::new(move |_| show_upload_modal.set(true))),
+
+            // Tabs for soundpack types
+            div { class: "tabs tabs-lift",
+                // Keyboard tab
+                label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
+                    input {
+                        r#type: "radio",
+                        name: "soundpack-tab",
+                        checked: true,
+                    }
+                    Keyboard { class: "w-5 h-5 mr-2" }
+                    "Keyboard ({keyboard_soundpacks().len()})"
+                }
+                div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
+                    SoundpackTable {
+                        soundpacks: keyboard_soundpacks(),
+                        soundpack_type: "Keyboard",
+                        on_add_click: Some(EventHandler::new(move |_| show_upload_modal.set(true))),
+                    }
+                }
+
+                // Mouse tab
+                label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
+                    input { r#type: "radio", name: "soundpack-tab" }
+                    Mouse { class: "w-5 h-5 mr-2" }
+                    "Mouse ({mouse_soundpacks().len()})"
+                }
+                div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
+                    SoundpackTable {
+                        soundpacks: mouse_soundpacks(),
+                        soundpack_type: "Mouse",
+                        on_add_click: Some(EventHandler::new(move |_| show_upload_modal.set(true))),
+                    }
+                }
+
+                // Manage tab
+                label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
+                    input { r#type: "radio", name: "soundpack-tab" }
+                    Settings2 { class: "w-5 h-5 mr-2" }
+                    "Manage"
+                }
+                div { class: "tab-content overflow-hidden bg-base-200 border-base-300 p-4",
+                    SoundpackManager {
+                        on_upload_click: EventHandler::new(move |_| show_upload_modal.set(true)),
+                    }
+                }
             }
-          }
 
-          // Mouse tab
-          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
-            input { r#type: "radio", name: "soundpack-tab" }
-            Mouse { class: "w-5 h-5 mr-2" }
-            "Mouse ({mouse_soundpacks().len()})"
-          }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
-            SoundpackTable {
-              soundpacks: mouse_soundpacks(),
-              soundpack_type: "Mouse",
-              on_add_click: Some(EventHandler::new(move |_| show_upload_modal.set(true))),
+            // Upload modal
+            SoundpackUploadModal {
+                show: show_upload_modal,
+                progress: upload_progress,
+                error: upload_error,
+                success: upload_success,
+                on_upload: handle_upload_click,
             }
-          }
-
-          // Manage tab
-          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
-            input { r#type: "radio", name: "soundpack-tab" }
-            Settings2 { class: "w-5 h-5 mr-2" }
-            "Manage"
-          }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 p-4",
-            SoundpackManager { on_upload_click: EventHandler::new(move |_| show_upload_modal.set(true)) }
-          }
         }
-
-        // Upload modal
-        SoundpackUploadModal {
-          show: show_upload_modal,
-          progress: upload_progress,
-          error: upload_error,
-          success: upload_success,
-          on_upload: handle_upload_click,
-        }
-      }
     }
 }
