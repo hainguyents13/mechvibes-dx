@@ -3519,6 +3519,13 @@
       margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
     }
   }
+  .space-y-8 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 8) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 8) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
   .space-x-2 {
     :where(& > :not(:last-child)) {
       --tw-space-x-reverse: 0;
@@ -3875,6 +3882,9 @@
   }
   .pb-32 {
     padding-bottom: calc(var(--spacing) * 32);
+  }
+  .pl-2 {
+    padding-left: calc(var(--spacing) * 2);
   }
   .pl-6 {
     padding-left: calc(var(--spacing) * 6);

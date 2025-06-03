@@ -1,5 +1,5 @@
 // Event-driven App State Manager
-use crate::state::soundpack_cache::SoundpackCache;
+use crate::state::soundpack::SoundpackCache;
 use dioxus::prelude::*;
 use once_cell::sync::OnceCell;
 use std::sync::{Arc, Mutex};
@@ -27,7 +27,7 @@ impl AppState {
         }
     }
 
-    pub fn get_soundpacks(&self) -> Vec<crate::state::soundpack_cache::SoundpackMetadata> {
+    pub fn get_soundpacks(&self) -> Vec<crate::state::soundpack::SoundpackMetadata> {
         self.optimized_cache.soundpacks.values().cloned().collect()
     }
 
@@ -43,13 +43,6 @@ impl AppState {
 
 // Global state instance
 static GLOBAL_APP_STATE: OnceCell<Mutex<AppState>> = OnceCell::new();
-
-// Events that can trigger state updates
-#[derive(Debug, Clone)]
-pub enum AppStateEvent {
-    SoundpackImported { soundpack_id: String },
-    CacheRefreshRequested,
-}
 
 // Simple hook for read-only access
 pub fn use_app_state() -> AppState {

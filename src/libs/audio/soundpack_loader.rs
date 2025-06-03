@@ -5,7 +5,7 @@ use std::io::{BufReader, Read};
 use crate::state::config::AppConfig;
 use crate::state::paths;
 use crate::state::soundpack::SoundPack;
-use crate::state::soundpack_cache::{SoundpackCache, SoundpackMetadata};
+use crate::state::soundpack::{SoundpackCache, SoundpackMetadata};
 
 use super::audio_context::AudioContext;
 

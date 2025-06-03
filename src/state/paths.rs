@@ -34,11 +34,9 @@ pub mod data {
         get_app_root().join("data").join("themes.json")
     }
 
-    /// Soundpack metadata cache file
-    pub fn soundpack_metadata_cache_json() -> PathBuf {
-        get_app_root()
-            .join("data")
-            .join("soundpack_metadata_cache.json")
+    /// Soundpack cache file
+    pub fn soundpack_cache_json() -> PathBuf {
+        get_app_root().join("data").join("soundpack_cache.json")
     }
 }
 

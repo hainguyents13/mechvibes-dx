@@ -36,12 +36,13 @@ fn main() {
         }
     } else {
         println!("ℹ️ No command line arguments provided");
-    }
+    } // Register protocol on first run
+      // if let Err(e) = protocol::register_protocol() {
+      //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
+      // }    // Load app manifest
+    let _manifest = state::manifest::AppManifest::load();
 
-    // Register protocol on first run
-    // if let Err(e) = protocol::register_protocol() {
-    //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
-    // }    let _manifest = state::AppManifest::load();    // Initialize global app state before rendering
+    // Initialize global app state before rendering
     state::app::init_app_state();
 
     // Create a WindowBuilder with custom appearance

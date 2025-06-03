@@ -2,24 +2,7 @@ use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 
-// User-defined configuration (app.config.json)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AppConfig {
-    pub app: AppConfigInfo,
-    pub compatibility: Compatibility,
-    pub paths: AppPaths,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AppConfigInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-}
-
-// Generated manifest (data/manifest.json)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppInfo {
     pub name: String,
@@ -32,16 +15,15 @@ pub struct AppInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Compatibility {
-    pub config_version: String,
-    pub soundpack_version: String,
-    pub cache_version: String,
-    pub minimum_app_version: String,
+pub struct CompatibilityInfo {
+    pub min_os_version: String,
+    pub supported_architectures: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppPaths {
-    pub config_file: String,
+    pub config: String,
+    pub themes: String,
     pub soundpack_cache: String,
     pub soundpacks_dir: String,
     pub data_dir: String,
@@ -57,130 +39,18 @@ pub struct Metadata {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppManifest {
     pub app: AppInfo,
-    pub compatibility: Compatibility,
+    pub compatibility: CompatibilityInfo,
     pub paths: AppPaths,
     pub metadata: Metadata,
 }
 
 impl AppManifest {
-    const CONFIG_FILE: &'static str = "./app.config.json";
-    pub fn load() -> Self {
-        // Ensure data directory exists
-        let data_dir = paths::data::manifest_json().parent().unwrap().to_path_buf();
-        if let Err(_) = fs::create_dir_all(&data_dir) {
-            eprintln!("Warning: Could not create data directory");
-        }
-
-        // Load user configuration
-        let config = Self::load_config();
-
-        // Check if manifest exists and load it
-        let manifest_path = paths::data::manifest_json();
-        if let Ok(contents) = fs::read_to_string(manifest_path) {
-            match serde_json::from_str::<AppManifest>(&contents) {
-                Ok(mut manifest) => {
-                    // Update from config
-                    manifest.app.name = config.app.name.clone();
-                    manifest.app.version = config.app.version.clone();
-                    manifest.app.description = config.app.description.clone();
-                    manifest.compatibility = config.compatibility.clone();
-                    manifest.paths = config.paths.clone();
-
-                    // Update runtime info
-                    manifest.metadata.last_updated = Utc::now();
-                    manifest.metadata.platform = Self::get_platform();
-                    manifest.app.build_type = if cfg!(debug_assertions) {
-                        "debug".to_string()
-                    } else {
-                        "release".to_string()
-                    };
-
-                    // Save updated manifest
-                    let _ = manifest.save();
-
-                    println!(
-                        "📋 Loaded app manifest: {} v{}",
-                        manifest.app.name, manifest.app.version
-                    );
-
-                    manifest
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse manifest file: {}. Creating new.",
-                        e
-                    );
-                    Self::create_from_config(config)
-                }
-            }
-        } else {
-            println!("📋 Creating new app manifest from config...");
-            Self::create_from_config(config)
-        }
-    }
-
-    fn load_config() -> AppConfig {
-        let config_path = PathBuf::from(Self::CONFIG_FILE);
-        if let Ok(contents) = fs::read_to_string(config_path) {
-            match serde_json::from_str::<AppConfig>(&contents) {
-                Ok(config) => {
-                    println!("📋 Loaded app configuration from {}", Self::CONFIG_FILE);
-                    config
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse config file: {}. Using default.",
-                        e
-                    );
-                    Self::create_default_config()
-                }
-            }
-        } else {
-            println!("📋 Config file not found, creating default...");
-            let config = Self::create_default_config();
-            let _ = Self::save_config(&config);
-            config
-        }
-    }
-
-    fn create_default_config() -> AppConfig {
-        AppConfig {
-            app: AppConfigInfo {
-                name: "MechvibesDX".to_string(),
-                version: "0.1.0".to_string(),
-                description: "Enhanced mechanical keyboard sound simulator".to_string(),
-            },
-            compatibility: Compatibility {
-                config_version: "1.0".to_string(),
-                soundpack_version: "1.0".to_string(),
-                cache_version: "1.0".to_string(),
-                minimum_app_version: "0.1.0".to_string(),
-            },
-            paths: AppPaths {
-                config_file: paths::utils::get_config_file_absolute(),
-                soundpack_cache: paths::data::soundpack_metadata_cache_json()
-                    .to_string_lossy()
-                    .to_string(),
-                soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
-                data_dir: paths::utils::get_data_dir_absolute(),
-            },
-        }
-    }
-
-    fn save_config(config: &AppConfig) -> Result<(), String> {
-        let contents = serde_json::to_string_pretty(config)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        fs::write(Self::CONFIG_FILE, contents)
-            .map_err(|e| format!("Failed to write config file: {}", e))?;
-        Ok(())
-    }
-
-    fn create_from_config(config: AppConfig) -> Self {
-        let manifest = Self {
+    pub fn new() -> Self {
+        Self {
             app: AppInfo {
-                name: config.app.name,
-                version: config.app.version,
-                description: config.app.description,
+                name: "MechVibes-DX".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                description: "Mechanical keyboard sound simulator".to_string(),
                 build_date: Utc::now(),
                 git_commit: option_env!("GIT_HASH").map(|s| s.to_string()),
                 git_branch: "main".to_string(),
@@ -190,17 +60,63 @@ impl AppManifest {
                     "release".to_string()
                 },
             },
-            compatibility: config.compatibility,
-            paths: config.paths,
+            compatibility: CompatibilityInfo {
+                min_os_version: "Windows 10".to_string(),
+                supported_architectures: vec!["x86_64".to_string()],
+            },
+            paths: AppPaths {
+                config: paths::data::config_json().to_string_lossy().to_string(),
+                themes: paths::data::themes_json().to_string_lossy().to_string(),
+                soundpack_cache: paths::data::soundpack_cache_json()
+                    .to_string_lossy()
+                    .to_string(),
+                soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
+                data_dir: paths::utils::get_data_dir_absolute(),
+            },
             metadata: Metadata {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 platform: Self::get_platform(),
             },
-        };
+        }
+    }
 
-        let _ = manifest.save();
-        manifest
+    pub fn load() -> Self {
+        let manifest_path = paths::data::manifest_json();
+
+        if manifest_path.exists() {
+            match fs::read_to_string(&manifest_path) {
+                Ok(content) => match serde_json::from_str::<AppManifest>(&content) {
+                    Ok(manifest) => {
+                        println!("✅ Loaded app manifest from {}", manifest_path.display());
+                        manifest
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to parse manifest.json: {}", e);
+                        let new_manifest = Self::new();
+                        if let Err(e) = new_manifest.save() {
+                            eprintln!("❌ Failed to create new manifest: {}", e);
+                        }
+                        new_manifest
+                    }
+                },
+                Err(e) => {
+                    eprintln!("❌ Failed to read manifest.json: {}", e);
+                    let new_manifest = Self::new();
+                    if let Err(e) = new_manifest.save() {
+                        eprintln!("❌ Failed to create new manifest: {}", e);
+                    }
+                    new_manifest
+                }
+            }
+        } else {
+            println!("📝 Creating new app manifest");
+            let new_manifest = Self::new();
+            if let Err(e) = new_manifest.save() {
+                eprintln!("❌ Failed to create manifest.json: {}", e);
+            }
+            new_manifest
+        }
     }
 
     fn get_platform() -> String {
@@ -214,42 +130,25 @@ impl AppManifest {
             "unknown".to_string()
         }
     }
+
     pub fn save(&self) -> Result<(), String> {
+        // Ensure data directory exists
+        if let Some(parent) = paths::data::manifest_json().parent() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                return Err(format!("Failed to create data directory: {}", e));
+            }
+        }
+
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
         fs::write(paths::data::manifest_json(), contents)
             .map_err(|e| format!("Failed to write manifest file: {}", e))?;
         Ok(())
     }
-
-    #[allow(dead_code)]
-    pub fn is_compatible_config(&self, config_version: &str) -> bool {
-        self.compatibility.config_version == config_version
-    }
-
-    #[allow(dead_code)]
-    pub fn is_compatible_soundpack(&self, soundpack_version: &str) -> bool {
-        self.compatibility.soundpack_version == soundpack_version
-    }
-
-    #[allow(dead_code)]
-    pub fn get_app_info(&self) -> String {
-        format!(
-            "{} v{} ({})",
-            self.app.name, self.app.version, self.app.build_type
-        )
-    }
 }
 
 impl Default for AppManifest {
     fn default() -> Self {
-        let config = AppConfig::default();
-        Self::create_from_config(config)
-    }
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        AppManifest::create_default_config()
+        Self::new()
     }
 }

@@ -1,4 +1,4 @@
-use crate::state::soundpack_cache::SoundpackMetadata;
+use crate::state::soundpack::SoundpackMetadata;
 use dioxus::prelude::*;
 use lucide_dioxus::{FolderOpen, Music, Plus, Trash};
 
@@ -41,48 +41,48 @@ pub fn SoundpackTable(
 
     if soundpacks.is_empty() {
         rsx! {
-            div { class: "p-4 text-center text-base-content/70",
-                "No {soundpack_type} soundpack found!"
-            }
+          div { class: "p-4 text-center text-base-content/70",
+            "No {soundpack_type} soundpack found!"
+          }
         }
     } else {
         rsx! {
-            div { class: "space-y-4",
-                // Search field
-                div { class: "flex items-center px-3 gap-2",
-                    input {
-                        class: "input w-full",
-                        placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
-                        value: "{search_query}",
-                        oninput: move |evt| search_query.set(evt.value()),
-                    }
-                    if let Some(add_handler) = on_add_click {
-                        button {
-                            class: "btn btn-primary",
-                            onclick: move |evt| add_handler.call(evt),
-                            Plus { class: "w-4 h-4 mr-2" }
-                            "Add"
-                        }
-                    }
+          div { class: "space-y-4",
+            // Search field
+            div { class: "flex items-center px-3 gap-2",
+              input {
+                class: "input w-full",
+                placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
+                value: "{search_query}",
+                oninput: move |evt| search_query.set(evt.value()),
+              }
+              if let Some(add_handler) = on_add_click {
+                button {
+                  class: "btn btn-neutral",
+                  onclick: move |evt| add_handler.call(evt),
+                  Plus { class: "w-4 h-4 mr-2" }
+                  "Add"
                 }
-
-                // Table
-                div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
-                    if filtered_soundpacks().is_empty() {
-                        div { class: "p-4 text-center text-base-content/70",
-                            "No result match your search!"
-                        }
-                    } else {
-                        table { class: "table table-sm w-full",
-                            tbody {
-                                for pack in filtered_soundpacks() {
-                                    SoundpackTableRow { soundpack: pack }
-                                }
-                            }
-                        }
-                    }
-                }
+              }
             }
+
+            // Table
+            div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
+              if filtered_soundpacks().is_empty() {
+                div { class: "p-4 text-center text-base-content/70",
+                  "No result match your search!"
+                }
+              } else {
+                table { class: "table table-sm w-full",
+                  tbody {
+                    for pack in filtered_soundpacks() {
+                      SoundpackTableRow { soundpack: pack }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
     }
 }
@@ -90,55 +90,55 @@ pub fn SoundpackTable(
 #[component]
 pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
     rsx! {
-        tr { class: "hover:bg-base-100",
-            td { class: "flex items-center gap-4",
-                // Icon
-                div { class: "flex items-center justify-center",
-                    if let Some(icon) = &soundpack.icon {
-                        if !icon.is_empty() {
-                            div { class: "w-8 h-8 rounded-lg overflow-hidden",
-                                img {
-                                    class: "w-full h-full object-cover",
-                                    src: "{icon}",
-                                    alt: "{soundpack.name}",
-                                }
-                            }
-                        } else {
-                            div { class: "w-8 h-8 rounded bg-base-300 flex items-center justify-center",
-                                Music { class: "w-4 h-4 text-base-content/40" }
-                            }
-                        }
-                    } else {
-                        div { class: "w-8 h-8 rounded bg-base-300 flex items-center justify-center",
-                            Music { class: "w-4 h-4 text-base-content/40" }
-                        }
-                    }
+      tr { class: "hover:bg-base-100",
+        td { class: "flex items-center gap-4",
+          // Icon
+          div { class: "flex items-center justify-center",
+            if let Some(icon) = &soundpack.icon {
+              if !icon.is_empty() {
+                div { class: "w-8 h-8 rounded-lg overflow-hidden",
+                  img {
+                    class: "w-full h-full object-cover",
+                    src: "{icon}",
+                    alt: "{soundpack.name}",
+                  }
                 }
-                // Name
-                div {
-                    div { class: "font-medium text-sm text-base-content line-clamp-1",
-                        "{soundpack.name}"
-                    }
-                    if let Some(author) = &soundpack.author {
-                        div { class: "text-xs text-base-content/50", "by {author}" }
-                    }
+              } else {
+                div { class: "w-8 h-8 rounded bg-base-300 flex items-center justify-center",
+                  Music { class: "w-4 h-4 text-base-content/40" }
                 }
+              }
+            } else {
+              div { class: "w-8 h-8 rounded bg-base-300 flex items-center justify-center",
+                Music { class: "w-4 h-4 text-base-content/40" }
+              }
             }
-            // Actions
-            td {
-                div { class: "flex items-center justify-end gap-2",
-                    button {
-                        class: "btn btn-soft btn-xs",
-                        title: "Open soundpack folder",
-                        FolderOpen { class: "w-4 h-4" }
-                    }
-                    button {
-                        class: "btn btn-error btn-xs",
-                        title: "Delete this soundpack",
-                        Trash { class: "w-4 h-4" }
-                    }
-                }
+          }
+          // Name
+          div {
+            div { class: "font-medium text-sm text-base-content line-clamp-1",
+              "{soundpack.name}"
             }
+            if let Some(author) = &soundpack.author {
+              div { class: "text-xs text-base-content/50", "by {author}" }
+            }
+          }
         }
+        // Actions
+        td {
+          div { class: "flex items-center justify-end gap-1",
+            button {
+              class: "btn btn-soft btn-xs",
+              title: "Open soundpack folder",
+              FolderOpen { class: "w-4 h-4" }
+            }
+            button {
+              class: "btn btn-soft btn-error btn-xs",
+              title: "Delete this soundpack",
+              Trash { class: "w-4 h-4" }
+            }
+          }
+        }
+      }
     }
 }

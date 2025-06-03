@@ -15,7 +15,7 @@ pub struct SoundpackInfo {
 /// Check if a soundpack ID already exists in the app state
 pub fn check_soundpack_id_conflict(
     id: &str,
-    soundpacks: &[crate::state::soundpack_cache::SoundpackMetadata],
+    soundpacks: &[crate::state::soundpack::SoundpackMetadata],
 ) -> bool {
     soundpacks.iter().any(|pack| pack.id == id)
 }

@@ -7,7 +7,7 @@ use std::process::Command;
 const DATA_DIR: &str = "data";
 const MANIFEST_JSON: &str = "data/manifest.json";
 const CONFIG_JSON: &str = "./data/config.json";
-const SOUNDPACK_METADATA_CACHE_JSON: &str = "data/soundpack_metadata_cache.json";
+const SOUNDPACK_CACHE_JSON: &str = "data/soundpack_cache.json";
 const SOUNDPACKS_DIR: &str = "./soundpacks";
 
 fn main() {
@@ -58,7 +58,9 @@ fn generate_manifest_for_production() {
 
     // Parse config
     let config: serde_json::Value =
-        serde_json::from_str(&config_content).expect("Failed to parse app.config.json"); // Create manifest with build information
+        serde_json::from_str(&config_content).expect("Failed to parse app.config.json");
+
+    // Create manifest with build information
     let manifest = serde_json::json!({
         "app": {
             "name": config["app"]["name"],
@@ -76,7 +78,8 @@ fn generate_manifest_for_production() {
             "last_updated": chrono::Utc::now().to_rfc3339(),
             "platform": get_target_platform()
         }
-    }); // Write manifest
+    });
+    // Write manifest
     let manifest_content =
         serde_json::to_string_pretty(&manifest).expect("Failed to serialize manifest");
 
@@ -98,7 +101,7 @@ fn create_default_config() {
             "cache_version": "1.0",
             "minimum_app_version": "0.1.0"        },        "paths": {
             "config_file": CONFIG_JSON,
-            "soundpack_cache": SOUNDPACK_METADATA_CACHE_JSON,
+            "soundpack_cache": SOUNDPACK_CACHE_JSON,
             "soundpacks_dir": SOUNDPACKS_DIR,
             "data_dir": DATA_DIR
         }

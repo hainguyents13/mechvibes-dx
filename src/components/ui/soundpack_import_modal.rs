@@ -1,11 +1,11 @@
 use crate::{
-    state::app::{trigger_global_state_update, use_app_state, AppStateEvent},
-    utils::soundpack_installer::{
-        check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
-    },
+  state::app::{trigger_global_state_update, use_app_state},
+  utils::soundpack_installer::{
+    check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
+  },
 };
 use dioxus::prelude::*;
-use lucide_dioxus::{HardDriveUpload, Import, X};
+use lucide_dioxus::{HardDriveUpload, X};
 use std::sync::Arc;
 
 #[component]

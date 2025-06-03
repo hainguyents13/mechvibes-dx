@@ -1,6 +1,6 @@
 use crate::state::{app::use_app_state, paths};
 use dioxus::prelude::*;
-use lucide_dioxus::{ExternalLink, FolderOpen, Import, Plus, RefreshCcw};
+use lucide_dioxus::{ExternalLink, FolderOpen, RefreshCcw};
 use std::sync::Arc;
 
 #[component]

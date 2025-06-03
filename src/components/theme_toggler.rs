@@ -5,7 +5,7 @@ use crate::utils::config_utils::use_config;
 use crate::utils::theme_utils::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Computer, Ellipsis, Moon, Pencil, Plus, Sun, Trash2};
+use lucide_dioxus::{Ellipsis, Pencil, Plus, Trash2};
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -25,74 +25,24 @@ pub fn ThemeToggler() -> Element {
     let mut editing_theme = use_signal(|| None::<String>); // Theme ID being edited
 
     rsx! {
-      div { class: "space-y-4 mt-4",        // Built-in themes
-        div { class: "text-sm text-base-content", "Built-in themes" }
-        div { class: "flex items-center justify-between gap-2 w-full",
-          button {
-            class: format!(
-                "btn btn-soft flex-1 {}",
-                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::Dark)) { "btn-disabled" } else { "" },
-            ),
-            onclick: {
-                let update_fn = update_config.clone();
-                move |_| {
-                    theme.set(Theme::BuiltIn(BuiltInTheme::Dark));
-                    update_fn(
-                        Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::BuiltIn(BuiltInTheme::Dark);
-                        }),
-                    );
-                }
-            },            Moon { class: "w-4 h-4 mr-1" }
-            "Dark"
-          }
-          button {
-            class: format!(
-                "btn btn-soft flex-1 {}",
-                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::Light)) { "btn-disabled" } else { "" },
-            ),
-            onclick: {
-                let update_fn = update_config.clone();
-                move |_| {
-                    theme.set(Theme::BuiltIn(BuiltInTheme::Light));
-                    update_fn(
-                        Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::BuiltIn(BuiltInTheme::Light);
-                        }),
-                    );
-                }
-            },            Sun { class: "w-4 h-4 mr-1" }
-            "Light"
-          }
-          button {
-            class: format!(
-                "btn btn-soft flex-1 {}",
-                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::System)) { "btn-disabled" } else { "" },
-            ),
-            onclick: {
-                let update_fn = update_config.clone();
-                move |_| {
-                    theme.set(Theme::BuiltIn(BuiltInTheme::System));
-                    update_fn(
-                        Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::BuiltIn(BuiltInTheme::System);
-                        }),
-                    );
-                }
-            },            Computer { class: "w-4 h-4 mr-1" }
-            "System"
-          }
-        }        // DaisyUI themes
-        div { class: "text-sm text-base-content mt-4", "DaisyUI themes" }
-        div { class: "grid grid-cols-3 gap-2",
-          for builtin_theme in BuiltInTheme::all().iter().skip(3) { // Skip Light, Dark, System
-            {
-                let builtin_theme_clone = builtin_theme.clone();
-                rsx! {
+      div { class: "space-y-8 mt-4",
+        // Built-in themes
+        div { class: "space-y-2",
+          div { class: "text-sm text-base-content", "Built-in themes" }
+          div { class: "grid grid-cols-3 gap-2",
+            for builtin_theme in BuiltInTheme::all().iter() {
+              {
+                  let builtin_theme_clone = builtin_theme.clone();
+                  let is_active = matches!(
+                      *theme.read(),
+                      Theme::BuiltIn(ref current)
+                      if current == builtin_theme
+                  );
+                  rsx! {
                     button {
                       class: format!(
-                          "btn btn-soft text-xs {}",
-                          if matches!(*theme.read(), Theme::BuiltIn(ref current) if current == builtin_theme) { "btn-disabled" } else { "" },
+                          "btn btn-soft text-left pl-2 justify-start text-xs {}",
+                          if is_active { "btn-disabled" } else { "" },
                       ),
                       onclick: {
                           let builtin_theme = builtin_theme_clone.clone();
@@ -109,24 +59,37 @@ pub fn ThemeToggler() -> Element {
                               );
                           }
                       },
+                      div {
+                        class: format!(
+                            "bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-1 shadow-sm {}",
+                            if is_active { "opacity-30" } else { "" },
+                        ),
+                        "data-theme": builtin_theme_clone.to_daisy_theme(),
+                        div { class: "bg-base-content size-2 rounded-full" }
+                        div { class: "bg-primary size-2 rounded-full" }
+                        div { class: "bg-secondary size-2 rounded-full" }
+                        div { class: "bg-accent size-2 rounded-full" }
+                      }
                       {format!("{:?}", builtin_theme_clone)}
                     }
-                }
+                  }
+              }
             }
           }
         }
 
         // Custom themes
-        if !custom_themes.is_empty() {
-          div { class: "space-y-2 mt-4",
-            div { class: "text-sm text-base-content", "Custom themes" }
+        div { class: "space-y-2",
+          div { class: "text-sm text-base-content", "Custom themes" }
+          if !custom_themes.is_empty() {
             for theme_data in custom_themes.iter() {
               CustomThemeButton {
                 name: theme_data.name.clone(),
                 theme_id: theme_data.id.clone(),
                 theme_css: theme_data.css.clone(),
                 is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == &theme_data.id),
-                is_built_in: false,                on_select: {
+                is_built_in: false,
+                on_select: {
                     let theme_id = theme_data.id.clone();
                     let update_fn = update_config.clone();
                     move |_| {
@@ -140,7 +103,8 @@ pub fn ThemeToggler() -> Element {
                             }),
                         );
                     }
-                },                on_delete: {
+                },
+                on_delete: {
                     let theme_id = theme_data.id.clone();
                     let update_themes = update_themes.clone();
                     move |_| {
@@ -163,10 +127,13 @@ pub fn ThemeToggler() -> Element {
                 },
               }
             }
+          } else {
+            div { class: "text-sm text-base-content/50", "No custom themes available" }
           }
+          // Create new theme button
+          CreateThemeButton { editing_theme_id: editing_theme }
         }
-        // Create new theme button
-        CreateThemeButton { editing_theme_id: editing_theme }
+      
       }
     }
 }
