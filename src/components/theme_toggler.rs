@@ -10,16 +10,11 @@ use lucide_dioxus::{Ellipsis, Pencil, Plus, Trash2};
 #[component]
 pub fn ThemeToggler() -> Element {
     // Get the config and update_config function
-    let (_config, update_config) = use_config();
-
-    // Theme management
+    let (_config, update_config) = use_config(); // Theme management
     let (themes, update_themes) = use_themes();
 
     // Theme state - use theme context
     let mut theme = use_theme();
-
-    let themes_config = themes();
-    let custom_themes = themes_config.list_themes();
 
     // State for editing themes
     let mut editing_theme = use_signal(|| None::<String>); // Theme ID being edited
@@ -77,58 +72,65 @@ pub fn ThemeToggler() -> Element {
             }
           }
         }
-
         // Custom themes
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Custom themes" }
-          if !custom_themes.is_empty() {
-            for theme_data in custom_themes.iter() {
-              CustomThemeButton {
-                name: theme_data.name.clone(),
-                theme_id: theme_data.id.clone(),
-                theme_css: theme_data.css.clone(),
-                is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == &theme_data.id),
-                is_built_in: false,
-                on_select: {
-                    let theme_id = theme_data.id.clone();
-                    let update_fn = update_config.clone();
-                    move |_| {
-                        theme.set(Theme::Custom(theme_id.clone()));
-                        update_fn(
-                            Box::new({
-                                let theme_id = theme_id.clone();
-                                move |config: &mut AppConfig| {
-                                    config.theme = Theme::Custom(theme_id);
-                                }
-                            }),
-                        );
+          {
+              let themes_config = themes();
+              let custom_themes = themes_config.list_themes();
+              if !custom_themes.is_empty() {
+                  rsx! {
+                    for theme_data in custom_themes.iter() {
+                      CustomThemeButton {
+                        name: theme_data.name.clone(),
+                        theme_id: theme_data.id.clone(),
+                        theme_css: theme_data.css.clone(),
+                        is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == &theme_data.id),
+                        is_built_in: false,
+                        on_select: {
+                            let theme_id = theme_data.id.clone();
+                            let update_fn = update_config.clone();
+                            move |_| {
+                                theme.set(Theme::Custom(theme_id.clone()));
+                                update_fn(
+                                    Box::new({
+                                        let theme_id = theme_id.clone();
+                                        move |config: &mut AppConfig| {
+                                            config.theme = Theme::Custom(theme_id);
+                                        }
+                                    }),
+                                );
+                            }
+                        },
+                        on_delete: {
+                            let theme_id = theme_data.id.clone();
+                            let update_themes = update_themes.clone();
+                            move |_| {
+                                update_themes(
+                                    Box::new({
+                                        let theme_id = theme_id.clone();
+                                        move |themes: &mut ThemesConfig| {
+                                            let _ = themes.delete_theme(&theme_id);
+                                        }
+                                    }),
+                                );
+                            }
+                        },
+                        on_edit: {
+                            let theme_id = theme_data.id.clone();
+                            move |_| {
+                                editing_theme.set(Some(theme_id.clone()));
+                                eval("theme_creator_modal.showModal()");
+                            }
+                        },
+                      }
                     }
-                },
-                on_delete: {
-                    let theme_id = theme_data.id.clone();
-                    let update_themes = update_themes.clone();
-                    move |_| {
-                        update_themes(
-                            Box::new({
-                                let theme_id = theme_id.clone();
-                                move |themes: &mut ThemesConfig| {
-                                    let _ = themes.delete_theme(&theme_id);
-                                }
-                            }),
-                        );
-                    }
-                },
-                on_edit: {
-                    let theme_id = theme_data.id.clone();
-                    move |_| {
-                        editing_theme.set(Some(theme_id.clone()));
-                        eval("theme_creator_modal.showModal()");
-                    }
-                },
+                  }
+              } else {
+                  rsx! {
+                    div { class: "text-sm text-base-content/50", "No custom themes available" }
+                  }
               }
-            }
-          } else {
-            div { class: "text-sm text-base-content/50", "No custom themes available" }
           }
           // Create new theme button
           CreateThemeButton { editing_theme_id: editing_theme }

@@ -12,8 +12,12 @@ use libs::protocol;
 use libs::ui;
 
 fn main() {
-    env_logger::init(); // Initialize app manifest first
+    env_logger::init();
+
     println!("🚀 Initializing MechvibesDX...");
+
+    // Initialize app manifest first
+    let _manifest = state::manifest::AppManifest::load();
 
     // Check for command line arguments (protocol handling)
     let args: Vec<String> = std::env::args().collect();
@@ -36,11 +40,12 @@ fn main() {
         }
     } else {
         println!("ℹ️ No command line arguments provided");
-    } // Register protocol on first run
-      // if let Err(e) = protocol::register_protocol() {
-      //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
-      // }    // Load app manifest
-    let _manifest = state::manifest::AppManifest::load();
+    }
+
+    // Register protocol on first run
+    // if let Err(e) = protocol::register_protocol() {
+    //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
+    // }
 
     // Initialize global app state before rendering
     state::app::init_app_state();
@@ -67,7 +72,6 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-      // Use the UI root component directly - Header component is already included in ui::app
       ui::app {}
     }
 }
