@@ -1,6 +1,6 @@
 use crate::components::theme_toggler::ThemeToggler;
 use crate::components::ui::PageHeader;
-use crate::state::config_utils::use_config;
+use crate::utils::config_utils::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::Palette;
 

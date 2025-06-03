@@ -8,9 +8,9 @@ use notify_rust::Notification;
 use std::sync::{mpsc, Arc};
 
 pub fn app() -> Element {
-    // Get global app state from the global signal
-    let app_state = crate::state::app::use_app_state();
-    use_context_provider(|| app_state);
+    // Create update signal for event-driven state management
+    let update_signal = use_signal(|| 0u32);
+    use_context_provider(|| update_signal);
 
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new());
@@ -20,8 +20,7 @@ pub fn app() -> Element {
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
-    use_context_provider(|| audio_context.clone());
-    // Load current soundpacks on startup
+    use_context_provider(|| audio_context.clone());    // Load current soundpacks on startup
     {
         let ctx = audio_context.clone();
         use_effect(move || {

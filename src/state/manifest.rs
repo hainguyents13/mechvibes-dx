@@ -63,7 +63,8 @@ pub struct AppManifest {
 }
 
 impl AppManifest {
-    const CONFIG_FILE: &'static str = "./app.config.json";    pub fn load() -> Self {
+    const CONFIG_FILE: &'static str = "./app.config.json";
+    pub fn load() -> Self {
         // Ensure data directory exists
         let data_dir = paths::data::manifest_json().parent().unwrap().to_path_buf();
         if let Err(_) = fs::create_dir_all(&data_dir) {
@@ -154,9 +155,12 @@ impl AppManifest {
                 soundpack_version: "1.0".to_string(),
                 cache_version: "1.0".to_string(),
                 minimum_app_version: "0.1.0".to_string(),
-            },            paths: AppPaths {
+            },
+            paths: AppPaths {
                 config_file: paths::utils::get_config_file_absolute(),
-                soundpack_cache: paths::data::soundpack_metadata_cache_json().to_string_lossy().to_string(),
+                soundpack_cache: paths::data::soundpack_metadata_cache_json()
+                    .to_string_lossy()
+                    .to_string(),
                 soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
                 data_dir: paths::utils::get_data_dir_absolute(),
             },
@@ -209,7 +213,8 @@ impl AppManifest {
         } else {
             "unknown".to_string()
         }
-    }    pub fn save(&self) -> Result<(), String> {
+    }
+    pub fn save(&self) -> Result<(), String> {
         let contents = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
         fs::write(paths::data::manifest_json(), contents)

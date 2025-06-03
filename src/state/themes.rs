@@ -12,6 +12,7 @@ pub struct CustomThemeData {
     pub css: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub is_built_in: bool, // Indicates if this is a built-in theme
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +119,7 @@ impl ThemesConfig {
             css,
             created_at: now,
             updated_at: now,
+            is_built_in: false,
         };
 
         self.custom_themes.insert(id.clone(), theme_data);

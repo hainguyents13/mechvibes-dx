@@ -61,7 +61,9 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
     let package_version = config
         .get("version")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string()); // Check for V1 indicators
+        .map(|s| s.to_string());
+
+    // Check for V1 indicators
     let has_defines = config.get("defines").is_some();
     let has_sound_field = config.get("sound").is_some();
     let _has_key_define_type = config.get("key_define_type").is_some();

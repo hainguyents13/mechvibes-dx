@@ -1,29 +1,26 @@
 use crate::state::{app::use_app_state, paths};
 use dioxus::prelude::*;
-use lucide_dioxus::{ExternalLink, FolderOpen, RefreshCcw, Upload};
+use lucide_dioxus::{ExternalLink, FolderOpen, Import, Plus, RefreshCcw};
 use std::sync::Arc;
 
 #[component]
-pub fn SoundpackManager(on_upload_click: EventHandler<MouseEvent>) -> Element {
+pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let app_state = use_app_state();
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
-
     // UI state for notification and loading
-    let mut refreshing_soundpacks = use_signal(|| false);
+    let refreshing_soundpacks = use_signal(|| false);
 
-    let mut refresh_soundpacks_cache = {
+    let refresh_soundpacks_cache = {
         let audio_ctx_refresh = audio_ctx.clone();
-        move || {
-            println!("🔄 Refreshing soundpack cache from settings page...");
+        let mut refreshing_soundpacks = refreshing_soundpacks.clone();
 
-            // Set loading state to true - directly update the signal
+        Callback::new(move |_| {
+            // Set loading state to true
             refreshing_soundpacks.set(true);
             println!("🌻 Loading state set to: {}", refreshing_soundpacks());
-
             // Clone necessary variables for the async task
             let mut refreshing_signal = refreshing_soundpacks.clone();
             let audio_ctx_clone = audio_ctx_refresh.clone();
-            let mut app_state_clone = app_state.clone();
 
             // Perform the refresh operation in a separate task to not block the UI
             spawn(async move {
@@ -32,30 +29,21 @@ pub fn SoundpackManager(on_upload_click: EventHandler<MouseEvent>) -> Element {
                 use std::time::Duration;
 
                 Delay::new(Duration::from_millis(100)).await;
-
                 println!("Starting soundpack refresh operation...");
 
-                // This will create a new SoundpackCache instance that will refresh from directory
-                let mut fresh_cache = crate::state::soundpack_cache::SoundpackCache::load();
-                fresh_cache.refresh_from_directory();
-                fresh_cache.save();
-
-                // Update the app state with new cache
-                app_state_clone.write().optimized_cache = Arc::new(fresh_cache);
+                // Trigger cache refresh through global trigger function
+                crate::state::app::trigger_global_state_update("CacheRefreshRequested".to_string());
 
                 // Reload current soundpacks to apply any changes
                 crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
 
                 // Add another small delay before changing the loading state back
-                Delay::new(Duration::from_millis(100)).await;
-
-                // Reset loading state
+                Delay::new(Duration::from_millis(100)).await; // Reset loading state
                 refreshing_signal.set(false);
-                println!("🌻 Loading state reset to: {}", refreshing_signal());
 
                 println!("✅ Soundpack refresh complete");
             });
-        }
+        })
     };
 
     // Count soundpacks
@@ -64,110 +52,87 @@ pub fn SoundpackManager(on_upload_click: EventHandler<MouseEvent>) -> Element {
     let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
 
     rsx! {
-        div { class: "space-y-4",
-            div { class: "text-base-content",
-                div {
-                    div { class: "font-medium text-sm pb-1",
-                        "Found {soundpack_count_keyboard + soundpack_count_mouse} soundpack(s)"
-                    }
-                    ul { class: "list-disc pl-6",
-                        li { class: "text-sm text-base-content/70",
-                            "Keyboard: {soundpack_count_keyboard}"
-                        }
-                        li { class: "text-sm text-base-content/70",
-                            "Mouse: {soundpack_count_mouse}"
-                        }
-                    }
-                }
+      div { class: "space-y-4",
+        div { class: "text-base-content",
+          div {
+            div { class: "font-medium text-sm pb-1",
+              "Found {soundpack_count_keyboard + soundpack_count_mouse} soundpack(s)"
             }
-            div { class: "space-y-2",
-                div { class: "text-base-content/70 text-sm",
-                    "Refresh soundpack list to detect newly added or removed soundpacks."
-                }
-                div { class: "flex items-center gap-4",
-                    button {
-                        class: "btn btn-soft btn-sm",
-                        onclick: move |_| {
-                            refresh_soundpacks_cache();
-                        },
-                        disabled: refreshing_soundpacks(),
-                        if refreshing_soundpacks() {
-                            span { class: "loading loading-spinner loading-xs mr-2" }
-                            "Refreshing..."
-                        } else {
-                            RefreshCcw { class: "w-4 h-4 mr-1" }
-                            "Refresh"
-                        }
-                    }
-                    // Last scan info
-                    if app_state.read().optimized_cache.last_scan > 0 {
-                        div { class: "text-xs text-base-content/60",
-                            "Last scan "
-                            {
-                                let last_scan = app_state.read().optimized_cache.last_scan;
-                                let now = std::time::SystemTime::now()
-                                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs();
-                                let diff = now.saturating_sub(last_scan);
-                                if diff < 60 {
-                                    ": just now".to_string()
-                                } else if diff < 3600 {
-                                    format!("{} min ago", diff / 60)
-                                } else if diff < 86400 {
-                                    format!("{} hr ago", diff / 3600)
-                                } else {
-                                    format!("{} days ago", diff / 86400)
-                                }
-                            }
-                        }
-                    }
-                }
+            ul { class: "list-disc pl-6",
+              li { class: "text-sm text-base-content/70",
+                "Keyboard: {soundpack_count_keyboard}"
+              }
+              li { class: "text-sm text-base-content/70",
+                "Mouse: {soundpack_count_mouse}"
+              }
             }
-            div { class: "divider" }
-            div { class: "space-y-2",
-                div { class: "text-base-content font-medium text-sm",
-                    "Soundpack folder path"
-                }
-                input {
-                    value: "{soundpacks_dir_absolute}",
-                    class: "input input-sm w-full",
-                    readonly: true,
-                }
-                button {
-                    class: "btn btn-soft btn-sm",
-                    FolderOpen { class: "w-4 h-4 mr-1" }
-                    "Open soundpack folder"
-                }
-            }
-            div { class: "divider" }
-            div { class: "space-y-2",
-                div { class: "text-base-content font-medium text-sm",
-                    "Install new soundpack"
-                }
-                div { class: "text-base-content/70 text-sm",
-                    "Upload a ZIP file containing a soundpack to install it."
-                }
-                button {
-                    class: "btn btn-primary btn-sm",
-                    onclick: move |evt| on_upload_click.call(evt),
-                    Upload { class: "w-4 h-4 mr-2" }
-                    "Upload Soundpack"
-                }
-            }
-            div { class: "divider" }
-            div { class: "space-y-2",
-                div { class: "text-base-content font-medium text-sm",
-                    "Need more soundpacks?"
-                }
-                a {
-                    class: "btn btn-soft btn-sm",
-                    href: "https://mechvibes.com/soundpacks",
-                    target: "_blank",
-                    "Browse soundpacks"
-                    ExternalLink { class: "w-4 h-4 ml-1" }
-                }
-            }
+          }
         }
+        div { class: "space-y-2",
+          div { class: "text-base-content/70 text-sm",
+            "Refresh soundpack list to detect newly added or removed soundpacks."
+          }
+          div { class: "flex items-center gap-4",
+            button {
+              class: "btn  btn-soft btn-sm",
+              onclick: refresh_soundpacks_cache,
+              disabled: refreshing_soundpacks(),
+              if refreshing_soundpacks() {
+                span { class: "loading loading-spinner loading-xs mr-2" }
+                "Refreshing..."
+              } else {
+                RefreshCcw { class: "w-4 h-4 mr-1" }
+                "Refresh"
+              }
+            } // Last scan info
+            if app_state.optimized_cache.last_scan > 0 {
+              div { class: "text-xs text-base-content/60",
+                "Last scan "
+                {
+                    let last_scan = app_state.optimized_cache.last_scan;
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let diff = now.saturating_sub(last_scan);
+                    if diff < 60 {
+                        ": just now".to_string()
+                    } else if diff < 3600 {
+                        format!("{} min ago", diff / 60)
+                    } else if diff < 86400 {
+                        format!("{} hr ago", diff / 3600)
+                    } else {
+                        format!("{} days ago", diff / 86400)
+                    }
+                }
+              }
+            }
+          }
+        }
+        div { class: "divider" }
+        div { class: "space-y-2",
+          div { class: "text-base-content font-medium text-sm", "Soundpack folder path" }
+          input {
+            value: "{soundpacks_dir_absolute}",
+            class: "input input-sm w-full",
+            readonly: true,
+          }
+          button { class: "btn btn-soft btn-sm",
+            FolderOpen { class: "w-4 h-4 mr-1" }
+            "Open"
+          }
+        }
+        div { class: "divider" }
+        div { class: "space-y-2",
+          div { class: "text-base-content font-medium text-sm", "Need more soundpacks?" }
+          a {
+            class: "btn btn-soft btn-sm",
+            href: "https://mechvibes.com/soundpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
+            target: "_blank",
+            "Browse soundpacks"
+            ExternalLink { class: "w-4 h-4 ml-1" }
+          }
+        }
+      }
     }
 }

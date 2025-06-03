@@ -41,11 +41,7 @@ fn main() {
     // Register protocol on first run
     // if let Err(e) = protocol::register_protocol() {
     //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
-    // }
-
-    let _manifest = state::AppManifest::load();
-
-    // Initialize global app state before rendering
+    // }    let _manifest = state::AppManifest::load();    // Initialize global app state before rendering
     state::app::init_app_state();
 
     // Create a WindowBuilder with custom appearance

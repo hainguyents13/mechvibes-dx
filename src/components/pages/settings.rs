@@ -1,6 +1,6 @@
 use crate::components::ui::PageHeader;
-use crate::libs::theme::{use_theme, Theme};
-use crate::state::config_utils::use_config;
+use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
+use crate::utils::config_utils::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
 
@@ -147,18 +147,17 @@ pub fn SettingsPage() -> Element {
               }
               div { class: " justify-start",
                 button {
-                  class: "btn btn-error btn-soft btn-sm",
-                  onclick: {
+                  class: "btn btn-error btn-soft btn-sm",                  onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          theme.set(Theme::System);
+                          theme.set(Theme::BuiltIn(BuiltInTheme::System));
                           update_config(
                               Box::new(|config| {
                                   config.volume = 1.0;
                                   config.enable_sound = true;
                                   config.auto_start = false;
                                   config.show_notifications = true;
-                                  config.theme = Theme::System;
+                                  config.theme = Theme::BuiltIn(BuiltInTheme::System);
                               }),
                           );
                       }

@@ -1,53 +1,103 @@
-// Standard library imports
-use std::sync::{Arc, Mutex, RwLock};
-
-// External crate imports
+// Event-driven App State Manager
+use crate::state::soundpack_cache::SoundpackCache;
 use dioxus::prelude::*;
 use once_cell::sync::OnceCell;
-
-// Internal crate imports
-use crate::state::soundpack_cache::SoundpackCache;
+use std::sync::{Arc, Mutex};
 
 // Global app state for sharing between components
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub optimized_cache: Arc<SoundpackCache>,
+    pub last_updated: std::time::Instant,
+}
+
+impl PartialEq for AppState {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare cache contents, ignoring timestamp for reactivity purposes
+        Arc::ptr_eq(&self.optimized_cache, &other.optimized_cache)
+    }
 }
 
 impl AppState {
     pub fn new() -> Self {
         println!("🌍 Initializing global AppState...");
-
         Self {
             optimized_cache: Arc::new(SoundpackCache::load()),
+            last_updated: std::time::Instant::now(),
         }
     }
 
-    // Load soundpack list from optimized cache
     pub fn get_soundpacks(&self) -> Vec<crate::state::soundpack_cache::SoundpackMetadata> {
         self.optimized_cache.soundpacks.values().cloned().collect()
     }
+
+    pub fn refresh_cache(&mut self) {
+        println!("🔄 Refreshing soundpack cache...");
+        let mut fresh_cache = SoundpackCache::load();
+        fresh_cache.refresh_from_directory();
+        fresh_cache.save();
+        self.optimized_cache = Arc::new(fresh_cache);
+        self.last_updated = std::time::Instant::now();
+    }
 }
 
-static APP_STATE_SIGNAL: OnceCell<RwLock<AppState>> = OnceCell::new();
+// Global state instance
+static GLOBAL_APP_STATE: OnceCell<Mutex<AppState>> = OnceCell::new();
 
-// Hook for easy access to state from components
-pub fn use_app_state() -> Signal<AppState> {
-    // Initialize the global signal if needed
-    if APP_STATE_SIGNAL.get().is_none() {
-        if let Some(mutex) = APP_STATE.get() {
-            if let Ok(state) = mutex.lock() {
-                let _ = APP_STATE_SIGNAL.set(RwLock::new(state.clone()));
+// Events that can trigger state updates
+#[derive(Debug, Clone)]
+pub enum AppStateEvent {
+    SoundpackImported { soundpack_id: String },
+    CacheRefreshRequested,
+}
+
+// Simple hook for read-only access
+pub fn use_app_state() -> AppState {
+    let update_signal: Signal<u32> = use_context();
+
+    let app_state = use_memo(move || {
+        let _ = update_signal(); // Subscribe to changes
+        if let Some(global_state) = GLOBAL_APP_STATE.get() {
+            if let Ok(state) = global_state.lock() {
+                return state.clone();
             }
         }
-    }
+        AppState::new()
+    });
 
-    use_signal(move || {
-        APP_STATE_SIGNAL
-            .get()
-            .and_then(|lock| lock.read().ok().map(|guard| guard.clone()))
-            .unwrap_or_else(AppState::new)
+    let result = app_state.read().clone();
+    result
+}
+
+// Hook to trigger state updates
+pub fn use_state_trigger() -> Callback<()> {
+    let mut update_signal: Signal<u32> = use_context();
+    use_callback(move |_| {
+        // Refresh cache and trigger UI update
+        if let Some(global_state) = GLOBAL_APP_STATE.get() {
+            if let Ok(mut state) = global_state.lock() {
+                println!("🔄 Triggering cache refresh...");
+                state.refresh_cache();
+            }
+        }
+        // Trigger UI update by incrementing the signal value
+        let current_value = {
+            let val = update_signal.read();
+            *val
+        };
+        update_signal.set(current_value + 1);
     })
+}
+
+// Global trigger function for use outside of components
+pub fn trigger_global_state_update(event: String) {
+    println!("🌍 Global state update triggered: {:?}", event);
+
+    if let Some(global_state) = GLOBAL_APP_STATE.get() {
+        if let Ok(mut state) = global_state.lock() {
+            state.refresh_cache();
+        }
+    }
 }
 
 // Reload the current soundpacks from configuration
@@ -79,28 +129,10 @@ pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
     }
 }
 
-pub static APP_STATE: OnceCell<Mutex<AppState>> = OnceCell::new();
-
-// Call this function once at the start of your application to initialize APP_STATE
+// Initialize the app state - call this once at startup
 pub fn init_app_state() {
-    // Initialize the mutex-based state if not already done
-    if APP_STATE.get().is_none() {
+    if GLOBAL_APP_STATE.get().is_none() {
         println!("📝 Initializing global app state (mutex)...");
-        APP_STATE
-            .set(Mutex::new(AppState::new()))
-            .expect("Failed to initialize global app state mutex");
-    }
-
-    // Initialize the signal-based state if not already done
-    if APP_STATE_SIGNAL.get().is_none() {
-        println!("📝 Initializing global app state (signal)...");
-        let app_state = match APP_STATE.get().and_then(|mutex| mutex.lock().ok()) {
-            Some(state) => state.clone(),
-            None => AppState::new(),
-        };
-
-        APP_STATE_SIGNAL
-            .set(RwLock::new(app_state))
-            .expect("Failed to initialize global app state signal");
+        let _ = GLOBAL_APP_STATE.set(Mutex::new(AppState::new()));
     }
 }

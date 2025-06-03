@@ -1,5 +1,5 @@
 use crate::libs::audio::AudioContext;
-use crate::state::config_utils::use_config;
+use crate::utils::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use lucide_dioxus::{Check, ChevronDown, Keyboard, Mouse, Music, Search};
@@ -33,12 +33,11 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
 }
 
 #[component]
-fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
-    // Use audio context from the layout provider
+fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio context from the layout provider
     let audio_ctx: Arc<AudioContext> = use_context();
+    
+    // Use the new event-driven app state
     use crate::state::app::use_app_state;
-
-    // Get global app state and shared config
     let app_state = use_app_state();
     let (config, update_config) = use_config();
 
@@ -46,10 +45,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     let error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let is_loading = use_signal(|| false);
-
-    // Use global app state for soundpacks
-    let soundpacks = use_memo(move || app_state.with(|state| state.get_soundpacks()));
+    let is_loading = use_signal(|| false);    // Use global app state for soundpacks
+    let soundpacks = use_memo(move || app_state.get_soundpacks());
 
     // Get current soundpack based on type
     let current = use_memo(move || {

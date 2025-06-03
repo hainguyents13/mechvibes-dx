@@ -2,7 +2,7 @@ use crate::components::logo::Logo;
 use crate::components::soundpack_selector::{KeyboardSoundpackSelector, MouseSoundpackSelector};
 use crate::components::volume_slider::{KeyboardVolumeSlider, MouseVolumeSlider};
 use crate::libs::AudioContext;
-use crate::state::config_utils::use_config;
+use crate::utils::config_utils::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use std::sync::atomic::{AtomicU64, Ordering};

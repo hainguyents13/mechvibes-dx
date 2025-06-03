@@ -1,11 +1,11 @@
-use crate::libs::theme::{use_theme, Theme};
+use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
 use crate::state::config::AppConfig;
-use crate::state::config_utils::use_config;
-use crate::state::theme_utils::use_themes;
 use crate::state::themes::ThemesConfig;
+use crate::utils::config_utils::use_config;
+use crate::utils::theme_utils::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Check, Computer, Moon, Palette, Pencil, Plus, Sun, Trash2};
+use lucide_dioxus::{Computer, Ellipsis, Moon, Pencil, Plus, Sun, Trash2};
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -25,62 +25,100 @@ pub fn ThemeToggler() -> Element {
     let mut editing_theme = use_signal(|| None::<String>); // Theme ID being edited
 
     rsx! {
-      div { class: "space-y-4 mt-4",
-        // Built-in themes
+      div { class: "space-y-4 mt-4",        // Built-in themes
         div { class: "text-sm text-base-content", "Built-in themes" }
         div { class: "flex items-center justify-between gap-2 w-full",
           button {
-            class: if matches!(*theme.read(), Theme::Dark) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
+            class: format!(
+                "btn btn-soft flex-1 {}",
+                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::Dark)) { "btn-disabled" } else { "" },
+            ),
             onclick: {
                 let update_fn = update_config.clone();
                 move |_| {
-                    theme.set(Theme::Dark);
+                    theme.set(Theme::BuiltIn(BuiltInTheme::Dark));
                     update_fn(
                         Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::Dark;
+                            config.theme = Theme::BuiltIn(BuiltInTheme::Dark);
                         }),
                     );
                 }
-            },
-            Moon { class: "w-4 h-4 mr-1" }
-            {Theme::Dark.display_name()}
+            },            Moon { class: "w-4 h-4 mr-1" }
+            "Dark"
           }
           button {
-            class: if matches!(*theme.read(), Theme::Light) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
+            class: format!(
+                "btn btn-soft flex-1 {}",
+                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::Light)) { "btn-disabled" } else { "" },
+            ),
             onclick: {
                 let update_fn = update_config.clone();
                 move |_| {
-                    theme.set(Theme::Light);
+                    theme.set(Theme::BuiltIn(BuiltInTheme::Light));
                     update_fn(
                         Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::Light;
+                            config.theme = Theme::BuiltIn(BuiltInTheme::Light);
                         }),
                     );
                 }
-            },
-            Sun { class: "w-4 h-4 mr-1" }
-            {Theme::Light.display_name()}
+            },            Sun { class: "w-4 h-4 mr-1" }
+            "Light"
           }
           button {
-            class: if matches!(*theme.read(), Theme::System) { "btn btn-neutral flex-1" } else { "btn btn-soft flex-1" },
+            class: format!(
+                "btn btn-soft flex-1 {}",
+                if matches!(*theme.read(), Theme::BuiltIn(BuiltInTheme::System)) { "btn-disabled" } else { "" },
+            ),
             onclick: {
                 let update_fn = update_config.clone();
                 move |_| {
-                    theme.set(Theme::System);
+                    theme.set(Theme::BuiltIn(BuiltInTheme::System));
                     update_fn(
                         Box::new(|config: &mut AppConfig| {
-                            config.theme = Theme::System;
+                            config.theme = Theme::BuiltIn(BuiltInTheme::System);
                         }),
                     );
                 }
-            },
-            Computer { class: "w-4 h-4 mr-1" }
-            {Theme::System.display_name()}
+            },            Computer { class: "w-4 h-4 mr-1" }
+            "System"
+          }
+        }        // DaisyUI themes
+        div { class: "text-sm text-base-content mt-4", "DaisyUI themes" }
+        div { class: "grid grid-cols-3 gap-2",
+          for builtin_theme in BuiltInTheme::all().iter().skip(3) { // Skip Light, Dark, System
+            {
+                let builtin_theme_clone = builtin_theme.clone();
+                rsx! {
+                    button {
+                      class: format!(
+                          "btn btn-soft text-xs {}",
+                          if matches!(*theme.read(), Theme::BuiltIn(ref current) if current == builtin_theme) { "btn-disabled" } else { "" },
+                      ),
+                      onclick: {
+                          let builtin_theme = builtin_theme_clone.clone();
+                          let update_fn = update_config.clone();
+                          move |_| {
+                              theme.set(Theme::BuiltIn(builtin_theme.clone()));
+                              update_fn(
+                                  Box::new({
+                                      let builtin_theme = builtin_theme.clone();
+                                      move |config: &mut AppConfig| {
+                                          config.theme = Theme::BuiltIn(builtin_theme);
+                                      }
+                                  }),
+                              );
+                          }
+                      },
+                      {format!("{:?}", builtin_theme_clone)}
+                    }
+                }
+            }
           }
         }
+
         // Custom themes
         if !custom_themes.is_empty() {
-          div { class: "space-y-2",
+          div { class: "space-y-2 mt-4",
             div { class: "text-sm text-base-content", "Custom themes" }
             for theme_data in custom_themes.iter() {
               CustomThemeButton {
@@ -88,27 +126,30 @@ pub fn ThemeToggler() -> Element {
                 theme_id: theme_data.id.clone(),
                 theme_css: theme_data.css.clone(),
                 is_active: matches!(*theme.read(), Theme::Custom(ref current) if current == &theme_data.id),
-                on_select: {
+                is_built_in: false,                on_select: {
                     let theme_id = theme_data.id.clone();
                     let update_fn = update_config.clone();
                     move |_| {
-                        let theme_id = theme_id.clone();
                         theme.set(Theme::Custom(theme_id.clone()));
                         update_fn(
-                            Box::new(move |config: &mut AppConfig| {
-                                config.theme = Theme::Custom(theme_id);
+                            Box::new({
+                                let theme_id = theme_id.clone();
+                                move |config: &mut AppConfig| {
+                                    config.theme = Theme::Custom(theme_id);
+                                }
                             }),
                         );
                     }
-                },
-                on_delete: {
+                },                on_delete: {
                     let theme_id = theme_data.id.clone();
                     let update_themes = update_themes.clone();
                     move |_| {
-                        let theme_id = theme_id.clone();
                         update_themes(
-                            Box::new(move |themes: &mut ThemesConfig| {
-                                let _ = themes.delete_theme(&theme_id);
+                            Box::new({
+                                let theme_id = theme_id.clone();
+                                move |themes: &mut ThemesConfig| {
+                                    let _ = themes.delete_theme(&theme_id);
+                                }
                             }),
                         );
                     }
@@ -123,7 +164,8 @@ pub fn ThemeToggler() -> Element {
               }
             }
           }
-        } // Create new theme button
+        }
+        // Create new theme button
         CreateThemeButton { editing_theme_id: editing_theme }
       }
     }
@@ -138,6 +180,7 @@ struct CustomThemeButtonProps {
     on_select: EventHandler<MouseEvent>,
     on_delete: EventHandler<MouseEvent>,
     on_edit: EventHandler<MouseEvent>,
+    is_built_in: bool,
 }
 
 #[component]
@@ -146,45 +189,51 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
       div { class: "flex w-full items-center gap-2",
         button {
           class: format!(
-              "bg-base-100 overflow-hidden border border-primary rounded-lg text-base-content w-full  font-sans transition-all {}",
-              if props.is_active {
-                  "select-none opacity-20"
-              } else {
-                  "hover:ring-4 cursor-pointer"
-              },
+              "gap-3 flex btn btn-soft grow text-left justify-start {}",
+              if props.is_active { "btn-disabled" } else { "" },
           ),
-          style: props.theme_css.clone(),
-          disabled: props.is_active,
           onclick: props.on_select,
-          div { class: "flex bg-base-100 gap-3 h-9 px-2 items-center justify-between relative",
-            div { class: "flex items-center grow-0 justify-center",
-              if props.is_active {
-                Check { class: "w-5 h-5 text-primary" }
-              } else {
-                Palette { class: "w-5 h-5 text-primary" }
+          div {
+            class: format!(
+                "bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-1 shadow-sm {}",
+                if props.is_active { "opacity-30" } else { "" },
+            ),
+            "data-theme": props.theme_id.clone(),
+            style: props.theme_css.clone(),
+            div { class: "bg-base-content size-2 rounded-full" }
+            div { class: "bg-primary size-2 rounded-full" }
+            div { class: "bg-secondary size-2 rounded-full" }
+            div { class: "bg-accent size-2 rounded-full" }
+          }
+          div { class: "w-32 truncate", {props.name.clone()} }
+        }
+        // Dropdown for actions
+        if !props.is_built_in {
+          div { class: "dropdown dropdown-hover dropdown-left",
+            div {
+              class: "btn btn-ghost",
+              tabindex: "0",
+              role: "button",
+              Ellipsis { class: "w-4 h-4" }
+            }
+            ul {
+              class: "dropdown-content menu bg-base-100 rounded-box z-1 p-2 shadow-sm",
+              tabindex: "0",
+              li {
+                a { onclick: props.on_edit,
+                  Pencil { class: "w-4 h-4 mr-1" }
+                  "Edit "
+                }
+              }
+              li {
+                a {
+                  class: "text-error",
+                  onclick: props.on_delete,
+                  Trash2 { class: "w-4 h-4 mr-1" }
+                  "Delete "
+                }
               }
             }
-            div { class: "bg-base-100 grow text-primary font-bold text-left",
-              {props.name.clone()}
-            }
-            div { class: "flex gap-1 items-center",
-              div { class: "bg-primary flex aspect-square w-3 rounded-full" }
-              div { class: "bg-secondary flex aspect-square w-3 rounded-full" }
-              div { class: "bg-accent flex aspect-square w-3 rounded-full" }
-              div { class: "bg-neutral flex aspect-square w-3 rounded-full" }
-            }
-          }
-        }
-        div { class: "join",
-          button {
-            class: "btn h-9 join-item btn-outline btn-sm",
-            onclick: props.on_edit,
-            Pencil { class: "w-4 h-4" }
-          }
-          button {
-            class: "btn h-9 join-item btn-sm btn-outline btn-error",
-            onclick: props.on_delete,
-            Trash2 { class: "w-4 h-4" }
           }
         }
       }

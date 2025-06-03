@@ -1,4 +1,4 @@
-use crate::libs::theme::Theme;
+use crate::libs::theme::{BuiltInTheme, Theme};
 use crate::state::paths;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,8 @@ pub struct AppConfig {
 
     // Audio settings
     pub keyboard_soundpack: String,
-    pub mouse_soundpack: String,    pub volume: f32,
+    pub mouse_soundpack: String,
+    pub volume: f32,
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
@@ -54,7 +55,8 @@ impl AppConfig {
             }
         } else {
             let default_config = Self::default();
-            let _ = default_config.save();            default_config
+            let _ = default_config.save();
+            default_config
         }
     }
 
@@ -81,9 +83,10 @@ impl Default for AppConfig {
             enable_sound: true,
             enable_keyboard_sound: true, // Default keyboard sounds enabled
             enable_mouse_sound: true,    // Default mouse sounds enabled
-            theme: Theme::System,        // Default to System theme
+            theme: Theme::BuiltIn(BuiltInTheme::System), // Default to System theme
             custom_css: String::new(),
-            auto_start: false,            show_notifications: true,
+            auto_start: false,
+            show_notifications: true,
         }
     }
 }

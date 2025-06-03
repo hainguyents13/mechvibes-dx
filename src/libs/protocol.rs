@@ -141,16 +141,6 @@ pub fn handle_protocol_url(url: &str) -> Result<(), Box<dyn std::error::Error>> 
             // The app is already opening, so we just need to ensure it's focused
             focus_window();
         }
-        path if path.starts_with("switch-theme/") => {
-            let theme_id = &path[13..];
-            println!("🎨 Applying theme from protocol: {}", theme_id);
-            switch_theme_from_protocol(theme_id)?;
-        }
-        path if path.starts_with("switch-soundpack/") => {
-            let soundpack_name = &path[17..];
-            println!("🔊 Loading soundpack from protocol: {}", soundpack_name);
-            switch_soundpack_from_protocol(soundpack_name)?;
-        }
         path if path.starts_with("install-soundpack/") => {
             let soundpack_name = &path[18..];
             println!("🔊 Installing soundpack from protocol: {}", soundpack_name);
@@ -180,103 +170,6 @@ fn focus_window() {
 #[cfg(not(target_os = "windows"))]
 fn focus_window() {
     println!("🖥️ Window focus handling for this platform not implemented");
-}
-
-/// Apply a theme from protocol URL
-fn switch_theme_from_protocol(theme_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::libs::theme::Theme;
-    use crate::state::config::AppConfig;
-    use crate::state::theme_utils::get_themes_config;
-    use crate::state::themes::CustomThemeData;
-    use chrono::Utc;
-
-    let mut themes_config = get_themes_config();
-
-    // Special case handling for built-in themes
-    if theme_id == "dark" || theme_id == "light" || theme_id == "system" {
-        let mut config = AppConfig::load();
-        config.theme = match theme_id {
-            "dark" => Theme::Dark,
-            "light" => Theme::Light,
-            "system" => Theme::System,
-            _ => Theme::Dark, // Fallback
-        };
-
-        if let Err(e) = config.save() {
-            eprintln!("❌ Failed to save config with new theme: {}", e);
-            return Err(e.into());
-        }
-
-        println!("🎨 Applied built-in theme: {}", theme_id);
-        return Ok(());
-    }
-
-    // Try to find a custom theme
-    if let Some(theme_data) = themes_config.get_theme_by_id(theme_id) {
-        println!("✅ Found theme: {}", theme_data.name);
-        // Update the main config to use this theme
-        let mut config = AppConfig::load();
-        config.theme = Theme::Custom(theme_id.to_string());
-
-        if let Err(e) = config.save() {
-            eprintln!("❌ Failed to save config with new theme: {}", e);
-        }
-
-        println!("🎨 Applied theme: {}", theme_data.name);
-    } else {
-        // Create the theme if it doesn't exist
-        println!("📝 Creating theme: {}", theme_id);
-
-        let new_theme = CustomThemeData {
-            id: theme_id.to_string(),
-            name: theme_id.to_string(),
-            description: format!("Theme created from protocol URL: {}", theme_id),
-            css: format!(
-                r#".app-container {{ background-color: #202020; color: #ffffff; }}
-                    .title-bar {{ background-color: #101010; }}"#
-            ),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-
-        // Add to themes
-        themes_config
-            .custom_themes
-            .insert(theme_id.to_string(), new_theme);
-
-        // Save themes config
-        if let Err(e) = themes_config.save() {
-            return Err(format!("Failed to save new theme: {}", e).into());
-        }
-
-        // Update main config
-        let mut config = AppConfig::load();
-        config.theme = Theme::Custom(theme_id.to_string());
-
-        if let Err(e) = config.save() {
-            return Err(format!("Failed to apply new theme: {}", e).into());
-        }
-
-        println!("✅ Created and applied new theme: {}", theme_id);
-    }
-
-    Ok(())
-}
-
-/// Load a soundpack from protocol URL
-fn switch_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::state::config::AppConfig;
-
-    let mut config = AppConfig::load();
-    config.keyboard_soundpack = soundpack_name.to_string();
-
-    if let Err(e) = config.save() {
-        eprintln!("❌ Failed to save config with new soundpack: {}", e);
-        return Err(e.into());
-    }
-
-    println!("🔊 Loaded soundpack: {}", soundpack_name);
-    Ok(())
 }
 
 fn install_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -357,8 +250,8 @@ fn install_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn s
 fn import_theme_from_protocol(theme_data: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::libs::theme::Theme;
     use crate::state::config::AppConfig;
-    use crate::state::theme_utils::get_themes_config;
     use crate::state::themes::CustomThemeData;
+    use crate::utils::theme_utils::get_themes_config;
     use chrono::Utc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -389,12 +282,15 @@ fn import_theme_from_protocol(theme_data: &str) -> Result<(), Box<dyn std::error
         css: ".app-container { background-color: #202020; color: #ffffff; }".to_string(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        is_built_in: false, // Mark as custom theme
     };
 
     // Add theme to custom_themes map
     themes_config
         .custom_themes
-        .insert(theme_id.clone(), new_theme); // Save the themes config
+        .insert(theme_id.clone(), new_theme);
+
+    // Save the themes config
     if let Err(e) = themes_config.save() {
         return Err(format!("Failed to save imported theme: {}", e).into());
     }
