@@ -31,6 +31,10 @@ serde_json = "1.0.140"
 default = ["dioxus/desktop"]
 desktop = ["dioxus/desktop"]
 
+[[bin]]
+name = "config_converter"
+path = "src/config_converter.rs"
+
 [package.metadata.bundle]
 name = "MechvibesDX"
 identifier = "com.hainguyents13.mechvibesdx"

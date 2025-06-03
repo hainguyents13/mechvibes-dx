@@ -1,4 +1,6 @@
 use crate::state::paths;
+use crate::utils::soundpack_validator::{validate_soundpack_config, SoundpackValidationStatus};
+use crate::utils::config_converter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -17,6 +19,11 @@ pub struct SoundpackMetadata {
     pub mouse: bool, // true for mouse soundpacks, false for keyboard
     pub last_modified: u64,
     pub last_accessed: u64,
+    // Validation fields
+    pub config_version: Option<u32>,
+    pub is_valid_v2: bool,
+    pub validation_status: String,
+    pub can_be_converted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,10 +64,10 @@ impl SoundpackCache {
         };
 
         // Auto-refresh if cache is empty, outdated, or version mismatch
-        if cache.soundpacks.is_empty() || cache.last_scan == 0 || cache.cache_version < 2 {
-            if cache.cache_version < 2 {
+        if cache.soundpacks.is_empty() || cache.last_scan == 0 || cache.cache_version < 3 {
+            if cache.cache_version < 3 {
                 println!(
-                    "🔄 Cache version outdated (v{} -> v2), refreshing...",
+                    "🔄 Cache version outdated (v{} -> v3), refreshing...",
                     cache.cache_version
                 );
             }
@@ -76,7 +83,7 @@ impl SoundpackCache {
         Self {
             soundpacks: HashMap::new(),
             last_scan: 0,
-            cache_version: 2, // Current version with data URI support
+            cache_version: 3, // Current version with validation support
         }
     }
 
@@ -164,6 +171,34 @@ impl SoundpackCache {
     fn load_soundpack_metadata(&self, soundpack_id: &str) -> Result<SoundpackMetadata, String> {
         let config_path = paths::soundpacks::config_json(soundpack_id);
 
+        // Validate the soundpack configuration first
+        let validation_result = validate_soundpack_config(&config_path);
+        
+        // If it's a V1 config that can be converted, auto-convert it
+        if validation_result.status == SoundpackValidationStatus::VersionOneNeedsConversion && validation_result.can_be_converted {
+            println!("🔄 Auto-converting V1 soundpack '{}' to V2 format", soundpack_id);
+            
+            // Create backup of original config
+            let backup_path = format!("{}.v1.backup", config_path);
+            if let Err(e) = std::fs::copy(&config_path, &backup_path) {
+                println!("⚠️  Failed to create backup for {}: {}", soundpack_id, e);
+            }
+            
+            // Convert V1 to V2
+            match config_converter::convert_v1_to_v2(&config_path, &config_path) {
+                Ok(()) => {
+                    println!("✅ Successfully converted {} from V1 to V2", soundpack_id);
+                }
+                Err(e) => {
+                    println!("❌ Failed to convert {} from V1 to V2: {}", soundpack_id, e);
+                    // Restore backup if conversion failed
+                    if std::fs::copy(&backup_path, &config_path).is_ok() {
+                        println!("🔙 Restored original config from backup");
+                    }
+                }
+            }
+        }
+
         let content = std::fs::read_to_string(&config_path)
             .map_err(|e| format!("Failed to read config: {}", e))?;
 
@@ -192,6 +227,9 @@ impl SoundpackCache {
             })
             .unwrap_or_default();
 
+        // Re-validate after potential conversion
+        let final_validation = validate_soundpack_config(&config_path);
+
         // Get file stats
         let metadata = std::fs::metadata(&config_path)
             .map_err(|e| format!("Failed to get metadata: {}", e))?;
@@ -201,6 +239,7 @@ impl SoundpackCache {
             name,
             author: config
                 .get("author")
+                .or_else(|| config.get("m_author"))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             description: config
@@ -262,6 +301,17 @@ impl SoundpackCache {
                 .unwrap_or_default()
                 .as_secs(),
             last_accessed: 0, // Will be updated when accessed
+            // Validation fields
+            config_version: final_validation.config_version,
+            is_valid_v2: final_validation.is_valid_v2,
+            validation_status: match final_validation.status {
+                SoundpackValidationStatus::Valid => "valid".to_string(),
+                SoundpackValidationStatus::InvalidVersion => "invalid_version".to_string(),
+                SoundpackValidationStatus::InvalidStructure(_) => "invalid_structure".to_string(),
+                SoundpackValidationStatus::MissingRequiredFields(_) => "missing_fields".to_string(),
+                SoundpackValidationStatus::VersionOneNeedsConversion => "v1_needs_conversion".to_string(),
+            },
+            can_be_converted: final_validation.can_be_converted,
         })
     }
 

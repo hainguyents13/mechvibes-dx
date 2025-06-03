@@ -336,6 +336,11 @@ fn create_soundpack_metadata(
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs(),
+        // Add validation fields with default values
+        config_version: Some(soundpack.config_version),
+        is_valid_v2: true, // Assume valid since it loaded successfully
+        validation_status: "valid".to_string(),
+        can_be_converted: false,
     })
 }
 

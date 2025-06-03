@@ -83,11 +83,6 @@ pub mod utils {
         get_app_root().join("data").join("config.json").exists()
     }
 
-    /// Check if soundpacks directory exists
-    pub fn soundpacks_dir_exists() -> bool {
-        get_app_root().join("soundpacks").exists()
-    }
-
     /// Count soundpacks in the soundpacks directory
     pub fn count_soundpacks_by_type() -> (usize, usize) {
         let soundpacks_dir = get_app_root().join("soundpacks");
