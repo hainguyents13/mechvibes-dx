@@ -1,0 +1,23 @@
+{
+    "name": "Test V1 Soundpack",
+    "about": "A test soundpack using V1 format for testing conversion",
+    "include_typed_keys": [
+        "Backspace",
+        "Delete",
+        "Enter",
+        "Tab",
+        "Escape",
+        "Space",
+        "CapsLock",
+        "LShift",
+        "RShift",
+        "LCtrl",
+        "RCtrl",
+        "LAlt",
+        "RAlt"
+    ],
+    "key_define_type": "single",
+    "sound": "test_sound.wav",
+    "key_volume": 0.8,
+    "enabled": true
+}

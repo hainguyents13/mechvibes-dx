@@ -13,4 +13,11 @@ node_modules
 /wix
 create_portable.ps1
 /bundles
-/tests
+/tests*
+
+# Test files and directories
+test_*.zip
+test_*.json
+test_soundpack/
+test_soundpack_v1/
+test_nested_soundpack/
