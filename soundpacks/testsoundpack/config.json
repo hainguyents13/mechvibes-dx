@@ -1,9 +1,0 @@
-{
-    "name": "Test Soundpack",
-    "id": "test-soundpack-2024",
-    "author": "Test Author",
-    "desc": "A test soundpack for validation",
-    "sounds": {
-        "key": "test_sound.wav"
-    }
-}
