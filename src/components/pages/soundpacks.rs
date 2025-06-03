@@ -53,8 +53,7 @@ pub fn SoundpacksPage() -> Element {
             use futures_timer::Delay;
             use std::time::Duration;
 
-            // Add a small artificial delay to make loading state more visible
-            Delay::new(Duration::from_millis(800)).await;
+            Delay::new(Duration::from_millis(100)).await;
 
             println!("Starting soundpack refresh operation...");
 
@@ -70,7 +69,7 @@ pub fn SoundpacksPage() -> Element {
             crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
 
             // Add another small delay before changing the loading state back
-            Delay::new(Duration::from_millis(200)).await;
+            Delay::new(Duration::from_millis(100)).await;
 
             // Reset loading state
             refreshing_signal.set(false);

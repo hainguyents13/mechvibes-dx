@@ -2,13 +2,13 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 
 /// Convert soundpack config from version 1 to version 2
-/// 
+///
 /// Version 1 format:
 /// - Uses "defines" field mapping numeric IDs to sound files
 /// - Uses "key_define_type" field
 /// - Uses "sound" field for main sound file
 /// - Has numeric key mappings in "defines"
-/// 
+///
 /// Version 2 format:
 /// - Uses "defs" field mapping key names to [start, end] timing arrays
 /// - Uses "source" field for main sound file  
@@ -16,7 +16,10 @@ use std::collections::HashMap;
 /// - Has "config_version" field set to 2
 /// - Has "mouse" field (defaults to false for keyboard)
 /// - Has "author" field (required)
-pub fn convert_v1_to_v2(v1_config_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn convert_v1_to_v2(
+    v1_config_path: &str,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Read the V1 config
     let content = std::fs::read_to_string(v1_config_path)?;
     let config: Value = serde_json::from_str(&content)?;
@@ -32,13 +35,11 @@ pub fn convert_v1_to_v2(v1_config_path: &str, output_path: &str) -> Result<(), B
         converted_config.insert("name".to_string(), name.clone());
     }
 
-    // Add author field (required in V2) - use from config or default
-    if let Some(author) = config.get("m_author") {
-        converted_config.insert("author".to_string(), author.clone());
-    } else if let Some(author) = config.get("author") {
+    // Add author field (required in V2) - use from config or default to "N/A"
+    if let Some(author) = config.get("author") {
         converted_config.insert("author".to_string(), author.clone());
     } else {
-        converted_config.insert("author".to_string(), Value::String("Unknown".to_string()));
+        converted_config.insert("author".to_string(), Value::String("N/A".to_string()));
     }
 
     // Optional fields
@@ -87,7 +88,10 @@ pub fn convert_v1_to_v2(v1_config_path: &str, output_path: &str) -> Result<(), B
     converted_config.insert("mouse".to_string(), Value::Bool(false));
 
     // Add config_version field set to 2
-    converted_config.insert("config_version".to_string(), Value::Number(serde_json::Number::from(2)));
+    converted_config.insert(
+        "config_version".to_string(),
+        Value::Number(serde_json::Number::from(2)),
+    );
 
     // Convert "defines" to "defs" with proper timing format
     let mut defs = Map::new();
@@ -107,9 +111,7 @@ pub fn convert_v1_to_v2(v1_config_path: &str, output_path: &str) -> Result<(), B
                     if let Some(key_name) = key_mappings.get(&vk_num) {
                         // Create timing array [start, end] - for now, use default timing
                         // In a real implementation, you'd extract timing from the sound file
-                        let timing = vec![
-                            Value::Array(vec![Value::from(0.0), Value::from(100.0)])
-                        ];
+                        let timing = vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])];
                         defs.insert(key_name.clone(), Value::Array(timing));
                     }
                 }
@@ -146,13 +148,11 @@ pub fn convert_v1_to_v2_memory(v1_config_json: &str) -> Result<String, Box<dyn s
         converted_config.insert("name".to_string(), name.clone());
     }
 
-    // Add author field (required in V2) - use from config or default
-    if let Some(author) = config.get("m_author") {
-        converted_config.insert("author".to_string(), author.clone());
-    } else if let Some(author) = config.get("author") {
+    // Add author field (required in V2) - use from config or default to "N/A"
+    if let Some(author) = config.get("author") {
         converted_config.insert("author".to_string(), author.clone());
     } else {
-        converted_config.insert("author".to_string(), Value::String("Unknown".to_string()));
+        converted_config.insert("author".to_string(), Value::String("N/A".to_string()));
     }
 
     // Optional fields
@@ -201,7 +201,10 @@ pub fn convert_v1_to_v2_memory(v1_config_json: &str) -> Result<String, Box<dyn s
     converted_config.insert("mouse".to_string(), Value::Bool(false));
 
     // Add config_version field set to 2
-    converted_config.insert("config_version".to_string(), Value::Number(serde_json::Number::from(2)));
+    converted_config.insert(
+        "config_version".to_string(),
+        Value::Number(serde_json::Number::from(2)),
+    );
 
     // Convert "defines" to "defs" with proper timing format
     let mut defs = Map::new();
@@ -220,9 +223,7 @@ pub fn convert_v1_to_v2_memory(v1_config_json: &str) -> Result<String, Box<dyn s
                 if let Ok(vk_num) = vk_code.parse::<u32>() {
                     if let Some(key_name) = key_mappings.get(&vk_num) {
                         // Create timing array [start, end] - for now, use default timing
-                        let timing = vec![
-                            Value::Array(vec![Value::from(0.0), Value::from(100.0)])
-                        ];
+                        let timing = vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])];
                         defs.insert(key_name.clone(), Value::Array(timing));
                     }
                 }

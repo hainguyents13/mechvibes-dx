@@ -69,7 +69,7 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
     // Check for V2 indicators
     let has_defs = config.get("defs").is_some();
     let _has_source_field = config.get("source").is_some();
-    let has_author = config.get("author").is_some() || config.get("m_author").is_some();
+    let has_author = config.get("author").is_some();
 
     // Determine version based on structure
     if config_version == Some(2) {
@@ -92,7 +92,7 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
         // Unknown or invalid structure
         let mut missing_fields = Vec::new();
 
-        if !has_author && !config.get("m_author").is_some() {
+        if !has_author {
             missing_fields.push("author".to_string());
         }
 
@@ -230,7 +230,7 @@ pub fn is_v2_config(config: &Value) -> bool {
         .and_then(|v| v.as_u64())
         .map(|v| v as u32);
     let has_defs = config.get("defs").is_some();
-    let has_author = config.get("author").is_some() || config.get("m_author").is_some();
+    let has_author = config.get("author").is_some();
 
     // V2 if explicitly marked or has V2 structure
     config_version == Some(2) || (has_defs && has_author)
