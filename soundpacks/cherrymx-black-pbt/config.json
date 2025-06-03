@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "tags": ["cherry", "mx", "black", "mechanical", "pbt"],
     "keycap": "pbt",
+    "config_version": 2,
     "icon": "icon.jpg",
     "source": "sound.ogg",
     "method": "single",

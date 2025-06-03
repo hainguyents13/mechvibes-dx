@@ -59,7 +59,7 @@ pub fn Home() -> Element {
 #[component]
 pub fn Soundpacks() -> Element {
     rsx! {
-      crate::components::pages::SoundpacksPage {}
+      crate::components::pages::Soundpacks {}
     }
 }
 

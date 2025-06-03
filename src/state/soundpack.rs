@@ -12,6 +12,11 @@ impl SoundpackType {}
 
 impl SoundPack {}
 
+// Default function for config_version field
+fn default_config_version() -> u32 {
+    2
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundPack {
     pub id: String,
@@ -35,5 +40,7 @@ pub struct SoundPack {
     pub includes_numpad: Option<bool>,
     #[serde(default)]
     pub mouse: bool, // true for mouse soundpacks, false for keyboard soundpacks
+    #[serde(default = "default_config_version")]
+    pub config_version: u32, // Configuration version, default to 2
     pub defs: HashMap<String, Vec<[f32; 2]>>,
 }

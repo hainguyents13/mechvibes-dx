@@ -106,11 +106,11 @@ impl AudioContext {
         }
     }
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
-        // println!(
-        //     "🖱️ Mouse event received: {} ({})",
-        //     button,
-        //     if is_buttondown { "down" } else { "up" }
-        // );
+        println!(
+            "🖱️ Mouse event received: {} ({})",
+            button,
+            if is_buttondown { "down" } else { "up" }
+        );
 
         // Check enable_sound from config before playing audio
         let config = AppConfig::load();

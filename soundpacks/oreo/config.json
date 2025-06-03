@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "tags": ["oreo", "ryan", "sound pack", "fun", "thocky"],
     "keycap": "pbt",
+    "config_version": 2,
     "icon": "icon.png",
     "source": "oreo.ogg",
     "method": "single",

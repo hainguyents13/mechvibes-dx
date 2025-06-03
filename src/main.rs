@@ -4,6 +4,7 @@
 mod components;
 mod libs;
 mod state;
+mod utils;
 pub use crate::components::header::Header;
 use dioxus::desktop::{Config, LogicalPosition, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;

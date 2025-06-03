@@ -46,7 +46,8 @@ impl AudioContext {
             mouse_pressed: Arc::new(Mutex::new(HashMap::new())),
             key_sinks: Arc::new(Mutex::new(HashMap::new())),
             mouse_sinks: Arc::new(Mutex::new(HashMap::new())),
-        }; // Initialize volume from config
+        };
+        // Initialize volume from config
         let config = AppConfig::load();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
