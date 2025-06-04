@@ -6,6 +6,7 @@ use crate::Header;
 use dioxus::prelude::*;
 use notify_rust::Notification;
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 pub fn app() -> Element {
     // Create update signal for event-driven state management
@@ -14,14 +15,17 @@ pub fn app() -> Element {
 
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new());
+
     // Provide the keyboard state context to all child components
     use_context_provider(|| keyboard_state);
+
     // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
     let audio_context = use_hook(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
-    use_context_provider(|| audio_context.clone());    // Load current soundpacks on startup
+    use_context_provider(|| audio_context.clone());
     {
+        // Load current soundpacks on startup
         let ctx = audio_context.clone();
         use_effect(move || {
             println!("🎵 Loading current soundpacks on startup...");
@@ -105,15 +109,15 @@ pub fn app() -> Element {
                 }
             }
         });
-    }
-
-    // Process hotkey Ctrl+Alt+M to toggle global sound
+    } // Process hotkey Ctrl+Alt+M to toggle global sound
     {
         let hotkey_rx = hotkey_rx.clone();
 
+        // Create signals for debounced notification system using atomic counter pattern
+        let notification_counter = use_signal(|| Arc::new(std::sync::atomic::AtomicU64::new(0)));
+
         use_future(move || {
             let hotkey_rx = hotkey_rx.clone();
-
             async move {
                 loop {
                     if let Ok(hotkey_command) = hotkey_rx.try_recv() {
@@ -135,22 +139,60 @@ pub fn app() -> Element {
                                         if old_state { "ENABLED" } else { "DISABLED" },
                                         status
                                     );
-                                    // Show system notification if enabled
-                                    if config.show_notifications {
-                                        let message = if config.enable_sound {
-                                            "Global sound enabled"
-                                        } else {
-                                            "Global sound disabled"
-                                        };
 
-                                        if let Err(e) = Notification::new()
-                                            .summary("MechvibesDX")
-                                            .body(message)
-                                            .timeout(3000) // 3 seconds
-                                            .show()
-                                        {
-                                            eprintln!("❌ Failed to show notification: {}", e);
-                                        }
+                                    // Handle debounced notifications
+                                    if config.show_notifications {
+                                        // Increment counter to invalidate previous notification tasks
+                                        let current_task_id = notification_counter()
+                                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                                            + 1;
+
+                                        println!(
+                                            "🔔 Scheduling debounced notification (task ID: {})",
+                                            current_task_id
+                                        );
+
+                                        // Store the current sound state for the delayed notification
+                                        let current_state = config.enable_sound;
+                                        let notification_counter_clone = notification_counter();
+
+                                        // Start a new delayed notification task
+                                        spawn(async move {
+                                            // Wait for 1s
+                                            futures_timer::Delay::new(Duration::from_secs(1)).await;
+
+                                            // Check if this task is still the latest one
+                                            if notification_counter_clone
+                                                .load(std::sync::atomic::Ordering::SeqCst)
+                                                == current_task_id
+                                            {
+                                                // Show notification with the final state
+                                                let message = if current_state {
+                                                    "Global sound enabled"
+                                                } else {
+                                                    "Global sound disabled"
+                                                };
+
+                                                if let Err(e) = Notification::new()
+                                                    .summary("MechvibesDX")
+                                                    .body(message)
+                                                    .timeout(3000) // 3 seconds
+                                                    .show()
+                                                {
+                                                    eprintln!(
+                                                        "❌ Failed to show notification: {}",
+                                                        e
+                                                    );
+                                                } else {
+                                                    println!(
+                                                        "✅ Debounced notification shown: {}",
+                                                        message
+                                                    );
+                                                }
+                                            } else {
+                                                println!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
+                                            }
+                                        });
                                     }
                                 }
                                 Err(e) => {

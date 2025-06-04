@@ -121,13 +121,6 @@ pub fn SettingsPage() -> Element {
               }
             }
           }
-          // Soundpack Management Section
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "Soundpack management" }
-            div { class: "collapse-content text-sm" }
-          }
-
           // App info Section
           div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
             input { r#type: "radio", name: "setting-accordion" }
@@ -147,7 +140,8 @@ pub fn SettingsPage() -> Element {
               }
               div { class: " justify-start",
                 button {
-                  class: "btn btn-error btn-soft btn-sm",                  onclick: {
+                  class: "btn btn-error btn-soft btn-sm",
+                  onclick: {
                       let update_config = update_config.clone();
                       move |_| {
                           theme.set(Theme::BuiltIn(BuiltInTheme::System));

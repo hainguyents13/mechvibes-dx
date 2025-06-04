@@ -131,12 +131,21 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
           div { class: "text-sm text-base-content/70",
             "Check out the Mechvibes website to find more soundpacks. You can also create your own soundpacks using the Soundpack Editor."
           }
-          a {
-            class: "btn btn-soft btn-sm",
-            href: "https://mechvibes.com/soundpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
-            target: "_blank",
-            "Browse soundpacks"
-            ExternalLink { class: "w-4 h-4 ml-1" }
+          div { class: "flex items-center gap-2",
+            a {
+              class: "btn btn-soft btn-sm",
+              href: "https://mechvibes.com/soundpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
+              target: "_blank",
+              "Browse soundpacks"
+              ExternalLink { class: "w-4 h-4 ml-1" }
+            }
+            a {
+              class: "btn btn-soft btn-sm",
+              href: "https://mechvibes.com/editor?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
+              target: "_blank",
+              "Open Editor"
+              ExternalLink { class: "w-4 h-4 ml-1" }
+            }
           }
         }
       }
