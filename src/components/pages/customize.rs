@@ -51,8 +51,7 @@ pub fn CustomizePage() -> Element {
             input { r#type: "radio", name: "customize-accordion" }
             div { class: "collapse-title font-semibold", "Logo" }
             div { class: "collapse-content overflow-visible text-base-content/70",
-              div { class: "mb-4", "Customize the Mechvibes logo appearance" }
-              LogoCustomizationPanel {}
+              LogoCustomizationSection {}
             }
           }
           // Custom CSS Section
@@ -83,6 +82,54 @@ pub fn CustomizePage() -> Element {
               }
             }
           }
+        }
+      }
+    }
+}
+
+#[component]
+fn LogoCustomizationSection() -> Element {
+    let (config, update_config) = use_config();
+    let enable_logo_customization = use_memo(move || config().enable_logo_customization);
+
+    // Create a local signal that syncs with config
+    let mut local_enable = use_signal(|| enable_logo_customization());
+
+    // Update local state when config changes
+    use_effect(move || {
+        local_enable.set(enable_logo_customization());
+    });
+
+    rsx! {
+      div { class: "space-y-4",
+        // Toggle switch for logo customization
+        div { class: "flex items-center justify-between",
+          div { class: "flex flex-col",
+            div { class: "text-sm font-medium text-base-content",
+              "Enable Logo Customization"
+            }
+            div { class: "text-xs text-base-content/70",
+              "Customize border, text, shadow and background colors"
+            }
+          }
+          input {
+            r#type: "checkbox",
+            class: "toggle toggle-sm",
+            checked: local_enable(),
+            onchange: move |evt| {
+                let new_value = evt.checked();
+                local_enable.set(new_value);
+                update_config(
+                    Box::new(move |cfg| {
+                        cfg.enable_logo_customization = new_value;
+                    }),
+                );
+            },
+          }
+        }
+        // Show LogoCustomizationPanel only when enabled
+        if local_enable() {
+          LogoCustomizationPanel {}
         }
       }
     }
@@ -174,7 +221,7 @@ fn LogoCustomizationPanel() -> Element {
             div {
               class: "select-none border-4 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-fit mx-auto",
               style: format!(
-                  "border-color: {}; color: {}; background-color: {}; box-shadow: 0 3px 0 {}",
+                  "border-color: {}; color: {}; background: {}; box-shadow: 0 5px 0 {}",
                   border_color(),
                   text_color(),
                   background_color(),
@@ -283,6 +330,9 @@ fn LogoCustomizationPanel() -> Element {
           RotateCcw { class: "w-4 h-4 mr-1" }
           "Reset"
         }
+      }
+      div { class: "text-sm text-base-content/70 mt-4",
+        "When you reset the logo customization, it will revert to the selected theme colors."
       }
     }
 }

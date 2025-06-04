@@ -37,12 +37,11 @@ pub struct AppConfig {
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
-    pub enable_mouse_sound: bool,    // Enable/disable mouse sounds specifically
-
-    // UI settings
+    pub enable_mouse_sound: bool,    // Enable/disable mouse sounds specifically    // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
+    pub enable_logo_customization: bool, // Enable/disable logo customization panel
 
     // System settings
     pub auto_start: bool,
@@ -106,6 +105,7 @@ impl Default for AppConfig {
             theme: Theme::BuiltIn(BuiltInTheme::System), // Default to System theme
             custom_css: String::new(),
             logo_customization: LogoCustomization::default(),
+            enable_logo_customization: false, // Default logo customization disabled
             auto_start: false,
             show_notifications: true,
         }

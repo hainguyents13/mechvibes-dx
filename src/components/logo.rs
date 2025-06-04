@@ -12,13 +12,15 @@ pub fn Logo() -> Element {
     let logo_customization = use_memo(move || config().logo_customization.clone());
 
     // Get the current key press state
-    let key_pressed = keyboard_state.read().key_pressed; // Apply dynamic styling based on whether a key is pressed
+    let key_pressed = keyboard_state.read().key_pressed;
+
+    // Apply dynamic styling based on whether a key is pressed
     let base = "select-none border-4 font-black block py-6 px-8 pt-7 text-5xl rounded-box transition-all duration-150 ease-in-out flex justify-center items-center";
 
     // Create dynamic styles using the custom colors
     let logo_colors = logo_customization();
     let dynamic_style = format!(
-        "border-color: {}; color: {}; background-color: {}; {}",
+        "border-color: {}; color: {}; background: {}; {}",
         logo_colors.border_color,
         logo_colors.text_color,
         logo_colors.background_color,
@@ -41,10 +43,6 @@ pub fn Logo() -> Element {
     };
 
     rsx! {
-      div {
-        class,
-        style: "{dynamic_style}",
-        "Mechvibes"
-      }
+      div { class, style: "{dynamic_style}", "Mechvibes" }
     }
 }
