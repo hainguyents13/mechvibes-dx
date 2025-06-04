@@ -1,8 +1,8 @@
 use crate::{
-  state::app::{trigger_global_state_update, use_app_state},
-  utils::soundpack_installer::{
-    check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
-  },
+    state::app::{trigger_global_state_update, use_app_state},
+    utils::soundpack_installer::{
+        check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
+    },
 };
 use dioxus::prelude::*;
 use lucide_dioxus::{HardDriveUpload, X};
@@ -64,7 +64,7 @@ pub fn SoundpackImportModal(
 
                         if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
                             error.set(format!(
-                                "A soundpack with ID '{}' already exists. Please remove the existing soundpack first or rename the new one.",
+                                "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack first",
                                 soundpack_id
                             ));
                             progress.set(String::new());
@@ -132,7 +132,7 @@ pub fn SoundpackImportModal(
         div { class: "relative bg-base-100 rounded-lg shadow-xl p-6 w-full max-w-md mx-4",
           // Header
           div { class: "flex items-center justify-between mb-4",
-            h3 { class: "text-lg font-semibold text-base-content", "Import Soundpack" }
+            h3 { class: "text-lg font-semibold text-base-content", "Import soundpack" }
             if progress().is_empty() {
               button {
                 class: "btn btn-ghost btn-sm btn-circle",
@@ -148,10 +148,7 @@ pub fn SoundpackImportModal(
               div { class: "text-sm text-base-content/70",
                 "Select a ZIP file containing a soundpack to install it."
                 br {}
-                "Supports both V1 and V2 soundpack formats."
-                br {}
-                br {}
-                "⚠️ Note: Installation will be cancelled if a soundpack with the same ID already exists."
+                "Supports both v1 and v2 soundpack formats."
               }
             }
 
@@ -186,10 +183,10 @@ pub fn SoundpackImportModal(
                   "Cancel"
                 }
                 button {
-                  class: "btn btn-primary",
+                  class: "btn btn-neutral",
                   onclick: handle_import_click,
                   HardDriveUpload { class: "w-4 h-4 mr-2" }
-                  "Select File"
+                  "Select file"
                 }
               }
             }
