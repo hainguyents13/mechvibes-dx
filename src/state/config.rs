@@ -4,6 +4,25 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LogoCustomization {
+    pub border_color: String,
+    pub text_color: String,
+    pub shadow_color: String,
+    pub background_color: String,
+}
+
+impl Default for LogoCustomization {
+    fn default() -> Self {
+        Self {
+            border_color: "var(--color-base-content)".to_string(),
+            text_color: "var(--color-base-content)".to_string(),
+            shadow_color: "var(--color-base-content)".to_string(),
+            background_color: "var(--color-base-200)".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     // Metadata
@@ -23,6 +42,7 @@ pub struct AppConfig {
     // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
+    pub logo_customization: LogoCustomization,
 
     // System settings
     pub auto_start: bool,
@@ -85,6 +105,7 @@ impl Default for AppConfig {
             enable_mouse_sound: true,    // Default mouse sounds enabled
             theme: Theme::BuiltIn(BuiltInTheme::System), // Default to System theme
             custom_css: String::new(),
+            logo_customization: LogoCustomization::default(),
             auto_start: false,
             show_notifications: true,
         }
