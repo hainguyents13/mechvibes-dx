@@ -155,10 +155,10 @@ struct CustomThemeButtonProps {
 #[component]
 fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
     rsx! {
-      div { class: "flex w-full items-center gap-2",
+      div { class: "flex w-full max-w-full items-center gap-2",
         button {
           class: format!(
-              "gap-3 flex btn btn-soft grow text-left justify-start {}",
+              "gap-3 flex btn btn-soft px-2 grow text-left justify-start {}",
               if props.is_active { "btn-disabled" } else { "" },
           ),
           onclick: props.on_select,
@@ -174,7 +174,7 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
             div { class: "bg-secondary size-2 rounded-full" }
             div { class: "bg-accent size-2 rounded-full" }
           }
-          div { class: "w-32 truncate", {props.name.clone()} }
+          div { class: "line-clamp-1 w-60", {props.name.clone()} }
         }
         // Dropdown for actions
         if !props.is_built_in {
@@ -217,9 +217,9 @@ struct CreateThemeButtonProps {
 #[component]
 fn CreateThemeButton(props: CreateThemeButtonProps) -> Element {
     rsx! {
-      div {
+      div { class: "flex justify-center mt-4",
         button {
-          class: "btn btn-soft btn-sm w-full",
+          class: "btn btn-neutral btn-sm",
           onclick: {
               let mut editing_theme_id = props.editing_theme_id;
               move |_| {
