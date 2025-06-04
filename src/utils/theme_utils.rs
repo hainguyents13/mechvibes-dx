@@ -1,40 +1,48 @@
 use crate::state::themes::ThemesConfig;
 use dioxus::prelude::*;
 use once_cell::sync::Lazy;
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 static THEMES_CONFIG: Lazy<Arc<Mutex<ThemesConfig>>> =
     Lazy::new(|| Arc::new(Mutex::new(ThemesConfig::load())));
 
-/// Creates a themes updater function that loads fresh themes, applies changes, and saves
-pub fn create_themes_updater(
-    themes_signal: Signal<ThemesConfig>,
-) -> Rc<dyn Fn(Box<dyn FnOnce(&mut ThemesConfig)>)> {
-    let signal_ref = Rc::new(RefCell::new(themes_signal));
-    Rc::new(move |updater: Box<dyn FnOnce(&mut ThemesConfig)>| {
-        let mut config_guard = THEMES_CONFIG.lock().unwrap();
-        updater(&mut *config_guard);
-
-        if let Err(e) = config_guard.save() {
-            eprintln!("❌ Failed to save themes: {}", e);
-        }
-
-        // Update the signal through RefCell
-        signal_ref.borrow_mut().set(config_guard.clone());
-        println!("[theme_utils] Themes updated");
-    })
-}
+/// Global signal to trigger refresh of all theme components
+static REFRESH_TRIGGER: GlobalSignal<u32> = Signal::global(|| 0);
 
 /// Hook for accessing and updating themes configuration
 pub fn use_themes() -> (
     Signal<ThemesConfig>,
     Rc<dyn Fn(Box<dyn FnOnce(&mut ThemesConfig)>)>,
 ) {
-    let themes = use_signal(|| THEMES_CONFIG.lock().unwrap().clone());
+    // Load initial themes config
+    let mut themes = use_signal(|| THEMES_CONFIG.lock().unwrap().clone());
 
-    let update_themes = create_themes_updater(themes);
+    // Watch for refresh trigger changes
+    use_effect(move || {
+        let _trigger_value = REFRESH_TRIGGER();
+        // When trigger changes, reload themes from global config
+        themes.set(THEMES_CONFIG.lock().unwrap().clone());
+    });
+
+    let update_themes = Rc::new(|updater: Box<dyn FnOnce(&mut ThemesConfig)>| {
+        // Update the global static config
+        {
+            let mut config_guard = THEMES_CONFIG.lock().unwrap();
+            updater(&mut *config_guard);
+
+            if let Err(e) = config_guard.save() {
+                eprintln!("❌ Failed to save themes: {}", e);
+                return;
+            }
+        }
+
+        // Trigger refresh of all components using themes
+        let current = REFRESH_TRIGGER();
+        *REFRESH_TRIGGER.write() = current + 1;
+
+        println!("[theme_utils] ✅ Themes updated and saved to disk - triggering UI refresh");
+    });
 
     (themes, update_themes)
 }
