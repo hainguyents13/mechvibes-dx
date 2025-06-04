@@ -178,7 +178,7 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
         }
         // Dropdown for actions
         if !props.is_built_in {
-          div { class: "dropdown dropdown-hover dropdown-left",
+          div { class: "dropdown dropdown-left",
             div {
               class: "btn btn-ghost",
               tabindex: "0",
