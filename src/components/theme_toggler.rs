@@ -5,7 +5,7 @@ use crate::utils::config_utils::use_config;
 use crate::utils::theme_utils::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Ellipsis, Pencil, Plus, Trash2};
+use lucide_dioxus::{Ellipsis, Pencil, Plus, Share2, Trash2};
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -191,7 +191,13 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
               li {
                 a { onclick: props.on_edit,
                   Pencil { class: "w-4 h-4 mr-1" }
-                  "Edit "
+                  "Edit"
+                }
+              }
+              li {
+                a { href: "",
+                  Share2 { class: "w-4 h-4 mr-1" }
+                  "Share"
                 }
               }
               li {
@@ -199,7 +205,7 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
                   class: "text-error",
                   onclick: props.on_delete,
                   Trash2 { class: "w-4 h-4 mr-1" }
-                  "Delete "
+                  "Delete"
                 }
               }
             }

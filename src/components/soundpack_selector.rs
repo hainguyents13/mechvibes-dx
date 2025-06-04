@@ -33,9 +33,10 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
 }
 
 #[component]
-fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio context from the layout provider
+fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
+    // Use audio context from the layout provider
     let audio_ctx: Arc<AudioContext> = use_context();
-    
+
     // Use the new event-driven app state
     use crate::state::app::use_app_state;
     let app_state = use_app_state();
@@ -45,7 +46,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio 
     let error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let is_loading = use_signal(|| false);    // Use global app state for soundpacks
+    let is_loading = use_signal(|| false); // Use global app state for soundpacks
     let soundpacks = use_memo(move || app_state.get_soundpacks());
 
     // Get current soundpack based on type
@@ -110,17 +111,17 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio 
     rsx! {
       div { class: "space-y-2",
         div { class: "relative w-full",
-          // DaisyUI dropdown button
+          // Dropdown toggle button
           button {
             class: format!(
-                "w-full btn btn-soft justify-start gap-3 h-17 rounded-lg {}",
+                "w-full btn btn-soft justify-start gap-3 h-17 rounded-box {}",
                 if is_open() { "btn-active" } else { "" },
             ),
             disabled: is_loading(),
             onclick: move |_| is_open.set(!is_open()),
             div { class: "flex items-center gap-3 flex-1",
               if let Some(pack) = current_soundpack() {
-                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-lg flex items-center justify-center",
+                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
@@ -162,7 +163,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio 
 
           // Dropdown panel
           if is_open() {
-            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden",
+            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
               // Search input
               div { class: "p-3 border-b border-base-200",
                 div { class: "relative",
@@ -304,7 +305,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {    // Use audio 
                           }
                       },
                       div { class: "flex items-center justify-between gap-3",
-                        div { class: "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply relative",
+                        div { class: "flex-shrink-0 w-10 h-10 rounded-box flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply relative",
                           if let Some(icon) = &pack.icon {
                             if !icon.is_empty() {
                               img {

@@ -17,7 +17,6 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         Callback::new(move |_| {
             // Set loading state to true
             refreshing_soundpacks.set(true);
-            println!("🌻 Loading state set to: {}", refreshing_soundpacks());
             // Clone necessary variables for the async task
             let mut refreshing_signal = refreshing_soundpacks.clone();
             let audio_ctx_clone = audio_ctx_refresh.clone();
@@ -84,7 +83,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
                 RefreshCcw { class: "w-4 h-4 mr-1" }
                 "Refresh"
               }
-            } // Last scan info
+            }
+            // Last scan info
             if app_state.optimized_cache.last_scan > 0 {
               div { class: "text-xs text-base-content/60",
                 "Last scan "
@@ -112,6 +112,9 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         div { class: "divider" }
         div { class: "space-y-2",
           div { class: "text-base-content font-medium text-sm", "Soundpack folder path" }
+          div { class: "text-sm text-base-content/70",
+            "This is the absolute path to the soundpack directory where Mechvibes looks for soundpacks."
+          }
           input {
             value: "{soundpacks_dir_absolute}",
             class: "input input-sm w-full",
@@ -123,8 +126,11 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
           }
         }
         div { class: "divider" }
-        div { class: "space-y-2",
+        div { class: "space-y-3",
           div { class: "text-base-content font-medium text-sm", "Need more soundpacks?" }
+          div { class: "text-sm text-base-content/70",
+            "Check out the Mechvibes website to find more soundpacks. You can also create your own soundpacks using the Soundpack Editor."
+          }
           a {
             class: "btn btn-soft btn-sm",
             href: "https://mechvibes.com/soundpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",

@@ -96,7 +96,7 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
           div { class: "flex items-center justify-center",
             if let Some(icon) = &soundpack.icon {
               if !icon.is_empty() {
-                div { class: "w-8 h-8 rounded-lg overflow-hidden",
+                div { class: "w-8 h-8 rounded-box overflow-hidden",
                   img {
                     class: "w-full h-full object-cover",
                     src: "{icon}",

@@ -13,7 +13,7 @@ pub fn Logo() -> Element {
     let key_pressed = keyboard_state.read().key_pressed;
 
     // Apply dynamic styling based on whether a key is pressed
-    let base = "select-none border-4 font-black block py-6 px-8 pt-7 text-5xl rounded-2xl transition-all duration-150 ease-in-out bg-base-300 flex justify-center items-center";
+    let base = "select-none border-4 font-black block py-6 px-8 pt-7 text-5xl rounded-box transition-all duration-150 ease-in-out bg-base-200 flex justify-center items-center";
 
     // Determine the class based on key press state
     let class = if key_pressed || !enable_sound() {
@@ -23,7 +23,7 @@ pub fn Logo() -> Element {
             if !enable_sound() { "opacity-50" } else { "" }
         )
     } else {
-        format!("{} shadow-[0_5px_0_var(--color-base-content)]", base)
+        format!("{} shadow-[0_5px_0_var(--color-base-300)]", base)
     };
 
     rsx! {

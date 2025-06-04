@@ -40,14 +40,14 @@ pub fn TitleBar() -> Element {
         // Right side - window controls
         div { class: "flex items-center space-x-2 px-3 py-2", // Minimize button
           button {
-            class: "p-1.5 rounded-md hover:bg-neutral/70 text-base-content/70 hover:text-neutral-content transition-colors",
+            class: "p-1.5 rounded-box hover:bg-neutral/70 text-base-content/70 hover:text-neutral-content transition-colors",
             title: "Minimize",
             onclick: minimize,
             Minus { class: "w-4 h-4" }
           }
           // Close button
           button {
-            class: "p-1.5 rounded-md hover:bg-error text-base-content/70 hover:text-error-content transition-colors",
+            class: "p-1.5 rounded-box hover:bg-error text-base-content/70 hover:text-error-content transition-colors",
             title: "Close",
             onclick: close,
             X { class: "w-4 h-4" }

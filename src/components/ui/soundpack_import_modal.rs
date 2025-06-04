@@ -129,7 +129,7 @@ pub fn SoundpackImportModal(
         }
 
         // Modal content
-        div { class: "relative bg-base-100 rounded-lg shadow-xl p-6 w-full max-w-md mx-4",
+        div { class: "relative bg-base-100 rounded-box shadow-xl p-6 w-full max-w-md mx-4",
           // Header
           div { class: "flex items-center justify-between mb-4",
             h3 { class: "text-lg font-semibold text-base-content", "Import soundpack" }
