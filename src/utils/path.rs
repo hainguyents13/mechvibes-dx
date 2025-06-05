@@ -113,11 +113,6 @@ pub fn directory_exists(path: &str) -> bool {
     std::path::Path::new(path).exists()
 }
 
-/// Check if a file exists
-pub fn file_exists(path: &str) -> bool {
-    std::path::Path::new(path).is_file()
-}
-
 /// Create directory recursively if it doesn't exist
 pub fn ensure_directory_exists(path: &str) -> Result<(), String> {
     fs::create_dir_all(path).map_err(|e| format!("Failed to create directory '{}': {}", path, e))
@@ -131,20 +126,4 @@ pub fn read_file_contents(path: &str) -> Result<String, String> {
 /// Write string contents to file
 pub fn write_file_contents(path: &str, contents: &str) -> Result<(), String> {
     fs::write(path, contents).map_err(|e| format!("Failed to write file '{}': {}", path, e))
-}
-
-/// Get file extension from path
-pub fn get_file_extension(path: &str) -> Option<String> {
-    std::path::Path::new(path)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_lowercase())
-}
-
-/// Join path components
-pub fn join_paths(base: &str, component: &str) -> String {
-    std::path::Path::new(base)
-        .join(component)
-        .to_string_lossy()
-        .to_string()
 }

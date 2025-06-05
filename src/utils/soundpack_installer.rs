@@ -107,16 +107,16 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 
     // If no ID in config, generate a UUID-based ID
     if soundpack_id.is_empty() {
-        soundpack_id = format!("imported_{}", Uuid::new_v4());
+        soundpack_id = format!("imported-{}", Uuid::new_v4());
 
         // Add the generated ID to the config
         config["id"] = Value::String(soundpack_id.clone());
     }
 
     // Handle V1 to V2 conversion if needed
-    let final_config_content = handle_config_conversion(&config.to_string(), &soundpack_id)?;    // Determine installation directory using soundpack ID
+    let final_config_content = handle_config_conversion(&config.to_string(), &soundpack_id)?; // Determine installation directory using soundpack ID
     let soundpacks_dir = crate::state::paths::utils::get_soundpacks_dir_absolute();
-    let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);    // Create installation directory
+    let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id); // Create installation directory
     path::ensure_directory_exists(&install_dir.to_string_lossy())
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
@@ -147,7 +147,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             }
         } else {
             install_dir.join(&file_path)
-        };        // Create parent directories if needed
+        }; // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
             path::ensure_directory_exists(&parent.to_string_lossy())
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
@@ -158,7 +158,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             File::create(&output_path).map_err(|e| format!("Failed to create file: {}", e))?;
         std::io::copy(&mut file, &mut output_file)
             .map_err(|e| format!("Failed to extract file: {}", e))?;
-    }    // Write the final config.json at the root level of the soundpack directory
+    } // Write the final config.json at the root level of the soundpack directory
     let config_path = install_dir.join("config.json");
     path::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
         .map_err(|e| format!("Failed to write config.json: {}", e))?;
