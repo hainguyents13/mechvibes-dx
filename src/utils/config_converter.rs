@@ -1,3 +1,4 @@
+use crate::utils::file_utils;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
@@ -21,7 +22,8 @@ pub fn convert_v1_to_v2(
     output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Read the V1 config
-    let content = std::fs::read_to_string(v1_config_path)?;
+    let content = file_utils::read_file_contents(v1_config_path)
+        .map_err(|e| format!("Failed to read V1 config: {}", e))?;
     let config: Value = serde_json::from_str(&content)?;
 
     let mut converted_config = Map::new();
@@ -119,11 +121,10 @@ pub fn convert_v1_to_v2(
         }
     }
 
-    converted_config.insert("defs".to_string(), Value::Object(defs.clone()));
-
-    // Write the converted config
+    converted_config.insert("defs".to_string(), Value::Object(defs.clone())); // Write the converted config
     let converted_json = serde_json::to_string_pretty(&converted_config)?;
-    std::fs::write(output_path, converted_json)?;
+    file_utils::write_file_contents(output_path, &converted_json)
+        .map_err(|e| format!("Failed to write converted config: {}", e))?;
 
     println!("✅ Successfully converted config from V1 to V2");
     println!("   Input: {}", v1_config_path);

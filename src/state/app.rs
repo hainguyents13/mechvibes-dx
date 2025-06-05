@@ -49,7 +49,8 @@ pub fn use_app_state() -> AppState {
     let update_signal: Signal<u32> = use_context();
 
     let app_state = use_memo(move || {
-        let _ = update_signal(); // Subscribe to changes
+        let _ = update_signal();
+        // Subscribe to changes
         if let Some(global_state) = GLOBAL_APP_STATE.get() {
             if let Ok(state) = global_state.lock() {
                 return state.clone();

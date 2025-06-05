@@ -1,8 +1,8 @@
 use crate::libs::theme::{BuiltInTheme, Theme};
 use crate::state::paths;
+use crate::utils::{data_utils, file_utils};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LogoCustomization {
@@ -54,42 +54,32 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn load() -> Self {
+        let config_path = paths::data::config_json();
+        
         // Ensure data directory exists
-        let data_dir = paths::data::config_json().parent().unwrap().to_path_buf();
-        if let Err(_) = fs::create_dir_all(&data_dir) {
-            eprintln!("Warning: Could not create data directory");
+        if let Some(parent) = config_path.parent() {
+            if let Err(_) = file_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+                eprintln!("Warning: Could not create data directory");
+            }
         }
 
-        let config_path = paths::data::config_json();
-        if let Ok(contents) = fs::read_to_string(config_path) {
-            match serde_json::from_str::<AppConfig>(&contents) {
-                Ok(config) => {
-                    // Don't update version and last_updated when only reading config
-                    // Don't save file when only reading config
-                    config
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse config file: {}. Using defaults.",
-                        e
-                    );
-                    Self::default()
-                }
+        match data_utils::load_json_from_file::<AppConfig>(&config_path) {
+            Ok(config) => {
+                // Don't update version and last_updated when only reading config
+                config
             }
-        } else {
-            let default_config = Self::default();
-            let _ = default_config.save();
-            default_config
+            Err(e) => {
+                eprintln!("Warning: Failed to load config file: {}. Using defaults.", e);
+                let default_config = Self::default();
+                let _ = default_config.save();
+                default_config
+            }
         }
     }
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
-        let contents = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        fs::write(config_path, contents)
-            .map_err(|e| format!("Failed to write config file: {}", e))?;
-        Ok(())
+        data_utils::save_json_to_file(self, &config_path)
     }
 }
 

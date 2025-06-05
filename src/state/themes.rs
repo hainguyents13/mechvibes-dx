@@ -1,8 +1,8 @@
 use crate::state::paths;
+use crate::utils::{data_utils, file_utils};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CustomThemeData {
@@ -38,38 +38,25 @@ impl ThemesConfig {
 
         // Ensure data directory exists
         if let Some(parent) = themes_path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
+            if let Err(e) = file_utils::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("Warning: Could not create themes data directory: {}", e);
             }
         }
 
-        if themes_path.exists() {
-            match fs::read_to_string(&themes_path) {
-                Ok(content) => match serde_json::from_str::<ThemesConfig>(&content) {
-                    Ok(config) => {
-                        println!(
-                            "✅ Loaded themes configuration from {}",
-                            themes_path.display()
-                        );
-                        config
-                    }
-                    Err(e) => {
-                        eprintln!("❌ Failed to parse themes.json: {}", e);
-                        Self::default()
-                    }
-                },
-                Err(e) => {
-                    eprintln!("❌ Failed to read themes.json: {}", e);
-                    Self::default()
+        match data_utils::load_json_from_file::<ThemesConfig>(&themes_path) {
+            Ok(config) => {
+                println!("✅ Loaded themes configuration from {}", themes_path.display());
+                config
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to load themes.json: {}", e);
+                println!("📝 Creating new themes configuration");
+                let config = Self::default();
+                if let Err(e) = config.save() {
+                    eprintln!("❌ Failed to create initial themes.json: {}", e);
                 }
+                config
             }
-        } else {
-            println!("📝 Creating new themes configuration");
-            let config = Self::default();
-            if let Err(e) = config.save() {
-                eprintln!("❌ Failed to create initial themes.json: {}", e);
-            }
-            config
         }
     }
 
@@ -78,17 +65,11 @@ impl ThemesConfig {
 
         // Ensure the data directory exists
         if let Some(parent) = themes_path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                return Err(format!("Failed to create data directory: {}", e));
-            }
+            file_utils::ensure_directory_exists(&parent.to_string_lossy())
+                .map_err(|e| format!("Failed to create data directory: {}", e))?;
         }
 
-        let content = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize themes config: {}", e))?;
-
-        fs::write(&themes_path, content)
-            .map_err(|e| format!("Failed to write themes.json: {}", e))?;
-
+        data_utils::save_json_to_file(self, &themes_path)?;
         println!("💾 Saved themes configuration to {}", themes_path.display());
         Ok(())
     }

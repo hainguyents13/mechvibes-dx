@@ -1,27 +1,15 @@
 use crate::state::paths;
+use crate::utils::file_utils;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, Folder, FolderCog, LaptopMinimalCheck};
 use std::env;
-use std::process::Command;
 
 /// Open the application directory in the system file manager
 fn open_app_directory() -> Result<(), String> {
     let app_root =
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
-
-    let result = if cfg!(target_os = "windows") {
-        Command::new("explorer").arg(&app_root).spawn()
-    } else if cfg!(target_os = "macos") {
-        Command::new("open").arg(&app_root).spawn()
-    } else {
-        // Linux and other Unix-like systems
-        Command::new("xdg-open").arg(&app_root).spawn()
-    };
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to open directory: {}", e)),
-    }
+    
+    file_utils::open_path(&app_root.to_string_lossy())
 }
 
 #[component]
