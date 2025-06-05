@@ -1,5 +1,5 @@
 use crate::{
-    state::app::use_app_state,
+    state::app::{use_app_state, use_state_trigger},
     utils::soundpack_installer::{
         check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
     },
@@ -16,13 +16,15 @@ pub fn SoundpackImportModal(
 ) -> Element {
     let progress = use_signal(|| String::new());
     let error = use_signal(|| String::new());
-    let success = use_signal(|| String::new()); // Get app state outside the handler
+    let success = use_signal(|| String::new());
+    // Get app state outside the handler
     let app_state = use_app_state();
-
+    let state_trigger = use_state_trigger();
     // File import handler
     let handle_import_click = {
         let audio_ctx = audio_ctx.clone();
         let app_state = app_state.clone();
+        let state_trigger = state_trigger.clone();
         Callback::new(move |_| {
             let mut error = error.clone();
             let mut success = success.clone();
@@ -31,6 +33,7 @@ pub fn SoundpackImportModal(
             let audio_ctx = audio_ctx.clone();
             let app_state = app_state.clone();
             let on_import_success = on_import_success.clone();
+            let state_trigger = state_trigger.clone();
 
             spawn(async move {
                 error.set(String::new());
@@ -73,7 +76,6 @@ pub fn SoundpackImportModal(
 
                         // No conflict, proceed with extraction
                         progress.set("Extracting soundpack...".to_string());
-
                         match extract_and_install_soundpack(&file_path) {
                             Ok(soundpack_info) => {
                                 success.set(format!(
@@ -84,6 +86,10 @@ pub fn SoundpackImportModal(
 
                                 // Reload soundpacks in audio context
                                 crate::state::app::reload_current_soundpacks(&audio_ctx);
+
+                                // Refresh the soundpack cache to show the new soundpack in the UI
+                                println!("🔄 Triggering soundpack cache refresh after import...");
+                                state_trigger.call(());
 
                                 // Notify parent component (this will trigger UI update)
                                 on_import_success.call(soundpack_id);
