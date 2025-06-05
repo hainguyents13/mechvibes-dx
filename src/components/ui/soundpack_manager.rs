@@ -7,12 +7,13 @@ use std::sync::Arc;
 pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let app_state = use_app_state();
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+    let state_trigger = crate::state::app::use_state_trigger();
     // UI state for notification and loading
     let refreshing_soundpacks = use_signal(|| false);
-
     let refresh_soundpacks_cache = {
         let audio_ctx_refresh = audio_ctx.clone();
         let mut refreshing_soundpacks = refreshing_soundpacks.clone();
+        let state_trigger_clone = state_trigger.clone();
 
         Callback::new(move |_| {
             // Set loading state to true
@@ -20,6 +21,7 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
             // Clone necessary variables for the async task
             let mut refreshing_signal = refreshing_soundpacks.clone();
             let audio_ctx_clone = audio_ctx_refresh.clone();
+            let trigger = state_trigger_clone.clone();
 
             // Perform the refresh operation in a separate task to not block the UI
             spawn(async move {
@@ -30,8 +32,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
                 Delay::new(Duration::from_millis(100)).await;
                 println!("Starting soundpack refresh operation...");
 
-                // Trigger cache refresh through global trigger function
-                crate::state::app::trigger_global_state_update("CacheRefreshRequested".to_string());
+                // Use the state trigger to refresh cache and update UI
+                trigger.call(());
 
                 // Reload current soundpacks to apply any changes
                 crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
