@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::{data_utils, path_utils, soundpack_utils};
+use crate::utils::{data, path, soundpack};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -90,7 +90,7 @@ impl SoundpackCache {
     pub fn load() -> Self {
         let cache_file = Self::cache_file();
         // Load metadata cache using data utilities
-        let mut cache = match data_utils::load_json_from_file::<SoundpackCache>(
+        let mut cache = match data::load_json_from_file::<SoundpackCache>(
             std::path::Path::new(&cache_file),
         ) {
             Ok(cache) => {
@@ -134,7 +134,7 @@ impl SoundpackCache {
 
         // Ensure parent directory exists
         if let Some(parent) = Path::new(&cache_file).parent() {
-            if let Err(e) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("⚠️  Failed to create cache directory: {}", e);
                 return;
             }
@@ -159,7 +159,7 @@ impl SoundpackCache {
             );
         }
 
-        match data_utils::save_json_to_file(self, std::path::Path::new(&cache_file)) {
+        match data::save_json_to_file(self, std::path::Path::new(&cache_file)) {
             Ok(_) => println!(
                 "💾 Saved soundpack metadata cache with {} entries",
                 self.soundpacks.len()
@@ -185,7 +185,7 @@ impl SoundpackCache {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_id) = entry.file_name().to_str() {
                         println!("🔄 Regenerating metadata for: {}", soundpack_id);
-                        if let Ok(metadata) = soundpack_utils::load_soundpack_metadata(soundpack_id)
+                        if let Ok(metadata) = soundpack::load_soundpack_metadata(soundpack_id)
                         {
                             self.soundpacks.insert(soundpack_id.to_string(), metadata);
                         }

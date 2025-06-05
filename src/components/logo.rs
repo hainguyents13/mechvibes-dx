@@ -1,5 +1,5 @@
 use crate::state::keyboard::KeyboardState;
-use crate::utils::config_utils::use_config;
+use crate::utils::config::use_config;
 use dioxus::prelude::*;
 
 #[component]

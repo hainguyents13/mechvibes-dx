@@ -1,9 +1,9 @@
+pub mod config;
 pub mod config_converter;
-pub mod config_utils;
-pub mod data_utils;
-pub mod path_utils;
-pub mod platform_utils;
+pub mod data;
+pub mod path;
+pub mod platform;
+pub mod soundpack;
 pub mod soundpack_installer;
-pub mod soundpack_utils;
 pub mod soundpack_validator;
-pub mod theme_utils;
+pub mod theme;

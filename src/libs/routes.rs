@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::{libs::theme::use_theme, utils::config_utils::use_config};
+use crate::{libs::theme::use_theme, utils::config::use_config};
 
 #[derive(Clone, Routable, Debug, PartialEq)]
 pub enum Route {

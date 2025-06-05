@@ -1,7 +1,7 @@
 use crate::state::paths;
 use crate::state::soundpack::SoundpackMetadata;
 use crate::state::{app::use_state_trigger, paths::utils::open_path};
-use crate::utils::path_utils;
+use crate::utils::path;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::{FolderOpen, Music, Plus, Trash};
@@ -17,7 +17,7 @@ fn open_soundpack_folder(soundpack_id: &str) -> Result<(), String> {
 /// Delete a soundpack directory and all its contents
 fn delete_soundpack(soundpack_id: &str) -> Result<(), String> {
     let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id); // Check if the directory exists
-    if !path_utils::directory_exists(&soundpack_path) {
+    if !path::directory_exists(&soundpack_path) {
         return Err(format!("Soundpack directory not found: {}", soundpack_path));
     }
 

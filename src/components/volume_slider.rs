@@ -1,4 +1,4 @@
-use crate::utils::config_utils::use_config;
+use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::{Volume2, VolumeOff};
 

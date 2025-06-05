@@ -1,6 +1,6 @@
 use crate::libs::theme::{BuiltInTheme, Theme};
 use crate::state::paths;
-use crate::utils::{data_utils, path_utils};
+use crate::utils::{data, path};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -58,12 +58,12 @@ impl AppConfig {
         
         // Ensure data directory exists
         if let Some(parent) = config_path.parent() {
-            if let Err(_) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(_) = path::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("Warning: Could not create data directory");
             }
         }
 
-        match data_utils::load_json_from_file::<AppConfig>(&config_path) {
+        match data::load_json_from_file::<AppConfig>(&config_path) {
             Ok(config) => {
                 // Don't update version and last_updated when only reading config
                 config
@@ -79,7 +79,7 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
-        data_utils::save_json_to_file(self, &config_path)
+        data::save_json_to_file(self, &config_path)
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::platform_utils;
+use crate::utils::platform;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -54,10 +54,12 @@ impl AppManifest {
                 description: "Mechanical keyboard sound simulator".to_string(),
                 build_date: Utc::now(),
                 git_commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-                git_branch: "main".to_string(),                build_type: platform_utils::get_build_type(),
-            },            compatibility: CompatibilityInfo {
-                min_os_version: platform_utils::get_min_os_version(),
-                supported_architectures: platform_utils::get_supported_architectures(),
+                git_branch: "main".to_string(),
+                build_type: platform::get_build_type(),
+            },
+            compatibility: CompatibilityInfo {
+                min_os_version: platform::get_min_os_version(),
+                supported_architectures: platform::get_supported_architectures(),
             },
             paths: AppPaths {
                 config: paths::data::config_json().to_string_lossy().to_string(),
@@ -67,10 +69,11 @@ impl AppManifest {
                     .to_string(),
                 soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
                 data_dir: paths::utils::get_data_dir_absolute(),
-            },            metadata: Metadata {
+            },
+            metadata: Metadata {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
-                platform: platform_utils::get_platform(),
+                platform: platform::get_platform(),
             },
         }
     }
@@ -109,7 +112,8 @@ impl AppManifest {
             if let Err(e) = new_manifest.save() {
                 eprintln!("❌ Failed to create manifest.json: {}", e);
             }
-            new_manifest        }
+            new_manifest
+        }
     }
 
     pub fn save(&self) -> Result<(), String> {

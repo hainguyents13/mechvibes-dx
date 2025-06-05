@@ -65,32 +65,31 @@ pub mod soundpacks {
 }
 
 /// Legacy compatibility functions - delegate to new utility modules
-pub mod utils {
-    // Delegate to new utility modules for backward compatibility
+pub mod utils {    // Delegate to new utility modules for backward compatibility
     pub fn count_soundpacks_by_type() -> (usize, usize) {
-        crate::utils::path_utils::count_soundpacks_by_type()
+        crate::utils::path::count_soundpacks_by_type()
     }
 
     pub fn data_dir_exists() -> bool {
-        crate::utils::path_utils::data_dir_exists()
+        crate::utils::path::data_dir_exists()
     }
 
     pub fn config_file_exists() -> bool {
-        crate::utils::path_utils::config_file_exists()
+        crate::utils::path::config_file_exists()
     }
     pub fn open_path(path_to_open: &str) -> Result<(), String> {
-        crate::utils::path_utils::open_path(path_to_open)
+        crate::utils::path::open_path(path_to_open)
     }
 
     pub fn get_data_dir_absolute() -> String {
-        crate::utils::path_utils::get_data_dir_absolute()
+        crate::utils::path::get_data_dir_absolute()
     }
 
     pub fn get_config_file_absolute() -> String {
-        crate::utils::path_utils::get_config_file_absolute()
+        crate::utils::path::get_config_file_absolute()
     }
 
     pub fn get_soundpacks_dir_absolute() -> String {
-        crate::utils::path_utils::get_soundpacks_dir_absolute()
+        crate::utils::path::get_soundpacks_dir_absolute()
     }
 }

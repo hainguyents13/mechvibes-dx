@@ -251,7 +251,7 @@ fn import_theme_from_protocol(theme_data: &str) -> Result<(), Box<dyn std::error
     use crate::libs::theme::Theme;
     use crate::state::config::AppConfig;
     use crate::state::themes::CustomThemeData;
-    use crate::utils::theme_utils::get_themes_config;
+    use crate::utils::theme::get_themes_config;
     use chrono::Utc;
     use std::time::{SystemTime, UNIX_EPOCH};
 

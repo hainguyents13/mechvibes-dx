@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::path_utils;
+use crate::utils::path;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, Folder, FolderCog, LaptopMinimalCheck};
 use std::env;
@@ -9,7 +9,7 @@ fn open_app_directory() -> Result<(), String> {
     let app_root =
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
-    path_utils::open_path(&app_root.to_string_lossy())
+    path::open_path(&app_root.to_string_lossy())
 }
 
 #[component]

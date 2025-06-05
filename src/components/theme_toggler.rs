@@ -1,8 +1,8 @@
 use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
 use crate::state::config::AppConfig;
 use crate::state::themes::ThemesConfig;
-use crate::utils::config_utils::use_config;
-use crate::utils::theme_utils::use_themes;
+use crate::utils::config::use_config;
+use crate::utils::theme::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::{Ellipsis, ExternalLink, Palette, Pencil, Plus, Share2, Trash2};

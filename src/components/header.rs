@@ -1,5 +1,5 @@
 use crate::libs::theme::{use_theme, Theme};
-use crate::utils::theme_utils::use_themes;
+use crate::utils::theme::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
@@ -8,7 +8,7 @@ const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
 
 #[component]
 pub fn Header() -> Element {
-    use crate::utils::config_utils::use_config;
+    use crate::utils::config::use_config;
 
     let (config, _) = use_config();
     let (themes, _) = use_themes();

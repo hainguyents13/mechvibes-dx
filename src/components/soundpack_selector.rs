@@ -1,5 +1,5 @@
 use crate::libs::audio::AudioContext;
-use crate::utils::config_utils::use_config;
+use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use lucide_dioxus::{Check, ChevronDown, Keyboard, Mouse, Music, Search};

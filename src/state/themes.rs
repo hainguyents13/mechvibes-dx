@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::{data_utils, path_utils};
+use crate::utils::{data, path};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -38,14 +38,17 @@ impl ThemesConfig {
 
         // Ensure data directory exists
         if let Some(parent) = themes_path.parent() {
-            if let Err(e) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("Warning: Could not create themes data directory: {}", e);
             }
         }
 
-        match data_utils::load_json_from_file::<ThemesConfig>(&themes_path) {
+        match data::load_json_from_file::<ThemesConfig>(&themes_path) {
             Ok(config) => {
-                println!("✅ Loaded themes configuration from {}", themes_path.display());
+                println!(
+                    "✅ Loaded themes configuration from {}",
+                    themes_path.display()
+                );
                 config
             }
             Err(e) => {
@@ -65,11 +68,11 @@ impl ThemesConfig {
 
         // Ensure the data directory exists
         if let Some(parent) = themes_path.parent() {
-            path_utils::ensure_directory_exists(&parent.to_string_lossy())
+            path::ensure_directory_exists(&parent.to_string_lossy())
                 .map_err(|e| format!("Failed to create data directory: {}", e))?;
         }
 
-        data_utils::save_json_to_file(self, &themes_path)?;
+        data::save_json_to_file(self, &themes_path)?;
         println!("💾 Saved themes configuration to {}", themes_path.display());
         Ok(())
     }
