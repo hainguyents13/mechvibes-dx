@@ -1,40 +1,23 @@
+use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{TriangleAlert, X};
+use lucide_dioxus::{Check, TriangleAlert};
 
 #[component]
 pub fn ConfirmDeleteModal(
-    show: Signal<bool>,
+    modal_id: String,
     soundpack_name: String,
     on_confirm: EventHandler<()>,
 ) -> Element {
-    if !show() {
-        return rsx! {
-          div {}
-        };
-    }
-
     rsx! {
-      div { class: "fixed inset-0 z-50 flex items-center justify-center",
-        // Backdrop
-        div {
-          class: "absolute inset-0 bg-black/50",
-          onclick: move |_| show.set(false),
-        }
-
-        // Modal content
-        div { class: "relative bg-base-100 rounded-box shadow-xl p-6 w-full max-w-md mx-4",
-          // Header
-          div { class: "flex items-center justify-between mb-4",
-            h3 { class: "text-lg font-semibold text-base-content", "Delete Soundpack" }
-            button {
-              class: "btn btn-ghost btn-sm btn-circle",
-              onclick: move |_| show.set(false),
-              X { class: "w-4 h-4" }
-            }
+      dialog { class: "modal", id: "{modal_id}",
+        div { class: "modal-box",
+          form { method: "dialog",
+            button { class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2", "✕" }
           }
+          h3 { class: "text-lg font-bold", "Delete Soundpack" }
 
           // Content
-          div { class: "space-y-4",
+          div { class: "space-y-4 py-4",
             // Warning icon and message
             div { class: "flex items-start gap-3",
               div { class: "flex-shrink-0 w-10 h-10 rounded-full bg-error/10 flex items-center justify-center",
@@ -52,21 +35,23 @@ pub fn ConfirmDeleteModal(
 
             // Action buttons
             div { class: "flex justify-end gap-2 pt-2",
-              button {
-                class: "btn btn-ghost",
-                onclick: move |_| show.set(false),
-                "Cancel"
+              form { method: "dialog",
+                button { class: "btn btn-ghost", "Cancel" }
               }
               button {
                 class: "btn btn-error",
                 onclick: move |_| {
-                    show.set(false);
                     on_confirm.call(());
+                    eval(&format!("{}.close()", modal_id));
                 },
+                Check { class: "w-4 h-4 mr-1" }
                 "Delete"
               }
             }
           }
+        }
+        form { method: "dialog", class: "modal-backdrop",
+          button { "close" }
         }
       }
     }

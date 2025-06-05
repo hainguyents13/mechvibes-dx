@@ -4,13 +4,14 @@ use crate::{
         check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
     },
 };
+use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{HardDriveUpload, X};
+use lucide_dioxus::HardDriveUpload;
 use std::sync::Arc;
 
 #[component]
 pub fn SoundpackImportModal(
-    show: Signal<bool>,
+    modal_id: String,
     audio_ctx: Arc<crate::libs::audio::AudioContext>,
     on_import_success: EventHandler<String>,
 ) -> Element {
@@ -19,21 +20,21 @@ pub fn SoundpackImportModal(
     let success = use_signal(|| String::new());
     // Get app state outside the handler
     let app_state = use_app_state();
-    let state_trigger = use_state_trigger();
-    // File import handler
+    let state_trigger = use_state_trigger(); // File import handler
     let handle_import_click = {
         let audio_ctx = audio_ctx.clone();
         let app_state = app_state.clone();
         let state_trigger = state_trigger.clone();
+        let modal_id_close = modal_id.clone();
         Callback::new(move |_| {
             let mut error = error.clone();
             let mut success = success.clone();
             let mut progress = progress.clone();
-            let mut show = show.clone();
             let audio_ctx = audio_ctx.clone();
             let app_state = app_state.clone();
             let on_import_success = on_import_success.clone();
             let state_trigger = state_trigger.clone();
+            let modal_id_close = modal_id_close.clone();
 
             spawn(async move {
                 error.set(String::new());
@@ -95,8 +96,13 @@ pub fn SoundpackImportModal(
                                 on_import_success.call(soundpack_id);
 
                                 // Close modal after delay
-                                show.set(false);
-                                success.set(String::new());
+                                spawn(async move {
+                                    futures_timer::Delay::new(std::time::Duration::from_millis(
+                                        2000,
+                                    ))
+                                    .await;
+                                    eval(&format!("{}.close()", modal_id_close));
+                                });
                             }
                             Err(e) => {
                                 error.set(format!("Failed to install soundpack: {}", e));
@@ -113,40 +119,21 @@ pub fn SoundpackImportModal(
         })
     };
 
-    if !show() {
-        return rsx! {
-          div {}
-        };
-    }
-
     rsx! {
-      div { class: "fixed inset-0 z-50 flex items-center justify-center",
-        // Backdrop
-        div {
-          class: "absolute inset-0 bg-black/50",
-          onclick: move |_| {
-              if progress().is_empty() {
-                  show.set(false);
-              }
-          },
-        }
-
-        // Modal content
-        div { class: "relative bg-base-100 rounded-box shadow-xl p-6 w-full max-w-md mx-4",
-          // Header
-          div { class: "flex items-center justify-between mb-4",
-            h3 { class: "text-lg font-semibold text-base-content", "Import soundpack" }
-            if progress().is_empty() {
-              button {
-                class: "btn btn-ghost btn-sm btn-circle",
-                onclick: move |_| show.set(false),
-                X { class: "w-4 h-4" }
-              }
+      dialog { class: "modal", id: "{modal_id}",
+        div { class: "modal-box",
+          form { method: "dialog",
+            button {
+              class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2",
+              disabled: !progress().is_empty(),
+              "✕"
             }
           }
+          h3 { class: "text-lg font-bold", "Import soundpack" }
 
           // Content
-          div { class: "space-y-4", // Instructions
+          div { class: "space-y-6 mt-4",
+            // Instructions
             if progress().is_empty() && error().is_empty() && success().is_empty() {
               div { class: "text-sm text-base-content/70",
                 "Select a ZIP file containing a soundpack to install it."
@@ -180,20 +167,21 @@ pub fn SoundpackImportModal(
             // Import button
             if progress().is_empty() && success().is_empty() {
               div { class: "flex justify-end gap-2",
-                button {
-                  class: "btn btn-ghost",
-                  onclick: move |_| show.set(false),
-                  "Cancel"
+                form { method: "dialog",
+                  button { class: "btn btn-ghost", "Cancel" }
                 }
                 button {
                   class: "btn btn-neutral",
                   onclick: handle_import_click,
-                  HardDriveUpload { class: "w-4 h-4 mr-2" }
+                  HardDriveUpload { class: "w-4 h-4 mr-1" }
                   "Select file"
                 }
               }
             }
           }
+        }
+        form { method: "dialog", class: "modal-backdrop",
+          button { "close" }
         }
       }
     }

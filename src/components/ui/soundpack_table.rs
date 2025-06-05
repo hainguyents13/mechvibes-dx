@@ -1,29 +1,16 @@
-use crate::state::app::use_state_trigger;
 use crate::state::paths;
 use crate::state::soundpack::SoundpackMetadata;
+use crate::state::{app::use_state_trigger, paths::utils::open_path};
+use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::{FolderOpen, Music, Plus, Trash};
-use std::process::Command;
 
 use super::ConfirmDeleteModal;
 
 /// Open a soundpack folder in the system file manager
 fn open_soundpack_folder(soundpack_id: &str) -> Result<(), String> {
     let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
-
-    let result = if cfg!(target_os = "windows") {
-        Command::new("explorer").arg(&soundpack_path).spawn()
-    } else if cfg!(target_os = "macos") {
-        Command::new("open").arg(&soundpack_path).spawn()
-    } else {
-        // Linux and other Unix-like systems
-        Command::new("xdg-open").arg(&soundpack_path).spawn()
-    };
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to open soundpack folder: {}", e)),
-    }
+    open_path(&soundpack_path).map_err(|e| format!("Failed to open soundpack folder: {}", e))
 }
 
 /// Delete a soundpack directory and all its contents
@@ -124,7 +111,6 @@ pub fn SoundpackTable(
 #[component]
 pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
     let state_trigger = use_state_trigger();
-    let mut show_delete_modal = use_signal(|| false);
 
     // Handlers for button clicks
     let on_open_folder = {
@@ -145,9 +131,14 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             });
         }
     };
-
-    let on_delete_click = move |_| {
-        show_delete_modal.set(true);
+    let on_delete_click = {
+        let soundpack_id = soundpack.id.clone();
+        move |_| {
+            eval(&format!(
+                "confirm_delete_modal_{}.showModal()",
+                soundpack_id
+            ));
+        }
     };
 
     let on_confirm_delete = {
@@ -223,11 +214,9 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             }
           }
         }
-      }
-
-      // Delete confirmation modal
+      } // Delete confirmation modal
       ConfirmDeleteModal {
-        show: show_delete_modal,
+        modal_id: format!("confirm_delete_modal_{}", soundpack.id),
         soundpack_name: soundpack.name.clone(),
         on_confirm: on_confirm_delete,
       }

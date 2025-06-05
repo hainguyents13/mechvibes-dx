@@ -125,7 +125,11 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
             class: "input input-sm w-full",
             readonly: true,
           }
-          button { class: "btn btn-soft btn-sm",
+          button {
+            class: "btn btn-soft btn-sm",
+            onclick: move |_| {
+                let _ = paths::utils::open_path(&soundpacks_dir_absolute.clone());
+            },
             FolderOpen { class: "w-4 h-4 mr-1" }
             "Open"
           }

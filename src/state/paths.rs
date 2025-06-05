@@ -70,6 +70,7 @@ pub mod utils {
     use serde::Deserialize;
     use std::fs;
     use std::io::Read;
+    use std::process::Command;
 
     /// Check if data directory exists
     pub fn data_dir_exists() -> bool {
@@ -79,6 +80,23 @@ pub mod utils {
     /// Check if config file exists
     pub fn config_file_exists() -> bool {
         get_app_root().join("data").join("config.json").exists()
+    }
+
+    /// Open a soundpack folder in the system file manager
+    pub fn open_path(path_to_open: &str) -> Result<(), String> {
+        let result = if cfg!(target_os = "windows") {
+            Command::new("explorer").arg(&path_to_open).spawn()
+        } else if cfg!(target_os = "macos") {
+            Command::new("open").arg(&path_to_open).spawn()
+        } else {
+            // Linux and other Unix-like systems
+            Command::new("xdg-open").arg(&path_to_open).spawn()
+        };
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("Failed to open path: {}", e)),
+        }
     }
 
     /// Count soundpacks in the soundpacks directory
