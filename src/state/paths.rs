@@ -78,9 +78,8 @@ pub mod utils {
     pub fn config_file_exists() -> bool {
         crate::utils::path_utils::config_file_exists()
     }
-
     pub fn open_path(path_to_open: &str) -> Result<(), String> {
-        crate::utils::file_utils::open_path(path_to_open)
+        crate::utils::path_utils::open_path(path_to_open)
     }
 
     pub fn get_data_dir_absolute() -> String {

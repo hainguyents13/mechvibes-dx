@@ -1,4 +1,3 @@
-use crate::utils::file_utils;
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +22,7 @@ pub struct SoundpackValidationResult {
 /// Detect and validate soundpack configuration version and structure
 pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult {
     // Try to read and parse the config file
-    let content = match file_utils::read_file_contents(config_path) {
+    let content = match crate::utils::path_utils::read_file_contents(config_path) {
         Ok(content) => content,
         Err(e) => {
             return SoundpackValidationResult {

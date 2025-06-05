@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::{data_utils, file_utils};
+use crate::utils::{data_utils, path_utils};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ impl ThemesConfig {
 
         // Ensure data directory exists
         if let Some(parent) = themes_path.parent() {
-            if let Err(e) = file_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("Warning: Could not create themes data directory: {}", e);
             }
         }
@@ -65,7 +65,7 @@ impl ThemesConfig {
 
         // Ensure the data directory exists
         if let Some(parent) = themes_path.parent() {
-            file_utils::ensure_directory_exists(&parent.to_string_lossy())
+            path_utils::ensure_directory_exists(&parent.to_string_lossy())
                 .map_err(|e| format!("Failed to create data directory: {}", e))?;
         }
 

@@ -1,4 +1,4 @@
-use crate::utils::file_utils;
+use crate::utils::path_utils;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -116,10 +116,8 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
     // Handle V1 to V2 conversion if needed
     let final_config_content = handle_config_conversion(&config.to_string(), &soundpack_id)?;    // Determine installation directory using soundpack ID
     let soundpacks_dir = crate::state::paths::utils::get_soundpacks_dir_absolute();
-    let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);
-
-    // Create installation directory
-    file_utils::ensure_directory_exists(&install_dir.to_string_lossy())
+    let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);    // Create installation directory
+    path_utils::ensure_directory_exists(&install_dir.to_string_lossy())
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
     // Second pass: extract all files
@@ -151,7 +149,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             install_dir.join(&file_path)
         };        // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
-            file_utils::ensure_directory_exists(&parent.to_string_lossy())
+            path_utils::ensure_directory_exists(&parent.to_string_lossy())
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
@@ -160,11 +158,9 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             File::create(&output_path).map_err(|e| format!("Failed to create file: {}", e))?;
         std::io::copy(&mut file, &mut output_file)
             .map_err(|e| format!("Failed to extract file: {}", e))?;
-    }
-
-    // Write the final config.json at the root level of the soundpack directory
+    }    // Write the final config.json at the root level of the soundpack directory
     let config_path = install_dir.join("config.json");
-    file_utils::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
+    path_utils::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
         .map_err(|e| format!("Failed to write config.json: {}", e))?;
 
     Ok(SoundpackInfo {

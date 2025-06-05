@@ -1,7 +1,6 @@
 pub mod config_converter;
 pub mod config_utils;
 pub mod data_utils;
-pub mod file_utils;
 pub mod path_utils;
 pub mod platform_utils;
 pub mod soundpack_installer;

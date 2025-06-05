@@ -1,6 +1,6 @@
 use crate::libs::theme::{BuiltInTheme, Theme};
 use crate::state::paths;
-use crate::utils::{data_utils, file_utils};
+use crate::utils::{data_utils, path_utils};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -58,7 +58,7 @@ impl AppConfig {
         
         // Ensure data directory exists
         if let Some(parent) = config_path.parent() {
-            if let Err(_) = file_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(_) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("Warning: Could not create data directory");
             }
         }

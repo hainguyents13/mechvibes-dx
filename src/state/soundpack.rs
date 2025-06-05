@@ -1,5 +1,5 @@
 use crate::state::paths;
-use crate::utils::{data_utils, file_utils, soundpack_utils};
+use crate::utils::{data_utils, path_utils, soundpack_utils};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -134,7 +134,7 @@ impl SoundpackCache {
 
         // Ensure parent directory exists
         if let Some(parent) = Path::new(&cache_file).parent() {
-            if let Err(e) = file_utils::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path_utils::ensure_directory_exists(&parent.to_string_lossy()) {
                 eprintln!("⚠️  Failed to create cache directory: {}", e);
                 return;
             }
