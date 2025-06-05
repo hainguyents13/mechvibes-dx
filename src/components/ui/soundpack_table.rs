@@ -130,15 +130,8 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             });
         }
     };
-    let on_delete_click = {
-        let soundpack_id = soundpack.id.clone();
-        move |_| {
-            eval(&format!(
-                "confirm_delete_modal_{}.showModal()",
-                soundpack_id
-            ));
-        }
-    };
+
+    // Handler for delete button click
 
     let on_confirm_delete = {
         let soundpack_id = soundpack.id.clone();
@@ -150,6 +143,7 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
                 match delete_soundpack(&soundpack_id) {
                     Ok(_) => {
                         println!("✅ Successfully deleted soundpack: {}", soundpack_id);
+                        eval(&format!("confirm_delete_modal_{}.close()", soundpack_id));
                         // Trigger state refresh to update the UI
                         trigger.call(());
                     }
@@ -208,12 +202,20 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             button {
               class: "btn btn-soft btn-error btn-xs",
               title: "Delete this soundpack",
-              onclick: on_delete_click,
+              onclick: move |_| {
+                  eval(
+                      &format!(
+                          "document.getElementById(\"confirm_delete_modal_{}\").showModal()",
+                          soundpack.id,
+                      ),
+                  );
+              },
               Trash { class: "w-4 h-4" }
             }
           }
         }
-      } // Delete confirmation modal
+      }
+      // Delete confirmation modal
       ConfirmDeleteModal {
         modal_id: format!("confirm_delete_modal_{}", soundpack.id),
         soundpack_name: soundpack.name.clone(),

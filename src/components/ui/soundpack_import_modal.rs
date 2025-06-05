@@ -4,7 +4,6 @@ use crate::{
         check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
     },
 };
-use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::HardDriveUpload;
 use std::sync::Arc;
@@ -25,7 +24,6 @@ pub fn SoundpackImportModal(
         let audio_ctx = audio_ctx.clone();
         let app_state = app_state.clone();
         let state_trigger = state_trigger.clone();
-        let modal_id_close = modal_id.clone();
         Callback::new(move |_| {
             let mut error = error.clone();
             let mut success = success.clone();
@@ -34,7 +32,6 @@ pub fn SoundpackImportModal(
             let app_state = app_state.clone();
             let on_import_success = on_import_success.clone();
             let state_trigger = state_trigger.clone();
-            let modal_id_close = modal_id_close.clone();
 
             spawn(async move {
                 error.set(String::new());
@@ -94,15 +91,6 @@ pub fn SoundpackImportModal(
 
                                 // Notify parent component (this will trigger UI update)
                                 on_import_success.call(soundpack_id);
-
-                                // Close modal after delay
-                                spawn(async move {
-                                    futures_timer::Delay::new(std::time::Duration::from_millis(
-                                        2000,
-                                    ))
-                                    .await;
-                                    eval(&format!("{}.close()", modal_id_close));
-                                });
                             }
                             Err(e) => {
                                 error.set(format!("Failed to install soundpack: {}", e));
@@ -152,20 +140,20 @@ pub fn SoundpackImportModal(
 
             // Error
             if !error().is_empty() {
-              div { class: "alert alert-error",
+              div { class: "alert alert-error alert-soft",
                 div { class: "text-sm", "{error()}" }
               }
             }
 
             // Success
             if !success().is_empty() {
-              div { class: "alert alert-success",
+              div { class: "alert alert-success alert-outline",
                 div { class: "text-sm", "{success()}" }
               }
             }
 
             // Import button
-            if progress().is_empty() && success().is_empty() {
+            if progress().is_empty() {
               div { class: "flex justify-end gap-2",
                 form { method: "dialog",
                   button { class: "btn btn-ghost", "Cancel" }

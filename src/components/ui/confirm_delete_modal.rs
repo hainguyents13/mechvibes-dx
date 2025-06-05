@@ -12,12 +12,14 @@ pub fn ConfirmDeleteModal(
       dialog { class: "modal", id: "{modal_id}",
         div { class: "modal-box",
           form { method: "dialog",
-            button { class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2", "✕" }
+            button { class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2",
+              "✕"
+            }
           }
-          h3 { class: "text-lg font-bold", "Delete Soundpack" }
+          h3 { class: "text-lg font-bold", "Delete soundpack" }
 
           // Content
-          div { class: "space-y-4 py-4",
+          div { class: "space-y-4 mt-6",
             // Warning icon and message
             div { class: "flex items-start gap-3",
               div { class: "flex-shrink-0 w-10 h-10 rounded-full bg-error/10 flex items-center justify-center",
