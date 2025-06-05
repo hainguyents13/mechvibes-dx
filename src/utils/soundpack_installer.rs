@@ -49,7 +49,7 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
             }
 
             // If no ID in config, generate a UUID-based ID
-            return Ok(format!("imported_{}", Uuid::new_v4()));
+            return Ok(format!("imported-{}", Uuid::new_v4()));
         }
     }
 
@@ -158,7 +158,8 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             File::create(&output_path).map_err(|e| format!("Failed to create file: {}", e))?;
         std::io::copy(&mut file, &mut output_file)
             .map_err(|e| format!("Failed to extract file: {}", e))?;
-    } // Write the final config.json at the root level of the soundpack directory
+    }
+    // Write the final config.json at the root level of the soundpack directory
     let config_path = install_dir.join("config.json");
     path::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
         .map_err(|e| format!("Failed to write config.json: {}", e))?;

@@ -265,7 +265,7 @@ fn import_theme_from_protocol(theme_data: &str) -> Result<(), Box<dyn std::error
         .unwrap()
         .as_secs();
 
-    let theme_id = format!("imported_{}", timestamp);
+    let theme_id = format!("imported-{}", timestamp);
     let theme_name = if theme_data.is_empty() {
         "Imported Theme"
     } else {
