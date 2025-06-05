@@ -82,17 +82,6 @@ pub fn use_state_trigger() -> Callback<()> {
     })
 }
 
-// Global trigger function for use outside of components
-pub fn trigger_global_state_update(event: String) {
-    println!("🌍 Global state update triggered: {:?}", event);
-
-    if let Some(global_state) = GLOBAL_APP_STATE.get() {
-        if let Ok(mut state) = global_state.lock() {
-            state.refresh_cache();
-        }
-    }
-}
-
 // Reload the current soundpacks from configuration
 pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
     let config = crate::state::config::AppConfig::load();

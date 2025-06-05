@@ -1,5 +1,5 @@
 use crate::{
-    state::app::{trigger_global_state_update, use_app_state},
+    state::app::use_app_state,
     utils::soundpack_installer::{
         check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
     },
@@ -82,13 +82,10 @@ pub fn SoundpackImportModal(
                                 ));
                                 progress.set(String::new());
 
-                                // Trigger global state update
-                                trigger_global_state_update("SoundpackImported".to_string());
-
                                 // Reload soundpacks in audio context
                                 crate::state::app::reload_current_soundpacks(&audio_ctx);
 
-                                // Notify parent component
+                                // Notify parent component (this will trigger UI update)
                                 on_import_success.call(soundpack_id);
 
                                 // Close modal after delay

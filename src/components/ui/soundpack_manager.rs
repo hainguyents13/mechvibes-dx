@@ -14,8 +14,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         let audio_ctx_refresh = audio_ctx.clone();
         let mut refreshing_soundpacks = refreshing_soundpacks.clone();
         let state_trigger_clone = state_trigger.clone();
-
         Callback::new(move |_| {
+            println!("🔄 Refresh button clicked!");
             // Set loading state to true
             refreshing_soundpacks.set(true);
             // Clone necessary variables for the async task
@@ -30,12 +30,15 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
                 use std::time::Duration;
 
                 Delay::new(Duration::from_millis(100)).await;
-                println!("Starting soundpack refresh operation...");
+                println!("🔄 Starting soundpack refresh operation...");
 
                 // Use the state trigger to refresh cache and update UI
+                println!("🔄 Calling state trigger...");
                 trigger.call(());
+                println!("🔄 State trigger called successfully");
 
                 // Reload current soundpacks to apply any changes
+                println!("🔄 Reloading current soundpacks...");
                 crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
 
                 // Add another small delay before changing the loading state back

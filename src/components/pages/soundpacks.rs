@@ -12,10 +12,14 @@ pub fn Soundpacks() -> Element {
     let app_state = use_app_state();
     let trigger_update = use_state_trigger();
 
-    // Get all soundpacks
+    // Get all soundpacks (this will be reactive to app_state changes)
     let all_soundpacks = app_state.get_soundpacks();
+    println!(
+        "🔄 Soundpacks component rendering with {} soundpacks",
+        all_soundpacks.len()
+    );
 
-    // Filter soundpacks by type
+    // Filter soundpacks by type (these will update when all_soundpacks changes)
     let keyboard_soundpacks: Vec<_> = all_soundpacks
         .iter()
         .filter(|pack| !pack.mouse)
@@ -27,6 +31,12 @@ pub fn Soundpacks() -> Element {
         .filter(|pack| pack.mouse)
         .cloned()
         .collect();
+
+    println!(
+        "🔄 Filtered: {} keyboard, {} mouse soundpacks",
+        keyboard_soundpacks.len(),
+        mouse_soundpacks.len()
+    );
 
     // Get access to audio context for reloading soundpacks
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
