@@ -103,7 +103,7 @@ fn LogoCustomizationSection() -> Element {
     rsx! {
       div { class: "space-y-4",
         // Toggle switch for logo customization
-        div { class: "flex items-center justify-between",
+        label { class: "label w-full justify-between",
           div { class: "flex flex-col",
             div { class: "text-sm font-medium text-base-content",
               "Enable Logo Customization"
@@ -139,11 +139,11 @@ fn LogoCustomizationSection() -> Element {
 fn LogoCustomizationPanel() -> Element {
     let (config, update_config) = use_config();
     let logo_customization = use_memo(move || config().logo_customization.clone());
-
     let mut border_color = use_signal(|| logo_customization().border_color);
     let mut text_color = use_signal(|| logo_customization().text_color);
     let mut shadow_color = use_signal(|| logo_customization().shadow_color);
     let mut background_color = use_signal(|| logo_customization().background_color);
+    let mut muted_background = use_signal(|| logo_customization().muted_background);
     let mut saving = use_signal(|| false);
     // Theme-based color options using CSS variables
     let color_options = vec![
@@ -175,12 +175,14 @@ fn LogoCustomizationPanel() -> Element {
             let text = text_color();
             let shadow = shadow_color();
             let background = background_color();
+            let muted_bg = muted_background();
 
             update_config_clone(Box::new(move |cfg| {
                 cfg.logo_customization.border_color = border;
                 cfg.logo_customization.text_color = text;
                 cfg.logo_customization.shadow_color = shadow;
                 cfg.logo_customization.background_color = background;
+                cfg.logo_customization.muted_background = muted_bg;
             }));
 
             saving.set(true);
@@ -190,44 +192,60 @@ fn LogoCustomizationPanel() -> Element {
             });
         }
     };
-
     let on_reset = move |_| {
         let default_logo = crate::state::config::LogoCustomization::default();
         border_color.set(default_logo.border_color.clone());
         text_color.set(default_logo.text_color.clone());
         shadow_color.set(default_logo.shadow_color.clone());
         background_color.set(default_logo.background_color.clone());
+        muted_background.set(default_logo.muted_background.clone());
 
         update_config(Box::new(move |cfg| {
             cfg.logo_customization = default_logo;
         }));
-    };
-
-    // Update local state when config changes
+    }; // Update local state when config changes
     use_effect(move || {
         let logo = logo_customization();
         border_color.set(logo.border_color);
         text_color.set(logo.text_color);
         shadow_color.set(logo.shadow_color);
         background_color.set(logo.background_color);
+        muted_background.set(logo.muted_background);
     });
 
     rsx! {
-      div { class: "space-y-4",
-        // Preview
+      div { class: "space-y-4", // Preview
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Preview" }
-          div { class: "p-4 bg-base-100 rounded-box border border-base-300",
+          div { class: "grid grid-cols-2 gap-2 p-4 bg-base-100 rounded-box border border-base-300 space-y-3",
             div {
-              class: "select-none border-4 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-fit mx-auto",
-              style: format!(
-                  "border-color: {}; color: {}; background: {}; box-shadow: 0 5px 0 {}",
-                  border_color(),
-                  text_color(),
-                  background_color(),
-                  shadow_color(),
-              ),
-              "Mechvibes"
+              // Normal state preview
+              div { class: "text-xs text-base-content/70", "Normal state:" }
+              div {
+                class: "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mt-1",
+                style: format!(
+                    "border-color: {}; color: {}; background: {}; box-shadow: 0 3px 0 {}",
+                    border_color(),
+                    text_color(),
+                    background_color(),
+                    shadow_color(),
+                ),
+                "Mechvibes"
+              }
+            }
+            div {
+              // Muted state preview
+              div { class: "text-xs text-base-content/70", "Muted state:" }
+              div {
+                class: "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mx-auto opacity-50 mt-1",
+                style: format!(
+                    "border-color: {}; color: {}; background: {}",
+                    border_color(),
+                    text_color(),
+                    muted_background(),
+                ),
+                "Mechvibes"
+              }
             }
           }
         }
@@ -290,8 +308,7 @@ fn LogoCustomizationPanel() -> Element {
               oninput: move |evt| shadow_color.set(evt.value()),
             }
           }
-        }
-        // Background Color
+        } // Background Color
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Background" }
           div { class: "grid grid-cols-2 gap-2",
@@ -309,6 +326,29 @@ fn LogoCustomizationPanel() -> Element {
               value: if color_options.iter().any(|(_, c)| *c == background_color()) { "" } else { background_color() },
               oninput: move |evt| background_color.set(evt.value()),
             }
+          }
+        }
+        // Muted Background Color
+        div { class: "space-y-2",
+          div { class: "text-sm text-base-content", "Muted Background" }
+          div { class: "grid grid-cols-2 gap-2",
+            ColorDropdown {
+              selected_value: muted_background(),
+              options: color_options.clone(),
+              on_change: move |value| muted_background.set(value),
+              placeholder: "Select a color...".to_string(),
+              field: "muted_background".to_string(),
+            }
+            input {
+              r#type: "text",
+              class: "input",
+              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
+              value: if color_options.iter().any(|(_, c)| *c == muted_background()) { "" } else { muted_background() },
+              oninput: move |evt| muted_background.set(evt.value()),
+            }
+          }
+          div { class: "text-xs text-base-content/50 mb-2",
+            "Background color when sound is disabled"
           }
         }
       }
@@ -331,7 +371,7 @@ fn LogoCustomizationPanel() -> Element {
           "Reset"
         }
       }
-      div { class: "text-sm text-base-content/70 mt-3",
+      div { class: "text-sm text-base-content/50 mt-3",
         "When you reset the logo customization, it will revert to the selected theme colors."
       }
     }
@@ -358,7 +398,9 @@ fn ColorDropdown(
       div {
         class: format!(
             "dropdown w-full {}",
-            if field == "background_color" || field == "shadow_color" {
+            if field == "background_color" || field == "shadow_color"
+                || field == "muted_background"
+            {
                 "dropdown-top"
             } else {
                 "dropdown-bottom"

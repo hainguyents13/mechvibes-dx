@@ -10,6 +10,7 @@ pub struct LogoCustomization {
     pub text_color: String,
     pub shadow_color: String,
     pub background_color: String,
+    pub muted_background: String,
 }
 
 impl Default for LogoCustomization {
@@ -19,6 +20,7 @@ impl Default for LogoCustomization {
             text_color: "var(--color-base-content)".to_string(),
             shadow_color: "var(--color-base-content)".to_string(),
             background_color: "var(--color-base-200)".to_string(),
+            muted_background: "var(--color-base-300)".to_string(),
         }
     }
 }
