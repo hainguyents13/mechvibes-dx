@@ -1,8 +1,8 @@
 use crate::components::theme_toggler::ThemeToggler;
-use crate::components::ui::PageHeader;
+use crate::components::ui::{ColorPicker, PageHeader};
 use crate::utils::config_utils::use_config;
-use dioxus::{document::eval, prelude::*};
-use lucide_dioxus::{Check, ChevronDown, Palette, RotateCcw};
+use dioxus::prelude::*;
+use lucide_dioxus::{Check, Palette, RotateCcw};
 
 #[component]
 pub fn CustomizePage() -> Element {
@@ -144,6 +144,7 @@ fn LogoCustomizationPanel() -> Element {
     let mut shadow_color = use_signal(|| logo_customization().shadow_color);
     let mut background_color = use_signal(|| logo_customization().background_color);
     let mut muted_background = use_signal(|| logo_customization().muted_background);
+    let mut dimmed_when_muted = use_signal(|| logo_customization().dimmed_when_muted);
     let mut saving = use_signal(|| false);
     // Theme-based color options using CSS variables
     let color_options = vec![
@@ -176,6 +177,7 @@ fn LogoCustomizationPanel() -> Element {
             let shadow = shadow_color();
             let background = background_color();
             let muted_bg = muted_background();
+            let dimmed = dimmed_when_muted();
 
             update_config_clone(Box::new(move |cfg| {
                 cfg.logo_customization.border_color = border;
@@ -183,6 +185,7 @@ fn LogoCustomizationPanel() -> Element {
                 cfg.logo_customization.shadow_color = shadow;
                 cfg.logo_customization.background_color = background;
                 cfg.logo_customization.muted_background = muted_bg;
+                cfg.logo_customization.dimmed_when_muted = dimmed;
             }));
 
             saving.set(true);
@@ -199,6 +202,7 @@ fn LogoCustomizationPanel() -> Element {
         shadow_color.set(default_logo.shadow_color.clone());
         background_color.set(default_logo.background_color.clone());
         muted_background.set(default_logo.muted_background.clone());
+        dimmed_when_muted.set(default_logo.dimmed_when_muted);
 
         update_config(Box::new(move |cfg| {
             cfg.logo_customization = default_logo;
@@ -211,16 +215,18 @@ fn LogoCustomizationPanel() -> Element {
         shadow_color.set(logo.shadow_color);
         background_color.set(logo.background_color);
         muted_background.set(logo.muted_background);
+        dimmed_when_muted.set(logo.dimmed_when_muted);
     });
 
     rsx! {
-      div { class: "space-y-4", // Preview
+      div { class: "space-y-4",
+        // Preview
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Preview" }
           div { class: "grid grid-cols-2 gap-2 p-4 bg-base-100 rounded-box border border-base-300 space-y-3",
+            // Normal state preview
             div {
-              // Normal state preview
-              div { class: "text-xs text-base-content/70", "Normal state:" }
+              div { class: "text-xs text-base-content/70", "Normal" }
               div {
                 class: "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mt-1",
                 style: format!(
@@ -233,11 +239,14 @@ fn LogoCustomizationPanel() -> Element {
                 "Mechvibes"
               }
             }
+            // Muted state preview
             div {
-              // Muted state preview
-              div { class: "text-xs text-base-content/70", "Muted state:" }
+              div { class: "text-xs text-base-content/70", "Muted" }
               div {
-                class: "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mx-auto opacity-50 mt-1",
+                class: format!(
+                    "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mx-auto mt-1{}",
+                    if dimmed_when_muted() { " opacity-50" } else { "" },
+                ),
                 style: format!(
                     "border-color: {}; color: {}; background: {}",
                     border_color(),
@@ -250,105 +259,68 @@ fn LogoCustomizationPanel() -> Element {
           }
         }
         // Border Color
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Border Color" }
-          div { class: "grid grid-cols-2 gap-2",
-            ColorDropdown {
-              selected_value: border_color(),
-              options: color_options.clone(),
-              placeholder: "Select a color...".to_string(),
-              on_change: move |color: String| border_color.set(color),
-              field: "border_color".to_string(),
-            }
-            input {
-              r#type: "text",
-              class: "input",
-              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
-              value: if color_options.iter().any(|(_, c)| *c == border_color()) { "" } else { border_color() },
-              oninput: move |evt| border_color.set(evt.value()),
-            }
-          }
+        ColorPicker {
+          label: "Border Color".to_string(),
+          selected_value: border_color(),
+          options: color_options.clone(),
+          placeholder: "Select a color...".to_string(),
+          on_change: move |color: String| border_color.set(color),
+          field: "border_color".to_string(),
+          description: None,
         }
         // Text Color
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Text Color" }
-          div { class: "grid grid-cols-2 gap-2",
-            ColorDropdown {
-              selected_value: text_color(),
-              options: color_options.clone(),
-              on_change: move |value| text_color.set(value),
-              placeholder: "Select a color...".to_string(),
-              field: "text_color".to_string(),
-            }
-            input {
-              r#type: "text",
-              class: "input",
-              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
-              value: if color_options.iter().any(|(_, c)| *c == text_color()) { "" } else { text_color() },
-              oninput: move |evt| text_color.set(evt.value()),
-            }
-          }
+        ColorPicker {
+          label: "Text Color".to_string(),
+          selected_value: text_color(),
+          options: color_options.clone(),
+          placeholder: "Select a color...".to_string(),
+          on_change: move |value| text_color.set(value),
+          field: "text_color".to_string(),
+          description: None,
         }
         // Shadow Color
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Shadow Color" }
-          div { class: "grid grid-cols-2 gap-2",
-            ColorDropdown {
-              selected_value: shadow_color(),
-              options: color_options.clone(),
-              on_change: move |value| shadow_color.set(value),
-              placeholder: "Select a color...".to_string(),
-              field: "shadow_color".to_string(),
-            }
-            input {
-              r#type: "text",
-              class: "input",
-              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
-              value: if color_options.iter().any(|(_, c)| *c == shadow_color()) { "" } else { shadow_color() },
-              oninput: move |evt| shadow_color.set(evt.value()),
-            }
-          }
-        } // Background Color
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Background" }
-          div { class: "grid grid-cols-2 gap-2",
-            ColorDropdown {
-              selected_value: background_color(),
-              options: color_options.clone(),
-              on_change: move |value| background_color.set(value),
-              placeholder: "Select a color...".to_string(),
-              field: "background_color".to_string(),
-            }
-            input {
-              r#type: "text",
-              class: "input",
-              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
-              value: if color_options.iter().any(|(_, c)| *c == background_color()) { "" } else { background_color() },
-              oninput: move |evt| background_color.set(evt.value()),
-            }
-          }
+        ColorPicker {
+          label: "Shadow Color".to_string(),
+          selected_value: shadow_color(),
+          options: color_options.clone(),
+          placeholder: "Select a color...".to_string(),
+          on_change: move |value| shadow_color.set(value),
+          field: "shadow_color".to_string(),
+          description: None,
+        }
+        // Background Color
+        ColorPicker {
+          label: "Background".to_string(),
+          selected_value: background_color(),
+          options: color_options.clone(),
+          placeholder: "Select a color...".to_string(),
+          on_change: move |value| background_color.set(value),
+          field: "background_color".to_string(),
+          description: None,
         }
         // Muted Background Color
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Muted Background" }
-          div { class: "grid grid-cols-2 gap-2",
-            ColorDropdown {
-              selected_value: muted_background(),
-              options: color_options.clone(),
-              on_change: move |value| muted_background.set(value),
-              placeholder: "Select a color...".to_string(),
-              field: "muted_background".to_string(),
-            }
-            input {
-              r#type: "text",
-              class: "input",
-              placeholder: "Or enter custom color (e.g., #ff0000, rgb(255,0,0))",
-              value: if color_options.iter().any(|(_, c)| *c == muted_background()) { "" } else { muted_background() },
-              oninput: move |evt| muted_background.set(evt.value()),
+        ColorPicker {
+          label: "Muted Background".to_string(),
+          selected_value: muted_background(),
+          options: color_options.clone(),
+          placeholder: "Select a color...".to_string(),
+          on_change: move |value| muted_background.set(value),
+          field: "muted_background".to_string(),
+          description: Some("Background color when sound is disabled".to_string()),
+        }
+        // Dimmed logo when muted option
+        label { class: "label justify-between w-full",
+          div { class: "flex flex-col",
+            div { class: "text-sm font-medium text-base-content", "Dimmed logo when muted" }
+            div { class: "text-xs text-base-content/70",
+              "Applies opacity to the logo when sound is disabled"
             }
           }
-          div { class: "text-xs text-base-content/50 mb-2",
-            "Background color when sound is disabled"
+          input {
+            r#type: "checkbox",
+            class: "toggle toggle-sm",
+            checked: dimmed_when_muted(),
+            onchange: move |evt| dimmed_when_muted.set(evt.checked()),
           }
         }
       }
@@ -373,80 +345,6 @@ fn LogoCustomizationPanel() -> Element {
       }
       div { class: "text-sm text-base-content/50 mt-3",
         "When you reset the logo customization, it will revert to the selected theme colors."
-      }
-    }
-}
-
-#[component]
-fn ColorDropdown(
-    selected_value: String,
-    options: Vec<(&'static str, &'static str)>,
-    on_change: EventHandler<String>,
-    placeholder: String,
-    field: String,
-) -> Element {
-    let mut is_open = use_signal(|| false);
-
-    // Find the display name for the selected value
-    let selected_display = options
-        .iter()
-        .find(|(_, value)| *value == selected_value)
-        .map(|(name, _)| *name)
-        .unwrap_or(&placeholder);
-
-    rsx! {
-      div {
-        class: format!(
-            "dropdown w-full {}",
-            if field == "background_color" || field == "shadow_color"
-                || field == "muted_background"
-            {
-                "dropdown-top"
-            } else {
-                "dropdown-bottom"
-            },
-        ),
-        button {
-          class: "btn btn-soft w-full justify-between",
-          "tabindex": "0",
-          "role": "button",
-          div { class: "flex items-center gap-2",
-            // Color circle indicator
-            div {
-              class: "w-4 h-4 rounded-full border border-base-300 flex-shrink-0",
-              style: format!("background-color: {}", selected_value),
-            }
-            span { class: "text-left truncate w-26", "{selected_display}" }
-          }
-          ChevronDown { class: "w-4 h-4 " }
-        }
-        ul {
-          class: "dropdown-content bg-base-100 rounded-box z-1 flex-col p-2 h-52 overflow-y-auto w-full shadow-sm",
-          "tabindex": "0",
-          for (name , color) in options.iter() {
-            li { class: "w-full",
-              a {
-                class: format!(
-                    "flex w-full cursor-pointer items-center gap-2 p-2 rounded hover:bg-base-200 text-left {}",
-                    if *color == selected_value { "bg-primary/10" } else { "" },
-                ),
-                onclick: {
-                    let color = color.to_string();
-                    move |_| {
-                        on_change.call(color.clone());
-                        is_open.set(false);
-                        eval("document.activeElement.blur()");
-                    }
-                },
-                div {
-                  class: "w-4 h-4 rounded-full border border-base-300 flex-shrink-0",
-                  style: format!("background-color: {}", color),
-                }
-                span { class: "truncate text-sm", "{name}" }
-              }
-            }
-          }
-        }
       }
     }
 }

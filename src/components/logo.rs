@@ -57,18 +57,23 @@ pub fn Logo() -> Element {
         )
     } else {
         base.to_string()
-    };
-
-    // Add default logo styling classes when customization is disabled
+    }; // Add default logo styling classes when customization is disabled
     let mut final_class = if enable_logo_customization() {
         class
     } else {
         format!("{} border-primary text-primary bg-transparent", class)
-    };
-
-    // Logo muted
+    }; // Logo muted - add opacity when not using custom logo and sound is disabled
     final_class = if !enable_sound() {
-        format!("{} logo-muted", final_class)
+        if enable_logo_customization() {
+            let dimmed_class = if logo_customization().dimmed_when_muted {
+                " opacity-50"
+            } else {
+                ""
+            };
+            format!("{} logo-muted{}", final_class, dimmed_class)
+        } else {
+            format!("{} logo-muted opacity-50", final_class)
+        }
     } else {
         final_class
     };

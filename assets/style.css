@@ -2502,6 +2502,9 @@
   .ml-2 {
     margin-left: calc(var(--spacing) * 2);
   }
+  .ml-7 {
+    margin-left: calc(var(--spacing) * 7);
+  }
   .status {
     display: inline-block;
     aspect-ratio: 1 / 1;
@@ -3258,6 +3261,10 @@
   }
   .object-cover {
     object-fit: cover;
+  }
+  .checkbox-sm {
+    padding: 0.1875rem;
+    --size: calc(var(--size-selector, 0.25rem) * 5);
   }
   .p-1 {
     padding: calc(var(--spacing) * 1);
