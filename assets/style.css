@@ -2400,9 +2400,6 @@
       }
     }
   }
-  .mx-4 {
-    margin-inline: calc(var(--spacing) * 4);
-  }
   .mx-auto {
     margin-inline: auto;
   }
@@ -2504,9 +2501,6 @@
   }
   .ml-2 {
     margin-left: calc(var(--spacing) * 2);
-  }
-  .ml-7 {
-    margin-left: calc(var(--spacing) * 7);
   }
   .status {
     display: inline-block;
@@ -2890,9 +2884,6 @@
       color: currentColor;
     }
   }
-  .btn-block {
-    width: 100%;
-  }
   .loading-sm {
     width: calc(var(--size-selector, 0.25rem) * 5);
   }
@@ -2922,9 +2913,6 @@
   }
   .w-60 {
     width: calc(var(--spacing) * 60);
-  }
-  .w-fit {
-    width: fit-content;
   }
   .w-full {
     width: 100%;
@@ -3162,10 +3150,6 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
   }
-  .border-2 {
-    border-style: var(--tw-border-style);
-    border-width: 2px;
-  }
   .border-3 {
     border-style: var(--tw-border-style);
     border-width: 3px;
@@ -3197,9 +3181,6 @@
   .border-base-300 {
     border-color: var(--color-base-300);
   }
-  .border-base-content {
-    border-color: var(--color-base-content);
-  }
   .border-primary {
     border-color: var(--color-primary);
   }
@@ -3223,15 +3204,6 @@
   }
   .bg-base-content {
     background-color: var(--color-base-content);
-  }
-  .bg-black {
-    background-color: var(--color-black);
-  }
-  .bg-black\/50 {
-    background-color: color-mix(in srgb, #000 50%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--color-black) 50%, transparent);
-    }
   }
   .bg-error {
     background-color: var(--color-error);
@@ -3277,10 +3249,6 @@
   .object-cover {
     object-fit: cover;
   }
-  .checkbox-sm {
-    padding: 0.1875rem;
-    --size: calc(var(--size-selector, 0.25rem) * 5);
-  }
   .p-1 {
     padding: calc(var(--spacing) * 1);
   }
@@ -3295,9 +3263,6 @@
   }
   .p-4 {
     padding: calc(var(--spacing) * 4);
-  }
-  .p-6 {
-    padding: calc(var(--spacing) * 6);
   }
   .p-12 {
     padding: calc(var(--spacing) * 12);
@@ -3495,9 +3460,6 @@
   .opacity-50 {
     opacity: 50%;
   }
-  .opacity-70 {
-    opacity: 70%;
-  }
   .opacity-80 {
     opacity: 80%;
   }
@@ -3514,10 +3476,6 @@
   }
   .shadow-sm {
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-  }
-  .shadow-xl {
-    --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 8px 10px -6px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .outline {
@@ -3653,10 +3611,6 @@
     --btn-color: var(--color-primary);
     --btn-fg: var(--color-primary-content);
   }
-  .btn-secondary {
-    --btn-color: var(--color-secondary);
-    --btn-fg: var(--color-secondary-content);
-  }
   .select-none {
     -webkit-user-select: none;
     user-select: none;
@@ -3748,38 +3702,7 @@
     }
   }
 }
-@font-face {
-  font-family: "Lato";
-  src: url("/assets/fonts/Lato-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Lato";
-  src: url("/assets/fonts/Lato-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Lato";
-  src: url("/assets/fonts/Lato-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: italic;
-}
-@font-face {
-  font-family: "Lato";
-  src: url("/assets/fonts/Lato-BoldItalic.ttf") format("truetype");
-  font-weight: 700;
-  font-style: italic;
-}
-@font-face {
-  font-family: "Lato";
-  src: url("/assets/fonts/Lato-Black.ttf") format("truetype");
-  font-weight: 900;
-  font-style: normal;
-}
 body {
-  font-family: "Lato", sans-serif;
   overflow: hidden;
 }
 .logo-pressed {

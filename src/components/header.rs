@@ -6,6 +6,13 @@ use dioxus::prelude::*;
 const FAVICON: Asset = asset!("/assets/icon.ico");
 const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
 
+// Font assets
+const LATO_REGULAR: Asset = asset!("/assets/fonts/Lato-Regular.ttf");
+const LATO_BOLD: Asset = asset!("/assets/fonts/Lato-Bold.ttf");
+const LATO_ITALIC: Asset = asset!("/assets/fonts/Lato-Italic.ttf");
+const LATO_BOLD_ITALIC: Asset = asset!("/assets/fonts/Lato-BoldItalic.ttf");
+const LATO_BLACK: Asset = asset!("/assets/fonts/Lato-Black.ttf");
+
 #[component]
 pub fn Header() -> Element {
     use crate::utils::config::use_config;
@@ -14,18 +21,57 @@ pub fn Header() -> Element {
     let (themes, _) = use_themes();
     let theme = use_theme();
 
-    // Use effect to inject only dynamic CSS (custom theme CSS and custom CSS)
+    // Use effect to inject fonts and dynamic CSS
     use_effect(move || {
         let custom_css = config().custom_css.clone();
+
+        // Create font-face declarations using Manganis assets
+        let font_css = format!(
+            r#"
+            @font-face {{
+                font-family: "Lato";
+                src: url("{}") format("truetype");
+                font-weight: 400;
+                font-style: normal;
+            }}
+            @font-face {{
+                font-family: "Lato";
+                src: url("{}") format("truetype");
+                font-weight: 700;
+                font-style: normal;
+            }}
+            @font-face {{
+                font-family: "Lato";
+                src: url("{}") format("truetype");
+                font-weight: 400;
+                font-style: italic;
+            }}
+            @font-face {{
+                font-family: "Lato";
+                src: url("{}") format("truetype");
+                font-weight: 700;
+                font-style: italic;
+            }}
+            @font-face {{
+                font-family: "Lato";
+                src: url("{}") format("truetype");
+                font-weight: 900;
+                font-style: normal;
+            }}
+            body {{
+                font-family: "Lato", sans-serif;
+            }}
+            "#,
+            LATO_REGULAR, LATO_BOLD, LATO_ITALIC, LATO_BOLD_ITALIC, LATO_BLACK
+        );
+
         // Get custom theme CSS if current theme is custom
         let custom_theme_css = if let Theme::Custom(theme_id) = &theme() {
             if let Some(theme_data) = themes().get_theme_by_id(theme_id) {
                 // Wrap custom theme CSS with proper data-theme selectors
                 format!(
-                    ":root:has(input.theme-controller[value=custom-{}]:checked),[data-theme=\"custom-{}\"] {{\n{}\n}}",
-                    theme_id,
-                    theme_id,
-                    theme_data.css
+                    "[data-theme=\"custom-{}\"] {{\n{}\n}}",
+                    theme_id, theme_data.css
                 )
             } else {
                 String::new()
@@ -34,8 +80,8 @@ pub fn Header() -> Element {
             String::new()
         };
 
-        // Only combine dynamic CSS parts
-        let dynamic_css = format!("{}\n{}", custom_theme_css, custom_css);
+        // Combine all dynamic CSS parts
+        let dynamic_css = format!("{}\n{}\n{}", font_css, custom_theme_css, custom_css);
 
         // Inject only dynamic CSS using eval
         let script = format!(
@@ -58,7 +104,7 @@ pub fn Header() -> Element {
         eval(&script);
     });
     rsx! {
-      document::Link { rel: "icon", href: FAVICON }
+      document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
       document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
     }
 }

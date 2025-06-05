@@ -22,7 +22,7 @@ script = []
 [application.desktop]
 # Include assets directory for desktop builds
 bundle_assets = true
-bundle_assets_path = ["./assets", "./soundpacks"]
+bundle_assets_path = ["/assets", "/soundpacks"]
 
 # bundle configuration
 [bundle]

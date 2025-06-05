@@ -1,49 +1,16 @@
 @import "tailwindcss";
+
 @plugin "daisyui" {
     themes: all;
 }
 
-/* App-wide styling */
-@font-face {
-    font-family: "Lato";
-    src: url("/assets/fonts/Lato-Regular.ttf") format("truetype");
-    font-weight: 400;
-    font-style: normal;
-}
-@font-face {
-    font-family: "Lato";
-    src: url("/assets/fonts/Lato-Bold.ttf") format("truetype");
-    font-weight: 700;
-    font-style: normal;
-}
-@font-face {
-    font-family: "Lato";
-    src: url("/assets/fonts/Lato-Italic.ttf") format("truetype");
-    font-weight: 400;
-    font-style: italic;
-}
-@font-face {
-    font-family: "Lato";
-    src: url("/assets/fonts/Lato-BoldItalic.ttf") format("truetype");
-    font-weight: 700;
-    font-style: italic;
-}
-@font-face {
-    font-family: "Lato";
-    src: url("/assets/fonts/Lato-Black.ttf") format("truetype");
-    font-weight: 900;
-    font-style: normal;
-}
-
 body {
-    font-family: "Lato", sans-serif;
     overflow: hidden;
 }
 /* 
 .logo {
   box-shadow: 0 5px 0 rgba(163, 10, 10, 0.5);
   }
-  
   */
 .logo-pressed {
     margin-top: 5px;
