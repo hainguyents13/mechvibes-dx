@@ -7,6 +7,7 @@
       "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
       "Courier New", monospace;
+    --color-red-500: oklch(63.7% 0.237 25.331);
     --color-black: #000;
     --color-white: #fff;
     --spacing: 0.25rem;
@@ -2460,6 +2461,9 @@
       }
     }
   }
+  .-mt-1 {
+    margin-top: calc(var(--spacing) * -1);
+  }
   .mt-1 {
     margin-top: calc(var(--spacing) * 1);
   }
@@ -2815,6 +2819,9 @@
   .grid {
     display: grid;
   }
+  .inline {
+    display: inline;
+  }
   .inline-block {
     display: inline-block;
   }
@@ -2835,6 +2842,12 @@
   .size-2 {
     width: calc(var(--spacing) * 2);
     height: calc(var(--spacing) * 2);
+  }
+  .h-3 {
+    height: calc(var(--spacing) * 3);
+  }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
   }
   .h-4 {
     height: calc(var(--spacing) * 4);
@@ -2899,6 +2912,12 @@
   }
   .loading-xs {
     width: calc(var(--size-selector, 0.25rem) * 4);
+  }
+  .w-3 {
+    width: calc(var(--spacing) * 3);
+  }
+  .w-3\.5 {
+    width: calc(var(--spacing) * 3.5);
   }
   .w-4 {
     width: calc(var(--spacing) * 4);
@@ -3256,6 +3275,30 @@
   .mask-repeat {
     mask-repeat: repeat;
   }
+  .fill-accent {
+    fill: var(--color-accent);
+  }
+  .fill-base-100 {
+    fill: var(--color-base-100);
+  }
+  .fill-base-300 {
+    fill: var(--color-base-300);
+  }
+  .fill-error {
+    fill: var(--color-error);
+  }
+  .fill-error-content {
+    fill: var(--color-error-content);
+  }
+  .fill-error\/50 {
+    fill: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      fill: color-mix(in oklab, var(--color-error) 50%, transparent);
+    }
+  }
+  .fill-primary {
+    fill: var(--color-primary);
+  }
   .object-cover {
     object-fit: cover;
   }
@@ -3410,6 +3453,9 @@
   .break-all {
     word-break: break-all;
   }
+  .text-accent {
+    color: var(--color-accent);
+  }
   .text-base-100 {
     color: var(--color-base-100);
   }
@@ -3457,6 +3503,12 @@
   }
   .text-primary {
     color: var(--color-primary);
+  }
+  .text-primary-content {
+    color: var(--color-primary-content);
+  }
+  .text-red-500 {
+    color: var(--color-red-500);
   }
   .text-white {
     color: var(--color-white);
