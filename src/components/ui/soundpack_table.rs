@@ -11,7 +11,7 @@ pub fn SoundpackTable(
     // Search state
     let mut search_query = use_signal(String::new);
 
-    // Clone soundpacks for use in memo
+    // Clone soundpacks to avoid move issues
     let soundpacks_clone = soundpacks.clone();
 
     // Filter soundpacks based on search query

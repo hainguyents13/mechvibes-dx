@@ -12,31 +12,25 @@ pub fn Soundpacks() -> Element {
     let app_state = use_app_state();
     let trigger_update = use_state_trigger();
 
-    // Filter soundpacks by type
-    let keyboard_soundpacks = use_memo({
-        let app_state = app_state.clone();
-        move || {
-            app_state
-                .get_soundpacks()
-                .into_iter()
-                .filter(|pack| !pack.mouse)
-                .collect::<Vec<_>>()
-        }
-    });
+    // Get all soundpacks
+    let all_soundpacks = app_state.get_soundpacks();
 
-    let mouse_soundpacks = use_memo({
-        let app_state = app_state.clone();
-        move || {
-            app_state
-                .get_soundpacks()
-                .into_iter()
-                .filter(|pack| pack.mouse)
-                .collect::<Vec<_>>()
-        }
-    });
+    // Filter soundpacks by type
+    let keyboard_soundpacks: Vec<_> = all_soundpacks
+        .iter()
+        .filter(|pack| !pack.mouse)
+        .cloned()
+        .collect();
+
+    let mouse_soundpacks: Vec<_> = all_soundpacks
+        .iter()
+        .filter(|pack| pack.mouse)
+        .cloned()
+        .collect();
 
     // Get access to audio context for reloading soundpacks
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+
     // Import modal state
     let mut show_import_modal = use_signal(|| false);
 
@@ -61,11 +55,11 @@ pub fn Soundpacks() -> Element {
               checked: true,
             }
             Keyboard { class: "w-5 h-5 mr-2" }
-            "Keyboard ({keyboard_soundpacks().len()})"
+            "Keyboard ({keyboard_soundpacks.len()})"
           }
           div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
-              soundpacks: keyboard_soundpacks(),
+              soundpacks: keyboard_soundpacks,
               soundpack_type: "Keyboard",
               on_add_click: Some(EventHandler::new(move |_| show_import_modal.set(true))),
             }
@@ -75,11 +69,11 @@ pub fn Soundpacks() -> Element {
           label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
             input { r#type: "radio", name: "soundpack-tab" }
             Mouse { class: "w-5 h-5 mr-2" }
-            "Mouse ({mouse_soundpacks().len()})"
+            "Mouse ({mouse_soundpacks.len()})"
           }
           div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
             SoundpackTable {
-              soundpacks: mouse_soundpacks(),
+              soundpacks: mouse_soundpacks,
               soundpack_type: "Mouse",
               on_add_click: Some(EventHandler::new(move |_| show_import_modal.set(true))),
             }
@@ -98,7 +92,8 @@ pub fn Soundpacks() -> Element {
         // Import modal
         SoundpackImportModal {
           show: show_import_modal,
-          audio_ctx,          on_import_success: EventHandler::new(move |_soundpack_id: String| {
+          audio_ctx,
+          on_import_success: EventHandler::new(move |_soundpack_id: String| {
               trigger_update(());
           }),
         }
