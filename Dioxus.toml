@@ -2,22 +2,6 @@
 name = "mechvibes-dx"
 out_dir = "bundles"
 
-[web.app]
-# HTML title tag content
-title = "mechvibes-dx"
-
-# include `assets` in web platform
-[web.resource]
-# Additional CSS style files
-style = []
-# Additional JavaScript files
-script = []
-
-[web.resource.dev]
-# Javascript code file
-# serve: [dev-server] only
-script = []
-
 # Asset bundling configuration for desktop app
 [application.desktop]
 # Include assets directory for desktop builds

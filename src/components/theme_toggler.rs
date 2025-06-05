@@ -235,17 +235,13 @@ fn CreateThemeButton(props: CreateThemeButtonProps) -> Element {
           Palette { class: "w-4 h-4 mr-1" }
           "Create"
         }
-        button {
-          class: "btn btn-ghost btn-sm",
-          onclick: {
-              let mut editing_theme_id = props.editing_theme_id;
-              move |_| {
-                  editing_theme_id.set(None);
-                  eval("theme_creator_modal.showModal()");
-              }
-          },
-          Plus { class: "w-4 h-4 mr-1" }
-          "Add"
+        // Disabled button for adding themes
+        // This is just a placeholder for future functionality
+        div { class: "tooltip", "data-tip": "Coming soon!",
+          button { class: "btn btn-ghost btn-sm", disabled: true,
+            Plus { class: "w-4 h-4 mr-1" }
+            "Add"
+          }
         }
         a {
           class: "btn btn-ghost btn-sm",
