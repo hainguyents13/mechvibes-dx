@@ -26,7 +26,7 @@ pub fn CustomizePage() -> Element {
       div { class: "p-12 pb-32",
         PageHeader {
           title: "Customize".to_string(),
-          subtitle: Some("Change themes, styles, and more".to_string()),
+          subtitle: "Vibe it your way!".to_string(),
           icon: Some(rsx! {
             Palette { class: "w-8 h-8 mx-auto" }
           }),
@@ -104,7 +104,7 @@ fn LogoCustomizationSection() -> Element {
       div { class: "space-y-4",
         // Toggle switch for logo customization
         label { class: "label w-full justify-between",
-          div { class: "flex flex-col",
+          div { class: "space-y-1",
             div { class: "text-sm font-medium text-base-content",
               "Enable Logo Customization"
             }

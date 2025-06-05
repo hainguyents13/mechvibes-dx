@@ -40,13 +40,15 @@ pub fn SettingsPage() -> Element {
                 // Volume Control
                 label { class: " cursor-pointer flex items-center justify-between",
                   div {
-                    div { class: "", "Enable all sounds" }
-                    div { class: "text-base-content/70 text-xs truncate",
-                      span { "You can also use " }
-                      span { class: "kbd kbd-xs font-mono text-base",
-                        "Ctrl+Alt+M"
+                    div { class: "space-y-1",
+                      div { class: "", "Enable all sounds" }
+                      div { class: "text-base-content/70 text-xs truncate",
+                        span { "You can also use " }
+                        span { class: "kbd kbd-xs font-mono text-base",
+                          "Ctrl+Alt+M"
+                        }
+                        span { " to toggle sound on/off" }
                       }
-                      span { " to toggle sound on/off" }
                     }
                   }
 
@@ -69,7 +71,7 @@ pub fn SettingsPage() -> Element {
                 // Auto Start
                 div { class: "",
                   label { class: " cursor-pointer flex items-center justify-between",
-                    div {
+                    div { class: "space-y-1",
                       div { class: "", "Start with Windows" }
                       div { class: "text-xs text-base-content/70 truncate",
                         "Automatically start MechvibesDX when Windows boots"
@@ -95,7 +97,7 @@ pub fn SettingsPage() -> Element {
                 // Notifications
                 div { class: "",
                   label { class: "cursor-pointer flex items-center justify-between",
-                    div {
+                    div { class: "space-y-1",
                       div { class: "", "Show Notifications" }
                       div { class: "text-base-content/70 text-xs truncate",
                         "Display system notifications for important events"
