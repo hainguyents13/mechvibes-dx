@@ -8,6 +8,8 @@ use notify_rust::Notification;
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+const DELAY_MS: Duration = Duration::from_millis(5);
+
 pub fn app() -> Element {
     // Create update signal for event-driven state management
     let update_signal = use_signal(|| 0u32);
@@ -80,7 +82,7 @@ pub fn app() -> Element {
                             state.last_key = keycode.clone();
                         }
                     }
-                    futures_timer::Delay::new(std::time::Duration::from_millis(20)).await;
+                    futures_timer::Delay::new(DELAY_MS).await;
                 }
             }
         });
@@ -105,11 +107,13 @@ pub fn app() -> Element {
                             ctx.play_mouse_event_sound(&button_code, true);
                         }
                     }
-                    futures_timer::Delay::new(std::time::Duration::from_millis(20)).await;
+                    futures_timer::Delay::new(DELAY_MS).await;
                 }
             }
         });
-    } // Process hotkey Ctrl+Alt+M to toggle global sound
+    }
+
+    // Process hotkey Ctrl+Alt+M to toggle global sound
     {
         let hotkey_rx = hotkey_rx.clone();
 

@@ -3210,6 +3210,9 @@
   .border-base-300 {
     border-color: var(--color-base-300);
   }
+  .border-base-content {
+    border-color: var(--color-base-content);
+  }
   .border-primary {
     border-color: var(--color-primary);
   }
