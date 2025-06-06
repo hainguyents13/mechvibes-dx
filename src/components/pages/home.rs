@@ -126,7 +126,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
             // Footer with credits
             div { class: "text-sm text-base-content/50",
               span { "Made with " }
-              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-base-content/50 fill-error/50" }
+              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-error/70 fill-error/30" }
               span { " by " }
               a {
                 href: "https://github.com/hainguyents13/mechvibes-dx",

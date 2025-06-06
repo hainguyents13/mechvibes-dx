@@ -16,8 +16,8 @@ pub fn EffectsPage() -> Element {
     // Ambient Sounds states
     let mut rain_sound_enabled = use_signal(|| false);
     let mut rain_auto_play = use_signal(|| false);
-    let mut crow_noise_enabled = use_signal(|| false);
-    let mut crow_auto_play = use_signal(|| false);
+    let mut crowd_noise_enabled = use_signal(|| false);
+    let mut crowd_auto_play = use_signal(|| false);
 
     rsx! {
       div { class: "p-12 pb-32",
@@ -145,27 +145,27 @@ pub fn EffectsPage() -> Element {
                 Toggler {
                   title: "Café background noise".to_string(),
                   description: Some("Add background coffee shop chatter to your workspace.".to_string()),
-                  checked: crow_noise_enabled(),
+                  checked: crowd_noise_enabled(),
                   on_change: move |new_value: bool| {
-                      crow_noise_enabled.set(new_value);
+                      crowd_noise_enabled.set(new_value);
                   },
                 }
               
-                // Controls for Crow Noise
+                // Controls for Crowd Noise
                 div { class: "ml-4 flex items-center gap-2",
                   button {
                     class: "btn btn-xs btn-outline",
                     onclick: move |_| {
-                        println!("🎲 Randomizing crow noise...");
+                        println!("🎲 Randomizing crowd noise...");
                     },
                     "🎲 Randomize"
                   }
                   Toggler {
                     title: "Auto-play with Mechvibes".to_string(),
                     description: None,
-                    checked: crow_auto_play(),
+                    checked: crowd_auto_play(),
                     on_change: move |new_value: bool| {
-                        crow_auto_play.set(new_value);
+                        crowd_auto_play.set(new_value);
                     },
                     size: "xs",
                   }

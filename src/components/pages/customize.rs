@@ -32,7 +32,7 @@ pub fn CustomizePage() -> Element {
           }),
         }
         // Settings sections
-        div { class: "space-y-4 mt-8",          // Theme Section
+        div { class: "space-y-4 mt-8", // Theme Section
           Collapse {
             title: "Themes".to_string(),
             group_name: "customize-accordion".to_string(),
@@ -44,7 +44,8 @@ pub fn CustomizePage() -> Element {
               // Built-in theme toggler
               ThemeToggler {}
             },
-          }          Collapse {
+          }
+          Collapse {
             title: "Logo".to_string(),
             group_name: "customize-accordion".to_string(),
             variant: "border border-base-300 bg-base-200 text-base-content",
@@ -99,18 +100,18 @@ fn LogoCustomizationSection() -> Element {
         local_enable.set(enable_logo_customization());
     });
     rsx! {
-      div { class: "space-y-4",        // Toggle switch for logo customization
+      div { class: "space-y-4", // Toggle switch for logo customization
         Toggler {
           title: "Enable Logo Customization".to_string(),
           description: Some("Customize border, text, shadow and background colors".to_string()),
           checked: local_enable(),
           on_change: move |new_value: bool| {
-            local_enable.set(new_value);
-            update_config(
-                Box::new(move |cfg| {
-                    cfg.enable_logo_customization = new_value;
-                }),
-            );
+              local_enable.set(new_value);
+              update_config(
+                  Box::new(move |cfg| {
+                      cfg.enable_logo_customization = new_value;
+                  }),
+              );
           },
         }
         // Show LogoCustomizationPanel only when enabled
@@ -293,13 +294,13 @@ fn LogoCustomizationPanel() -> Element {
           on_change: move |value| muted_background.set(value),
           field: "muted_background".to_string(),
           description: Some("Background color when sound is disabled".to_string()),
-        }        // Dimmed logo when muted option
+        } // Dimmed logo when muted option
         Toggler {
           title: "Dimmed logo when muted".to_string(),
           description: Some("Applies opacity to the logo when sound is disabled".to_string()),
           checked: dimmed_when_muted(),
           on_change: move |new_value: bool| {
-            dimmed_when_muted.set(new_value);
+              dimmed_when_muted.set(new_value);
           },
         }
       }

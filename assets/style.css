@@ -3372,6 +3372,12 @@
   .fill-error-content {
     fill: var(--color-error-content);
   }
+  .fill-error\/30 {
+    fill: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      fill: color-mix(in oklab, var(--color-error) 30%, transparent);
+    }
+  }
   .fill-error\/50 {
     fill: var(--color-error);
     @supports (color: color-mix(in lab, red, red)) {
@@ -3380,6 +3386,15 @@
   }
   .fill-primary {
     fill: var(--color-primary);
+  }
+  .fill-secondary {
+    fill: var(--color-secondary);
+  }
+  .fill-secondary\/30 {
+    fill: var(--color-secondary);
+    @supports (color: color-mix(in lab, red, red)) {
+      fill: color-mix(in oklab, var(--color-secondary) 30%, transparent);
+    }
   }
   .object-cover {
     object-fit: cover;
@@ -3606,11 +3621,38 @@
   .text-error {
     color: var(--color-error);
   }
+  .text-error-content {
+    color: var(--color-error-content);
+  }
+  .text-error-content\/50 {
+    color: var(--color-error-content);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-error-content) 50%, transparent);
+    }
+  }
+  .text-error\/50 {
+    color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-error) 50%, transparent);
+    }
+  }
+  .text-error\/70 {
+    color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-error) 70%, transparent);
+    }
+  }
   .text-primary {
     color: var(--color-primary);
   }
   .text-primary-content {
     color: var(--color-primary-content);
+  }
+  .text-primary\/70 {
+    color: var(--color-primary);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-primary) 70%, transparent);
+    }
   }
   .text-red-500 {
     color: var(--color-red-500);
