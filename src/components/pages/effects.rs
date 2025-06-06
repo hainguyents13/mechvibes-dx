@@ -5,7 +5,7 @@ use crate::components::ui::{Collapse, PageHeader, Toggler};
 
 #[component]
 pub fn EffectsPage() -> Element {
-    // Local state for toggles
+    // Audio effects toggles
     let mut random_pitch_enabled = use_signal(|| false);
     let mut random_keys_enabled = use_signal(|| false);
 
@@ -139,6 +139,7 @@ pub fn EffectsPage() -> Element {
                     size: "xs",
                   }
                 }
+              
                 div { class: "divider" }
                 // Café background noise Toggle
                 Toggler {

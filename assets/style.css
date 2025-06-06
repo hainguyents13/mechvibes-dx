@@ -3748,6 +3748,11 @@
   .range-xs {
     --range-thumb-size: calc(var(--size-selector, 0.25rem) * 4);
   }
+  .toggle-error {
+    &:checked, &[aria-checked="true"] {
+      --input-color: var(--color-error);
+    }
+  }
   .toggle-primary {
     &:checked, &[aria-checked="true"] {
       --input-color: var(--color-primary);

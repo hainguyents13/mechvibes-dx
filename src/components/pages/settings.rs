@@ -1,4 +1,4 @@
-use crate::components::ui::PageHeader;
+use crate::components::ui::{Collapse, PageHeader, Toggler};
 use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
@@ -24,119 +24,84 @@ pub fn SettingsPage() -> Element {
           icon: Some(rsx! {
             Settings { class: "w-8 h-8 mx-auto" }
           }),
-        }
-        // Settings sections
+        } // Settings sections
         div { class: "space-y-4",
           // General Settings Section
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input {
-              r#type: "radio",
-              name: "setting-accordion",
-              checked: true,
-            }
-            div { class: "collapse-title font-semibold", "General" }
-            div { class: "collapse-content text-sm",
+          Collapse {
+            title: "General".to_string(),
+            group_name: "setting-accordion".to_string(),
+            default_open: true,
+            content_class: "collapse-content text-sm",
+            children: rsx! {
               div { class: "space-y-6",
                 // Volume Control
-                label { class: " cursor-pointer flex items-center justify-between",
-                  div {
-                    div { class: "space-y-1",
-                      div { class: "", "Enable all sounds" }
-                      div { class: "text-base-content/70 text-xs truncate",
-                        span { "You can also use " }
-                        span { class: "kbd kbd-xs font-mono text-base",
-                          "Ctrl+Alt+M"
-                        }
-                        span { " to toggle sound on/off" }
+                Toggler {
+                  title: "Enable all sounds".to_string(),
+                  description: Some("You can also use Ctrl+Alt+M to toggle sound on/off".to_string()),
+                  checked: enable_sound(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.enable_sound = new_value;
+                              }),
+                          );
                       }
-                    }
-                  }
-
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm toggle-base-100",
-                    checked: enable_sound(),
-                    onchange: {
-                        let update_config = update_config.clone();
-                        move |evt: Event<FormData>| {
-                            update_config(
-                                Box::new(move |config| {
-                                    config.enable_sound = evt.value() == "true";
-                                }),
-                            );
-                        }
-                    },
-                  }
+                  },
                 }
                 // Auto Start
-                div { class: "",
-                  label { class: " cursor-pointer flex items-center justify-between",
-                    div { class: "space-y-1",
-                      div { class: "", "Start with Windows" }
-                      div { class: "text-xs text-base-content/70 truncate",
-                        "Automatically start MechvibesDX when Windows boots"
+                Toggler {
+                  title: "Start with Windows".to_string(),
+                  description: Some("Automatically start MechvibesDX when Windows boots".to_string()),
+                  checked: auto_start(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.auto_start = new_value;
+                              }),
+                          );
                       }
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-sm toggle-base-100",
-                      checked: auto_start(),
-                      onchange: {
-                          let update_config = update_config.clone();
-                          move |evt: Event<FormData>| {
-                              update_config(
-                                  Box::new(move |config| {
-                                      config.auto_start = evt.value() == "true";
-                                  }),
-                              );
-                          }
-                      },
-                    }
-                  }
+                  },
                 }
                 // Notifications
-                div { class: "",
-                  label { class: "cursor-pointer flex items-center justify-between",
-                    div { class: "space-y-1",
-                      div { class: "", "Show Notifications" }
-                      div { class: "text-base-content/70 text-xs truncate",
-                        "Display system notifications for important events"
+                Toggler {
+                  title: "Show Notifications".to_string(),
+                  description: Some("Display system notifications for important events".to_string()),
+                  checked: show_notifications(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.show_notifications = new_value;
+                              }),
+                          );
                       }
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-sm toggle-base-100",
-                      checked: show_notifications(),
-                      onchange: {
-                          let update_config = update_config.clone();
-                          move |evt: Event<FormData>| {
-                              update_config(
-                                  Box::new(move |config| {
-                                      config.show_notifications = evt.value() == "true";
-                                  }),
-                              );
-                          }
-                      },
-                    }
-                  }
+                  },
                 }
               }
-            }
+            },
           }
           // App info Section
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold", "App info" }
-            div { class: "collapse-content text-sm",
+          Collapse {
+            title: "App info".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            children: rsx! {
               crate::components::app_info::AppInfoDisplay {}
-            }
+            },
           }
           // Danger Zone Section
-          // Reset Settings
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200",
-            input { r#type: "radio", name: "setting-accordion" }
-            div { class: "collapse-title font-semibold  text-error", "Danger zone" }
-            div { class: "collapse-content text-sm",
+          Collapse {
+            title: "Danger zone".to_string(),
+            group_name: "setting-accordion".to_string(),
+            title_class: "collapse-title font-semibold text-error",
+            variant: "border border-base-300 bg-base-200",
+            content_class: "collapse-content text-sm",
+            children: rsx! {
               p { class: "mb-4 text-base-content/70",
                 "Reset all settings to their default values. This action cannot be undone."
               }
@@ -161,7 +126,7 @@ pub fn SettingsPage() -> Element {
                   "Reset to Defaults"
                 }
               }
-            }
+            },
           }
         }
       }
