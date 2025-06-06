@@ -37,27 +37,24 @@ pub fn Toggler(props: TogglerProps) -> Element {
     );
 
     rsx! {
-        label {
-            class: format!("label w-full justify-between cursor-pointer {}", props.class),
-            div { class: "space-y-1 flex-1 pr-4",
-                div { class: "text-sm font-medium text-base-content",
-                    "{props.title}"
-                }
-                if let Some(description) = &props.description {
-                    div { class: "text-xs text-base-content/70",
-                        "{description}"
-                    }
-                }
+      label { class: format!("label w-full justify-between cursor-pointer {}", props.class),
+        div { class: "space-y-1 flex-1 pr-4",
+          div { class: "text-sm font-medium text-base-content", "{props.title}" }
+          if let Some(description) = &props.description {
+            div { class: "text-xs whitespace-break-spaces text-base-content/70",
+              "{description}"
             }
-            input {
-                r#type: "checkbox",
-                class: "{toggle_class}",
-                checked: props.checked,
-                disabled: props.disabled,
-                onchange: move |evt| {
-                    props.on_change.call(evt.checked());
-                },
-            }
+          }
         }
+        input {
+          r#type: "checkbox",
+          class: "{toggle_class}",
+          checked: props.checked,
+          disabled: props.disabled,
+          onchange: move |evt| {
+              props.on_change.call(evt.checked());
+          },
+        }
+      }
     }
 }

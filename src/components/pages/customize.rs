@@ -1,5 +1,5 @@
 use crate::components::theme_toggler::ThemeToggler;
-use crate::components::ui::{ColorPicker, PageHeader, Toggler};
+use crate::components::ui::{Collapse, ColorPicker, PageHeader, Toggler};
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, Palette, RotateCcw};
@@ -32,27 +32,26 @@ pub fn CustomizePage() -> Element {
           }),
         }
         // Settings sections
-        div { class: "space-y-4 mt-8",
-          // Theme Section
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input {
-              r#type: "radio",
-              name: "customize-accordion",
-              checked: true,
-            }
-            div { class: "collapse-title font-semibold", "Themes" }
-            div { class: "collapse-content text-sm text-base-content/70",
+        div { class: "space-y-4 mt-8",          // Theme Section
+          Collapse {
+            title: "Themes".to_string(),
+            group_name: "customize-accordion".to_string(),
+            default_open: true,
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content text-sm text-base-content/70",
+            children: rsx! {
               div { "Choose your preferred theme or create custom ones" }
               // Built-in theme toggler
               ThemeToggler {}
-            }
-          }
-          div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
-            input { r#type: "radio", name: "customize-accordion" }
-            div { class: "collapse-title font-semibold", "Logo" }
-            div { class: "collapse-content overflow-visible text-base-content/70",
+            },
+          }          Collapse {
+            title: "Logo".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            children: rsx! {
               LogoCustomizationSection {}
-            }
+            },
           }
                 // Custom CSS Section
         // div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",

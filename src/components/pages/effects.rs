@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Sparkles;
 
-use crate::components::ui::{PageHeader, Toggler};
+use crate::components::ui::{Collapse, PageHeader, Toggler};
 
 #[component]
 pub fn EffectsPage() -> Element {
@@ -28,18 +28,15 @@ pub fn EffectsPage() -> Element {
           icon: Some(rsx! {
             Sparkles { class: "w-8 h-8 mx-auto" }
           }),
-        } // Effects Configuration
+        }
+        // Effects Configuration
         div { class: "space-y-4",
           // Audio Effects Section
-          div { class: "collapse collapse-arrow border-base-300 bg-base-200",
-            input {
-              r#type: "radio",
-              name: "effect-collapse",
-              class: "",
-              checked: true,
-            }
-            div { class: "collapse-title font-semibold", "Audio effects" }
-            div { class: "collapse-content",
+          Collapse {
+            title: "Audio effects".to_string(),
+            group_name: "effect-collapse".to_string(),
+            default_open: true,
+            children: rsx! {
               div { class: "space-y-6 ",
                 // Random Pitch Toggle
                 Toggler {
@@ -65,18 +62,13 @@ pub fn EffectsPage() -> Element {
                   },
                 }
               }
-            }
+            },
           }
-
           // Background Music Section
-          div { class: "collapse collapse-arrow border-base-300 bg-base-200",
-            input {
-              r#type: "radio",
-              name: "effect-collapse",
-              class: "",
-            }
-            div { class: "collapse-title font-semibold", "Background music" }
-            div { class: "collapse-content",
+          Collapse {
+            title: "Background music".to_string(),
+            group_name: "effect-collapse".to_string(),
+            children: rsx! {
               div { class: "space-y-6",
                 // Lo-fi Music Toggle
                 Toggler {
@@ -89,7 +81,7 @@ pub fn EffectsPage() -> Element {
                       lofi_music_enabled.set(new_value);
                   },
                 }
-
+              
                 // Controls for Lofi Music
                 div { class: "ml-4 flex items-center gap-2",
                   button {
@@ -110,18 +102,13 @@ pub fn EffectsPage() -> Element {
                   }
                 }
               }
-            }
+            },
           }
-
           // Ambient Sounds Section
-          div { class: "collapse collapse-arrow border-base-300 bg-base-200",
-            input {
-              r#type: "radio",
-              name: "effect-collapse",
-              class: "",
-            }
-            div { class: "collapse-title font-semibold", "Ambient sounds" }
-            div { class: "collapse-content",
+          Collapse {
+            title: "Ambient sounds".to_string(),
+            group_name: "effect-collapse".to_string(),
+            children: rsx! {
               div { class: "space-y-6",
                 // Rain Sound Toggle
                 Toggler {
@@ -132,7 +119,7 @@ pub fn EffectsPage() -> Element {
                       rain_sound_enabled.set(new_value);
                   },
                 }
-
+              
                 // Controls for Rain Sound
                 div { class: "ml-4 flex items-center gap-2",
                   button {
@@ -162,7 +149,7 @@ pub fn EffectsPage() -> Element {
                       crow_noise_enabled.set(new_value);
                   },
                 }
-
+              
                 // Controls for Crow Noise
                 div { class: "ml-4 flex items-center gap-2",
                   button {
@@ -183,7 +170,7 @@ pub fn EffectsPage() -> Element {
                   }
                 }
               }
-            }
+            },
           }
         }
       }
