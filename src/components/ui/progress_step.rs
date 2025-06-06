@@ -5,13 +5,12 @@ use lucide_dioxus::{Check, X};
 #[repr(u8)]
 pub enum ImportStep {
     Idle = 0,
-    OpeningDialog = 1,
-    FileSelected = 2,
-    Validating = 3,
-    CheckingConflicts = 4,
-    Installing = 5,
-    Finalizing = 6,
-    Completed = 7,
+    FileSelected = 1,
+    Validating = 2,
+    CheckingConflicts = 3,
+    Installing = 4,
+    Finalizing = 5,
+    Completed = 6,
 }
 
 #[derive(Props, Clone, PartialEq)]
@@ -28,7 +27,7 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
     // Calculate is_active and is_completed based on current_step and step_number
     let current_step_num = props.current_step as u8;
     let is_completed = current_step_num > props.step_number
-        || (current_step_num == props.step_number && current_step_num == 7); // Step 7 is completed when reached
+        || (current_step_num == props.step_number && current_step_num == 6); // Step 6 is completed when reached
     let is_active = current_step_num == props.step_number && !is_completed;
     rsx! {
       div { class: "space-y-2",
