@@ -5,7 +5,7 @@ use lucide_dioxus::{Check, X};
 #[repr(u8)]
 pub enum ImportStep {
     Idle = 0,
-    FileSelected = 1,
+    FileSelecting = 1,
     Validating = 2,
     CheckingConflicts = 3,
     Installing = 4,
@@ -31,10 +31,10 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
     let is_active = current_step_num == props.step_number && !is_completed;
     rsx! {
       div { class: "space-y-2",
-        div { class: "flex items-center gap-3",
-          span {
+        div { class: "flex items-center",
+          div {
             class: format!(
-                "flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium {}",
+                "flex items-center mr-3 justify-center w-6 h-6 shrink-0 rounded-full text-xs font-medium {}",
                 if !props.error_message.is_empty() {
                     "bg-error/70 text-error-content"
                 } else if is_active {
@@ -55,9 +55,10 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
               span { "{props.step_number}" }
             }
           }
-          span {
+
+          div {
             class: format!(
-                "text-sm {}",
+                "text-sm whitespace-nowrap {}",
                 if !props.error_message.is_empty() {
                     "text-error"
                 } else if is_active {
@@ -68,15 +69,25 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
                     "text-base-content/50"
                 },
             ),
-            "{props.title}"
-          }        }
-
-        // Success message under step (when completed and has success message)
-        if is_completed && !props.success_message.is_empty() {
-          div { class: "ml-9 text-xs text-success bg-success/10 p-2 rounded border border-success/20",
-            "{props.success_message}"
+            if !props.success_message.is_empty() {
+              "{props.title}:"
+            } else {
+              "{props.title}"
+            }
+          }
+          if !props.success_message.is_empty() {
+            div { class: "ml-1 text-sm text-base-content/50 truncate",
+              "{props.success_message}"
+            }
           }
         }
+
+        // Success message under step (when completed and has success message)
+        // if is_completed && !props.success_message.is_empty() {
+        //   div { class: "ml-9 text-xs text-success bg-success/10 p-2 rounded border border-success/20",
+        //     "{props.success_message}"
+        //   }
+        // }
 
         // Error message under step
         if !props.error_message.is_empty() {

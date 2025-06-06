@@ -86,7 +86,8 @@ pub fn SoundpackTable(
                   "Add"
                 }
               }
-            } // Table
+            }
+            // Table
             div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
               if filtered_soundpacks.is_empty() {
                 div { class: "p-4 text-center text-base-content/70",

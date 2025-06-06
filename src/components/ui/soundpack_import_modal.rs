@@ -7,7 +7,7 @@ use crate::{
     utils::soundpack_validator::{validate_soundpack_structure, validate_zip_file},
 };
 use dioxus::prelude::*;
-use lucide_dioxus::HardDriveUpload;
+use lucide_dioxus::FolderArchive;
 use std::sync::Arc;
 
 #[component]
@@ -16,57 +16,83 @@ pub fn SoundpackImportModal(
     audio_ctx: Arc<crate::libs::audio::AudioContext>,
     on_import_success: EventHandler<String>,
 ) -> Element {
+    // Loading
+    let mut is_loading = use_signal(|| false);
+
     // Import step tracking
     let current_step = use_signal(|| ImportStep::Idle);
     let error_step = use_signal(|| ImportStep::Idle);
     let error_message = use_signal(|| String::new());
     let success_step = use_signal(|| ImportStep::Idle);
     let success_message = use_signal(|| String::new());
-
     // Success messages for each step
     let file_selected_message = use_signal(|| String::new());
-    let validation_success_message = use_signal(|| String::new());
-    let conflict_check_message = use_signal(|| String::new());
     let installation_success_message = use_signal(|| String::new());
     let finalization_success_message = use_signal(|| String::new());
-
     // Get app state outside the handler
     let app_state = use_app_state();
     let state_trigger = use_state_trigger();
+
+    // Reset function to clear all states
+    let reset_modal = {
+        let mut is_loading = is_loading.clone();
+        let mut current_step = current_step.clone();
+        let mut error_step = error_step.clone();
+        let mut error_message = error_message.clone();
+        let mut success_step = success_step.clone();
+        let mut success_message = success_message.clone();
+        let mut file_selected_message = file_selected_message.clone();
+        let mut installation_success_message = installation_success_message.clone();
+        let mut finalization_success_message = finalization_success_message.clone();
+
+        Callback::new(move |_| {
+            is_loading.set(false);
+            current_step.set(ImportStep::Idle);
+            error_step.set(ImportStep::Idle);
+            error_message.set(String::new());
+            success_step.set(ImportStep::Idle);
+            success_message.set(String::new());
+            file_selected_message.set(String::new());
+            installation_success_message.set(String::new());
+            finalization_success_message.set(String::new());
+        })
+    };
+
+    // Close button handler with reset
+    let handle_close = {
+        let reset_modal = reset_modal.clone();
+        move |_| {
+            reset_modal.call(());
+        }
+    };
 
     // File import handler
     let handle_import_click = {
         let audio_ctx = audio_ctx.clone();
         let app_state = app_state.clone();
         let state_trigger = state_trigger.clone();
-        Callback::new(move |_| {
+        let reset_modal = reset_modal.clone();
+        move |_| {
             let mut error_step = error_step.clone();
             let mut error_message = error_message.clone();
             let mut success_step = success_step.clone();
             let mut success_message = success_message.clone();
             let mut current_step = current_step.clone();
             let mut file_selected_message = file_selected_message.clone();
-            let mut validation_success_message = validation_success_message.clone();
-            let mut conflict_check_message = conflict_check_message.clone();
             let mut installation_success_message = installation_success_message.clone();
             let mut finalization_success_message = finalization_success_message.clone();
             let audio_ctx = audio_ctx.clone();
             let app_state = app_state.clone();
             let on_import_success = on_import_success.clone();
             let state_trigger = state_trigger.clone();
+            let reset_modal = reset_modal.clone();
 
             spawn(async move {
-                error_step.set(ImportStep::Idle);
-                error_message.set(String::new());
-                success_step.set(ImportStep::Idle);
-                success_message.set(String::new());
+                // Reset modal state before starting import
+                reset_modal.call(());
 
-                // Clear all step success messages
-                file_selected_message.set(String::new());
-                validation_success_message.set(String::new());
-                conflict_check_message.set(String::new());
-                installation_success_message.set(String::new());
-                finalization_success_message.set(String::new());
+                // Reset all steps and messages
+                current_step.set(ImportStep::FileSelecting);
 
                 // Step 1: Open file dialog and select file
                 // Open file dialog to select ZIP file
@@ -81,40 +107,36 @@ pub fn SoundpackImportModal(
                     None => {
                         // User cancelled the dialog
                         current_step.set(ImportStep::Idle);
+                        is_loading.set(false);
                         return;
                     }
                 };
 
                 // File selected successfully
-                current_step.set(ImportStep::FileSelected);
                 let file_name = file_handle.file_name();
-                file_selected_message.set(format!("Selected: {}", file_name));
+                file_selected_message.set(file_name);
                 futures_timer::Delay::new(std::time::Duration::from_millis(500)).await;
                 let file_path = file_handle.path().to_string_lossy().to_string();
 
                 // Step 2: Validating file
                 current_step.set(ImportStep::Validating);
-                futures_timer::Delay::new(std::time::Duration::from_millis(400)).await;
+                futures_timer::Delay::new(std::time::Duration::from_millis(500)).await;
 
                 // First validate ZIP file structure
                 if let Err(e) = validate_zip_file(&file_path).await {
                     error_step.set(ImportStep::Validating);
-                    error_message.set(format!("Invalid ZIP file: {}", e));
+                    error_message.set(format!("Invalid file: {}", e));
+                    is_loading.set(false);
                     return;
-                }
-
-                // Then validate soundpack structure and configuration
+                } // Then validate soundpack structure and configuration
                 match validate_soundpack_structure(&file_path).await {
-                    Ok((soundpack_name, _config_content)) => {
-                        validation_success_message
-                            .set(format!("Valid soundpack: {}", soundpack_name));
-
+                    Ok((_soundpack_name, _config_content)) => {
                         // Now get the soundpack ID for conflict checking
                         match get_soundpack_id_from_zip(&file_path) {
                             Ok(soundpack_id) => {
                                 // Step 3: Checking for conflicts
                                 current_step.set(ImportStep::CheckingConflicts);
-                                futures_timer::Delay::new(std::time::Duration::from_millis(600))
+                                futures_timer::Delay::new(std::time::Duration::from_millis(500))
                                     .await;
 
                                 // Get current soundpacks from app state
@@ -122,28 +144,26 @@ pub fn SoundpackImportModal(
                                 if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
                                     error_step.set(ImportStep::CheckingConflicts);
                                     error_message.set(format!(
-                                        "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack first",
+                                        "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.",
                                         soundpack_id
                                     ));
+                                    is_loading.set(false);
                                     return;
                                 }
-                                conflict_check_message
-                                    .set(format!("No conflicts found for ID: {}", soundpack_id));
 
                                 // Step 4: Installing soundpack
                                 current_step.set(ImportStep::Installing);
-                                futures_timer::Delay::new(std::time::Duration::from_millis(1000))
+                                futures_timer::Delay::new(std::time::Duration::from_millis(500))
                                     .await;
 
                                 match extract_and_install_soundpack(&file_path) {
                                     Ok(soundpack_info) => {
-                                        installation_success_message
-                                            .set(format!("Installed: {}", soundpack_info.name));
+                                        installation_success_message.set("Installed".to_string());
 
                                         // Step 5: Finalizing installation
                                         current_step.set(ImportStep::Finalizing);
                                         futures_timer::Delay::new(
-                                            std::time::Duration::from_millis(700),
+                                            std::time::Duration::from_millis(500),
                                         )
                                         .await;
 
@@ -157,7 +177,9 @@ pub fn SoundpackImportModal(
                                         state_trigger.call(());
 
                                         finalization_success_message
-                                            .set("Ready to use!".to_string()); // Notify parent component (this will trigger UI update)
+                                            .set("Ready to use!".to_string());
+
+                                        // Notify parent component (this will trigger UI update)
                                         on_import_success.call(soundpack_id.clone());
 
                                         // Step 6: Completed
@@ -166,119 +188,145 @@ pub fn SoundpackImportModal(
                                         success_message.set(format!(
                                             "Successfully installed: {}",
                                             soundpack_info.name
-                                        ));
-
-                                        // Reset after showing success for a while
+                                        )); // Reset after showing success for a while
                                         futures_timer::Delay::new(
-                                            std::time::Duration::from_millis(2000),
+                                            std::time::Duration::from_millis(3000),
                                         )
                                         .await;
-                                        current_step.set(ImportStep::Idle);
-                                        success_step.set(ImportStep::Idle);
-                                        success_message.set(String::new());
+                                        reset_modal.call(());
                                     }
                                     Err(e) => {
                                         error_step.set(ImportStep::Installing);
-                                        error_message
-                                            .set(format!("Failed to install soundpack: {}", e));
+                                        error_message.set(e);
+                                        is_loading.set(false);
                                     }
                                 }
                             }
                             Err(e) => {
                                 error_step.set(ImportStep::Validating);
                                 error_message.set(format!("Failed to read soundpack ID: {}", e));
+                                is_loading.set(false);
                             }
                         }
                     }
                     Err(e) => {
                         error_step.set(ImportStep::Validating);
-                        error_message.set(format!("Invalid soundpack file: {}", e));
+                        error_message.set(e);
+                        is_loading.set(false);
                     }
                 }
             });
-        })
+        }
     };
+
+    // Render the modal
     rsx! {
       dialog { class: "modal", id: "{modal_id}",
         div { class: "modal-box max-w-2xl",
           form { method: "dialog",
-            button { class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2",
+            button {
+              disabled: *is_loading.read(),
+              class: "btn btn-sm btn-circle btn-ghost absolute right-2 top-2",
               "✕"
             }
           }
-          h3 { class: "font-bold text-lg mb-4",
-            HardDriveUpload { class: "w-5 h-5 mr-2" }
-            "Import Soundpack"
-          }
+          h3 { class: "font-bold text-lg mb-4", "Import soundpack" }
 
-          div { class: "space-y-4",
-            // Progress Steps
-            div { class: "space-y-2",
-              ProgressStep {
-                step_number: 1,
-                title: "Select File".to_string(),
-                current_step: *current_step.read(),
-                error_message: if *error_step.read() == ImportStep::FileSelected { error_message.read().clone() } else { String::new() },
-                success_message: file_selected_message.read().clone(),
+          if *current_step.read() == ImportStep::Idle {
+            div { class: "card border border-base-300 bg-base-200 text-sm p-4 space-y-4",
+              div {
+                "To import a soundpack, select a ZIP file containing the soundpack structure as shown below:"
               }
-
-              ProgressStep {
-                step_number: 2,
-                title: "Validate Structure".to_string(),
-                current_step: *current_step.read(),
-                error_message: if *error_step.read() == ImportStep::Validating { error_message.read().clone() } else { String::new() },
-                success_message: validation_success_message.read().clone(),
+              div { class: "bg-base-100 p-2 rounded-box font-mono text-xs space-x-1",
+                div { "soundpack-name.zip" }
+                div { class: "", "├── config.json" }
+                div { class: "", "├── sound.ogg (for \"single\" def type)" }
+                div { class: "", "├── key_a.ogg (for \"multi\" def type)" }
+                div { class: "", "├── key_b.ogg (for \"multi\" def type)" }
+                div { class: "", "├── key_c.ogg (for \"multi\" def type)" }
               }
-
-              ProgressStep {
-                step_number: 3,
-                title: "Check Conflicts".to_string(),
-                current_step: *current_step.read(),
-                error_message: if *error_step.read() == ImportStep::CheckingConflicts { error_message.read().clone() } else { String::new() },
-                success_message: conflict_check_message.read().clone(),
-              }
-
-              ProgressStep {
-                step_number: 4,
-                title: "Install Files".to_string(),
-                current_step: *current_step.read(),
-                error_message: if *error_step.read() == ImportStep::Installing { error_message.read().clone() } else { String::new() },
-                success_message: installation_success_message.read().clone(),
-              }
-
-              ProgressStep {
-                step_number: 5,
-                title: "Finalize".to_string(),
-                current_step: *current_step.read(),
-                error_message: if *error_step.read() == ImportStep::Finalizing { error_message.read().clone() } else { String::new() },
-                success_message: finalization_success_message.read().clone(),
+              div {
+                div { class: "text-sm", "Notes:" }
+                ul { class: "list list-disc text-xs ml-4 text-base-content/70 space-y-1",
+                  li {
+                    span { class: "kbd kbd-xs", "single" }
+                    " Use a single sound file to play for the entire soundpack."
+                  }
+                  li {
+                    span { class: "kbd kbd-xs", "multi" }
+                    " Use multiple sound files for different keys."
+                  }
+                  li { "The config.json file must be in the root of the ZIP file" }
+                }
               }
             }
-          
+          } else {
 
-          // // Success message display
-          // if !success_message.read().is_empty() {
-          //   div { class: "alert alert-success",
-          //     strong { "Success: " }
-          //     "{success_message.read()}"
-          //   }
-          // }
+            div { class: "space-y-4",
+              // Progress Steps
+              div { class: "space-y-2",
+                ProgressStep {
+                  step_number: 1,
+                  title: "Select file (zip)".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::FileSelecting { error_message.read().clone() } else { String::new() },
+                  success_message: file_selected_message.read().clone(),
+                }
+                ProgressStep {
+                  step_number: 2,
+                  title: "Validating".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::Validating { error_message.read().clone() } else { String::new() },
+                  success_message: String::new(),
+                }
+                ProgressStep {
+                  step_number: 3,
+                  title: "Checking conflicts".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::CheckingConflicts { error_message.read().clone() } else { String::new() },
+                  success_message: String::new(),
+                }
+                ProgressStep {
+                  step_number: 4,
+                  title: "Installing soundpacks".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::Installing { error_message.read().clone() } else { String::new() },
+                  success_message: installation_success_message.read().clone(),
+                }
+                ProgressStep {
+                  step_number: 5,
+                  title: "Finalizing".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::Finalizing { error_message.read().clone() } else { String::new() },
+                  success_message: finalization_success_message.read().clone(),
+                }
+              }
+
+              // Success message display
+              if !success_message.read().is_empty() {
+                div { class: "alert alert-success alert-soft",
+                  "{success_message.read()}"
+                }
+              }
+            }
           }
 
           // Modal Actions
           div { class: "modal-action mt-6",
             form { method: "dialog",
-              button { class: "btn btn-ghost", "Close" }
+              button {
+                class: "btn btn-ghost",
+                disabled: *is_loading.read(),
+                onclick: handle_close,
+                "Close"
+              }
             }
             button {
-              class: "btn btn-primary",
-              disabled: *current_step.read() != ImportStep::Idle
-                  && *current_step.read() != ImportStep::Completed,
+              class: "btn btn-neutral",
+              disabled: *is_loading.read(),
               onclick: handle_import_click,
-              if *current_step.read() == ImportStep::Idle
-                  || *current_step.read() == ImportStep::Completed
-              {
-                HardDriveUpload { class: "w-4 h-4 mr-2" }
+              if *is_loading.read() == false {
+                FolderArchive { class: "w-4 h-4 mr-2" }
                 "Select file"
               } else {
                 span { class: "loading loading-spinner loading-sm mr-2" }
@@ -288,7 +336,7 @@ pub fn SoundpackImportModal(
           }
         }
         form { method: "dialog", class: "modal-backdrop",
-          button { "close" }
+          button { disabled: *is_loading.read(), onclick: handle_close, "close" }
         }
       }
     }
