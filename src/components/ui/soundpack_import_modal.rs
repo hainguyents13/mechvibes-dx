@@ -170,11 +170,11 @@ pub fn SoundpackImportModal(
             {
               div { class: "space-y-3",
                 h4 { class: "font-medium text-sm text-base-content/80 mb-3",
-                  "Import progress:"
+                  "Progress:"
                 }
                 ProgressStep {
                   step_number: 1,
-                  title: "Opening file dialog".to_string(),
+                  title: "Select .zip file".to_string(),
                   current_step: current_step(),
                   error_message: if error_step() == ImportStep::OpeningDialog { error_message() } else { String::new() },
                 }
@@ -222,7 +222,7 @@ pub fn SoundpackImportModal(
               }
             }
 
-            // Success message (separate from steps)
+            // Success message
             if success_step() == ImportStep::Completed && !success_message().is_empty() {
               div { class: "alert alert-success",
                 div { class: "text-sm", "{success_message()}" }

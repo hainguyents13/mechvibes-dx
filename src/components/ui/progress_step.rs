@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use lucide_dioxus::Check;
+use lucide_dioxus::{Check, X};
 
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 #[repr(u8)]
@@ -40,12 +40,10 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
                 "flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium {}",
                 if !props.error_message.is_empty() {
                     "bg-error text-error-content"
-                } else if is_active {
-                    "bg-primary text-primary-content animate-pulse"
-                } else if is_completed {
-                    "bg-success text-success-content"
+                } else if is_active || is_completed {
+                    "bg-base-300 text-base-content"
                 } else {
-                    "bg-base-300 text-base-content/60"
+                    "bg-base-200 text-base-content/50"
                 },
             ),
             "{props.step_number}"
@@ -54,31 +52,27 @@ pub fn ProgressStep(props: ProgressStepProps) -> Element {
             class: format!(
                 "text-sm {}",
                 if !props.error_message.is_empty() {
-                    "text-error font-medium"
-                } else if is_active {
-                    "text-primary font-medium"
-                } else if is_completed {
-                    "text-success"
+                    "text-error"
+                } else if is_active || is_completed {
+                    "text-base-content"
                 } else {
-                    "text-base-content/60"
+                    "text-base-content/50"
                 },
             ),
             "{props.title}"
           }
           if is_completed && props.error_message.is_empty() {
-            Check { class: "w-4 h-4 ml-1 text-success" }
+            Check { class: "w-4 h-4 text-success" }
           } else if is_active && props.error_message.is_empty() {
             span { class: "loading loading-spinner loading-xs" }
           } else if !props.error_message.is_empty() {
-            span { class: "text-error text-lg", "✗" }
+            X { class: "w-4 h-4 text-error" }
           }
         }
 
         // Error message under step
         if !props.error_message.is_empty() {
-          div { class: "ml-9 text-xs text-error bg-error/10 p-2 rounded border border-error/20",
-            "{props.error_message}"
-          }
+          div { class: "ml-9 alert alert-error alert-outline", "{props.error_message}" }
         }
       }
     }
