@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Sparkles;
 
-use crate::components::ui::PageHeader;
+use crate::components::ui::{PageHeader, Toggler};
 
 #[component]
 pub fn EffectsPage() -> Element {
@@ -42,37 +42,27 @@ pub fn EffectsPage() -> Element {
             div { class: "collapse-content",
               div { class: "space-y-6 ",
                 // Random Pitch Toggle
-                label { class: "label cursor-pointer",
-                  div { class: "space-y-1",
-                    h3 { class: "text-base-content text-sm", "Random pitch" }
-                    p { class: "text-xs whitespace-break-spaces text-base-content/70",
+                Toggler {
+                  title: "Random pitch".to_string(),
+                  description: Some(
                       "Add subtle pitch variations to make sounds feel more natural and less repetitive."
-                    }
-                  }
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm",
-                    checked: random_pitch_enabled(),
-                    onchange: move |evt| {
-                        random_pitch_enabled.set(evt.value() == "true");
-                    },
-                  }
+                          .to_string(),
+                  ),
+                  checked: random_pitch_enabled(),
+                  on_change: move |new_value: bool| {
+                      random_pitch_enabled.set(new_value);
+                  },
                 }
-                label { class: "label cursor-pointer",
-                  div { class: "space-y-1",
-                    h3 { class: "text-base-content text-sm", "Random keys" }
-                    p { class: "text-xs whitespace-break-spaces text-base-content/70",
+                Toggler {
+                  title: "Random keys".to_string(),
+                  description: Some(
                       "Randomize all keys in the selected soundpacks, except for the modifier keys and spacebar."
-                    }
-                  }
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm",
-                    checked: random_keys_enabled(),
-                    onchange: move |evt| {
-                        random_keys_enabled.set(evt.value() == "true");
-                    },
-                  }
+                          .to_string(),
+                  ),
+                  checked: random_keys_enabled(),
+                  on_change: move |new_value: bool| {
+                      random_keys_enabled.set(new_value);
+                  },
                 }
               }
             }
@@ -87,24 +77,17 @@ pub fn EffectsPage() -> Element {
             }
             div { class: "collapse-title font-semibold", "Background music" }
             div { class: "collapse-content",
-              div { class: "space-y-6", // Lofi Music Toggle
-                label { class: "label cursor-pointer",
-                  div { class: "",
-                    h3 { class: "text-base-content text-sm mb-1",
-                      "Lo-fi music"
-                    }
-                    p { class: "text-xs whitespace-break-spaces text-base-content/70",
-                      "Play relaxing lo-fi hip hop beats in the background while typing."
-                    }
-                  }
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm",
-                    checked: lofi_music_enabled(),
-                    onchange: move |evt| {
-                        lofi_music_enabled.set(evt.value() == "true");
-                    },
-                  }
+              div { class: "space-y-6",
+                // Lo-fi Music Toggle
+                Toggler {
+                  title: "Lo-fi music".to_string(),
+                  description: Some(
+                      "Play relaxing lo-fi hip hop beats in the background while typing.".to_string(),
+                  ),
+                  checked: lofi_music_enabled(),
+                  on_change: move |new_value: bool| {
+                      lofi_music_enabled.set(new_value);
+                  },
                 }
 
                 // Controls for Lofi Music
@@ -116,18 +99,14 @@ pub fn EffectsPage() -> Element {
                     },
                     "🎲 Randomize"
                   }
-                  label { class: "label cursor-pointer",
-                    span { class: "label-text text-xs mr-2",
-                      "Auto-play with Mechvibes"
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-xs",
-                      checked: lofi_auto_play(),
-                      onchange: move |evt| {
-                          lofi_auto_play.set(evt.value() == "true");
-                      },
-                    }
+                  Toggler {
+                    title: "Auto-play with Mechvibes".to_string(),
+                    description: None,
+                    checked: lofi_auto_play(),
+                    on_change: move |new_value: bool| {
+                        lofi_auto_play.set(new_value);
+                    },
+                    size: "xs",
                   }
                 }
               }
@@ -145,21 +124,13 @@ pub fn EffectsPage() -> Element {
             div { class: "collapse-content",
               div { class: "space-y-6",
                 // Rain Sound Toggle
-                label { class: "label cursor-pointer w-full",
-                  div { class: "space-y-1",
-                    h3 { class: "text-base-content text-sm ", "Rain sound" }
-                    p { class: "text-xs whitespace-break-spaces text-base-content/70",
-                      "Gentle rain sounds to create a cozy atmosphere while working."
-                    }
-                  }
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm ml-auto",
-                    checked: rain_sound_enabled(),
-                    onchange: move |evt| {
-                        rain_sound_enabled.set(evt.value() == "true");
-                    },
-                  }
+                Toggler {
+                  title: "Rain sound".to_string(),
+                  description: Some("Gentle rain sounds to create a cozy atmosphere while working.".to_string()),
+                  checked: rain_sound_enabled(),
+                  on_change: move |new_value: bool| {
+                      rain_sound_enabled.set(new_value);
+                  },
                 }
 
                 // Controls for Rain Sound
@@ -171,39 +142,25 @@ pub fn EffectsPage() -> Element {
                     },
                     "🎲 Randomize"
                   }
-                  label { class: "label cursor-pointer",
-                    span { class: "label-text text-xs mr-2",
-                      "Auto-play with Mechvibes"
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-xs",
-                      checked: rain_auto_play(),
-                      onchange: move |evt| {
-                          rain_auto_play.set(evt.value() == "true");
-                      },
-                    }
+                  Toggler {
+                    title: "Auto-play with Mechvibes".to_string(),
+                    description: None,
+                    checked: rain_auto_play(),
+                    on_change: move |new_value: bool| {
+                        rain_auto_play.set(new_value);
+                    },
+                    size: "xs",
                   }
                 }
                 div { class: "divider" }
                 // Café background noise Toggle
-                label { class: "label w-full cursor-pointer",
-                  div { class: "space-y-1",
-                    h3 { class: "text-base-content text-sm",
-                      "Café background noise"
-                    }
-                    p { class: "text-xs whitespace-break-spaces text-base-content/70",
-                      "Add background coffee shop chatter to your workspace."
-                    }
-                  }
-                  input {
-                    r#type: "checkbox",
-                    class: "toggle toggle-sm ml-auto",
-                    checked: crow_noise_enabled(),
-                    onchange: move |evt| {
-                        crow_noise_enabled.set(evt.value() == "true");
-                    },
-                  }
+                Toggler {
+                  title: "Café background noise".to_string(),
+                  description: Some("Add background coffee shop chatter to your workspace.".to_string()),
+                  checked: crow_noise_enabled(),
+                  on_change: move |new_value: bool| {
+                      crow_noise_enabled.set(new_value);
+                  },
                 }
 
                 // Controls for Crow Noise
@@ -215,18 +172,14 @@ pub fn EffectsPage() -> Element {
                     },
                     "🎲 Randomize"
                   }
-                  label { class: "label cursor-pointer",
-                    span { class: "label-text text-xs mr-2",
-                      "Auto-play with Mechvibes"
-                    }
-                    input {
-                      r#type: "checkbox",
-                      class: "toggle toggle-xs",
-                      checked: crow_auto_play(),
-                      onchange: move |evt| {
-                          crow_auto_play.set(evt.value() == "true");
-                      },
-                    }
+                  Toggler {
+                    title: "Auto-play with Mechvibes".to_string(),
+                    description: None,
+                    checked: crow_auto_play(),
+                    on_change: move |new_value: bool| {
+                        crow_auto_play.set(new_value);
+                    },
+                    size: "xs",
                   }
                 }
               }

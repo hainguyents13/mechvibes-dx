@@ -1,5 +1,5 @@
 use crate::components::theme_toggler::ThemeToggler;
-use crate::components::ui::{ColorPicker, PageHeader};
+use crate::components::ui::{ColorPicker, PageHeader, Toggler};
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, Palette, RotateCcw};
@@ -99,33 +99,20 @@ fn LogoCustomizationSection() -> Element {
     use_effect(move || {
         local_enable.set(enable_logo_customization());
     });
-
     rsx! {
-      div { class: "space-y-4",
-        // Toggle switch for logo customization
-        label { class: "label w-full justify-between",
-          div { class: "space-y-1",
-            div { class: "text-sm font-medium text-base-content",
-              "Enable Logo Customization"
-            }
-            div { class: "text-xs text-base-content/70",
-              "Customize border, text, shadow and background colors"
-            }
-          }
-          input {
-            r#type: "checkbox",
-            class: "toggle toggle-sm",
-            checked: local_enable(),
-            onchange: move |evt| {
-                let new_value = evt.checked();
-                local_enable.set(new_value);
-                update_config(
-                    Box::new(move |cfg| {
-                        cfg.enable_logo_customization = new_value;
-                    }),
-                );
-            },
-          }
+      div { class: "space-y-4",        // Toggle switch for logo customization
+        Toggler {
+          title: "Enable Logo Customization".to_string(),
+          description: Some("Customize border, text, shadow and background colors".to_string()),
+          checked: local_enable(),
+          on_change: move |new_value: bool| {
+            local_enable.set(new_value);
+            update_config(
+                Box::new(move |cfg| {
+                    cfg.enable_logo_customization = new_value;
+                }),
+            );
+          },
         }
         // Show LogoCustomizationPanel only when enabled
         if local_enable() {
@@ -307,21 +294,14 @@ fn LogoCustomizationPanel() -> Element {
           on_change: move |value| muted_background.set(value),
           field: "muted_background".to_string(),
           description: Some("Background color when sound is disabled".to_string()),
-        }
-        // Dimmed logo when muted option
-        label { class: "label justify-between w-full",
-          div { class: "flex flex-col",
-            div { class: "text-sm font-medium text-base-content", "Dimmed logo when muted" }
-            div { class: "text-xs text-base-content/70",
-              "Applies opacity to the logo when sound is disabled"
-            }
-          }
-          input {
-            r#type: "checkbox",
-            class: "toggle toggle-sm",
-            checked: dimmed_when_muted(),
-            onchange: move |evt| dimmed_when_muted.set(evt.checked()),
-          }
+        }        // Dimmed logo when muted option
+        Toggler {
+          title: "Dimmed logo when muted".to_string(),
+          description: Some("Applies opacity to the logo when sound is disabled".to_string()),
+          checked: dimmed_when_muted(),
+          on_change: move |new_value: bool| {
+            dimmed_when_muted.set(new_value);
+          },
         }
       }
 
