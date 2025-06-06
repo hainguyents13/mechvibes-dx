@@ -1,4 +1,8 @@
 use serde_json::Value;
+use std::fs::File;
+use std::io::Read;
+use uuid::Uuid;
+use zip::ZipArchive;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SoundpackValidationStatus {
@@ -205,6 +209,111 @@ fn validate_v2_structure(
             is_valid_v2: true,
             can_be_converted: false,
             message: "Valid V2 soundpack configuration".to_string(),
+        }
+    }
+}
+
+/// Validate ZIP file structure and basic requirements
+pub async fn validate_zip_file(file_path: &str) -> Result<(), String> {
+    // Check if file exists and is readable
+    if !std::path::Path::new(file_path).exists() {
+        return Err("File does not exist".to_string());
+    }
+
+    // Check file extension
+    if !file_path.to_lowercase().ends_with(".zip") {
+        return Err("File must be a ZIP archive".to_string());
+    }
+
+    // Try to open as ZIP
+    let file = File::open(file_path).map_err(|e| format!("Cannot open file: {}", e))?;
+
+    let archive = ZipArchive::new(file).map_err(|e| format!("Invalid ZIP file: {}", e))?;
+
+    // Check if ZIP is not empty
+    if archive.len() == 0 {
+        return Err("ZIP file is empty".to_string());
+    }
+
+    Ok(())
+}
+
+/// Validate soundpack structure within ZIP file and return soundpack name and config content
+pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, String), String> {
+    let file = File::open(file_path).map_err(|e| format!("Cannot open ZIP file: {}", e))?;
+
+    let mut archive = ZipArchive::new(file).map_err(|e| format!("Invalid ZIP archive: {}", e))?;
+
+    let mut config_found = false;
+    let mut audio_found = false;
+    let mut config_content = String::new();
+    let mut soundpack_name = "Unknown".to_string();
+
+    // Check for required files
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("Cannot read file in archive: {}", e))?;
+
+        let file_name = file.name().to_string();
+
+        // Check for config.json
+        if file_name.ends_with("config.json") {
+            file.read_to_string(&mut config_content)
+                .map_err(|e| format!("Cannot read config.json: {}", e))?;
+            config_found = true;
+
+            // Parse config to get name
+            if let Ok(config) = serde_json::from_str::<Value>(&config_content) {
+                if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
+                    soundpack_name = name.to_string();
+                }
+            }
+        }
+
+        // Check for audio files
+        let file_lower = file_name.to_lowercase();
+        if file_lower.ends_with(".ogg")
+            || file_lower.ends_with(".wav")
+            || file_lower.ends_with(".mp3")
+            || file_lower.ends_with(".flac")
+        {
+            audio_found = true;
+        }
+    }
+
+    if !config_found {
+        return Err("No config.json found in soundpack".to_string());
+    }
+
+    if !audio_found {
+        return Err("No audio files found in soundpack".to_string());
+    }
+
+    // Use existing validator to validate config content
+    let temp_config_path = format!("temp_validate_{}.json", Uuid::new_v4());
+    std::fs::write(&temp_config_path, &config_content)
+        .map_err(|e| format!("Cannot write temp config: {}", e))?;
+
+    let validation_result = validate_soundpack_config(&temp_config_path);
+
+    // Clean up temp file
+    let _ = std::fs::remove_file(&temp_config_path);
+
+    // Check validation result
+    match validation_result.status {
+        SoundpackValidationStatus::Valid => Ok((soundpack_name, config_content)),
+        SoundpackValidationStatus::VersionOneNeedsConversion => {
+            Ok((soundpack_name, config_content)) // V1 is acceptable, will be converted
+        }
+        SoundpackValidationStatus::InvalidStructure(msg) => {
+            Err(format!("Invalid soundpack structure: {}", msg))
+        }
+        SoundpackValidationStatus::MissingRequiredFields(fields) => {
+            Err(format!("Missing required fields: {}", fields.join(", ")))
+        }
+        SoundpackValidationStatus::InvalidVersion => {
+            Err("Invalid or unsupported soundpack version".to_string())
         }
     }
 }
