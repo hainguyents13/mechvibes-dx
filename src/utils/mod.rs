@@ -1,6 +1,7 @@
 pub mod config;
 pub mod config_converter;
 pub mod data;
+pub mod delay;
 pub mod path;
 pub mod platform;
 pub mod soundpack;

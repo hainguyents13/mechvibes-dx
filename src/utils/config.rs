@@ -1,4 +1,5 @@
 use crate::state::config::AppConfig;
+use crate::utils::delay;
 use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,7 +13,7 @@ pub fn use_fresh_config() -> Signal<AppConfig> {
     use_effect(move || {
         spawn(async move {
             loop {
-                futures_timer::Delay::new(std::time::Duration::from_millis(100)).await;
+                delay::Delay::ms(100).await;
                 let fresh_config = AppConfig::load();
                 if fresh_config.last_updated != config().last_updated {
                     config.set(fresh_config);

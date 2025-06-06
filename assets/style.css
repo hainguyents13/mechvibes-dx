@@ -1161,6 +1161,9 @@
   .collapse {
     visibility: collapse;
   }
+  .visible {
+    visibility: visible;
+  }
   .tabs-lift {
     --tabs-height: auto;
     --tabs-direction: row;

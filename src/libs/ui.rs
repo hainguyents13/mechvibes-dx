@@ -2,13 +2,11 @@ use crate::libs::input_listener::start_unified_input_listener;
 use crate::libs::routes::Route;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
+use crate::utils::delay;
 use crate::Header;
 use dioxus::prelude::*;
 use notify_rust::Notification;
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
-
-const DELAY_MS: Duration = Duration::from_millis(5);
 
 pub fn app() -> Element {
     // Create update signal for event-driven state management
@@ -75,14 +73,13 @@ pub fn app() -> Element {
                             // Update keyboard state - key released
                             keyboard_state.write().key_pressed = false;
                         } else if !keycode.is_empty() {
-                            ctx.play_key_event_sound(&keycode, true);
-                            // Update keyboard state - key pressed
+                            ctx.play_key_event_sound(&keycode, true); // Update keyboard state - key pressed
                             let mut state = keyboard_state.write();
                             state.key_pressed = true;
                             state.last_key = keycode.clone();
                         }
                     }
-                    futures_timer::Delay::new(DELAY_MS).await;
+                    delay::Delay::key_event().await;
                 }
             }
         });
@@ -107,7 +104,7 @@ pub fn app() -> Element {
                             ctx.play_mouse_event_sound(&button_code, true);
                         }
                     }
-                    futures_timer::Delay::new(DELAY_MS).await;
+                    delay::Delay::key_event().await;
                 }
             }
         });
@@ -158,12 +155,10 @@ pub fn app() -> Element {
 
                                         // Store the current sound state for the delayed notification
                                         let current_state = config.enable_sound;
-                                        let notification_counter_clone = notification_counter();
-
-                                        // Start a new delayed notification task
+                                        let notification_counter_clone = notification_counter(); // Start a new delayed notification task
                                         spawn(async move {
                                             // Wait for 1s
-                                            futures_timer::Delay::new(Duration::from_secs(1)).await;
+                                            delay::Delay::ms(1000).await;
 
                                             // Check if this task is still the latest one
                                             if notification_counter_clone
@@ -205,7 +200,7 @@ pub fn app() -> Element {
                             }
                         }
                     }
-                    futures_timer::Delay::new(std::time::Duration::from_millis(10)).await;
+                    delay::Delay::key_event().await;
                 }
             }
         });

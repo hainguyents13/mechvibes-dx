@@ -1,6 +1,7 @@
 use crate::{
     components::ui::{ImportStep, ProgressStep},
     state::app::{use_app_state, use_state_trigger},
+    utils::delay,
     utils::soundpack_installer::{
         check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
     },
@@ -14,7 +15,7 @@ use std::sync::Arc;
 pub fn SoundpackImportModal(
     modal_id: String,
     audio_ctx: Arc<crate::libs::audio::AudioContext>,
-    on_import_success: EventHandler<String>,
+    on_import_success: EventHandler<()>,
 ) -> Element {
     // Loading
     let mut is_loading = use_signal(|| false);
@@ -79,8 +80,6 @@ pub fn SoundpackImportModal(
             let mut success_message = success_message.clone();
             let mut current_step = current_step.clone();
             let mut file_selected_message = file_selected_message.clone();
-            let mut installation_success_message = installation_success_message.clone();
-            let mut finalization_success_message = finalization_success_message.clone();
             let audio_ctx = audio_ctx.clone();
             let app_state = app_state.clone();
             let on_import_success = on_import_success.clone();
@@ -91,10 +90,15 @@ pub fn SoundpackImportModal(
                 // Reset modal state before starting import
                 reset_modal.call(());
 
+                // Set loading state
+                is_loading.set(true);
+
                 // Reset all steps and messages
                 current_step.set(ImportStep::FileSelecting);
 
+                // ===========================================
                 // Step 1: Open file dialog and select file
+                // ===========================================
                 // Open file dialog to select ZIP file
                 let file_dialog = rfd::AsyncFileDialog::new()
                     .add_filter("ZIP Files", &["zip"])
@@ -115,12 +119,14 @@ pub fn SoundpackImportModal(
                 // File selected successfully
                 let file_name = file_handle.file_name();
                 file_selected_message.set(file_name);
-                futures_timer::Delay::new(std::time::Duration::from_millis(500)).await;
+                delay::Delay::ms(500).await;
                 let file_path = file_handle.path().to_string_lossy().to_string();
 
+                // ============================================
                 // Step 2: Validating file
+                // ============================================
                 current_step.set(ImportStep::Validating);
-                futures_timer::Delay::new(std::time::Duration::from_millis(500)).await;
+                delay::Delay::ms(500).await;
 
                 // First validate ZIP file structure
                 if let Err(e) = validate_zip_file(&file_path).await {
@@ -128,93 +134,92 @@ pub fn SoundpackImportModal(
                     error_message.set(format!("Invalid file: {}", e));
                     is_loading.set(false);
                     return;
-                } // Then validate soundpack structure and configuration
+                }
+
+                // Then validate soundpack structure and configuration
                 match validate_soundpack_structure(&file_path).await {
-                    Ok((_soundpack_name, _config_content)) => {
-                        // Now get the soundpack ID for conflict checking
-                        match get_soundpack_id_from_zip(&file_path) {
-                            Ok(soundpack_id) => {
-                                // Step 3: Checking for conflicts
-                                current_step.set(ImportStep::CheckingConflicts);
-                                futures_timer::Delay::new(std::time::Duration::from_millis(500))
-                                    .await;
-
-                                // Get current soundpacks from app state
-                                let soundpacks = app_state.get_soundpacks();
-                                if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
-                                    error_step.set(ImportStep::CheckingConflicts);
-                                    error_message.set(format!(
-                                        "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.",
-                                        soundpack_id
-                                    ));
-                                    is_loading.set(false);
-                                    return;
-                                }
-
-                                // Step 4: Installing soundpack
-                                current_step.set(ImportStep::Installing);
-                                futures_timer::Delay::new(std::time::Duration::from_millis(500))
-                                    .await;
-
-                                match extract_and_install_soundpack(&file_path) {
-                                    Ok(soundpack_info) => {
-                                        installation_success_message.set("Installed".to_string());
-
-                                        // Step 5: Finalizing installation
-                                        current_step.set(ImportStep::Finalizing);
-                                        futures_timer::Delay::new(
-                                            std::time::Duration::from_millis(500),
-                                        )
-                                        .await;
-
-                                        // Reload soundpacks in audio context
-                                        crate::state::app::reload_current_soundpacks(&audio_ctx);
-
-                                        // Refresh the soundpack cache to show the new soundpack in the UI
-                                        println!(
-                                            "🔄 Triggering soundpack cache refresh after import..."
-                                        );
-                                        state_trigger.call(());
-
-                                        finalization_success_message
-                                            .set("Ready to use!".to_string());
-
-                                        // Notify parent component (this will trigger UI update)
-                                        on_import_success.call(soundpack_id.clone());
-
-                                        // Step 6: Completed
-                                        current_step.set(ImportStep::Completed);
-                                        success_step.set(ImportStep::Completed);
-                                        success_message.set(format!(
-                                            "Successfully installed: {}",
-                                            soundpack_info.name
-                                        )); // Reset after showing success for a while
-                                        futures_timer::Delay::new(
-                                            std::time::Duration::from_millis(3000),
-                                        )
-                                        .await;
-                                        reset_modal.call(());
-                                    }
-                                    Err(e) => {
-                                        error_step.set(ImportStep::Installing);
-                                        error_message.set(e);
-                                        is_loading.set(false);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                error_step.set(ImportStep::Validating);
-                                error_message.set(format!("Failed to read soundpack ID: {}", e));
-                                is_loading.set(false);
-                            }
-                        }
+                    Ok((_, _)) => {
+                        // Continue to next step if validation succeeds
                     }
                     Err(e) => {
                         error_step.set(ImportStep::Validating);
                         error_message.set(e);
                         is_loading.set(false);
+                        return; // Stop import process on validation error
                     }
                 }
+
+                // =============================================
+                // Step 3: Checking for conflicts
+                // =============================================
+                // Now get the soundpack ID for conflict checking
+                let soundpack_id = match get_soundpack_id_from_zip(&file_path) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        error_step.set(ImportStep::Validating);
+                        error_message.set(format!("Failed to read soundpack ID: {}", e));
+                        is_loading.set(false);
+                        return; // Stop import process on ID reading error
+                    }
+                };
+
+                current_step.set(ImportStep::CheckingConflicts);
+                delay::Delay::ms(500).await;
+
+                // Get current soundpacks from app state
+                let soundpacks = app_state.get_soundpacks();
+                if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
+                    error_step.set(ImportStep::CheckingConflicts);
+                    error_message.set(format!(
+                        "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.",
+                        soundpack_id
+                    ));
+                    is_loading.set(false);
+                    return; // Stop import process on conflict
+                }
+
+                // ==============================================
+                // Step 4: Installing soundpack
+                // ==============================================
+                current_step.set(ImportStep::Installing);
+                delay::Delay::ms(500).await;
+
+                let soundpack_info = match extract_and_install_soundpack(&file_path) {
+                    Ok(info) => info,
+                    Err(e) => {
+                        error_step.set(ImportStep::Installing);
+                        error_message.set(e);
+                        is_loading.set(false);
+                        return; // Stop import process on installation error
+                    }
+                };
+
+                // =============================================
+                // Step 5: Finalizing installation
+                // =============================================
+                current_step.set(ImportStep::Finalizing);
+                delay::Delay::ms(500).await;
+
+                // Reload soundpacks in audio context
+                crate::state::app::reload_current_soundpacks(&audio_ctx);
+
+                // Refresh the soundpack cache to show the new soundpack in the UI
+                println!("🔄 Triggering soundpack cache refresh after import...");
+                state_trigger.call(());
+
+                // Notify parent component (this will trigger UI update)
+                on_import_success.call(());
+
+                // ============================================
+                // Step 6: Completed
+                // ============================================
+                current_step.set(ImportStep::Completed);
+                success_step.set(ImportStep::Completed);
+                success_message.set(format!("Successfully installed: {}", soundpack_info.name));
+
+                // Reset after showing success for a while
+                delay::Delay::ms(2000).await;
+                reset_modal.call(());
             });
         }
     };
