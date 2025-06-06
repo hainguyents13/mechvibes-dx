@@ -132,7 +132,6 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
     };
 
     // Handler for delete button click
-
     let on_confirm_delete = {
         let soundpack_id = soundpack.id.clone();
         let trigger = state_trigger.clone();
@@ -143,7 +142,7 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
                 match delete_soundpack(&soundpack_id) {
                     Ok(_) => {
                         println!("✅ Successfully deleted soundpack: {}", soundpack_id);
-                        eval(&format!("confirm_delete_modal_{}.close()", soundpack_id));
+                        // The modal will close automatically due to form method="dialog"
                         // Trigger state refresh to update the UI
                         trigger.call(());
                     }

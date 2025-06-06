@@ -1,4 +1,3 @@
-use dioxus::document::eval;
 use dioxus::prelude::*;
 use lucide_dioxus::{Check, TriangleAlert};
 
@@ -33,21 +32,20 @@ pub fn ConfirmDeleteModal(
                   "This action cannot be undone. The soundpack \"{soundpack_name}\" and all its files will be permanently removed."
                 }
               }
-            }
-
-            // Action buttons
+            }            // Action buttons
             div { class: "flex justify-end gap-2 pt-2",
               form { method: "dialog",
                 button { class: "btn btn-ghost", "Cancel" }
-              }
-              button {
-                class: "btn btn-error",
-                onclick: move |_| {
-                    on_confirm.call(());
-                    eval(&format!("{}.close()", modal_id));
-                },
-                Check { class: "w-4 h-4 mr-1" }
-                "Delete"
+              }              form { method: "dialog",
+                button {
+                  class: "btn btn-error",
+                  r#type: "submit",
+                  onclick: move |_| {
+                      on_confirm.call(());
+                  },
+                  Check { class: "w-4 h-4 mr-1" }
+                  "Delete"
+                }
               }
             }
           }

@@ -5,7 +5,7 @@ use crate::utils::config::use_config;
 use crate::utils::theme::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Ellipsis, ExternalLink, Palette, Pencil, Plus, Share2, Trash2};
+use lucide_dioxus::{Ellipsis, ExternalLink, Palette, Pencil, Plus, Trash2};
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -177,7 +177,7 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
         }
         // Dropdown for actions
         if !props.is_built_in {
-          div { class: "dropdown dropdown-left",
+          div { class: "dropdown dropdown-left dropdown-center",
             div {
               class: "btn btn-ghost",
               tabindex: "0",
@@ -193,12 +193,12 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
                   "Edit"
                 }
               }
-              li {
-                a { href: "",
-                  Share2 { class: "w-4 h-4 mr-1" }
-                  "Share"
-                }
-              }
+              // li {
+              //   a { href: "", class: "disabled",
+              //     Share2 { class: "w-4 h-4 mr-1" }
+              //     "Share"
+              //   }
+              // }
               li {
                 a {
                   class: "text-error",
