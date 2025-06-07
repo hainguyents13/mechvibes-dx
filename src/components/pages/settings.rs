@@ -2,6 +2,7 @@ use crate::components::ui::{ Collapse, PageHeader, Toggler };
 use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
+use crate::utils::constants::{ APP_NAME_DISPLAY, APP_NAME };
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
 
@@ -17,11 +18,10 @@ pub fn SettingsPage() -> Element {
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
     rsx! {
-      div { class: "p-12 pb-32",
-        // Page header
+      div { class: "p-12 pb-32",        // Page header
         PageHeader {
           title: "Settings".to_string(),
-          subtitle: "Config your MechvibesDX experience.".to_string(),
+          subtitle: format!("Config your {} experience.", APP_NAME_DISPLAY),
           icon: Some(rsx! {
             Settings { class: "w-8 h-8 mx-auto" }
           }),
@@ -53,11 +53,10 @@ pub fn SettingsPage() -> Element {
                       }
                   },
                 }
-                
-                 // Auto Start
+                  // Auto Start
                 Toggler {
                   title: "Start with Windows".to_string(),
-                  description: Some("Automatically start MechvibesDX when Windows boots".to_string()),
+                  description: Some(format!("Automatically start {} when Windows boots", APP_NAME)),
                   checked: auto_start(),
                   on_change: {
                       let update_config = update_config.clone();

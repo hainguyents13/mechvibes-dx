@@ -21,16 +21,14 @@ fn main() {
         use std::path::Path;
         if Path::new("assets/icon.ico").exists() {
             let mut res = winresource::WindowsResource::new();
-            res.set_icon("assets/icon.ico");
-
-            // Set version information
+            res.set_icon("assets/icon.ico"); // Set version information
             res.set("CompanyName", "Hải Nguyễn");
             res.set(
                 "FileDescription",
-                "MechvibesDX - Enhanced mechanical keyboard sound simulator"
+                "MechVibes DX - Enhanced mechanical keyboard sound simulator"
             );
             res.set("LegalCopyright", "Copyright © 2025 Hải Nguyễn");
-            res.set("ProductName", "MechvibesDX");
+            res.set("ProductName", "MechVibes DX");
             res.set("ProductVersion", "0.1.0");
             res.set("FileVersion", "0.1.0");
 
@@ -122,7 +120,7 @@ fn create_default_config() {
     let default_config =
         serde_json::json!({
         "app": {
-            "name": "MechvibesDX",
+            "name": "MechVibes DX",
             "version": "0.1.0",
             "description": "Enhanced mechanical keyboard sound simulator"
         },

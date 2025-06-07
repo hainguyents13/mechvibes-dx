@@ -1,9 +1,10 @@
-use crate::libs::theme::{use_theme, Theme};
+use crate::libs::theme::{ use_theme, Theme };
 use crate::utils::theme::use_themes;
+use crate::utils::constants::CSS_ID_PREFIX;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
-const FAVICON: Asset = asset!("/assets/icon.ico");
+const FAVICON: Asset = asset!("/assets/logo-noise.ico");
 const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
 
 // Font assets
@@ -62,17 +63,18 @@ pub fn Header() -> Element {
                 font-family: "Lato", sans-serif;
             }}
             "#,
-            LATO_REGULAR, LATO_BOLD, LATO_ITALIC, LATO_BOLD_ITALIC, LATO_BLACK
+            LATO_REGULAR,
+            LATO_BOLD,
+            LATO_ITALIC,
+            LATO_BOLD_ITALIC,
+            LATO_BLACK
         );
 
         // Get custom theme CSS if current theme is custom
         let custom_theme_css = if let Theme::Custom(theme_id) = &theme() {
             if let Some(theme_data) = themes().get_theme_by_id(theme_id) {
                 // Wrap custom theme CSS with proper data-theme selectors
-                format!(
-                    "[data-theme=\"custom-{}\"] {{\n{}\n}}",
-                    theme_id, theme_data.css
-                )
+                format!("[data-theme=\"custom-{}\"] {{\n{}\n}}", theme_id, theme_data.css)
             } else {
                 String::new()
             }
@@ -81,30 +83,31 @@ pub fn Header() -> Element {
         };
 
         // Combine all dynamic CSS parts
-        let dynamic_css = format!("{}\n{}\n{}", font_css, custom_theme_css, custom_css);
-
-        // Inject only dynamic CSS using eval
+        let dynamic_css = format!("{}\n{}\n{}", font_css, custom_theme_css, custom_css); // Inject only dynamic CSS using eval
         let script = format!(
             r#"
               // Remove existing custom style if any
-              const existingStyle = document.getElementById('mechvibes-custom-styles');
+              const existingStyle = document.getElementById('{}-custom-styles');
               if (existingStyle) {{
                   existingStyle.remove();
               }}
               
               // Create new style element for dynamic CSS
               const style = document.createElement('style');
-              style.id = 'mechvibes-custom-styles';
+              style.id = '{}-custom-styles';
               style.textContent = `{}`;
               document.head.appendChild(style);
             "#,
+            CSS_ID_PREFIX,
+            CSS_ID_PREFIX,
             dynamic_css.replace('`', r#"\`"#).replace("${", r#"\${"#)
         );
 
         eval(&script);
     });
     rsx! {
-      document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
-      document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
+        // prettier-ignore
+        document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
+        document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
     }
 }

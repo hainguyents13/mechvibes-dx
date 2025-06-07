@@ -4,6 +4,7 @@ use tray_icon::{
     TrayIcon,
     TrayIconBuilder,
 };
+use crate::utils::constants::APP_NAME;
 
 pub enum TrayMessage {
     Show,
@@ -25,7 +26,12 @@ impl TrayManager {
         let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" };
 
         // Create the tray menu with specific IDs
-        let show_item = MenuItem::with_id(MenuId::new("show"), "Show MechvibesDX", true, None);
+        let show_item = MenuItem::with_id(
+            MenuId::new("show"),
+            &format!("Show {}", APP_NAME),
+            true,
+            None
+        );
         let separator1 = PredefinedMenuItem::separator();
 
         // Sound control section
@@ -66,12 +72,12 @@ impl TrayManager {
         )?;
 
         // Load the icon from the specified path
-        let icon = Icon::from_path("assets/icon.ico", Some((32, 32))).expect("Failed to load icon");
-
-        // Build the tray icon
+        let icon = Icon::from_path("assets/logo-noise.ico", Some((32, 32))).expect(
+            "Failed to load icon"
+        ); // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("MechvibesDX")
+            .with_tooltip(APP_NAME)
             .with_icon(icon)
             .build()?;
         Ok(TrayManager {
@@ -82,10 +88,13 @@ impl TrayManager {
     pub fn update_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Load current config to determine sound state
         let config = crate::state::config::AppConfig::load();
-        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" };
-
-        // Create new menu with updated text
-        let show_item = MenuItem::with_id(MenuId::new("show"), "Show MechvibesDX", true, None);
+        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" }; // Create new menu with updated text
+        let show_item = MenuItem::with_id(
+            MenuId::new("show"),
+            &format!("Show {}", APP_NAME),
+            true,
+            None
+        );
         let separator1 = PredefinedMenuItem::separator();
 
         // Sound control section with updated text
@@ -139,7 +148,7 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
         println!("🖱️ Tray menu event received: {:?}", event);
         match event.id.0.as_str() {
             "show" => {
-                println!("🔼 Tray menu: Show MechvibesDX clicked");
+                println!("🔼 Tray menu: Show {} clicked", APP_NAME);
                 return Some(TrayMessage::Show);
             }
             "toggle_mute" => {

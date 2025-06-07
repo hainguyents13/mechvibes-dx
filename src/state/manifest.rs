@@ -1,6 +1,7 @@
 use crate::state::paths;
 use crate::{ debug_print, always_eprint };
 use crate::utils::platform;
+use crate::utils::constants::{ APP_NAME_DISPLAY, APP_VERSION };
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
 use std::fs;
@@ -50,8 +51,8 @@ impl AppManifest {
     pub fn new() -> Self {
         Self {
             app: AppInfo {
-                name: "MechVibesDX".to_string(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
+                name: APP_NAME_DISPLAY.to_string(),
+                version: APP_VERSION.to_string(),
                 description: "Mechanical keyboard sound simulator".to_string(),
                 build_date: Utc::now(),
                 git_commit: option_env!("GIT_HASH").map(|s| s.to_string()),

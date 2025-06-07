@@ -1,12 +1,13 @@
 use crate::components::logo::Logo;
-use crate::components::soundpack_selector::{KeyboardSoundpackSelector, MouseSoundpackSelector};
-use crate::components::volume_slider::{KeyboardVolumeSlider, MouseVolumeSlider};
+use crate::components::soundpack_selector::{ KeyboardSoundpackSelector, MouseSoundpackSelector };
+use crate::components::volume_slider::{ KeyboardVolumeSlider, MouseVolumeSlider };
 use crate::libs::AudioContext;
 use crate::utils::config::use_config;
+use crate::utils::constants::APP_NAME_DISPLAY;
 use dioxus::prelude::*;
 use futures_timer::Delay;
 use lucide_dioxus::Heart;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{ AtomicU64, Ordering };
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -54,9 +55,11 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
                 // Check if this task is still the latest one
                 if save_counter_clone.load(Ordering::SeqCst) == current_task_id {
                     // This is still the latest task, save the config
-                    update_config(Box::new(move |config| {
-                        config.volume = current_volume;
-                    }));
+                    update_config(
+                        Box::new(move |config| {
+                            config.volume = current_volume;
+                        })
+                    );
                 }
                 // If not the latest, this task was "cancelled" by a newer one
             });
@@ -82,9 +85,11 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
                 // Check if this task is still the latest one
                 if mouse_save_counter_clone.load(Ordering::SeqCst) == current_task_id {
                     // This is still the latest task, save the config
-                    update_config(Box::new(move |config| {
-                        config.mouse_volume = current_mouse_volume;
-                    }));
+                    update_config(
+                        Box::new(move |config| {
+                            config.mouse_volume = current_mouse_volume;
+                        })
+                    );
                 }
                 // If not the latest, this task was "cancelled" by a newer one
             });
@@ -119,10 +124,9 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               },
             }
           }
-          div { class: "divider" }
-          div { class: "text-center space-y-2",
+          div { class: "divider" }          div { class: "text-center space-y-2",
             // Version
-            div { class: "text-sm text-base-content/70 font-bold", "MechvibesDX (Beta)" }
+            div { class: "text-sm text-base-content/70 font-bold", "{APP_NAME_DISPLAY} (Beta)" }
             // Footer with credits
             div { class: "text-sm text-base-content/50",
               span { "Made with " }

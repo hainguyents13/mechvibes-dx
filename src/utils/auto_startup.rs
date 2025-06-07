@@ -1,11 +1,10 @@
 use std::path::PathBuf;
+use crate::utils::constants::APP_NAME;
 
 #[cfg(target_os = "windows")]
 use winreg::enums::*;
 #[cfg(target_os = "windows")]
 use winreg::RegKey;
-
-const APP_NAME: &str = "MechvibesDX";
 
 /// Get the current executable path
 fn get_exe_path() -> Result<PathBuf, String> {

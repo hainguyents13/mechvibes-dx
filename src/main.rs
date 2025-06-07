@@ -9,6 +9,7 @@ mod utils;
 use dioxus::desktop::{ Config, LogicalPosition, LogicalSize, WindowBuilder };
 use dioxus::prelude::*;
 use libs::protocol;
+use utils::constants::{ APP_NAME, APP_PROTOCOL_URL };
 use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
@@ -25,7 +26,7 @@ fn should_show_console() -> bool {
 }
 
 // Use .ico format for better Windows compatibility
-const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
+const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/logo-noise.ico");
 
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     // Try to create icon from embedded ICO data
@@ -67,10 +68,9 @@ fn main() {
             }
         }
     }
-
     env_logger::init();
 
-    debug_print!("🚀 Initializing MechvibesDX...");
+    debug_print!("🚀 Initializing {}...", APP_NAME);
 
     // Initialize app manifest first
     let _manifest = state::manifest::AppManifest::load(); // Check for command line arguments (protocol handling)
@@ -81,7 +81,7 @@ fn main() {
         // Handle protocol URL if passed as argument
         let url = &args[1];
         debug_print!("🔗 Processing argument: {}", url);
-        if url.starts_with("mechvibes://") {
+        if url.starts_with(APP_PROTOCOL_URL) {
             debug_print!("✅ Detected protocol URL: {}", url);
             if let Err(e) = protocol::handle_protocol_url(url) {
                 always_eprint!("❌ Failed to handle protocol URL {}: {}", url, e);
@@ -118,7 +118,7 @@ fn main() {
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx); // Create a WindowBuilder with custom appearance
     let window_builder = WindowBuilder::default()
-        .with_title("MechvibesDX")
+        .with_title(APP_NAME)
         .with_transparent(false) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
         .with_position(LogicalPosition::new(1700.0, 300.0))

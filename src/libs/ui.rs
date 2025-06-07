@@ -6,6 +6,7 @@ use crate::libs::input_manager::get_input_channels;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
+use crate::utils::constants::APP_NAME;
 use crate::{ debug_print, always_eprint };
 
 use dioxus::prelude::*;
@@ -156,7 +157,7 @@ pub fn app() -> Element {
                                                         "Global sound disabled"
                                                     };
                                                     let _ = Notification::new()
-                                                        .summary("MechvibesDX")
+                                                        .summary(APP_NAME)
                                                         .body(message)
                                                         .timeout(3000) // 3 seconds
                                                         .show();
@@ -180,10 +181,10 @@ pub fn app() -> Element {
     }
 
     rsx! {
-      // prettier-ignore
-      WindowController {}
-      // prettier-ignore
-      Header {}
-      Router::<Route> {}
+        // prettier-ignore
+        WindowController {}
+        // prettier-ignore
+        Header {}
+        Router::<Route> {}
     }
 }
