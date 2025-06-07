@@ -1,8 +1,8 @@
 use crate::components::window_controller::WindowController;
 use crate::components::header::Header;
-use crate::libs::input_listener::start_unified_input_listener;
 use crate::libs::routes::Route;
 use crate::libs::tray_service::request_tray_update;
+use crate::libs::input_manager::get_input_channels;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
@@ -11,9 +11,12 @@ use crate::{ debug_print, always_eprint };
 use dioxus::prelude::*;
 use dioxus_router::prelude::Router;
 use notify_rust::Notification;
-use std::sync::{ mpsc, Arc };
+use std::sync::Arc;
 
 pub fn app() -> Element {
+    // Get input channels from global state (initialized in main)
+    let input_channels = get_input_channels();
+
     // Create update signal for event-driven state management
     let update_signal = use_signal(|| 0u32);
     use_context_provider(|| update_signal);
@@ -38,27 +41,10 @@ pub fn app() -> Element {
         });
     }
 
-    // Create channels for real-time input event communication
-    let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
-    let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
-    let (hotkey_tx, hotkey_rx) = mpsc::channel::<String>();
-    let keyboard_rx = Arc::new(keyboard_rx);
-    let mouse_rx = Arc::new(mouse_rx);
-    let hotkey_rx = Arc::new(hotkey_rx);
-
-    // Launch the unified input listener (handles both keyboard and mouse)
-    {
-        use_effect(move || {
-            let keyboard_tx = keyboard_tx.clone();
-            let mouse_tx = mouse_tx.clone();
-            let hotkey_tx = hotkey_tx.clone();
-            spawn(async move {
-                start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx);
-            });
-        });
-    }
-
-    // Process keyboard events and update both audio and UI state
+    // Extract receivers from input channels
+    let keyboard_rx = input_channels.keyboard_rx.clone();
+    let mouse_rx = input_channels.mouse_rx.clone();
+    let hotkey_rx = input_channels.hotkey_rx.clone(); // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
         let keyboard_rx = keyboard_rx.clone();
@@ -70,28 +56,28 @@ pub fn app() -> Element {
 
             async move {
                 loop {
-                    if let Ok(keycode) = keyboard_rx.try_recv() {
-                        if keycode.starts_with("UP:") {
-                            let key = &keycode[3..];
-                            ctx.play_key_event_sound(key, false);
+                    if let Ok(receiver) = keyboard_rx.try_lock() {
+                        if let Ok(keycode) = receiver.try_recv() {
+                            if keycode.starts_with("UP:") {
+                                let key = &keycode[3..];
+                                ctx.play_key_event_sound(key, false);
 
-                            // Update keyboard state - key released
-                            keyboard_state.write().key_pressed = false;
-                        } else if !keycode.is_empty() {
-                            ctx.play_key_event_sound(&keycode, true);
-                            // Update keyboard state - key pressed
-                            let mut state = keyboard_state.write();
-                            state.key_pressed = true;
-                            state.last_key = keycode.clone();
+                                // Update keyboard state - key released
+                                keyboard_state.write().key_pressed = false;
+                            } else if !keycode.is_empty() {
+                                ctx.play_key_event_sound(&keycode, true);
+                                // Update keyboard state - key pressed
+                                let mut state = keyboard_state.write();
+                                state.key_pressed = true;
+                                state.last_key = keycode.clone();
+                            }
                         }
                     }
                     delay::Delay::key_event().await;
                 }
             }
         });
-    }
-
-    // Process mouse events and play sounds
+    } // Process mouse events and play sounds
     {
         let ctx = audio_context.clone();
         let mouse_rx = mouse_rx.clone();
@@ -102,21 +88,21 @@ pub fn app() -> Element {
 
             async move {
                 loop {
-                    if let Ok(button_code) = mouse_rx.try_recv() {
-                        if button_code.starts_with("UP:") {
-                            let button = &button_code[3..];
-                            ctx.play_mouse_event_sound(button, false);
-                        } else if !button_code.is_empty() {
-                            ctx.play_mouse_event_sound(&button_code, true);
+                    if let Ok(receiver) = mouse_rx.try_lock() {
+                        if let Ok(button_code) = receiver.try_recv() {
+                            if button_code.starts_with("UP:") {
+                                let button = &button_code[3..];
+                                ctx.play_mouse_event_sound(button, false);
+                            } else if !button_code.is_empty() {
+                                ctx.play_mouse_event_sound(&button_code, true);
+                            }
                         }
                     }
                     delay::Delay::key_event().await;
                 }
             }
         });
-    }
-
-    // Process hotkey Ctrl+Alt+M to toggle global sound
+    } // Process hotkey Ctrl+Alt+M to toggle global sound
     {
         let hotkey_rx = hotkey_rx.clone();
 
@@ -127,60 +113,62 @@ pub fn app() -> Element {
             let hotkey_rx = hotkey_rx.clone();
             async move {
                 loop {
-                    if let Ok(hotkey_command) = hotkey_rx.try_recv() {
-                        if hotkey_command == "TOGGLE_SOUND" {
-                            // Load current config, toggle enable_sound, and save
-                            let mut config = crate::state::config::AppConfig::load();
-                            config.enable_sound = !config.enable_sound;
-                            config.last_updated = chrono::Utc::now();
-                            match config.save() {
-                                Ok(_) => {
-                                    // Request tray menu update to reflect the new sound state
-                                    request_tray_update();
+                    if let Ok(receiver) = hotkey_rx.try_lock() {
+                        if let Ok(hotkey_command) = receiver.try_recv() {
+                            if hotkey_command == "TOGGLE_SOUND" {
+                                // Load current config, toggle enable_sound, and save
+                                let mut config = crate::state::config::AppConfig::load();
+                                config.enable_sound = !config.enable_sound;
+                                config.last_updated = chrono::Utc::now();
+                                match config.save() {
+                                    Ok(_) => {
+                                        // Request tray menu update to reflect the new sound state
+                                        request_tray_update();
 
-                                    // Handle debounced notifications
-                                    if config.show_notifications {
-                                        // Increment counter to invalidate previous notification tasks
-                                        let current_task_id =
-                                            notification_counter().fetch_add(
-                                                1,
-                                                std::sync::atomic::Ordering::SeqCst
-                                            ) + 1;
-
-                                        // Store the current sound state for the delayed notification
-                                        let current_state = config.enable_sound;
-                                        let notification_counter_clone = notification_counter();
-
-                                        // Start a new delayed notification task
-                                        spawn(async move {
-                                            // Wait for 1s
-                                            delay::Delay::ms(1000).await;
-
-                                            // Check if this task is still the latest one
-                                            if
-                                                notification_counter_clone.load(
+                                        // Handle debounced notifications
+                                        if config.show_notifications {
+                                            // Increment counter to invalidate previous notification tasks
+                                            let current_task_id =
+                                                notification_counter().fetch_add(
+                                                    1,
                                                     std::sync::atomic::Ordering::SeqCst
-                                                ) == current_task_id
-                                            {
-                                                // Show notification with the final state
-                                                let message = if current_state {
-                                                    "Global sound enabled"
+                                                ) + 1;
+
+                                            // Store the current sound state for the delayed notification
+                                            let current_state = config.enable_sound;
+                                            let notification_counter_clone = notification_counter();
+
+                                            // Start a new delayed notification task
+                                            spawn(async move {
+                                                // Wait for 1s
+                                                delay::Delay::ms(1000).await;
+
+                                                // Check if this task is still the latest one
+                                                if
+                                                    notification_counter_clone.load(
+                                                        std::sync::atomic::Ordering::SeqCst
+                                                    ) == current_task_id
+                                                {
+                                                    // Show notification with the final state
+                                                    let message = if current_state {
+                                                        "Global sound enabled"
+                                                    } else {
+                                                        "Global sound disabled"
+                                                    };
+                                                    let _ = Notification::new()
+                                                        .summary("MechvibesDX")
+                                                        .body(message)
+                                                        .timeout(3000) // 3 seconds
+                                                        .show();
                                                 } else {
-                                                    "Global sound disabled"
-                                                };
-                                                let _ = Notification::new()
-                                                    .summary("MechvibesDX")
-                                                    .body(message)
-                                                    .timeout(3000) // 3 seconds
-                                                    .show();
-                                            } else {
-                                                debug_print!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
-                                            }
-                                        });
+                                                    debug_print!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
+                                                }
+                                            });
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    always_eprint!("❌ Failed to save config after sound toggle: {}", e);
+                                    Err(e) => {
+                                        always_eprint!("❌ Failed to save config after sound toggle: {}", e);
+                                    }
                                 }
                             }
                         }
@@ -192,10 +180,10 @@ pub fn app() -> Element {
     }
 
     rsx! {
-        // prettier-ignore
-        WindowController {}
-        // prettier-ignore
-        Header {}
-        Router::<Route> {}
+      // prettier-ignore
+      WindowController {}
+      // prettier-ignore
+      Header {}
+      Router::<Route> {}
     }
 }

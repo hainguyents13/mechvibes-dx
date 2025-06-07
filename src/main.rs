@@ -11,6 +11,8 @@ use dioxus::prelude::*;
 use libs::protocol;
 use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
+use libs::input_listener::start_unified_input_listener;
+use libs::input_manager::init_input_channels;
 use std::sync::mpsc;
 
 // Function to conditionally set windows subsystem based on config
@@ -100,6 +102,18 @@ fn main() {
     // }    // Initialize global app state before rendering
     state::app::init_app_state();
 
+    // Create input event channels for communication between input listener and UI
+    let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
+    let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
+    let (hotkey_tx, hotkey_rx) = mpsc::channel::<String>();
+
+    // Initialize global input channels for UI to access
+    init_input_channels(keyboard_rx, mouse_rx, hotkey_rx);
+
+    // Start the unified input listener early in main
+    debug_print!("🎮 Starting unified input listener from main...");
+    start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx);
+
     // Create window action channel
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx); // Create a WindowBuilder with custom appearance
@@ -115,9 +129,7 @@ fn main() {
         .with_window_icon(load_icon()); // Set window icon for taskbar
 
     // Create config with our window settings
-    let config = Config::new().with_window(window_builder).with_menu(None);
-
-    // Launch the app with our config
+    let config = Config::new().with_window(window_builder).with_menu(None); // Launch the app with our config
     dioxus::LaunchBuilder::desktop().with_cfg(config).launch(app_with_stylesheets)
 }
 

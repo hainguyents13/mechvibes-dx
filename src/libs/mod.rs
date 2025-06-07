@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod input_listener;
+pub mod input_manager;
 pub mod protocol;
 pub mod routes;
 pub mod theme;
