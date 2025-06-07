@@ -247,6 +247,7 @@ pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, St
 
     let mut config_found = false;
     let mut audio_found = false;
+    let mut config_method = "single".to_string();
     let mut config_content = String::new();
     let mut soundpack_name = "Unknown".to_string();
 
@@ -269,6 +270,9 @@ pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, St
                 if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
                     soundpack_name = name.to_string();
                 }
+                if let Some(method) = config.get("method").and_then(|v| v.as_str()) {
+                    config_method = method.to_string();
+                }
             }
         }
 
@@ -287,7 +291,8 @@ pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, St
         return Err("No config.json found in soundpack".to_string());
     }
 
-    if !audio_found {
+    // If single method, ensure at least one audio file is present
+    if config_method == "single" && !audio_found {
         return Err("No audio files found in soundpack".to_string());
     }
 

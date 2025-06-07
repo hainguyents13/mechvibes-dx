@@ -242,7 +242,7 @@ pub fn SoundpackImportModal(
               div {
                 "To import a soundpack, select a ZIP file containing the soundpack structure as shown below:"
               }
-              div { class: "bg-base-100 p-2 rounded-box font-mono text-xs space-x-1",
+              div { class: "bg-base-100 p-2 px-3 rounded-box font-mono text-base-content/70 text-xs space-x-1",
                 div { "soundpack-name.zip" }
                 div { class: "", "├── config.json" }
                 div { class: "", "├── sound.ogg (for \"single\" def type)" }
@@ -254,11 +254,11 @@ pub fn SoundpackImportModal(
                 div { class: "text-sm", "Notes:" }
                 ul { class: "list list-disc text-xs ml-4 text-base-content/70 space-y-1",
                   li {
-                    span { class: "kbd kbd-xs", "single" }
+                    span { class: "kbd kbd-xs bg-base-100", "single" }
                     " Use a single sound file to play for the entire soundpack."
                   }
                   li {
-                    span { class: "kbd kbd-xs", "multi" }
+                    span { class: "kbd kbd-xs bg-base-100", "multi" }
                     " Use multiple sound files for different keys."
                   }
                   li { "The config.json file must be in the root of the ZIP file" }
