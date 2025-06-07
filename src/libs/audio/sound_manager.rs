@@ -32,8 +32,7 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed);
-        // Get timestamp and duration
+        drop(pressed); // Get timestamp and duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {
@@ -41,9 +40,17 @@ impl AudioContext {
                 let arr = arr[idx];
                 (arr[0] / 1000.0, arr[1] / 1000.0)
             }
+            Some(arr) if arr.len() == 1 => {
+                // Only keydown mapping available, ignore keyup events
+                if !is_keydown {
+                    return; // Skip keyup events for keys with only keydown mapping
+                }
+                let arr = arr[0];
+                (arr[0] / 1000.0, arr[1] / 1000.0)
+            }
             Some(arr) => {
                 eprintln!(
-                    "Invalid mapping for key '{}': expected 2 elements, got {}",
+                    "Invalid mapping for key '{}': expected 1-2 elements, got {}",
                     key,
                     arr.len()
                 );
@@ -131,9 +138,7 @@ impl AudioContext {
             }
             pressed.insert(button.to_string(), false);
         }
-        drop(pressed);
-
-        // Get timestamp and duration
+        drop(pressed); // Get timestamp and duration
         let mouse_map = self.mouse_map.lock().unwrap();
         let (start, duration) = match mouse_map.get(button) {
             Some(arr) if arr.len() == 2 => {
@@ -141,9 +146,17 @@ impl AudioContext {
                 let arr = arr[idx];
                 (arr[0] / 1000.0, arr[1] / 1000.0)
             }
+            Some(arr) if arr.len() == 1 => {
+                // Only buttondown mapping available, ignore buttonup events
+                if !is_buttondown {
+                    return; // Skip buttonup events for buttons with only buttondown mapping
+                }
+                let arr = arr[0];
+                (arr[0] / 1000.0, arr[1] / 1000.0)
+            }
             Some(arr) => {
                 eprintln!(
-                    "Invalid mapping for mouse button '{}': expected 2 elements, got {}",
+                    "Invalid mapping for mouse button '{}': expected 1-2 elements, got {}",
                     button,
                     arr.len()
                 );

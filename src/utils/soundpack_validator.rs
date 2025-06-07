@@ -70,26 +70,30 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
     // Check for V1 indicators
     let has_defines = config.get("defines").is_some();
     let has_sound_field = config.get("sound").is_some();
-    let _has_key_define_type = config.get("key_define_type").is_some();
+    let has_method_field =
+        config.get("method").is_some() || config.get("key_define_type").is_some();
 
     // Check for V2 indicators
     let has_defs = config.get("defs").is_some();
     let _has_source_field = config.get("source").is_some();
-    let has_author = config.get("author").is_some();
-
-    // Determine version based on structure
+    let has_author = config.get("author").is_some(); // Determine version based on structure
     if config_version == Some(2) {
         // Explicitly marked as V2, validate V2 structure
         validate_v2_structure(&config, config_version, package_version)
     } else if config_version == Some(1) || (has_defines && has_sound_field && !has_defs) {
-        // Explicitly V1 or has V1 structure
+        // Explicitly V1 or has V1 structure (defines + sound + no defs)
         SoundpackValidationResult {
             status: SoundpackValidationStatus::VersionOneNeedsConversion,
             config_version: Some(1),
             detected_version: package_version,
             is_valid_v2: false,
             can_be_converted: true,
-            message: "Version 1 soundpack detected, needs conversion to V2 format".to_string(),
+            message: if has_method_field {
+                "Version 1 soundpack with method field detected, needs conversion to V2 format"
+                    .to_string()
+            } else {
+                "Version 1 soundpack detected, needs conversion to V2 format".to_string()
+            },
         }
     } else if has_defs && has_author {
         // Looks like V2 but no explicit version
@@ -98,10 +102,6 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
         // Unknown or invalid structure
         let mut missing_fields = Vec::new();
 
-        if !has_author {
-            missing_fields.push("author".to_string());
-        }
-
         if !has_defs && !has_defines {
             missing_fields.push("defs or defines".to_string());
         }
@@ -109,7 +109,6 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
         if !config.get("name").is_some() {
             missing_fields.push("name".to_string());
         }
-
         SoundpackValidationResult {
             status: SoundpackValidationStatus::MissingRequiredFields(missing_fields.clone()),
             config_version: config_version,

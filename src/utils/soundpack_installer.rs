@@ -41,7 +41,9 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
 
             // Extract ID from config content only
             let config: Value = serde_json::from_str(&config_content)
-                .map_err(|e| format!("Failed to parse config.json: {}", e))?; // Check if the config already contains an ID field
+                .map_err(|e| format!("Failed to parse config.json: {}", e))?;
+
+            // Check if the config already contains an ID field
             if let Some(id) = config.get("id").and_then(|v| v.as_str()) {
                 if !id.trim().is_empty() {
                     return Ok(id.to_string());
