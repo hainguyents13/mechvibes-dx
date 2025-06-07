@@ -1,12 +1,16 @@
+use crate::components::window_controller::WindowController;
+use crate::components::header::Header;
 use crate::libs::input_listener::start_unified_input_listener;
 use crate::libs::routes::Route;
+use crate::libs::tray_service::request_tray_update;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
-use crate::Header;
+
 use dioxus::prelude::*;
+use dioxus_router::prelude::Router;
 use notify_rust::Notification;
-use std::sync::{mpsc, Arc};
+use std::sync::{ mpsc, Arc };
 
 pub fn app() -> Element {
     // Create update signal for event-driven state management
@@ -126,33 +130,21 @@ pub fn app() -> Element {
                         if hotkey_command == "TOGGLE_SOUND" {
                             // Load current config, toggle enable_sound, and save
                             let mut config = crate::state::config::AppConfig::load();
-                            let old_state = config.enable_sound;
                             config.enable_sound = !config.enable_sound;
                             config.last_updated = chrono::Utc::now();
                             match config.save() {
                                 Ok(_) => {
-                                    let status = if config.enable_sound {
-                                        "ENABLED"
-                                    } else {
-                                        "DISABLED"
-                                    };
-                                    println!(
-                                        "🔊 HOTKEY TRIGGERED: Global sound toggled from {} to {}",
-                                        if old_state { "ENABLED" } else { "DISABLED" },
-                                        status
-                                    );
+                                    // Request tray menu update to reflect the new sound state
+                                    request_tray_update();
 
                                     // Handle debounced notifications
                                     if config.show_notifications {
                                         // Increment counter to invalidate previous notification tasks
-                                        let current_task_id = notification_counter()
-                                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-                                            + 1;
-
-                                        println!(
-                                            "🔔 Scheduling debounced notification (task ID: {})",
-                                            current_task_id
-                                        );
+                                        let current_task_id =
+                                            notification_counter().fetch_add(
+                                                1,
+                                                std::sync::atomic::Ordering::SeqCst
+                                            ) + 1;
 
                                         // Store the current sound state for the delayed notification
                                         let current_state = config.enable_sound;
@@ -164,9 +156,10 @@ pub fn app() -> Element {
                                             delay::Delay::ms(1000).await;
 
                                             // Check if this task is still the latest one
-                                            if notification_counter_clone
-                                                .load(std::sync::atomic::Ordering::SeqCst)
-                                                == current_task_id
+                                            if
+                                                notification_counter_clone.load(
+                                                    std::sync::atomic::Ordering::SeqCst
+                                                ) == current_task_id
                                             {
                                                 // Show notification with the final state
                                                 let message = if current_state {
@@ -175,22 +168,11 @@ pub fn app() -> Element {
                                                     "Global sound disabled"
                                                 };
 
-                                                if let Err(e) = Notification::new()
+                                                let _ = Notification::new()
                                                     .summary("MechvibesDX")
                                                     .body(message)
                                                     .timeout(3000) // 3 seconds
-                                                    .show()
-                                                {
-                                                    eprintln!(
-                                                        "❌ Failed to show notification: {}",
-                                                        e
-                                                    );
-                                                } else {
-                                                    println!(
-                                                        "✅ Debounced notification shown: {}",
-                                                        message
-                                                    );
-                                                }
+                                                    .show();
                                             } else {
                                                 println!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
                                             }
@@ -210,8 +192,10 @@ pub fn app() -> Element {
     }
 
     rsx! {
+      // prettier-ignore
+      WindowController {}
+      // prettier-ignore
       Header {}
-      // Main application Router
       Router::<Route> {}
     }
 }

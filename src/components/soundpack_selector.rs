@@ -2,7 +2,7 @@ use crate::libs::audio::AudioContext;
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{Check, ChevronDown, Keyboard, Mouse, Music, Search};
+use lucide_dioxus::{ Check, ChevronDown, Keyboard, Mouse, Music, Search };
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -68,9 +68,11 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
         // Filter by type first
         let type_filtered_packs: Vec<_> = all_packs
             .into_iter()
-            .filter(|pack| match soundpack_type {
-                SelectorType::Keyboard => !pack.mouse, // Keyboard soundpacks have mouse: false
-                SelectorType::Mouse => pack.mouse,     // Mouse soundpacks have mouse: true
+            .filter(|pack| {
+                match soundpack_type {
+                    SelectorType::Keyboard => !pack.mouse, // Keyboard soundpacks have mouse: false
+                    SelectorType::Mouse => pack.mouse, // Mouse soundpacks have mouse: true
+                }
             })
             .collect();
 
@@ -81,33 +83,35 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
             type_filtered_packs
                 .into_iter()
                 .filter(|pack| {
-                    pack.name.to_lowercase().contains(&query)
-                        || pack.id.to_lowercase().contains(&query)
-                        || pack
-                            .tags
-                            .iter()
-                            .any(|tag| tag.to_lowercase().contains(&query))
+                    pack.name.to_lowercase().contains(&query) ||
+                        pack.id.to_lowercase().contains(&query) ||
+                        pack.tags.iter().any(|tag| tag.to_lowercase().contains(&query))
                 })
                 .collect()
         }
     });
 
     // Find current soundpack details
-    let current_soundpack =
-        use_memo(move || soundpacks().into_iter().find(|pack| pack.id == current()));
+    let current_soundpack = use_memo(move ||
+        soundpacks()
+            .into_iter()
+            .find(|pack| pack.id == current())
+    );
 
     // Get appropriate placeholder and search text based on type
     let (placeholder_text, search_placeholder, not_found_text) = match soundpack_type {
-        SelectorType::Keyboard => (
-            "Select a keyboard soundpack...",
-            "Search keyboard soundpacks...",
-            "No keyboard soundpacks found",
-        ),
-        SelectorType::Mouse => (
-            "Select a mouse soundpack...",
-            "Search mouse soundpacks...",
-            "No mouse soundpacks found",
-        ),
+        SelectorType::Keyboard =>
+            (
+                "Select a keyboard soundpack...",
+                "Search keyboard soundpacks...",
+                "No keyboard soundpacks found",
+            ),
+        SelectorType::Mouse =>
+            (
+                "Select a mouse soundpack...",
+                "Search mouse soundpacks...",
+                "No mouse soundpacks found",
+            ),
     };
 
     rsx! {
@@ -145,7 +149,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   div { class: "font-medium truncate text-base-content text-sm",
                     "{pack.name}"
                   }
-                  div { class: "text-xs truncate text-base-content/50",
+                  div { class: "text-xs font-normal truncate text-base-content/50",
                     if let Some(author) = &pack.author {
                       "by {author}"
                     }
@@ -330,7 +334,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           div { class: "text-xs font-medium truncate text-base-content",
                             "{pack.name}"
                           }
-                          div { class: "text-xs truncate text-base-content/50",
+                          div { class: "text-xs font-normal truncate text-base-content/50",
                             if let Some(author) = &pack.author {
                               "by {author}"
                             }

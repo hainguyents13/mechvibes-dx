@@ -34,6 +34,7 @@
     --text-5xl--line-height: 1;
     --text-6xl: 3.75rem;
     --text-6xl--line-height: 1;
+    --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
@@ -2327,6 +2328,16 @@
       inset: var(--tt-tail) auto auto 50%;
     }
   }
+  .tooltip-left {
+    > .tooltip-content, &[data-tip]:before {
+      transform: translateX(calc(var(--tt-pos, 0.25rem) - 0.25rem)) translateY(-50%);
+      inset: 50% var(--tt-off) auto auto;
+    }
+    &:after {
+      transform: translateX(var(--tt-pos, 0.25rem)) translateY(-50%) rotate(-90deg);
+      inset: 50% calc(var(--tt-tail) + 1px) auto auto;
+    }
+  }
   .inset-0 {
     inset: calc(var(--spacing) * 0);
   }
@@ -3132,6 +3143,9 @@
   .grid {
     display: grid;
   }
+  .hidden {
+    display: none;
+  }
   .inline {
     display: inline;
   }
@@ -3889,6 +3903,10 @@
   .font-medium {
     --tw-font-weight: var(--font-weight-medium);
     font-weight: var(--font-weight-medium);
+  }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
   }
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);

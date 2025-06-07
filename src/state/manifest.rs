@@ -1,7 +1,7 @@
 use crate::state::paths;
 use crate::utils::platform;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{ DateTime, Utc };
+use serde::{ Deserialize, Serialize };
 use std::fs;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ impl AppManifest {
     pub fn new() -> Self {
         Self {
             app: AppInfo {
-                name: "MechVibes-DX".to_string(),
+                name: "MechVibesDX".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 description: "Mechanical keyboard sound simulator".to_string(),
                 build_date: Utc::now(),
@@ -64,9 +64,7 @@ impl AppManifest {
             paths: AppPaths {
                 config: paths::data::config_json().to_string_lossy().to_string(),
                 themes: paths::data::themes_json().to_string_lossy().to_string(),
-                soundpack_cache: paths::data::soundpack_cache_json()
-                    .to_string_lossy()
-                    .to_string(),
+                soundpack_cache: paths::data::soundpack_cache_json().to_string_lossy().to_string(),
                 soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
                 data_dir: paths::utils::get_data_dir_absolute(),
             },
@@ -83,20 +81,21 @@ impl AppManifest {
 
         if manifest_path.exists() {
             match fs::read_to_string(&manifest_path) {
-                Ok(content) => match serde_json::from_str::<AppManifest>(&content) {
-                    Ok(manifest) => {
-                        println!("✅ Loaded app manifest from {}", manifest_path.display());
-                        manifest
-                    }
-                    Err(e) => {
-                        eprintln!("❌ Failed to parse manifest.json: {}", e);
-                        let new_manifest = Self::new();
-                        if let Err(e) = new_manifest.save() {
-                            eprintln!("❌ Failed to create new manifest: {}", e);
+                Ok(content) =>
+                    match serde_json::from_str::<AppManifest>(&content) {
+                        Ok(manifest) => {
+                            println!("✅ Loaded app manifest from {}", manifest_path.display());
+                            manifest
                         }
-                        new_manifest
+                        Err(e) => {
+                            eprintln!("❌ Failed to parse manifest.json: {}", e);
+                            let new_manifest = Self::new();
+                            if let Err(e) = new_manifest.save() {
+                                eprintln!("❌ Failed to create new manifest: {}", e);
+                            }
+                            new_manifest
+                        }
                     }
-                },
                 Err(e) => {
                     eprintln!("❌ Failed to read manifest.json: {}", e);
                     let new_manifest = Self::new();
@@ -124,9 +123,11 @@ impl AppManifest {
             }
         }
 
-        let contents = serde_json::to_string_pretty(self)
+        let contents = serde_json
+            ::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
-        fs::write(paths::data::manifest_json(), contents)
+        fs
+            ::write(paths::data::manifest_json(), contents)
             .map_err(|e| format!("Failed to write manifest file: {}", e))?;
         Ok(())
     }

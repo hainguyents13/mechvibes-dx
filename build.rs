@@ -13,6 +13,36 @@ const SOUNDPACKS_DIR: &str = "./soundpacks";
 fn main() {
     println!("cargo:rerun-if-changed=app.config.json");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=assets/icon.ico");
+
+    // Set Windows app icon and metadata
+    #[cfg(target_os = "windows")]
+    {
+        use std::path::Path;
+        if Path::new("assets/icon.ico").exists() {
+            let mut res = winresource::WindowsResource::new();
+            res.set_icon("assets/icon.ico");
+
+            // Set version information
+            res.set("CompanyName", "Hải Nguyễn");
+            res.set(
+                "FileDescription",
+                "MechvibesDX - Enhanced mechanical keyboard sound simulator"
+            );
+            res.set("LegalCopyright", "Copyright © 2025 Hải Nguyễn");
+            res.set("ProductName", "MechvibesDX");
+            res.set("ProductVersion", "0.1.0");
+            res.set("FileVersion", "0.1.0");
+
+            if let Err(e) = res.compile() {
+                eprintln!("Warning: Failed to compile Windows resources: {}", e);
+            } else {
+                println!("✅ Windows resources compiled successfully");
+            }
+        } else {
+            eprintln!("Warning: assets/icon.ico not found, skipping Windows resource compilation");
+        }
+    }
 
     // Only generate manifest for release builds
     if env::var("PROFILE").unwrap_or_default() == "release" {
@@ -27,10 +57,7 @@ fn main() {
         }
     }
 
-    if let Ok(output) = Command::new("git")
-        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
-    {
+    if let Ok(output) = Command::new("git").args(&["rev-parse", "--abbrev-ref", "HEAD"]).output() {
         if output.status.success() {
             let git_branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
             println!("cargo:rustc-env=GIT_BRANCH={}", git_branch);
@@ -57,11 +84,13 @@ fn generate_manifest_for_production() {
     };
 
     // Parse config
-    let config: serde_json::Value =
-        serde_json::from_str(&config_content).expect("Failed to parse app.config.json");
+    let config: serde_json::Value = serde_json
+        ::from_str(&config_content)
+        .expect("Failed to parse app.config.json");
 
     // Create manifest with build information
-    let manifest = serde_json::json!({
+    let manifest =
+        serde_json::json!({
         "app": {
             "name": config["app"]["name"],
             "version": config["app"]["version"],
@@ -80,8 +109,9 @@ fn generate_manifest_for_production() {
         }
     });
     // Write manifest
-    let manifest_content =
-        serde_json::to_string_pretty(&manifest).expect("Failed to serialize manifest");
+    let manifest_content = serde_json
+        ::to_string_pretty(&manifest)
+        .expect("Failed to serialize manifest");
 
     fs::write(MANIFEST_JSON, manifest_content).expect("Failed to write manifest file");
 
@@ -89,7 +119,8 @@ fn generate_manifest_for_production() {
 }
 
 fn create_default_config() {
-    let default_config = serde_json::json!({
+    let default_config =
+        serde_json::json!({
         "app": {
             "name": "MechvibesDX",
             "version": "0.1.0",
@@ -107,8 +138,9 @@ fn create_default_config() {
         }
     });
 
-    let config_content =
-        serde_json::to_string_pretty(&default_config).expect("Failed to serialize default config");
+    let config_content = serde_json
+        ::to_string_pretty(&default_config)
+        .expect("Failed to serialize default config");
 
     fs::write("app.config.json", config_content).expect("Failed to write default config");
 }

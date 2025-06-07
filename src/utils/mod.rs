@@ -1,3 +1,4 @@
+pub mod auto_startup;
 pub mod config;
 pub mod config_converter;
 pub mod data;

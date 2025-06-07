@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{navigator, use_route};
-use lucide_dioxus::{House, Music, Palette, Settings, Sparkles};
+use dioxus_router::prelude::{ navigator, use_route };
+use lucide_dioxus::{ House, Music, Palette, Settings, Sparkles };
 
 #[allow(non_snake_case)]
 #[component]
@@ -29,7 +29,7 @@ pub fn Dock() -> Element {
         }
         // Button Effects
         button {
-          class: if matches!(route, crate::libs::routes::Route::Effects {}) { "dock-active" } else { "" },
+          class: if matches!(route, crate::libs::routes::Route::Effects {}) { "dock-active" } else { "hidden" },
           onclick: move |_| {
               nav.push("/effects");
           },

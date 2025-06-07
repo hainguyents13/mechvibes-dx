@@ -1,5 +1,6 @@
-use crate::components::ui::{Collapse, PageHeader, Toggler};
-use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
+use crate::components::ui::{ Collapse, PageHeader, Toggler };
+use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
+use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
@@ -35,8 +36,7 @@ pub fn SettingsPage() -> Element {
             default_open: true,
             content_class: "collapse-content text-sm",
             children: rsx! {
-              div { class: "space-y-6",
-                // Volume Control
+              div { class: "space-y-6", // Volume Control
                 Toggler {
                   title: "Enable all sounds".to_string(),
                   description: Some("You can also use Ctrl+Alt+M to toggle sound on/off".to_string()),
@@ -49,10 +49,10 @@ pub fn SettingsPage() -> Element {
                                   config.enable_sound = new_value;
                               }),
                           );
+                          request_tray_update();
                       }
                   },
-                }
-                // Auto Start
+                } // Auto Start
                 Toggler {
                   title: "Start with Windows".to_string(),
                   description: Some("Automatically start MechvibesDX when Windows boots".to_string()),
@@ -65,6 +65,17 @@ pub fn SettingsPage() -> Element {
                                   config.auto_start = new_value;
                               }),
                           );
+                          spawn(async move {
+                              match crate::utils::auto_startup::set_auto_startup(new_value) {
+                                  Ok(_) => {
+                                      let status = if new_value { "enabled" } else { "disabled" };
+                                      println!("✅ Auto startup {}", status);
+                                  }
+                                  Err(e) => {
+                                      eprintln!("❌ Failed to set auto startup: {}", e);
+                                  }
+                              }
+                          });
                       }
                   },
                 }
