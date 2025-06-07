@@ -16,7 +16,9 @@ fn open_soundpack_folder(soundpack_id: &str) -> Result<(), String> {
 
 /// Delete a soundpack directory and all its contents
 fn delete_soundpack(soundpack_id: &str) -> Result<(), String> {
-    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id); // Check if the directory exists
+    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
+
+    // Check if the directory exists
     if !path::directory_exists(&soundpack_path) {
         return Err(format!("Soundpack directory not found: {}", soundpack_path));
     }

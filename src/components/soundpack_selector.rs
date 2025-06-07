@@ -46,7 +46,9 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     let error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let is_loading = use_signal(|| false); // Use global app state for soundpacks
+    let is_loading = use_signal(|| false);
+
+    // Use global app state for soundpacks
     let soundpacks = use_memo(move || app_state.get_soundpacks());
 
     // Get current soundpack based on type

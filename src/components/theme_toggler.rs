@@ -10,7 +10,9 @@ use lucide_dioxus::{Ellipsis, ExternalLink, Palette, Pencil, Plus, Trash2};
 #[component]
 pub fn ThemeToggler() -> Element {
     // Get the config and update_config function
-    let (_config, update_config) = use_config(); // Theme management
+    let (_config, update_config) = use_config();
+
+    // Theme management
     let (themes, update_themes) = use_themes();
 
     // Theme state - use theme context

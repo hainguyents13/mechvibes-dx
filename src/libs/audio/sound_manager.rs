@@ -32,7 +32,9 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Get timestamp and duration
+        drop(pressed);
+
+        // Get timestamp and duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {
@@ -63,8 +65,17 @@ impl AudioContext {
         };
         drop(key_map);
 
+        println!(
+            "Playing sound segment for key '{}': {}..{} ({} samples)",
+            key,
+            start,
+            duration,
+            is_keydown.then(|| "keydown").unwrap_or("keyup")
+        );
+
         self.play_sound_segment(key, start, duration, is_keydown);
     }
+
     fn play_sound_segment(&self, key: &str, start: f32, duration: f32, is_keydown: bool) {
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
 
@@ -82,6 +93,14 @@ impl AudioContext {
                     samples.len()
                 );
                 return;
+            } else {
+                println!(
+                    "[parsed] Playing sound segment for key '{}': {}..{} ({} samples)",
+                    key,
+                    start,
+                    duration,
+                    is_keydown.then(|| "keydown").unwrap_or("keyup")
+                );
             }
 
             let segment_samples = samples[start_sample..end_sample].to_vec();
@@ -112,6 +131,7 @@ impl AudioContext {
             }
         }
     }
+
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
         println!(
             "🖱️ Mouse event received: {} ({})",
@@ -138,7 +158,9 @@ impl AudioContext {
             }
             pressed.insert(button.to_string(), false);
         }
-        drop(pressed); // Get timestamp and duration
+        drop(pressed);
+
+        // Get timestamp and duration
         let mouse_map = self.mouse_map.lock().unwrap();
         let (start, duration) = match mouse_map.get(button) {
             Some(arr) if arr.len() == 2 => {

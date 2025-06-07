@@ -294,7 +294,9 @@ fn LogoCustomizationPanel() -> Element {
           on_change: move |value| muted_background.set(value),
           field: "muted_background".to_string(),
           description: Some("Background color when sound is disabled".to_string()),
-        } // Dimmed logo when muted option
+        }
+
+        // Dimmed logo when muted option
         Toggler {
           title: "Dimmed logo when muted".to_string(),
           description: Some("Applies opacity to the logo when sound is disabled".to_string()),

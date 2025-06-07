@@ -73,7 +73,8 @@ pub fn app() -> Element {
                             // Update keyboard state - key released
                             keyboard_state.write().key_pressed = false;
                         } else if !keycode.is_empty() {
-                            ctx.play_key_event_sound(&keycode, true); // Update keyboard state - key pressed
+                            ctx.play_key_event_sound(&keycode, true);
+                            // Update keyboard state - key pressed
                             let mut state = keyboard_state.write();
                             state.key_pressed = true;
                             state.last_key = keycode.clone();
@@ -155,7 +156,9 @@ pub fn app() -> Element {
 
                                         // Store the current sound state for the delayed notification
                                         let current_state = config.enable_sound;
-                                        let notification_counter_clone = notification_counter(); // Start a new delayed notification task
+                                        let notification_counter_clone = notification_counter();
+
+                                        // Start a new delayed notification task
                                         spawn(async move {
                                             // Wait for 1s
                                             delay::Delay::ms(1000).await;

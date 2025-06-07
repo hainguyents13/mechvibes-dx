@@ -24,7 +24,9 @@ pub fn SettingsPage() -> Element {
           icon: Some(rsx! {
             Settings { class: "w-8 h-8 mx-auto" }
           }),
-        } // Settings sections
+        }
+
+        // Settings sections
         div { class: "space-y-4",
           // General Settings Section
           Collapse {

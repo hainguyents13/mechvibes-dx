@@ -76,7 +76,9 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
     // Check for V2 indicators
     let has_defs = config.get("defs").is_some();
     let _has_source_field = config.get("source").is_some();
-    let has_author = config.get("author").is_some(); // Determine version based on structure
+    let has_author = config.get("author").is_some();
+
+    // Determine version based on structure
     if config_version == Some(2) {
         // Explicitly marked as V2, validate V2 structure
         validate_v2_structure(&config, config_version, package_version)

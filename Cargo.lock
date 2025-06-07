@@ -3226,6 +3226,7 @@ dependencies = [
  "dioxus",
  "env_logger",
  "futures-timer",
+ "hound",
  "lucide-dioxus",
  "notify-rust",
  "once_cell",
