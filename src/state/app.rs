@@ -1,8 +1,9 @@
 // Event-driven App State Manager
 use crate::state::soundpack::SoundpackCache;
+use crate::{ debug_print, always_eprint };
 use dioxus::prelude::*;
 use once_cell::sync::OnceCell;
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc, Mutex };
 
 // Global app state for sharing between components
 #[derive(Clone, Debug)]
@@ -20,7 +21,7 @@ impl PartialEq for AppState {
 
 impl AppState {
     pub fn new() -> Self {
-        println!("🌍 Initializing global AppState...");
+        debug_print!("🌍 Initializing global AppState...");
         Self {
             optimized_cache: Arc::new(SoundpackCache::load()),
             last_updated: std::time::Instant::now(),
@@ -30,9 +31,8 @@ impl AppState {
     pub fn get_soundpacks(&self) -> Vec<crate::state::soundpack::SoundpackMetadata> {
         self.optimized_cache.soundpacks.values().cloned().collect()
     }
-
     pub fn refresh_cache(&mut self) {
-        println!("🔄 Refreshing soundpack cache...");
+        debug_print!("🔄 Refreshing soundpack cache...");
         let mut fresh_cache = SoundpackCache::load();
         fresh_cache.refresh_from_directory();
         fresh_cache.save();
@@ -89,26 +89,29 @@ pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
 
     // Load keyboard soundpack
     match crate::libs::audio::load_keyboard_soundpack(audio_ctx, &config.keyboard_soundpack) {
-        Ok(_) => println!(
-            "✅ Keyboard soundpack '{}' reloaded successfully",
-            config.keyboard_soundpack
-        ),
-        Err(e) => eprintln!(
-            "❌ Failed to reload keyboard soundpack '{}': {}",
-            config.keyboard_soundpack, e
-        ),
+        Ok(_) =>
+            debug_print!(
+                "✅ Keyboard soundpack '{}' reloaded successfully",
+                config.keyboard_soundpack
+            ),
+        Err(e) =>
+            always_eprint!(
+                "❌ Failed to reload keyboard soundpack '{}': {}",
+                config.keyboard_soundpack,
+                e
+            ),
     }
 
     // Load mouse soundpack
     match crate::libs::audio::load_mouse_soundpack(audio_ctx, &config.mouse_soundpack) {
-        Ok(_) => println!(
-            "✅ Mouse soundpack '{}' reloaded successfully",
-            config.mouse_soundpack
-        ),
-        Err(e) => eprintln!(
-            "❌ Failed to reload mouse soundpack '{}': {}",
-            config.mouse_soundpack, e
-        ),
+        Ok(_) =>
+            debug_print!("✅ Mouse soundpack '{}' reloaded successfully", config.mouse_soundpack),
+        Err(e) =>
+            always_eprint!(
+                "❌ Failed to reload mouse soundpack '{}': {}",
+                config.mouse_soundpack,
+                e
+            ),
     }
 }
 

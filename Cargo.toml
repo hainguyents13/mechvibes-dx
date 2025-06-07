@@ -33,6 +33,7 @@ tray-icon = "0.14"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 zip = "2.2.0"
+winapi = { version = "0.3", features = ["wincon", "winuser"] }
 
 
 [build-dependencies]

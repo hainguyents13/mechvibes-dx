@@ -3371,6 +3371,7 @@ dependencies = [
  "strum",
  "tray-icon 0.14.3",
  "uuid",
+ "winapi",
  "winreg",
  "winresource",
  "zip",

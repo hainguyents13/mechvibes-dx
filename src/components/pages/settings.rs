@@ -8,11 +8,11 @@ use lucide_dioxus::Settings;
 #[component]
 pub fn SettingsPage() -> Element {
     // Use shared config hook
-    let (config, update_config) = use_config();
-    // Use computed signals that always reflect current config state
+    let (config, update_config) = use_config(); // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
     let auto_start = use_memo(move || config().auto_start);
     let show_notifications = use_memo(move || config().show_notifications);
+    let show_debug_console = use_memo(move || config().show_debug_console);
 
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
@@ -52,7 +52,9 @@ pub fn SettingsPage() -> Element {
                           request_tray_update();
                       }
                   },
-                } // Auto Start
+                }
+                
+                 // Auto Start
                 Toggler {
                   title: "Start with Windows".to_string(),
                   description: Some("Automatically start MechvibesDX when Windows boots".to_string()),
@@ -78,8 +80,7 @@ pub fn SettingsPage() -> Element {
                           });
                       }
                   },
-                }
-                // Notifications
+                }                // Notifications
                 Toggler {
                   title: "Show Notifications".to_string(),
                   description: Some("Display system notifications for important events".to_string()),
@@ -90,6 +91,22 @@ pub fn SettingsPage() -> Element {
                           update_config(
                               Box::new(move |config| {
                                   config.show_notifications = new_value;
+                              }),
+                          );
+                      }
+                  },
+                }
+                // Debug Console
+                Toggler {
+                  title: "Show Debug Console".to_string(),
+                  description: Some("Show terminal window for debugging (requires restart)".to_string()),
+                  checked: show_debug_console(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.show_debug_console = new_value;
                               }),
                           );
                       }

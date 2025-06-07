@@ -6,6 +6,7 @@ use crate::libs::tray_service::request_tray_update;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
+use crate::{ debug_print, always_eprint };
 
 use dioxus::prelude::*;
 use dioxus_router::prelude::Router;
@@ -32,7 +33,7 @@ pub fn app() -> Element {
         // Load current soundpacks on startup
         let ctx = audio_context.clone();
         use_effect(move || {
-            println!("🎵 Loading current soundpacks on startup...");
+            debug_print!("🎵 Loading current soundpacks on startup...");
             crate::state::app::reload_current_soundpacks(&ctx);
         });
     }
@@ -167,20 +168,19 @@ pub fn app() -> Element {
                                                 } else {
                                                     "Global sound disabled"
                                                 };
-
                                                 let _ = Notification::new()
                                                     .summary("MechvibesDX")
                                                     .body(message)
                                                     .timeout(3000) // 3 seconds
                                                     .show();
                                             } else {
-                                                println!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
+                                                debug_print!("🚫 Notification task {} cancelled due to newer hotkey press", current_task_id);
                                             }
                                         });
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("❌ Failed to save config after sound toggle: {}", e);
+                                    always_eprint!("❌ Failed to save config after sound toggle: {}", e);
                                 }
                             }
                         }
@@ -192,10 +192,10 @@ pub fn app() -> Element {
     }
 
     rsx! {
-      // prettier-ignore
-      WindowController {}
-      // prettier-ignore
-      Header {}
-      Router::<Route> {}
+        // prettier-ignore
+        WindowController {}
+        // prettier-ignore
+        Header {}
+        Router::<Route> {}
     }
 }

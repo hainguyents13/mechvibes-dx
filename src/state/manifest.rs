@@ -1,4 +1,5 @@
 use crate::state::paths;
+use crate::{ debug_print, always_eprint };
 use crate::utils::platform;
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
@@ -97,19 +98,19 @@ impl AppManifest {
                         }
                     }
                 Err(e) => {
-                    eprintln!("❌ Failed to read manifest.json: {}", e);
+                    always_eprint!("❌ Failed to read manifest.json: {}", e);
                     let new_manifest = Self::new();
                     if let Err(e) = new_manifest.save() {
-                        eprintln!("❌ Failed to create new manifest: {}", e);
+                        always_eprint!("❌ Failed to create new manifest: {}", e);
                     }
                     new_manifest
                 }
             }
         } else {
-            println!("📝 Creating new app manifest");
+            debug_print!("📝 Creating new app manifest");
             let new_manifest = Self::new();
             if let Err(e) = new_manifest.save() {
-                eprintln!("❌ Failed to create manifest.json: {}", e);
+                always_eprint!("❌ Failed to create manifest.json: {}", e);
             }
             new_manifest
         }

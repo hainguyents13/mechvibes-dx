@@ -1,6 +1,7 @@
 use crate::libs::tray::{ handle_tray_events, TrayManager, TrayMessage };
 use crate::libs::tray_service::TRAY_UPDATE_SERVICE;
 use crate::libs::window_manager::{ WindowAction, WINDOW_MANAGER };
+use crate::{ debug_print, always_eprint };
 use dioxus::desktop::use_window;
 use dioxus::prelude::*;
 use std::sync::mpsc;
@@ -27,11 +28,11 @@ pub fn WindowController() -> Element {
         if tray_manager.read().is_none() {
             match TrayManager::new() {
                 Ok(tray) => {
-                    println!("✅ System tray initialized successfully");
+                    debug_print!("✅ System tray initialized successfully");
                     *tray_manager.write() = Some(tray);
                 }
                 Err(e) => {
-                    eprintln!("❌ Failed to initialize system tray: {}", e);
+                    always_eprint!("❌ Failed to initialize system tray: {}", e);
                 }
             }
         }
@@ -81,7 +82,7 @@ pub fn WindowController() -> Element {
                             window_clone.set_visible(true);
                             window_clone.set_focus();
                             WINDOW_MANAGER.set_visible(true);
-                            println!("🔼 Window shown from tray");
+                            debug_print!("🔼 Window shown from tray");
                         }
                         TrayMessage::ToggleMute => {
                             // Toggle the global sound enable flag
@@ -96,26 +97,24 @@ pub fn WindowController() -> Element {
                                     } else {
                                         "disabled"
                                     };
-                                    println!("🔇 Sounds {} via tray menu", status);
-
-                                    // Update tray menu to reflect new state
+                                    debug_print!("🔇 Sounds {} via tray menu", status); // Update tray menu to reflect new state
                                     if let Some(ref mut tray) = tray_manager_clone.write().as_mut() {
                                         if let Err(e) = tray.update_menu() {
-                                            eprintln!("❌ Failed to update tray menu: {}", e);
+                                            always_eprint!("❌ Failed to update tray menu: {}", e);
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("❌ Failed to save config after mute toggle: {}", e);
+                                    always_eprint!("❌ Failed to save config after mute toggle: {}", e);
                                 }
                             }
                         }
                         TrayMessage::OpenGitHub => {
                             let url = "https://github.com/hainguyents13/mechvibes-dx";
                             if let Err(e) = open::that(url) {
-                                eprintln!("❌ Failed to open GitHub URL: {}", e);
+                                always_eprint!("❌ Failed to open GitHub URL: {}", e);
                             } else {
-                                println!("🐙 Opened GitHub repository in browser");
+                                debug_print!("🐙 Opened GitHub repository in browser");
                             }
                         }
                         TrayMessage::OpenDiscord => {
@@ -148,7 +147,7 @@ pub fn WindowController() -> Element {
     });
 
     rsx! {
-      // This component doesn't render anything visible
-      span { style: "display: none;" }
+        // This component doesn't render anything visible
+        span { style: "display: none;" }
     }
 }

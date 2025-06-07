@@ -13,7 +13,15 @@ use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use std::sync::mpsc;
 
-// Embed icon data at compile time so it works in both dev and release builds
+// Function to conditionally set windows subsystem based on config
+fn should_show_console() -> bool {
+    // Try to load config to check debug console setting
+    match std::panic::catch_unwind(|| { state::config::AppConfig::load().show_debug_console }) {
+        Ok(show_debug) => show_debug,
+        Err(_) => false, // Default to false if config loading fails
+    }
+}
+
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
@@ -25,77 +33,65 @@ fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
             let (width, height) = rgba.dimensions();
             match dioxus::desktop::tao::window::Icon::from_rgba(rgba.into_raw(), width, height) {
                 Ok(icon) => {
-                    println!("✅ Loaded embedded ICO icon ({}x{})", width, height);
+                    debug_print!("✅ Loaded embedded ICO icon ({}x{})", width, height);
                     Some(icon)
                 }
                 Err(e) => {
-                    eprintln!("❌ Failed to create icon from embedded ICO data: {}", e);
+                    always_eprint!("❌ Failed to create icon from embedded ICO data: {}", e);
                     None
                 }
             }
         }
         Err(e) => {
-            eprintln!("❌ Failed to load embedded ICO data: {}", e);
-            // Fallback to PNG if ICO fails
-            match image::load_from_memory(EMBEDDED_ICON) {
-                Ok(img) => {
-                    let rgba = img.to_rgba8();
-                    let (width, height) = rgba.dimensions();
-                    match
-                        dioxus::desktop::tao::window::Icon::from_rgba(
-                            rgba.into_raw(),
-                            width,
-                            height
-                        )
-                    {
-                        Ok(icon) => {
-                            println!("✅ Loaded embedded icon as fallback ({}x{})", width, height);
-                            Some(icon)
-                        }
-                        Err(e) => {
-                            eprintln!("❌ Failed to create fallback icon: {}", e);
-                            None
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to load icon data: {}", e);
-                    None
-                }
-            }
+            debug_eprint!("❌ Failed to load embedded ICO data: {}", e);
+            None
         }
     }
 }
 
 fn main() {
+    // Initialize debug logging first
+    utils::logger::init_debug_logging();
+
+    // Hide console window if debug console is disabled in config
+    if !should_show_console() {
+        #[cfg(windows)]
+        {
+            unsafe {
+                let console = winapi::um::wincon::GetConsoleWindow();
+                if !console.is_null() {
+                    winapi::um::winuser::ShowWindow(console, winapi::um::winuser::SW_HIDE);
+                }
+            }
+        }
+    }
+
     env_logger::init();
 
-    println!("🚀 Initializing MechvibesDX...");
+    debug_print!("🚀 Initializing MechvibesDX...");
 
     // Initialize app manifest first
-    let _manifest = state::manifest::AppManifest::load();
-
-    // Check for command line arguments (protocol handling)
+    let _manifest = state::manifest::AppManifest::load(); // Check for command line arguments (protocol handling)
     let args: Vec<String> = std::env::args().collect();
-    println!("🔍 Command line args: {:?}", args);
+    debug_print!("🔍 Command line args: {:?}", args);
 
     if args.len() > 1 {
         // Handle protocol URL if passed as argument
         let url = &args[1];
-        println!("🔗 Processing argument: {}", url);
+        debug_print!("🔗 Processing argument: {}", url);
         if url.starts_with("mechvibes://") {
-            println!("✅ Detected protocol URL: {}", url);
+            debug_print!("✅ Detected protocol URL: {}", url);
             if let Err(e) = protocol::handle_protocol_url(url) {
-                eprintln!("❌ Failed to handle protocol URL {}: {}", url, e);
+                always_eprint!("❌ Failed to handle protocol URL {}: {}", url, e);
             } else {
-                println!("✅ Protocol URL handled successfully");
+                debug_print!("✅ Protocol URL handled successfully");
             }
             return; // Exit after handling protocol
         } else {
-            println!("ℹ️ Argument is not a protocol URL: {}", url);
+            debug_print!("ℹ️ Argument is not a protocol URL: {}", url);
         }
     } else {
-        println!("ℹ️ No command line arguments provided");
+        debug_print!("ℹ️ No command line arguments provided");
     }
 
     // Register protocol on first run

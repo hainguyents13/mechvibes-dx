@@ -1,13 +1,15 @@
 use crate::state::paths;
+use crate::{ debug_print, always_eprint };
 use crate::utils::path;
 use dioxus::prelude::*;
-use lucide_dioxus::{Check, Folder, FolderCog, LaptopMinimalCheck};
+use lucide_dioxus::{ Check, Folder, FolderCog, LaptopMinimalCheck };
 use std::env;
 
 /// Open the application directory in the system file manager
 fn open_app_directory() -> Result<(), String> {
-    let app_root =
-        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let app_root = std::env
+        ::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     path::open_path(&app_root.to_string_lossy())
 }
@@ -15,12 +17,14 @@ fn open_app_directory() -> Result<(), String> {
 #[component]
 pub fn AppInfoDisplay() -> Element {
     // Get current executable path
-    let exe_path = env::current_exe()
+    let exe_path = env
+        ::current_exe()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "Unknown".to_string());
 
     // Get current working directory
-    let current_dir = env::current_dir()
+    let current_dir = env
+        ::current_dir()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "Unknown".to_string());
 
@@ -98,12 +102,11 @@ pub fn AppInfoDisplay() -> Element {
         // Open App Directory Button
         div {
           button {
-            class: "btn btn-soft btn-sm",
-            onclick: move |_| {
+            class: "btn btn-soft btn-sm",            onclick: move |_| {
                 spawn(async move {
                     match open_app_directory() {
-                        Ok(_) => println!("✅ Successfully opened app directory"),
-                        Err(e) => eprintln!("❌ Failed to open app directory: {}", e),
+                        Ok(_) => debug_print!("✅ Successfully opened app directory"),
+                        Err(e) => always_eprint!("❌ Failed to open app directory: {}", e),
                     }
                 });
             },

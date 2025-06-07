@@ -45,11 +45,10 @@ pub struct AppConfig {
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
-    pub enable_logo_customization: bool, // Enable/disable logo customization panel
-
-    // System settings
+    pub enable_logo_customization: bool, // Enable/disable logo customization panel    // System settings
     pub auto_start: bool,
     pub show_notifications: bool,
+    pub show_debug_console: bool, // Show/hide debug console window
 }
 
 impl AppConfig {
@@ -113,6 +112,7 @@ impl Default for AppConfig {
             enable_logo_customization: false, // Default logo customization disabled
             auto_start: false,
             show_notifications: true,
+            show_debug_console: false, // Default debug console disabled
         }
     }
 }
