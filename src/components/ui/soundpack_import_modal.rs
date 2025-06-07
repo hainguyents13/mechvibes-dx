@@ -1,11 +1,13 @@
 use crate::{
-    components::ui::{ImportStep, ProgressStep},
-    state::app::{use_app_state, use_state_trigger},
+    components::ui::{ ImportStep, ProgressStep },
+    state::app::{ use_app_state, use_state_trigger },
     utils::delay,
     utils::soundpack_installer::{
-        check_soundpack_id_conflict, extract_and_install_soundpack, get_soundpack_id_from_zip,
+        check_soundpack_id_conflict,
+        extract_and_install_soundpack,
+        get_soundpack_id_from_zip,
     },
-    utils::soundpack_validator::{validate_soundpack_structure, validate_zip_file},
+    utils::soundpack_validator::{ validate_soundpack_structure, validate_zip_file },
 };
 use dioxus::prelude::*;
 use lucide_dioxus::FolderArchive;
@@ -15,7 +17,7 @@ use std::sync::Arc;
 pub fn SoundpackImportModal(
     modal_id: String,
     audio_ctx: Arc<crate::libs::audio::AudioContext>,
-    on_import_success: EventHandler<()>,
+    on_import_success: EventHandler<()>
 ) -> Element {
     // Loading
     let mut is_loading = use_signal(|| false);
@@ -100,11 +102,11 @@ pub fn SoundpackImportModal(
                 // Step 1: Open file dialog and select file
                 // ===========================================
                 // Open file dialog to select ZIP file
-                let file_dialog = rfd::AsyncFileDialog::new()
+                let file_dialog = rfd::AsyncFileDialog
+                    ::new()
                     .add_filter("ZIP Files", &["zip"])
                     .set_title("Select Soundpack ZIP File")
-                    .pick_file()
-                    .await;
+                    .pick_file().await;
 
                 let file_handle = match file_dialog {
                     Some(handle) => handle,
@@ -170,10 +172,9 @@ pub fn SoundpackImportModal(
                 let soundpacks = app_state.get_soundpacks();
                 if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
                     error_step.set(ImportStep::CheckingConflicts);
-                    error_message.set(format!(
-                        "A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.",
-                        soundpack_id
-                    ));
+                    error_message.set(
+                        format!("A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.", soundpack_id)
+                    );
                     is_loading.set(false);
                     return; // Stop import process on conflict
                 }
