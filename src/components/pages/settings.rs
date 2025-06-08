@@ -12,6 +12,7 @@ pub fn SettingsPage() -> Element {
     let (config, update_config) = use_config(); // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
     let auto_start = use_memo(move || config().auto_start);
+    let start_minimized = use_memo(move || config().start_minimized);
     let show_notifications = use_memo(move || config().show_notifications);
     let show_debug_console = use_memo(move || config().show_debug_console);
 
@@ -79,7 +80,41 @@ pub fn SettingsPage() -> Element {
                           });
                       }
                   },
-                }                // Notifications
+                }
+                  // Start Minimized (only show when auto start is enabled)
+                if auto_start() {
+                    Toggler {
+                      title: "Start minimized to tray".to_string(),
+                      description: Some("When starting with Windows, open minimized to system tray".to_string()),
+                      checked: start_minimized(),
+                      on_change: {
+                          let update_config = update_config.clone();
+                          move |new_value: bool| {
+                              update_config(
+                                  Box::new(move |config| {
+                                      config.start_minimized = new_value;
+                                  }),
+                              );
+                              // Update auto startup registry entry to include/exclude --minimized flag
+                              spawn(async move {
+                                  if crate::state::config::AppConfig::load().auto_start {
+                                      match crate::utils::auto_startup::set_auto_startup(true) {
+                                          Ok(_) => {
+                                              let status = if new_value { "with minimized flag" } else { "without minimized flag" };
+                                              println!("✅ Auto startup updated {}", status);
+                                          }
+                                          Err(e) => {
+                                              eprintln!("❌ Failed to update auto startup: {}", e);
+                                          }
+                                      }
+                                  }
+                              });
+                          }
+                      },
+                    }
+                }
+                
+                // Notifications
                 Toggler {
                   title: "Show Notifications".to_string(),
                   description: Some("Display system notifications for important events".to_string()),

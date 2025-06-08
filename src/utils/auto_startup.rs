@@ -17,16 +17,24 @@ pub fn enable_auto_startup() -> Result<(), String> {
     let exe_path = get_exe_path()?;
     let exe_path_str = exe_path.to_str().ok_or("Failed to convert executable path to string")?;
 
+    // Check if we should start minimized
+    let config = crate::state::config::AppConfig::load();
+    let command = if config.start_minimized {
+        format!("\"{}\" --minimized", exe_path_str)
+    } else {
+        exe_path_str.to_string()
+    };
+
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let run_key = hkcu
         .open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", KEY_WRITE)
         .map_err(|e| format!("Failed to open registry key: {}", e))?;
 
     run_key
-        .set_value(APP_NAME, &exe_path_str)
+        .set_value(APP_NAME, &command)
         .map_err(|e| format!("Failed to set registry value: {}", e))?;
 
-    println!("✅ Auto startup enabled: {}", exe_path_str);
+    println!("✅ Auto startup enabled: {}", command);
     Ok(())
 }
 

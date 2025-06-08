@@ -4,7 +4,7 @@ use crate::utils::constants::CSS_ID_PREFIX;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
-const FAVICON: Asset = asset!("/assets/logo-noise.ico");
+const FAVICON: Asset = asset!("/assets/icon.ico");
 const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
 
 // Font assets
@@ -106,8 +106,8 @@ pub fn Header() -> Element {
         eval(&script);
     });
     rsx! {
-        // prettier-ignore
-        document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
-        document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
+      // prettier-ignore
+      document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
+      document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
     }
 }

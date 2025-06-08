@@ -33,7 +33,6 @@ pub struct AppConfig {
     pub version: String,
     pub last_updated: DateTime<Utc>,
     pub commit: Option<String>,
-
     // Audio settings
     pub keyboard_soundpack: String,
     pub mouse_soundpack: String,
@@ -41,12 +40,15 @@ pub struct AppConfig {
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
-    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically    // UI settings
+    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically
+    // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
-    pub enable_logo_customization: bool, // Enable/disable logo customization panel    // System settings
+    pub enable_logo_customization: bool, // Enable/disable logo customization panel
+    // System settings
     pub auto_start: bool,
+    pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
     pub show_notifications: bool,
     pub show_debug_console: bool, // Show/hide debug console window
 }
@@ -111,6 +113,7 @@ impl Default for AppConfig {
             logo_customization: LogoCustomization::default(),
             enable_logo_customization: false, // Default logo customization disabled
             auto_start: false,
+            start_minimized: false, // Default to not starting minimized
             show_notifications: true,
             show_debug_console: false, // Default debug console disabled
         }

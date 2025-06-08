@@ -73,24 +73,35 @@ fn main() {
     debug_print!("🚀 Initializing {}...", APP_NAME);
 
     // Initialize app manifest first
-    let _manifest = state::manifest::AppManifest::load(); // Check for command line arguments (protocol handling)
+    let _manifest = state::manifest::AppManifest::load(); // Check for command line arguments (protocol handling and startup options)
     let args: Vec<String> = std::env::args().collect();
-    debug_print!("🔍 Command line args: {:?}", args);
+    debug_print!("🔍 Command line args: {:?}", args); // Check if we should start minimized (from auto-startup)
+    let should_start_minimized =
+        args.contains(&"--minimized".to_string()) ||
+        (state::config::AppConfig::load().auto_start &&
+            state::config::AppConfig::load().start_minimized);
+
+    if should_start_minimized {
+        debug_print!("🔽 Starting minimized to system tray");
+    }
 
     if args.len() > 1 {
         // Handle protocol URL if passed as argument
-        let url = &args[1];
-        debug_print!("🔗 Processing argument: {}", url);
-        if url.starts_with(APP_PROTOCOL_URL) {
-            debug_print!("✅ Detected protocol URL: {}", url);
-            if let Err(e) = protocol::handle_protocol_url(url) {
-                always_eprint!("❌ Failed to handle protocol URL {}: {}", url, e);
-            } else {
-                debug_print!("✅ Protocol URL handled successfully");
+        for arg in &args[1..] {
+            if arg == "--minimized" {
+                debug_print!("🔽 Starting minimized to tray");
+                continue;
             }
-            return; // Exit after handling protocol
-        } else {
-            debug_print!("ℹ️ Argument is not a protocol URL: {}", url);
+
+            if arg.starts_with(APP_PROTOCOL_URL) {
+                debug_print!("✅ Detected protocol URL: {}", arg);
+                if let Err(e) = protocol::handle_protocol_url(arg) {
+                    always_eprint!("❌ Failed to handle protocol URL {}: {}", arg, e);
+                } else {
+                    debug_print!("✅ Protocol URL handled successfully");
+                }
+                return; // Exit after handling protocol
+            }
         }
     } else {
         debug_print!("ℹ️ No command line arguments provided");
@@ -126,6 +137,7 @@ fn main() {
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false) // Disable window resizing
+        .with_visible(!should_start_minimized) // Hide window if starting minimized
         .with_window_icon(load_icon()); // Set window icon for taskbar
 
     // Create config with our window settings
