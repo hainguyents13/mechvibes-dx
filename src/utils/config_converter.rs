@@ -1,27 +1,41 @@
 use crate::utils::path;
-use serde_json::{Map, Value};
+use serde_json::{ Map, Value };
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
 /// Get the duration of an audio file in milliseconds
 fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    use rodio::{Decoder, Source};
+    use rodio::{ Decoder, Source };
     use std::io::BufReader;
 
-    let file = File::open(file_path)?;
+    // Debug log the file being processed
+    println!("🎵 Attempting to get duration for: {}", file_path);
+
+    let file = File::open(file_path).map_err(|e| {
+        println!("❌ Failed to open file {}: {}", file_path, e);
+        e
+    })?;
+
     let reader = BufReader::new(file);
-    let source = Decoder::new(reader)?;
-
-    // Get duration from the source
+    let source = Decoder::new(reader).map_err(|e| {
+        println!("❌ Failed to decode audio file {}: {}", file_path, e);
+        e
+    })?; // Get duration from the source
     if let Some(duration) = source.total_duration() {
-        Ok(duration.as_millis() as f64)
+        let duration_ms = duration.as_millis() as f64;
+        if duration_ms > 0.0 {
+            println!("✅ Successfully got duration for {}: {:.1}ms", file_path, duration_ms);
+            Ok(duration_ms)
+        } else {
+            println!("⚠️ Got zero duration from metadata for {}, will use fallback", file_path);
+            // Use fallback duration for zero-duration files
+            Ok(100.0)
+        }
     } else {
-        // Fallback: try to estimate by counting samples
-        let _sample_rate = source.sample_rate() as f64;
-        let _channels = source.channels() as f64;
-
-        Err("Could not determine audio duration".into())
+        println!("⚠️ No duration metadata available for {}, using fallback", file_path);
+        // Use fallback duration when no metadata is available
+        Ok(100.0)
     }
 }
 
@@ -29,16 +43,16 @@ fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Err
 fn create_concatenated_audio_and_segments(
     soundpack_dir: &str,
     sound_files: &HashMap<String, String>, // key_name -> sound_file_name
-    output_audio_path: &str,
+    output_audio_path: &str
 ) -> Result<HashMap<String, (f64, f64)>, Box<dyn std::error::Error>> {
     use std::collections::BTreeSet;
 
+    println!("\n🔗 === SEGMENT CREATION DEBUG ===");
+    println!("Processing {} sound files for multi-method conversion", sound_files.len());
+
     let mut segments = HashMap::new();
 
-    println!(
-        "🔗 Processing {} sound files for multi-method conversion",
-        sound_files.len()
-    );
+    println!("🔗 Processing {} sound files for multi-method conversion", sound_files.len());
 
     // Step 1: Collect unique sound files and their durations
     let mut unique_files: BTreeSet<String> = BTreeSet::new();
@@ -51,21 +65,14 @@ fn create_concatenated_audio_and_segments(
         }
     }
 
-    println!(
-        "📁 Found {} unique audio files to concatenate",
-        unique_files.len()
-    );
-
-    // Step 2: Read durations for all unique files
+    println!("📁 Found {} unique audio files to concatenate", unique_files.len()); // Step 2: Read durations for all unique files
     for sound_file in &unique_files {
         let file_path = format!("{}/{}", soundpack_dir, sound_file);
-
         if !Path::new(&file_path).exists() {
             println!("⚠️ File not found: {}, using default duration", file_path);
             file_durations.insert(sound_file.clone(), 100.0);
             continue;
         }
-
         match get_audio_duration_ms(&file_path) {
             Ok(duration) => {
                 file_durations.insert(sound_file.clone(), duration);
@@ -73,10 +80,7 @@ fn create_concatenated_audio_and_segments(
             }
             Err(_) => {
                 file_durations.insert(sound_file.clone(), 100.0);
-                println!(
-                    "⚠️ Could not read duration for {}, using default 100ms",
-                    file_path
-                );
+                println!("⚠️ Could not read duration for {}, using default 100ms", file_path);
             }
         }
     }
@@ -86,12 +90,14 @@ fn create_concatenated_audio_and_segments(
     let mut file_segments: HashMap<String, (f64, f64)> = HashMap::new();
 
     // Try to create concatenated audio using simple file concatenation approach
-    if let Err(e) = create_concatenated_audio_file(
-        soundpack_dir,
-        &unique_files,
-        &file_durations,
-        output_audio_path,
-    ) {
+    if
+        let Err(e) = create_concatenated_audio_file(
+            soundpack_dir,
+            &unique_files,
+            &file_durations,
+            output_audio_path
+        )
+    {
         println!("⚠️ Failed to create concatenated audio: {}", e);
         println!("📁 Falling back to using first available file");
 
@@ -122,16 +128,34 @@ fn create_concatenated_audio_and_segments(
                     current_position + duration,
                     duration
                 );
+                println!(
+                    "Segment '{}': [{:.1}ms - {:.1}ms] (duration: {:.1}ms)",
+                    sound_file,
+                    current_position,
+                    current_position + duration,
+                    duration
+                );
                 current_position += duration;
             }
-        }
-
-        // Step 5: Map keys to their corresponding segments
+        } // Step 5: Map keys to their corresponding segments
         for (key_name, sound_file) in sound_files {
             if let Some(&(start, duration)) = file_segments.get(sound_file) {
+                println!(
+                    "🔗 Mapping key '{}' to segment: start={}, duration={}",
+                    key_name,
+                    start,
+                    duration
+                );
                 segments.insert(key_name.clone(), (start, duration));
+                println!(
+                    "🔗 Mapping key '{}' to segment: start={}, duration={}",
+                    key_name,
+                    start,
+                    duration
+                );
             } else {
                 // Fallback for missing files
+                println!("⚠️ Fallback for missing file '{}', using default (0.0, 100.0)", sound_file);
                 segments.insert(key_name.clone(), (0.0, 100.0));
             }
         }
@@ -140,13 +164,14 @@ fn create_concatenated_audio_and_segments(
             "✅ Created concatenated audio file with {:.1}ms total duration",
             current_position
         );
+        println!(
+            "✅ Created concatenated audio file with {:.1}ms total duration",
+            current_position
+        );
     }
 
-    println!(
-        "✅ Created {} key segments from {} unique files",
-        segments.len(),
-        unique_files.len()
-    );
+    println!("✅ Created {} key segments from {} unique files", segments.len(), unique_files.len());
+
     Ok(segments)
 }
 
@@ -155,9 +180,9 @@ fn create_concatenated_audio_file(
     soundpack_dir: &str,
     unique_files: &std::collections::BTreeSet<String>,
     _file_durations: &HashMap<String, f64>,
-    output_path: &str,
+    output_path: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use rodio::{Decoder, Source};
+    use rodio::{ Decoder, Source };
     use std::fs::File;
     use std::io::BufReader;
 
@@ -187,7 +212,8 @@ fn create_concatenated_audio_file(
                             channels = source.channels();
                             println!(
                                 "📊 Using audio format: {}Hz, {} channels",
-                                sample_rate, channels
+                                sample_rate,
+                                channels
                             );
                         }
                         // Convert to f32 samples and collect
@@ -230,14 +256,11 @@ fn create_concatenated_audio_file(
 
     writer.finalize()?;
 
-    println!(
-        "🎵 Successfully created concatenated audio file: {}",
-        output_path
-    );
+    println!("🎵 Successfully created concatenated audio file: {}", output_path);
     println!(
         "📊 Total samples: {}, Duration: ~{:.1}ms",
         total_samples,
-        (total_samples as f64 / channels as f64) / sample_rate as f64 * 1000.0
+        ((total_samples as f64) / (channels as f64) / (sample_rate as f64)) * 1000.0
     );
 
     Ok(())
@@ -257,14 +280,14 @@ fn create_concatenated_audio_file(
 /// - Uses "defs" field mapping key names to timing arrays
 /// - "multi" method: [[start, duration]] timing arrays (calculated from sound file durations)
 /// - "single" method: [[keydown_start, keydown_duration]] timing arrays (preserved format)
-/// - Uses "source" field for main sound file  
+/// - Uses "source" field for main sound file
 /// - Has proper key name mappings in "defs"
 /// - Has "config_version" field set to 2
 /// - Has "mouse" field (defaults to false for keyboard)
 /// - Has "author" field (required)
 pub fn convert_v1_to_v2(
     v1_config_path: &str,
-    output_path: &str,
+    output_path: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get the directory containing the V1 config (for relative sound file paths)
     let soundpack_dir = Path::new(v1_config_path)
@@ -273,7 +296,8 @@ pub fn convert_v1_to_v2(
         .ok_or("Could not determine soundpack directory")?;
 
     // Read the V1 config
-    let content = path::read_file_contents(v1_config_path)
+    let content = path
+        ::read_file_contents(v1_config_path)
         .map_err(|e| format!("Failed to read V1 config: {}", e))?;
     let config: Value = serde_json::from_str(&content)?;
 
@@ -344,7 +368,7 @@ pub fn convert_v1_to_v2(
     // Add config_version field set to 2
     converted_config.insert(
         "config_version".to_string(),
-        Value::Number(serde_json::Number::from(2)),
+        Value::Number(serde_json::Number::from(2))
     );
 
     // Convert "defines" to "defs" with proper timing format based on method
@@ -384,16 +408,18 @@ pub fn convert_v1_to_v2(
                 .ok_or("Could not determine output directory")?;
             let output_audio_path = format!("{}/combined_audio.wav", output_dir);
 
-            match create_concatenated_audio_and_segments(
-                soundpack_dir,
-                &sound_files,
-                &output_audio_path,
-            ) {
+            match
+                create_concatenated_audio_and_segments(
+                    soundpack_dir,
+                    &sound_files,
+                    &output_audio_path
+                )
+            {
                 Ok(segments) => {
                     // Set the source to the combined audio file
                     converted_config.insert(
                         "source".to_string(),
-                        Value::String("combined_audio.wav".to_string()),
+                        Value::String("combined_audio.wav".to_string())
                     );
 
                     // Second pass: create timing definitions using calculated segments
@@ -403,11 +429,29 @@ pub fn convert_v1_to_v2(
                                 if let Some(sound_file_str) = value.as_str() {
                                     if !sound_file_str.is_empty() && sound_file_str != "null" {
                                         if let Some((start, duration)) = segments.get(key_name) {
-                                            let timing = vec![Value::Array(vec![
-                                                Value::from(*start),
-                                                Value::from(*duration),
-                                            ])];
-                                            defs.insert(key_name.clone(), Value::Array(timing));
+                                            println!(
+                                                "🔍 Debug: key={}, start={}, duration={}",
+                                                key_name,
+                                                start,
+                                                duration
+                                            );
+                                            let timing = vec![
+                                                Value::Array(
+                                                    vec![
+                                                        Value::from(*start),
+                                                        Value::from(*duration)
+                                                    ]
+                                                )
+                                            ];
+                                            defs.insert(key_name.clone(), Value::Array(timing)); // Log to console
+                                            println!(
+                                                "Writing to defs: key={}, timing=[{}, {}]",
+                                                key_name,
+                                                start,
+                                                duration
+                                            );
+                                        } else {
+                                            println!("⚠️ No segment found for key: {}", key_name);
                                         }
                                     }
                                 }
@@ -415,16 +459,10 @@ pub fn convert_v1_to_v2(
                         }
                     }
 
-                    println!(
-                        "✅ Created {} audio segments for multi method",
-                        segments.len()
-                    );
+                    println!("✅ Created {} audio segments for multi method", segments.len());
                 }
                 Err(e) => {
-                    println!(
-                        "⚠️ Warning: Could not process audio files: {}. Using default segments.",
-                        e
-                    );
+                    println!("⚠️ Warning: Could not process audio files: {}. Using default segments.", e);
 
                     // Fallback: use default timing for multi method
                     for (vk_code, value) in defines {
@@ -432,10 +470,9 @@ pub fn convert_v1_to_v2(
                             if let Some(key_name) = key_mappings.get(&vk_num) {
                                 if let Some(sound_file_str) = value.as_str() {
                                     if !sound_file_str.is_empty() && sound_file_str != "null" {
-                                        let timing = vec![Value::Array(vec![
-                                            Value::from(0.0),
-                                            Value::from(100.0),
-                                        ])];
+                                        let timing = vec![
+                                            Value::Array(vec![Value::from(0.0), Value::from(100.0)])
+                                        ];
                                         defs.insert(key_name.clone(), Value::Array(timing));
                                     }
                                 }
@@ -453,13 +490,17 @@ pub fn convert_v1_to_v2(
                         let timing = if let Some(timing_array) = value.as_array() {
                             if timing_array.len() >= 2 {
                                 // Keep [start_ms, duration_ms] format: [[start_ms, duration_ms]]
-                                if let (Some(start), Some(duration)) =
-                                    (timing_array[0].as_f64(), timing_array[1].as_f64())
+                                if
+                                    let (Some(start), Some(duration)) = (
+                                        timing_array[0].as_f64(),
+                                        timing_array[1].as_f64(),
+                                    )
                                 {
-                                    vec![Value::Array(vec![
-                                        Value::from(start),
-                                        Value::from(duration),
-                                    ])]
+                                    vec![
+                                        Value::Array(
+                                            vec![Value::from(start), Value::from(duration)]
+                                        )
+                                    ]
                                 } else {
                                     // Fallback to default timing if conversion fails
                                     vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])]
@@ -489,7 +530,8 @@ pub fn convert_v1_to_v2(
 
     // Write the converted config
     let converted_json = serde_json::to_string_pretty(&converted_config)?;
-    path::write_file_contents(output_path, &converted_json)
+    path
+        ::write_file_contents(output_path, &converted_json)
         .map_err(|e| format!("Failed to write converted config: {}", e))?;
 
     println!("✅ Successfully converted config from V1 to V2");

@@ -16,7 +16,7 @@ pub struct SoundpackInfo {
 /// Check if a soundpack ID already exists in the app state
 pub fn check_soundpack_id_conflict(
     id: &str,
-    soundpacks: &[crate::state::soundpack::SoundpackMetadata],
+    soundpacks: &[crate::state::soundpack::SoundpackMetadata]
 ) -> bool {
     soundpacks.iter().any(|pack| pack.id == id)
 }
@@ -24,8 +24,9 @@ pub fn check_soundpack_id_conflict(
 /// Extract soundpack ID from ZIP without extracting files
 pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
     let file = File::open(file_path).map_err(|e| format!("Failed to open ZIP file: {}", e))?;
-    let mut archive =
-        ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP archive: {}", e))?;
+    let mut archive = ZipArchive::new(file).map_err(|e|
+        format!("Failed to read ZIP archive: {}", e)
+    )?;
 
     // Find config.json to determine soundpack ID
     for i in 0..archive.len() {
@@ -36,11 +37,13 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
 
         if file_path.ends_with("config.json") {
             let mut config_content = String::new();
-            file.read_to_string(&mut config_content)
+            file
+                .read_to_string(&mut config_content)
                 .map_err(|e| format!("Failed to read config.json: {}", e))?;
 
             // Extract ID from config content only
-            let config: Value = serde_json::from_str(&config_content)
+            let config: Value = serde_json
+                ::from_str(&config_content)
                 .map_err(|e| format!("Failed to parse config.json: {}", e))?;
 
             // Check if the config already contains an ID field
@@ -62,8 +65,9 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
 pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, String> {
     // Open ZIP file
     let file = File::open(file_path).map_err(|e| format!("Failed to open ZIP file: {}", e))?;
-    let mut archive =
-        ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP archive: {}", e))?;
+    let mut archive = ZipArchive::new(file).map_err(|e|
+        format!("Failed to read ZIP archive: {}", e)
+    )?;
 
     // Find config.json to determine soundpack info
     let mut config_content = String::new();
@@ -79,7 +83,8 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 
         // Look for config.json in any directory level
         if file_path.ends_with("config.json") {
-            file.read_to_string(&mut config_content)
+            file
+                .read_to_string(&mut config_content)
                 .map_err(|e| format!("Failed to read config.json: {}", e))?;
             found_config = true;
             break;
@@ -91,7 +96,8 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
     }
 
     // Parse config to get soundpack info
-    let mut config: Value = serde_json::from_str(&config_content)
+    let mut config: Value = serde_json
+        ::from_str(&config_content)
         .map_err(|e| format!("Failed to parse config.json: {}", e))?;
 
     let soundpack_name = config
@@ -121,13 +127,14 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
     let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);
 
     // Create installation directory
-    path::ensure_directory_exists(&install_dir.to_string_lossy())
+    path
+        ::ensure_directory_exists(&install_dir.to_string_lossy())
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
     // Second pass: extract all files
-    let mut archive =
-        ZipArchive::new(File::open(file_path).map_err(|e| format!("Failed to reopen ZIP: {}", e))?)
-            .map_err(|e| format!("Failed to reread ZIP archive: {}", e))?;
+    let mut archive = ZipArchive::new(
+        File::open(file_path).map_err(|e| format!("Failed to reopen ZIP: {}", e))?
+    ).map_err(|e| format!("Failed to reread ZIP archive: {}", e))?;
 
     for i in 0..archive.len() {
         let mut file = archive
@@ -153,19 +160,23 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             install_dir.join(&file_path)
         }; // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
-            path::ensure_directory_exists(&parent.to_string_lossy())
+            path
+                ::ensure_directory_exists(&parent.to_string_lossy())
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
         // Extract file
-        let mut output_file =
-            File::create(&output_path).map_err(|e| format!("Failed to create file: {}", e))?;
-        std::io::copy(&mut file, &mut output_file)
+        let mut output_file = File::create(&output_path).map_err(|e|
+            format!("Failed to create file: {}", e)
+        )?;
+        std::io
+            ::copy(&mut file, &mut output_file)
             .map_err(|e| format!("Failed to extract file: {}", e))?;
     }
     // Write the final config.json at the root level of the soundpack directory
     let config_path = install_dir.join("config.json");
-    path::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
+    path
+        ::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
         .map_err(|e| format!("Failed to write config.json: {}", e))?;
 
     Ok(SoundpackInfo {
@@ -176,26 +187,37 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 
 /// Handle V1 to V2 config conversion if needed
 fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<String, String> {
-    let validation_result = crate::utils::soundpack_validator::validate_soundpack_config(&format!(
-        "temp_config_{}.json",
-        soundpack_id
-    ));
+    // Write the config content to a temporary file so we can validate it
+    let temp_validate_file = format!("temp_validate_{}.json", soundpack_id);
+    std::fs
+        ::write(&temp_validate_file, config_content)
+        .map_err(|e| format!("Failed to write temp validation file: {}", e))?;
+
+    let validation_result = crate::utils::soundpack_validator::validate_soundpack_config(
+        &temp_validate_file
+    );
+
+    // Clean up temp validation file
+    let _ = std::fs::remove_file(&temp_validate_file);
 
     let mut final_config_content = config_content.to_string();
 
-    if validation_result.status
-        == crate::utils::soundpack_validator::SoundpackValidationStatus::VersionOneNeedsConversion
+    if
+        validation_result.status ==
+        crate::utils::soundpack_validator::SoundpackValidationStatus::VersionOneNeedsConversion
     {
         // Convert V1 to V2 format
         let temp_input = format!("temp_v1_{}.json", soundpack_id);
         let temp_output = format!("temp_v2_{}.json", soundpack_id);
 
-        std::fs::write(&temp_input, config_content)
+        std::fs
+            ::write(&temp_input, config_content)
             .map_err(|e| format!("Failed to write temp config: {}", e))?;
 
         match crate::utils::config_converter::convert_v1_to_v2(&temp_input, &temp_output) {
             Ok(()) => {
-                final_config_content = std::fs::read_to_string(&temp_output)
+                final_config_content = std::fs
+                    ::read_to_string(&temp_output)
                     .map_err(|e| format!("Failed to read converted config: {}", e))?;
 
                 // Clean up temp files
@@ -211,4 +233,21 @@ fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<
         }
     }
     Ok(final_config_content)
+}
+
+/// Test function to expose config conversion for external testing
+#[cfg(test)]
+pub fn test_handle_config_conversion(
+    config_content: &str,
+    soundpack_id: &str
+) -> Result<String, String> {
+    handle_config_conversion(config_content, soundpack_id)
+}
+
+/// Public wrapper for testing config conversion
+pub fn handle_config_conversion_test(
+    config_content: &str,
+    soundpack_id: &str
+) -> Result<String, String> {
+    handle_config_conversion(config_content, soundpack_id)
 }
