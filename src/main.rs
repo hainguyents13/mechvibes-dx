@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 #![allow(non_snake_case)]
 
 mod components;
@@ -26,7 +26,7 @@ fn should_show_console() -> bool {
 }
 
 // Use .ico format for better Windows compatibility
-const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/logo-noise.ico");
+const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     // Try to create icon from embedded ICO data

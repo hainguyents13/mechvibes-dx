@@ -72,9 +72,9 @@ impl TrayManager {
         )?;
 
         // Load the icon from the specified path
-        let icon = Icon::from_path("assets/logo-noise.ico", Some((32, 32))).expect(
-            "Failed to load icon"
-        ); // Build the tray icon
+        let icon = Icon::from_path("assets/icon.ico", Some((32, 32))).expect("Failed to load icon");
+
+        // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
             .with_tooltip(APP_NAME)
@@ -88,7 +88,9 @@ impl TrayManager {
     pub fn update_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Load current config to determine sound state
         let config = crate::state::config::AppConfig::load();
-        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" }; // Create new menu with updated text
+        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" };
+
+        // Create new menu with updated text
         let show_item = MenuItem::with_id(
             MenuId::new("show"),
             &format!("Show {}", APP_NAME),
