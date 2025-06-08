@@ -14,26 +14,22 @@ pub fn WindowController() -> Element {
     let mut window_action_receiver = use_signal(|| None::<mpsc::Receiver<WindowAction>>); // Create a signal to hold the tray manager
     let mut tray_manager = use_signal(|| None::<TrayManager>);
 
-    // Initialize the receiver and tray once
-    use_effect(move || {
-        if window_action_receiver.read().is_none() {
-            let (tx, rx) = mpsc::channel::<WindowAction>();
-            WINDOW_MANAGER.set_action_sender(tx);
-            *window_action_receiver.write() = Some(rx);
-        }
+    // Initialize the receiver once using use_resource to avoid reactive loops
+    let _window_channel = use_resource(move || async move {
+        let (tx, rx) = mpsc::channel::<WindowAction>();
+        WINDOW_MANAGER.set_action_sender(tx);
+        window_action_receiver.set(Some(rx));
     });
 
-    // Initialize tray in a separate effect to avoid reactive scope warnings
-    use_effect(move || {
-        if tray_manager.read().is_none() {
-            match TrayManager::new() {
-                Ok(tray) => {
-                    debug_print!("✅ System tray initialized successfully");
-                    *tray_manager.write() = Some(tray);
-                }
-                Err(e) => {
-                    always_eprint!("❌ Failed to initialize system tray: {}", e);
-                }
+    // Initialize tray using use_resource to avoid reactive scope warnings
+    let _tray_init = use_resource(move || async move {
+        match TrayManager::new() {
+            Ok(tray) => {
+                debug_print!("✅ System tray initialized successfully");
+                tray_manager.set(Some(tray));
+            }
+            Err(e) => {
+                always_eprint!("❌ Failed to initialize system tray: {}", e);
             }
         }
     });
@@ -62,17 +58,17 @@ pub fn WindowController() -> Element {
                             }
                         }
                     }
-                }
-
-                // Handle tray update requests from other parts of the application
+                } // Handle tray update requests from other parts of the application
                 if let Some(_) = TRAY_UPDATE_SERVICE.try_receive() {
-                    if let Some(ref mut tray) = tray_manager_clone.write().as_mut() {
-                        if let Err(e) = tray.update_menu() {
-                            eprintln!("❌ Failed to update tray menu from global request: {}", e);
-                        } else {
-                            println!("✅ Tray menu updated from global request");
+                    tray_manager_clone.with_mut(|tray_opt| {
+                        if let Some(ref mut tray) = tray_opt {
+                            if let Err(e) = tray.update_menu() {
+                                eprintln!("❌ Failed to update tray menu from global request: {}", e);
+                            } else {
+                                println!("✅ Tray menu updated from global request");
+                            }
                         }
-                    }
+                    });
                 }
 
                 // Handle tray events
@@ -97,12 +93,15 @@ pub fn WindowController() -> Element {
                                     } else {
                                         "disabled"
                                     };
-                                    debug_print!("🔇 Sounds {} via tray menu", status); // Update tray menu to reflect new state
-                                    if let Some(ref mut tray) = tray_manager_clone.write().as_mut() {
-                                        if let Err(e) = tray.update_menu() {
-                                            always_eprint!("❌ Failed to update tray menu: {}", e);
+                                    debug_print!("🔇 Sounds {} via tray menu", status);
+                                    // Update tray menu to reflect new state
+                                    tray_manager_clone.with_mut(|tray_opt| {
+                                        if let Some(ref mut tray) = tray_opt {
+                                            if let Err(e) = tray.update_menu() {
+                                                always_eprint!("❌ Failed to update tray menu: {}", e);
+                                            }
                                         }
-                                    }
+                                    });
                                 }
                                 Err(e) => {
                                     always_eprint!("❌ Failed to save config after mute toggle: {}", e);
@@ -147,7 +146,7 @@ pub fn WindowController() -> Element {
     });
 
     rsx! {
-        // This component doesn't render anything visible
-        span { style: "display: none;" }
+      // This component doesn't render anything visible
+      span { style: "display: none;" }
     }
 }
