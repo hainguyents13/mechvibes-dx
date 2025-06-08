@@ -1,8 +1,8 @@
-# MechVibesDX - State Management Architecture
+# MechvibesDX - State Management Architecture
 
 ## 📊 Executive Summary
 
-MechVibesDX sử dụng một kiến trúc state management hybrid với:
+MechvibesDX sử dụng một kiến trúc state management hybrid với:
 
 -   **Global State**: Quản lý dữ liệu ứng dụng chính qua `GLOBAL_APP_STATE`
 -   **Local State**: Quản lý UI state cục bộ qua Dioxus signals
@@ -468,13 +468,13 @@ use_effect(move || {
 
 ## 📄 Document Information
 
-**Document**: MechVibesDX State Management Architecture  
+**Document**: MechvibesDX State Management Architecture  
 **Version**: 1.0  
 **Date**: June 2025  
 **Author**: Development Team  
-**Project**: MechVibesDX - Mechanical Keyboard Sound Simulator  
-**Repository**: [MechVibesDX](https://github.com/hainguyents13/mechvibes-dx)
+**Project**: MechvibesDX - Mechanical Keyboard Sound Simulator  
+**Repository**: [MechvibesDX](https://github.com/hainguyents13/mechvibes-dx)
 
 ---
 
-_This document provides a comprehensive overview of the state management architecture in MechVibesDX, including implementation details, best practices, and optimization strategies._
+_This document provides a comprehensive overview of the state management architecture in MechvibesDX, including implementation details, best practices, and optimization strategies._

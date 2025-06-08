@@ -11,13 +11,13 @@ bundle_assets_path = ["/assets", "/soundpacks"]
 # bundle configuration
 [bundle]
 identifier = "com.hainguyents13.mechvibesdx"
-name = "MechVibes DX"
+name = "MechvibesDX"
 version = "0.1.0"
 publisher = "Hai Nguyen"
 icon = ["./assets/icon.ico"]
 category = "Productivity"
-short_description = "MechVibes DX"
-long_description = "MechVibes DX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
+short_description = "MechvibesDX"
+long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
 resources = ["./soundpacks", "./assets"]
 
 # configure bundling for windows

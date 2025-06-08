@@ -48,11 +48,11 @@ default = ["dioxus/desktop"]
 desktop = ["dioxus/desktop"]
 
 [package.metadata.bundle]
-name = "MechVibes DX"
+name = "MechvibesDX"
 identifier = "com.hainguyents13.mechvibesdx"
 version = "0.1.0"
 category = "Productivity"
-short_description = "MechVibes DX"
+short_description = "MechvibesDX"
 long_description = ""
 
 [profile.wasm-dev]

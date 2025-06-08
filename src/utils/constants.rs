@@ -5,7 +5,7 @@
 pub const APP_NAME: &str = "MechvibesDX";
 
 /// The display name with spaces for better readability
-pub const APP_NAME_DISPLAY: &str = "MechVibes DX";
+pub const APP_NAME_DISPLAY: &str = "MechvibesDX";
 
 /// The lowercase version for file names, URLs, etc.
 pub const APP_NAME_LOWERCASE: &str = "mechvibes-dx";

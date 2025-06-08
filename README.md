@@ -1,8 +1,8 @@
-# MechVibesDX
+# MechvibesDX
 
 A modern, feature-rich mechanical keyboard sound simulator built with Rust and Dioxus. Experience the satisfying sounds of mechanical keyboards and mouse clicks with customizable soundpacks, themes, and advanced audio controls.
 
-![MechVibesDX](assets/header.svg)
+![MechvibesDX](assets/header.svg)
 
 ## ✨ Features
 
@@ -75,7 +75,7 @@ cargo run --release
 
 Access the Settings page to configure:
 
--   **Auto-start** - Launch MechVibesDX with Windows
+-   **Auto-start** - Launch MechvibesDX with Windows
 -   **System tray** - Minimize to system tray
 -   **Default volumes** - Set preferred volume levels
 -   **Theme preferences** - Choose default theme
@@ -84,7 +84,7 @@ Access the Settings page to configure:
 
 ### Understanding Soundpacks
 
-MechVibesDX uses a flexible soundpack system that maps keyboard keys and mouse buttons to specific segments of audio files. Each soundpack contains:
+MechvibesDX uses a flexible soundpack system that maps keyboard keys and mouse buttons to specific segments of audio files. Each soundpack contains:
 
 -   **Audio file** - The source audio containing all sounds
 -   **Configuration** - JSON mapping of keys/buttons to audio segments
@@ -105,7 +105,7 @@ Mouse soundpacks use the following button codes:
 
 ### Included Soundpacks
 
-MechVibesDX comes with several high-quality soundpacks:
+MechvibesDX comes with several high-quality soundpacks:
 
 -   **Cherry MX Black PBT** - Deep, satisfying mechanical keyboard sounds
 -   **Oreo** - Unique, clicky mechanical switch sounds
@@ -215,7 +215,7 @@ For example, `[0, 150]` means the sound for the "A" key starts at 0ms and ends a
 ### Testing Your Soundpack
 
 1. **Create the directory** - Add your soundpack folder to `soundpacks/`
-2. **Restart the application** - MechVibesDX will automatically detect new soundpacks
+2. **Restart the application** - MechvibesDX will automatically detect new soundpacks
 3. **Select your soundpack** - Choose it from the dropdown menu
 4. **Test the sounds** - Type or click to hear your custom sounds
 
@@ -231,7 +231,7 @@ For example, `[0, 150]` means the sound for the "A" key starts at 0ms and ends a
 
 ### Theme System
 
-MechVibesDX supports extensive theming:
+MechvibesDX supports extensive theming:
 
 -   **Built-in themes** - Light and dark themes with automatic system detection
 -   **Custom CSS** - Write custom CSS for complete visual control
@@ -341,7 +341,7 @@ dx build --release
 
 ### Architecture
 
-MechVibesDX is built on Windows 11 using modern technologies:
+MechvibesDX is built on Windows 11 using modern technologies:
 
 -   **Rust** - Systems programming language for performance and safety
 -   **Dioxus** - Modern React-like UI framework for Rust
@@ -404,7 +404,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
--   **Original MechVibes** - Inspiration for this modern rewrite
+-   **Original Mechvibes** - Inspiration for this modern rewrite
 -   **Rust Community** - Amazing ecosystem and tools
 -   **Dioxus Team** - Excellent UI framework
 -   **Contributors** - Everyone who helps improve the project

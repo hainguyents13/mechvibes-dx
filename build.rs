@@ -25,10 +25,10 @@ fn main() {
             res.set("CompanyName", "Hải Nguyễn");
             res.set(
                 "FileDescription",
-                "MechVibes DX - Enhanced mechanical keyboard sound simulator"
+                "MechvibesDX - Enhanced mechanical keyboard sound simulator"
             );
             res.set("LegalCopyright", "Copyright © 2025 Hải Nguyễn");
-            res.set("ProductName", "MechVibes DX");
+            res.set("ProductName", "MechvibesDX");
             res.set("ProductVersion", "0.1.0");
             res.set("FileVersion", "0.1.0");
 
@@ -120,7 +120,7 @@ fn create_default_config() {
     let default_config =
         serde_json::json!({
         "app": {
-            "name": "MechVibes DX",
+            "name": "MechvibesDX",
             "version": "0.1.0",
             "description": "Enhanced mechanical keyboard sound simulator"
         },
