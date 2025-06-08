@@ -6,43 +6,99 @@ use std::path::Path;
 
 /// Get the duration of an audio file in milliseconds
 fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    use rodio::{ Decoder, Source };
-    use std::io::BufReader;
-
     // Debug log the file being processed
     println!("🎵 Attempting to get duration for: {}", file_path);
 
-    let file = File::open(file_path).map_err(|e| {
-        println!("❌ Failed to open file {}: {}", file_path, e);
-        e
-    })?;
+    // Try symphonia first for better metadata support
+    if let Ok(duration) = get_duration_with_symphonia(file_path) {
+        if duration > 0.0 {
+            println!("✅ Symphonia duration for {}: {:.1}ms", file_path, duration);
+            return Ok(duration);
+        }
+    }
 
+    // Fallback to rodio if symphonia fails
+    if let Ok(duration) = get_duration_with_rodio(file_path) {
+        if duration > 0.0 {
+            println!("✅ Rodio duration for {}: {:.1}ms", file_path, duration);
+            return Ok(duration);
+        }
+    }
+
+    println!("⚠️ No duration metadata available for {}, using fallback", file_path);
+    Ok(100.0)
+}
+
+/// Get duration using Symphonia (better for MP3 metadata)
+fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+    use std::fs::File;
+
+    let file = File::open(file_path)?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(extension) = std::path::Path::new(file_path).extension() {
+        if let Some(ext_str) = extension.to_str() {
+            hint.with_extension(ext_str);
+        }
+    }
+
+    let meta_opts: MetadataOptions = Default::default();
+    let fmt_opts: FormatOptions = Default::default();
+    let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
+    let format = probed.format;
+
+    // Get the default track
+    let track = format
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+        .ok_or("No valid audio track found")?;
+
+    // Calculate duration from time base and frames
+    if
+        let (Some(time_base), Some(n_frames)) = (
+            track.codec_params.time_base,
+            track.codec_params.n_frames,
+        )
+    {
+        let duration_seconds =
+            ((n_frames as f64) * (time_base.numer as f64)) / (time_base.denom as f64);
+        let duration_ms = duration_seconds * 1000.0;
+        return Ok(duration_ms);
+    }
+
+    Err("No duration information available in track".into())
+}
+
+/// Get duration using Rodio (fallback method)
+fn get_duration_with_rodio(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
+    use rodio::{ Decoder, Source };
+    use std::io::BufReader;
+
+    let file = File::open(file_path)?;
     let reader = BufReader::new(file);
-    let source = Decoder::new(reader).map_err(|e| {
-        println!("❌ Failed to decode audio file {}: {}", file_path, e);
-        e
-    })?; // Get duration from the source
+    let source = Decoder::new(reader)?;
+
     if let Some(duration) = source.total_duration() {
         let duration_ms = duration.as_millis() as f64;
         if duration_ms > 0.0 {
-            println!("✅ Successfully got duration for {}: {:.1}ms", file_path, duration_ms);
-            Ok(duration_ms)
-        } else {
-            println!("⚠️ Got zero duration from metadata for {}, will use fallback", file_path);
-            // Use fallback duration for zero-duration files
-            Ok(100.0)
+            return Ok(duration_ms);
         }
-    } else {
-        println!("⚠️ No duration metadata available for {}, using fallback", file_path);
-        // Use fallback duration when no metadata is available
-        Ok(100.0)
     }
+
+    Err("No duration available from rodio".into())
 }
 
 /// Create concatenated audio file from multiple sound files and return segment mappings
 fn create_concatenated_audio_and_segments(
     soundpack_dir: &str,
-    sound_files: &HashMap<String, String>, // key_name -> sound_file_name
+    sound_files: &HashMap<String, String>,
+    // key_name -> sound_file_name
     output_audio_path: &str
 ) -> Result<HashMap<String, (f64, f64)>, Box<dyn std::error::Error>> {
     use std::collections::BTreeSet;
@@ -65,7 +121,9 @@ fn create_concatenated_audio_and_segments(
         }
     }
 
-    println!("📁 Found {} unique audio files to concatenate", unique_files.len()); // Step 2: Read durations for all unique files
+    println!("📁 Found {} unique audio files to concatenate", unique_files.len());
+
+    // Step 2: Read durations for all unique files
     for sound_file in &unique_files {
         let file_path = format!("{}/{}", soundpack_dir, sound_file);
         if !Path::new(&file_path).exists() {

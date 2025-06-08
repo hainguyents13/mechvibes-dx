@@ -234,20 +234,3 @@ fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<
     }
     Ok(final_config_content)
 }
-
-/// Test function to expose config conversion for external testing
-#[cfg(test)]
-pub fn test_handle_config_conversion(
-    config_content: &str,
-    soundpack_id: &str
-) -> Result<String, String> {
-    handle_config_conversion(config_content, soundpack_id)
-}
-
-/// Public wrapper for testing config conversion
-pub fn handle_config_conversion_test(
-    config_content: &str,
-    soundpack_id: &str
-) -> Result<String, String> {
-    handle_config_conversion(config_content, soundpack_id)
-}
