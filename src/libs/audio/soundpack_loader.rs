@@ -1,11 +1,11 @@
-use rodio::{Decoder, Source};
+use rodio::{ Decoder, Source };
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{ BufReader, Read };
 
 use crate::state::config::AppConfig;
 use crate::state::paths;
 use crate::state::soundpack::SoundPack;
-use crate::state::soundpack::{SoundpackCache, SoundpackMetadata};
+use crate::state::soundpack::{ SoundpackCache, SoundpackMetadata };
 
 use super::audio_context::AudioContext;
 
@@ -29,10 +29,9 @@ pub fn load_mouse_soundpack(context: &AudioContext, soundpack_id: &str) -> Resul
 
 fn load_audio_file(
     soundpack_path: &str,
-    soundpack: &SoundPack,
+    soundpack: &SoundPack
 ) -> Result<(Vec<f32>, u16, u32), String> {
-    let sound_file_path = soundpack
-        .source
+    let sound_file_path = soundpack.source
         .as_ref()
         .map(|src| format!("{}/{}", soundpack_path, src.trim_start_matches("./")))
         .ok_or_else(|| "No source field in soundpack config".to_string())?;
@@ -41,17 +40,20 @@ fn load_audio_file(
         return Err(format!("Sound file not found: {}", sound_file_path));
     }
 
-    let file =
-        File::open(&sound_file_path).map_err(|e| format!("Failed to open sound file: {}", e))?;
+    let file = File::open(&sound_file_path).map_err(|e|
+        format!("Failed to open sound file: {}", e)
+    )?;
 
     let mut buf = Vec::new();
-    file.take(10_000_000)
+    file
+        .take(10_000_000)
         .read_to_end(&mut buf)
         .map_err(|e| format!("Failed to read sound file: {}", e))?;
 
     let cursor = std::io::Cursor::new(buf);
-    let decoder = Decoder::new(BufReader::new(cursor))
-        .map_err(|e| format!("Failed to decode audio: {}", e))?;
+    let decoder = Decoder::new(BufReader::new(cursor)).map_err(|e|
+        format!("Failed to decode audio: {}", e)
+    )?;
 
     let sample_rate = decoder.sample_rate();
     let channels = decoder.channels();
@@ -63,7 +65,7 @@ fn load_audio_file(
 /// Direct keyboard soundpack loading
 pub fn load_keyboard_soundpack_optimized(
     context: &AudioContext,
-    soundpack_id: &str,
+    soundpack_id: &str
 ) -> Result<(), String> {
     println!("📂 Direct loading keyboard soundpack: {}", soundpack_id);
 
@@ -72,10 +74,12 @@ pub fn load_keyboard_soundpack_optimized(
 
     // Load config.json
     let config_path = paths::soundpacks::config_json(soundpack_id);
-    let config_content = std::fs::read_to_string(&config_path)
+    let config_content = std::fs
+        ::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let soundpack: SoundPack = serde_json::from_str(&config_content)
+    let soundpack: SoundPack = serde_json
+        ::from_str(&config_content)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
 
     // Verify this is a keyboard soundpack
@@ -98,17 +102,14 @@ pub fn load_keyboard_soundpack_optimized(
     cache.add_soundpack(metadata);
     cache.save();
 
-    println!(
-        "✅ Successfully loaded keyboard soundpack: {} (direct from files)",
-        soundpack.name
-    );
+    println!("✅ Successfully loaded keyboard soundpack: {} (direct from files)", soundpack.name);
     Ok(())
 }
 
 /// Direct mouse soundpack loading
 pub fn load_mouse_soundpack_optimized(
     context: &AudioContext,
-    soundpack_id: &str,
+    soundpack_id: &str
 ) -> Result<(), String> {
     println!("📂 Direct loading mouse soundpack: {}", soundpack_id);
 
@@ -117,10 +118,12 @@ pub fn load_mouse_soundpack_optimized(
 
     // Load config.json
     let config_path = paths::soundpacks::config_json(soundpack_id);
-    let config_content = std::fs::read_to_string(&config_path)
+    let config_content = std::fs
+        ::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let soundpack: SoundPack = serde_json::from_str(&config_content)
+    let soundpack: SoundPack = serde_json
+        ::from_str(&config_content)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
 
     // Verify this is a mouse soundpack
@@ -143,10 +146,7 @@ pub fn load_mouse_soundpack_optimized(
     cache.add_soundpack(metadata);
     cache.save();
 
-    println!(
-        "✅ Successfully loaded mouse soundpack: {} (direct from files)",
-        soundpack.name
-    );
+    println!("✅ Successfully loaded mouse soundpack: {} (direct from files)", soundpack.name);
     Ok(())
 }
 
@@ -154,7 +154,7 @@ fn update_keyboard_context(
     context: &AudioContext,
     samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
     key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
-    soundpack: &SoundPack,
+    soundpack: &SoundPack
 ) -> Result<(), String> {
     let (audio_samples, channels, sample_rate) = samples;
     let sample_count = audio_samples.len();
@@ -182,11 +182,7 @@ fn update_keyboard_context(
             key_map.insert(key.clone(), converted_mappings);
         }
 
-        println!(
-            "🗝️ Updated key mappings: {} -> {} keys",
-            old_count,
-            key_map.len()
-        );
+        println!("🗝️ Updated key mappings: {} -> {} keys", old_count, key_map.len());
     } else {
         return Err("Failed to acquire lock on key_map".to_string());
     }
@@ -210,7 +206,8 @@ fn update_keyboard_context(
 
     println!(
         "✅ Successfully loaded keyboard soundpack: {} ({} key mappings) - Memory properly cleaned",
-        soundpack_name, key_mapping_count
+        soundpack_name,
+        key_mapping_count
     );
     Ok(())
 }
@@ -219,7 +216,7 @@ fn update_mouse_context(
     context: &AudioContext,
     samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
     mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
-    soundpack: &SoundPack,
+    soundpack: &SoundPack
 ) -> Result<(), String> {
     let (audio_samples, channels, sample_rate) = samples;
     let sample_count = audio_samples.len();
@@ -247,11 +244,7 @@ fn update_mouse_context(
             mouse_map.insert(button.clone(), converted_mappings);
         }
 
-        println!(
-            "🖱️ Updated mouse mappings: {} -> {} buttons",
-            old_count,
-            mouse_map.len()
-        );
+        println!("🖱️ Updated mouse mappings: {} -> {} buttons", old_count, mouse_map.len());
     } else {
         return Err("Failed to acquire lock on mouse_map".to_string());
     }
@@ -275,14 +268,15 @@ fn update_mouse_context(
 
     println!(
         "✅ Successfully loaded mouse soundpack: {} ({} mouse mappings) - Memory properly cleaned",
-        soundpack_name, mouse_mapping_count
+        soundpack_name,
+        mouse_mapping_count
     );
     Ok(())
 }
 
 fn create_soundpack_metadata(
     soundpack_path: &str,
-    soundpack: &SoundPack,
+    soundpack: &SoundPack
 ) -> Result<SoundpackMetadata, String> {
     let path = std::path::Path::new(soundpack_path);
     let id = path
@@ -293,12 +287,13 @@ fn create_soundpack_metadata(
 
     // Get file metadata
     let last_modified = match std::fs::metadata(soundpack_path) {
-        Ok(metadata) => metadata
-            .modified()
-            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs(),
+        Ok(metadata) =>
+            metadata
+                .modified()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         Err(_) => 0,
     };
 
@@ -307,22 +302,26 @@ fn create_soundpack_metadata(
         name: soundpack.name.clone(),
         author: Some(soundpack.author.clone()),
         description: soundpack.description.clone(),
-        version: soundpack
-            .version
-            .clone()
-            .unwrap_or_else(|| "1.0".to_string()),
+        version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
         tags: soundpack.tags.clone().unwrap_or_default(),
         keycap: soundpack.keycap.clone(),
         icon: {
-            // Convert icon to base64 data URI, similar to soundpack_cache.rs
+            // Generate dynamic URL for icon instead of base64 conversion
             if let Some(icon_filename) = &soundpack.icon {
                 let icon_path = format!("{}/{}", soundpack_path, icon_filename);
                 if std::path::Path::new(&icon_path).exists() {
-                    // Convert to base64 data URI for Dioxus WebView
-                    match convert_image_to_data_uri(&icon_path) {
-                        Ok(data_uri) => Some(data_uri),
-                        Err(_) => Some(String::new()),
-                    }
+                    // Create dynamic URL that will be served by the asset handler
+                    Some(
+                        format!(
+                            "/soundpack-images/{}/{}",
+                            std::path::Path
+                                ::new(soundpack_path)
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .unwrap_or("unknown"),
+                            icon_filename
+                        )
+                    )
                 } else {
                     Some(String::new()) // Empty string if icon file not found
                 }
@@ -332,7 +331,8 @@ fn create_soundpack_metadata(
         },
         mouse: soundpack.mouse, // Include the mouse field
         last_modified,
-        last_accessed: std::time::SystemTime::now()
+        last_accessed: std::time::SystemTime
+            ::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs(),
@@ -344,41 +344,9 @@ fn create_soundpack_metadata(
     })
 }
 
-// Helper function to convert image files to base64 data URIs for WebView compatibility
-fn convert_image_to_data_uri(image_path: &str) -> Result<String, String> {
-    // Read the image file
-    let image_data =
-        std::fs::read(image_path).map_err(|e| format!("Failed to read image file: {}", e))?;
-
-    // Determine MIME type based on file extension
-    let mime_type = match std::path::Path::new(image_path)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_lowercase())
-        .as_deref()
-    {
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("png") => "image/png",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        Some("avif") => "image/avif",
-        Some("svg") => "image/svg+xml",
-        Some("bmp") => "image/bmp",
-        Some("ico") => "image/x-icon",
-        _ => "image/png", // Default fallback
-    };
-
-    // Convert to base64
-    let base64_data =
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_data);
-
-    // Create data URI
-    Ok(format!("data:{};base64,{}", mime_type, base64_data))
-}
-
 fn create_key_mappings(
     soundpack: &SoundPack,
-    _samples: &[f32],
+    _samples: &[f32]
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
     let mut key_mappings = std::collections::HashMap::new();
 
@@ -400,7 +368,7 @@ fn create_key_mappings(
 
 fn create_mouse_mappings(
     soundpack: &SoundPack,
-    _samples: &[f32],
+    _samples: &[f32]
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
     let mut mouse_mappings = std::collections::HashMap::new();
 

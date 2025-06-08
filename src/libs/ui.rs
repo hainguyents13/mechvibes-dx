@@ -11,6 +11,7 @@ use crate::{ debug_print, always_eprint };
 
 use dioxus::prelude::*;
 use dioxus_router::prelude::Router;
+use dioxus::desktop::{ use_asset_handler, wry::http::Response };
 use notify_rust::Notification;
 use std::sync::Arc;
 
@@ -178,7 +179,71 @@ pub fn app() -> Element {
                 }
             }
         });
-    }
+    } // Set up asset handler for serving soundpack images
+    use_asset_handler("soundpack-images", |request, response| {
+        let request_path = request.uri().path();
+
+        // Parse the path: /soundpack-images/{soundpack_id}/{filename}
+        let path_parts: Vec<&str> = request_path.trim_start_matches('/').split('/').collect();
+
+        if path_parts.len() == 3 && path_parts[0] == "soundpack-images" {
+            let soundpack_id = path_parts[1];
+            let filename = path_parts[2];
+
+            // Get the soundpack directory path using the correct function
+            let soundpacks_path = std::path::PathBuf::from(
+                crate::state::paths::utils::get_soundpacks_dir_absolute()
+            );
+            let image_path = soundpacks_path.join(soundpack_id).join(filename);
+
+            if image_path.exists() {
+                // Read the file and determine content type
+                match std::fs::read(&image_path) {
+                    Ok(data) => {
+                        let mut response_builder = Response::builder();
+
+                        let content_type = match
+                            image_path.extension().and_then(|ext| ext.to_str())
+                        {
+                            Some("png") => "image/png",
+                            Some("jpg") | Some("jpeg") => "image/jpeg",
+                            Some("gif") => "image/gif",
+                            Some("svg") => "image/svg+xml",
+                            Some("webp") => "image/webp",
+                            Some("ico") => "image/x-icon",
+                            _ => "application/octet-stream",
+                        };
+
+                        response_builder = response_builder
+                            .header("Content-Type", content_type)
+                            .header("Cache-Control", "public, max-age=3600");
+
+                        if let Ok(http_response) = response_builder.body(data) {
+                            response.respond(http_response);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        debug_print!(
+                            "❌ Failed to read soundpack image file {:?}: {}",
+                            image_path,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        // Return 404 for invalid paths or missing files
+        if
+            let Ok(not_found_response) = Response::builder()
+                .status(404)
+                .header("Content-Type", "text/plain")
+                .body(b"Not Found".to_vec())
+        {
+            response.respond(not_found_response);
+        }
+    });
 
     rsx! {
         // prettier-ignore

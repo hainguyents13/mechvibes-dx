@@ -1,11 +1,11 @@
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
-use lucide_dioxus::{Volume2, VolumeOff};
+use lucide_dioxus::{ Volume2, VolumeOff };
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum VolumeType {
     Keyboard, // Controls enable_keyboard_sound
-    Mouse,    // Controls enable_mouse_sound
+    Mouse, // Controls enable_mouse_sound
 }
 
 #[component]
@@ -14,7 +14,7 @@ fn VolumeSliderBase(
     on_change: Option<EventHandler<f32>>,
     id: String,
     label_text: Option<String>,
-    volume_type: VolumeType,
+    volume_type: VolumeType
 ) -> Element {
     // Use shared config hook for enable_sound
     let (config, update_config) = use_config();
@@ -48,7 +48,7 @@ fn VolumeSliderBase(
             r#type: "range",
             min: 0.0,
             max: 1.0,
-            step: 0.05,
+            step: 0.01,
             id: "{id}",
             value: volume(),
             disabled: !enable_sound(),

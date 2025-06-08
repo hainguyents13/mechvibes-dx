@@ -1,7 +1,7 @@
 use crate::state::paths;
 use crate::state::soundpack::SoundpackMetadata;
 use crate::utils::config_converter;
-use crate::utils::soundpack_validator::{validate_soundpack_config, SoundpackValidationStatus};
+use crate::utils::soundpack_validator::{ validate_soundpack_config, SoundpackValidationStatus };
 use std::fs;
 
 /// Load soundpack metadata from config.json
@@ -12,13 +12,11 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
     let validation_result = validate_soundpack_config(&config_path);
 
     // If it's a V1 config that can be converted, auto-convert it
-    if validation_result.status == SoundpackValidationStatus::VersionOneNeedsConversion
-        && validation_result.can_be_converted
+    if
+        validation_result.status == SoundpackValidationStatus::VersionOneNeedsConversion &&
+        validation_result.can_be_converted
     {
-        println!(
-            "🔄 Auto-converting V1 soundpack '{}' to V2 format",
-            soundpack_id
-        );
+        println!("🔄 Auto-converting V1 soundpack '{}' to V2 format", soundpack_id);
 
         // Create backup of original config
         let backup_path = format!("{}.v1.backup", config_path);
@@ -41,11 +39,13 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
         }
     }
 
-    let content =
-        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {}", e))?;
+    let content = fs
+        ::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let config: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))?;
+    let config: serde_json::Value = serde_json
+        ::from_str(&content)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
 
     let name = config
         .get("name")
@@ -73,8 +73,9 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
     let final_validation = validate_soundpack_config(&config_path);
 
     // Get file stats
-    let metadata =
-        fs::metadata(&config_path).map_err(|e| format!("Failed to get metadata: {}", e))?;
+    let metadata = fs
+        ::metadata(&config_path)
+        .map_err(|e| format!("Failed to get metadata: {}", e))?;
 
     Ok(SoundpackMetadata {
         id: soundpack_id.to_string(),
@@ -95,7 +96,7 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
         icon: {
-            // Check if icon file exists and convert to base64 data URI or empty string
+            // Generate dynamic asset URL
             if let Some(icon_filename) = config.get("icon").and_then(|v| v.as_str()) {
                 let icon_path = format!(
                     "{}/{}",
@@ -109,22 +110,12 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
                     std::path::Path::new(&icon_path).exists()
                 );
                 if std::path::Path::new(&icon_path).exists() {
-                    // Convert to base64 data URI for Dioxus WebView
-                    match convert_image_to_data_uri(&icon_path) {
-                        Ok(data_uri) => {
-                            println!("✅ Icon converted to data URI for {}", soundpack_id);
-                            Some(data_uri)
-                        }
-                        Err(e) => {
-                            println!("❌ Failed to convert icon for {}: {}", soundpack_id, e);
-                            Some(String::new())
-                        }
-                    }
+                    // Generate dynamic asset URL instead of base64 data URI
+                    let asset_url = format!("/soundpack-images/{}/{}", soundpack_id, icon_filename);
+                    println!("✅ Generated asset URL for {}: {}", soundpack_id, asset_url);
+                    Some(asset_url)
                 } else {
-                    println!(
-                        "❌ Icon not found for {}, setting empty string",
-                        soundpack_id
-                    );
+                    println!("❌ Icon not found for {}, setting empty string", soundpack_id);
                     Some(String::new()) // Empty string if icon file not found
                 }
             } else {
@@ -157,36 +148,4 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
         },
         can_be_converted: final_validation.can_be_converted,
     })
-}
-
-/// Convert image file to base64 data URI for WebView compatibility
-pub fn convert_image_to_data_uri(image_path: &str) -> Result<String, String> {
-    // Read the image file
-    let image_data =
-        fs::read(image_path).map_err(|e| format!("Failed to read image file: {}", e))?;
-
-    // Determine MIME type based on file extension
-    let mime_type = match std::path::Path::new(image_path)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_lowercase())
-        .as_deref()
-    {
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("png") => "image/png",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        Some("avif") => "image/avif",
-        Some("svg") => "image/svg+xml",
-        Some("bmp") => "image/bmp",
-        Some("ico") => "image/x-icon",
-        _ => "image/png", // Default fallback
-    };
-
-    // Convert to base64
-    let base64_data =
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_data);
-
-    // Create data URI
-    Ok(format!("data:{};base64,{}", mime_type, base64_data))
 }
