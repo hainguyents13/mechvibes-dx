@@ -179,38 +179,14 @@ fn create_concatenated_audio_and_segments(
         for sound_file in &unique_files {
             if let Some(&duration) = file_durations.get(sound_file) {
                 file_segments.insert(sound_file.clone(), (current_position, duration));
-                println!(
-                    "🎵 Segment '{}': [{:.1}ms - {:.1}ms] (duration: {:.1}ms)",
-                    sound_file,
-                    current_position,
-                    current_position + duration,
-                    duration
-                );
-                println!(
-                    "Segment '{}': [{:.1}ms - {:.1}ms] (duration: {:.1}ms)",
-                    sound_file,
-                    current_position,
-                    current_position + duration,
-                    duration
-                );
                 current_position += duration;
             }
-        } // Step 5: Map keys to their corresponding segments
+        }
+
+        // Step 5: Map keys to their corresponding segments
         for (key_name, sound_file) in sound_files {
             if let Some(&(start, duration)) = file_segments.get(sound_file) {
-                println!(
-                    "🔗 Mapping key '{}' to segment: start={}, duration={}",
-                    key_name,
-                    start,
-                    duration
-                );
                 segments.insert(key_name.clone(), (start, duration));
-                println!(
-                    "🔗 Mapping key '{}' to segment: start={}, duration={}",
-                    key_name,
-                    start,
-                    duration
-                );
             } else {
                 // Fallback for missing files
                 println!("⚠️ Fallback for missing file '{}', using default (0.0, 100.0)", sound_file);
@@ -218,10 +194,6 @@ fn create_concatenated_audio_and_segments(
             }
         }
 
-        println!(
-            "✅ Created concatenated audio file with {:.1}ms total duration",
-            current_position
-        );
         println!(
             "✅ Created concatenated audio file with {:.1}ms total duration",
             current_position
@@ -254,7 +226,7 @@ fn create_concatenated_audio_file(
     // Process each unique file
     for (index, sound_file) in unique_files.iter().enumerate() {
         let file_path = format!("{}/{}", soundpack_dir, sound_file);
-        println!("🔍 Processing file: {} + {}", soundpack_dir, file_path);
+        println!("🔍 Processing file:  {}", file_path);
 
         if !Path::new(&file_path).exists() {
             println!("⚠️ Skipping missing file: {}", file_path);
@@ -306,14 +278,43 @@ fn create_concatenated_audio_file(
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,
     };
-    let mut writer = hound::WavWriter::create(output_path, spec)?;
-    let total_samples = all_samples.len();
 
-    for sample in &all_samples {
-        writer.write_sample(*sample)?;
+    println!("🚧 Creating WAV file at: {}", output_path);
+
+    let mut writer = match hound::WavWriter::create(output_path, spec) {
+        Ok(writer) => writer,
+        Err(e) => {
+            println!("❌ Failed to create WAV writer for {}: {}", output_path, e);
+            return Err(format!("Failed to create WAV writer: {}", e).into());
+        }
+    };
+
+    let total_samples = all_samples.len();
+    println!("📝 Writing {} samples to WAV file...", total_samples);
+
+    // Write samples with error handling
+    for (index, sample) in all_samples.iter().enumerate() {
+        if let Err(e) = writer.write_sample(*sample) {
+            println!("❌ Failed to write sample {} to WAV file: {}", index, e);
+            return Err(format!("Failed to write sample {} to WAV file: {}", index, e).into());
+        }
+
+        // Progress indicator for large files
+        if index > 0 && index % 100000 == 0 {
+            println!(
+                "📝 Written {}/{} samples ({:.1}%)",
+                index,
+                total_samples,
+                ((index as f64) / (total_samples as f64)) * 100.0
+            );
+        }
     }
 
-    writer.finalize()?;
+    // Finalize the WAV file with error handling
+    if let Err(e) = writer.finalize() {
+        println!("❌ Failed to finalize WAV file {}: {}", output_path, e);
+        return Err(format!("Failed to finalize WAV file: {}", e).into());
+    }
 
     println!("🎵 Successfully created concatenated audio file: {}", output_path);
     println!(
@@ -443,7 +444,9 @@ pub fn convert_v1_to_v2(
     converted_config.insert(
         "config_version".to_string(),
         Value::Number(serde_json::Number::from(2))
-    ); // Handle source field and multi-method audio processing
+    );
+
+    // Handle source field and multi-method audio processing
     let output_audio_filename = if method == "multi" {
         // For multi method, always use combined_audio.wav
         "combined_audio.wav".to_string()
@@ -480,11 +483,8 @@ pub fn convert_v1_to_v2(
             }
 
             // Create concatenated audio and get segment mappings
-            let output_dir = Path::new(output_path)
-                .parent()
-                .and_then(|p| p.to_str())
-                .ok_or("Could not determine output directory")?;
-            let output_audio_path = format!("{}/{}", output_dir, output_audio_filename);
+            // Write the audio file to the soundpack directory
+            let output_audio_path = format!("{}/{}", soundpack_dir, output_audio_filename);
 
             match
                 create_concatenated_audio_and_segments(
@@ -507,12 +507,6 @@ pub fn convert_v1_to_v2(
                                 if let Some(sound_file_str) = value.as_str() {
                                     if !sound_file_str.is_empty() && sound_file_str != "null" {
                                         if let Some((start, duration)) = segments.get(key_name) {
-                                            println!(
-                                                "🔍 Debug: key={}, start={}, duration={}",
-                                                key_name,
-                                                start,
-                                                duration
-                                            );
                                             let timing = vec![
                                                 Value::Array(
                                                     vec![
@@ -522,12 +516,6 @@ pub fn convert_v1_to_v2(
                                                 )
                                             ];
                                             defs.insert(key_name.clone(), Value::Array(timing));
-                                            println!(
-                                                "Writing to defs: key={}, timing=[{}, {}]",
-                                                key_name,
-                                                start,
-                                                duration
-                                            );
                                         } else {
                                             println!("⚠️ No segment found for key: {}", key_name);
                                         }

@@ -1,10 +1,10 @@
 use crate::{
-    components::ui::{PageHeader, SoundpackImportModal, SoundpackManager, SoundpackTable},
-    state::app::{use_app_state, use_state_trigger},
+    components::ui::{ PageHeader, SoundpackImportModal, SoundpackManager, SoundpackTable },
+    state::app::{ use_app_state, use_state_trigger },
 };
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Keyboard, Mouse, Music, Settings2};
+use lucide_dioxus::{ Keyboard, Mouse, Music, Settings2 };
 use std::sync::Arc;
 
 #[component]
@@ -15,10 +15,7 @@ pub fn Soundpacks() -> Element {
 
     // Get all soundpacks (this will be reactive to app_state changes)
     let all_soundpacks = app_state.get_soundpacks();
-    println!(
-        "🔄 Soundpacks component rendering with {} soundpacks",
-        all_soundpacks.len()
-    );
+    println!("🔄 Soundpacks component rendering with {} soundpacks", all_soundpacks.len());
 
     // Filter soundpacks by type (these will update when all_soundpacks changes)
     let keyboard_soundpacks: Vec<_> = all_soundpacks
@@ -43,7 +40,7 @@ pub fn Soundpacks() -> Element {
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
 
     rsx! {
-      div { class: "p-12 pb-32",
+      div { class: "p-12",
         // Page header
         PageHeader {
           title: "Soundpacks".to_string(),

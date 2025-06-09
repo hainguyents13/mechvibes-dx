@@ -219,6 +219,16 @@ fn handle_config_conversion(
         validation_result.status ==
         crate::utils::soundpack_validator::SoundpackValidationStatus::VersionOneNeedsConversion
     {
+        println!("🔄 Converting V1 soundpack '{}' to V2 format during import", soundpack_id);
+
+        // Create backup of the original V1 config before conversion
+        let config_backup_path = std::path::Path::new(soundpack_dir).join("config.json.v1.backup");
+        if let Err(e) = std::fs::write(&config_backup_path, config_content) {
+            println!("⚠️ Failed to create V1 config backup for {}: {}", soundpack_id, e);
+        } else {
+            println!("💾 Created V1 config backup at: {}", config_backup_path.display());
+        }
+
         // Convert V1 to V2 format
         let temp_input = format!("temp_v1_{}.json", soundpack_id);
         let temp_output = format!("temp_v2_{}.json", soundpack_id);
@@ -238,6 +248,8 @@ fn handle_config_conversion(
                     ::read_to_string(&temp_output)
                     .map_err(|e| format!("Failed to read converted config: {}", e))?;
 
+                println!("✅ Successfully converted {} from V1 to V2 during import", soundpack_id);
+
                 // Clean up temp files
                 let _ = std::fs::remove_file(&temp_input);
                 let _ = std::fs::remove_file(&temp_output);
@@ -246,6 +258,10 @@ fn handle_config_conversion(
                 // Clean up temp files on error
                 let _ = std::fs::remove_file(&temp_input);
                 let _ = std::fs::remove_file(&temp_output);
+
+                // If conversion failed, also remove the backup we created
+                let _ = std::fs::remove_file(&config_backup_path);
+
                 return Err(format!("Failed to convert V1 soundpack: {}", e));
             }
         }

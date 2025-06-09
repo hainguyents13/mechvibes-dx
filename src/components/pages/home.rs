@@ -97,7 +97,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     }
 
     rsx! {
-      div { class: "flex flex-col gap-10 p-16",
+      div { class: "flex flex-col gap-10 p-16 pb-0",
         div { class: "mb-2",
           // Mechvibes logo with animated press effect
           Logo {}
@@ -124,9 +124,12 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               },
             }
           }
-          div { class: "divider" }          div { class: "text-center space-y-2",
+          div { class: "divider" }
+          div { class: "text-center space-y-2",
             // Version
-            div { class: "text-sm text-base-content/70 font-bold", "{APP_NAME_DISPLAY} (Beta)" }
+            div { class: "text-sm text-base-content/70 font-bold",
+              "{APP_NAME_DISPLAY} (Beta)"
+            }
             // Footer with credits
             div { class: "text-sm text-base-content/50",
               span { "Made with " }

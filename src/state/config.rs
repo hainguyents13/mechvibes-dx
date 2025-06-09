@@ -45,12 +45,12 @@ pub struct AppConfig {
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
-    pub enable_logo_customization: bool, // Enable/disable logo customization panel
-    // System settings
+    pub enable_logo_customization: bool, // Enable/disable logo customization panel    // System settings
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
     pub show_notifications: bool,
     pub show_debug_console: bool, // Show/hide debug console window
+    pub landscape_mode: bool, // Enable/disable landscape mode layout
 }
 
 impl AppConfig {
@@ -116,6 +116,7 @@ impl Default for AppConfig {
             start_minimized: false, // Default to not starting minimized
             show_notifications: true,
             show_debug_console: false, // Default debug console disabled
+            landscape_mode: false, // Default landscape mode disabled
         }
     }
 }

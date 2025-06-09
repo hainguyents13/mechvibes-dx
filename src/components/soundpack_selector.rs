@@ -125,7 +125,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
             ),
             disabled: is_loading(),
             onclick: move |_| is_open.set(!is_open()),
-            div { class: "flex items-center gap-3 flex-1",
+            div { class: "flex items-center gap-3 flex-1 ",
               if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
                   if is_loading() {
@@ -146,7 +146,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   }
                 }
                 div { class: "flex-1 min-w-0 text-left",
-                  div { class: "font-medium truncate text-base-content text-sm",
+                  div { class: "font-medium line-clamp-1 text-base-content  text-sm",
                     "{pack.name}"
                   }
                   div { class: "text-xs font-normal truncate text-base-content/50",
@@ -310,7 +310,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                               }
                           }
                       },
-                      div { class: "flex items-center justify-between gap-3",
+                      div { class: "flex items-center justify-between gap-3 ",
                         div { class: "flex-shrink-0 w-10 h-10 rounded-box flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply relative",
                           if let Some(icon) = &pack.icon {
                             if !icon.is_empty() {
@@ -331,10 +331,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           }
                         }
                         div { class: "flex-1 min-w-0",
-                          div { class: "text-xs font-medium truncate text-base-content",
+                          div { class: "text-xs font-medium line-clamp-1 text-base-content",
                             "{pack.name}"
                           }
-                          div { class: "text-xs font-normal truncate text-base-content/50",
+                          div { class: "text-xs font-normal line-clamp-1 text-base-content/50",
                             if let Some(author) = &pack.author {
                               "by {author}"
                             }

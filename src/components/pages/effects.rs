@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Sparkles;
 
-use crate::components::ui::{Collapse, PageHeader, Toggler};
+use crate::components::ui::{ Collapse, PageHeader, Toggler };
 
 #[component]
 pub fn EffectsPage() -> Element {
@@ -20,7 +20,7 @@ pub fn EffectsPage() -> Element {
     let mut crowd_auto_play = use_signal(|| false);
 
     rsx! {
-      div { class: "p-12 pb-32",
+      div { class: "p-12",
         // Page header
         PageHeader {
           title: "Effects".to_string(),
@@ -81,7 +81,6 @@ pub fn EffectsPage() -> Element {
                       lofi_music_enabled.set(new_value);
                   },
                 }
-              
                 // Controls for Lofi Music
                 div { class: "ml-4 flex items-center gap-2",
                   button {
@@ -119,7 +118,6 @@ pub fn EffectsPage() -> Element {
                       rain_sound_enabled.set(new_value);
                   },
                 }
-              
                 // Controls for Rain Sound
                 div { class: "ml-4 flex items-center gap-2",
                   button {
@@ -139,7 +137,6 @@ pub fn EffectsPage() -> Element {
                     size: "xs",
                   }
                 }
-              
                 div { class: "divider" }
                 // Café background noise Toggle
                 Toggler {
@@ -150,7 +147,6 @@ pub fn EffectsPage() -> Element {
                       crowd_noise_enabled.set(new_value);
                   },
                 }
-              
                 // Controls for Crowd Noise
                 div { class: "ml-4 flex items-center gap-2",
                   button {

@@ -1,9 +1,9 @@
 use crate::components::theme_toggler::ThemeToggler;
-use crate::components::ui::{Collapse, ColorPicker, PageHeader, Toggler};
+use crate::components::ui::{ Collapse, ColorPicker, PageHeader, Toggler };
 use crate::utils::config::use_config;
 use crate::utils::delay;
 use dioxus::prelude::*;
-use lucide_dioxus::{Check, Palette, RotateCcw};
+use lucide_dioxus::{ Check, Palette, RotateCcw };
 
 #[component]
 pub fn CustomizePage() -> Element {
@@ -24,7 +24,7 @@ pub fn CustomizePage() -> Element {
     //     });
     // };
     rsx! {
-      div { class: "p-12 pb-32",
+      div { class: "p-12",
         PageHeader {
           title: "Customize".to_string(),
           subtitle: "Vibe it your way!".to_string(),
@@ -155,7 +155,7 @@ fn LogoCustomizationPanel() -> Element {
         ("Warning", "var(--color-warning)"),
         ("Warning Content", "var(--color-warning-content)"),
         ("Error", "var(--color-error)"),
-        ("Error Content", "var(--color-error-content)"),
+        ("Error Content", "var(--color-error-content)")
     ];
     let on_save = {
         let update_config_clone = update_config.clone();
@@ -167,14 +167,16 @@ fn LogoCustomizationPanel() -> Element {
             let muted_bg = muted_background();
             let dimmed = dimmed_when_muted();
 
-            update_config_clone(Box::new(move |cfg| {
-                cfg.logo_customization.border_color = border;
-                cfg.logo_customization.text_color = text;
-                cfg.logo_customization.shadow_color = shadow;
-                cfg.logo_customization.background_color = background;
-                cfg.logo_customization.muted_background = muted_bg;
-                cfg.logo_customization.dimmed_when_muted = dimmed;
-            }));
+            update_config_clone(
+                Box::new(move |cfg| {
+                    cfg.logo_customization.border_color = border;
+                    cfg.logo_customization.text_color = text;
+                    cfg.logo_customization.shadow_color = shadow;
+                    cfg.logo_customization.background_color = background;
+                    cfg.logo_customization.muted_background = muted_bg;
+                    cfg.logo_customization.dimmed_when_muted = dimmed;
+                })
+            );
             saving.set(true);
             spawn(async move {
                 delay::Delay::ms(500).await;
@@ -191,9 +193,11 @@ fn LogoCustomizationPanel() -> Element {
         muted_background.set(default_logo.muted_background.clone());
         dimmed_when_muted.set(default_logo.dimmed_when_muted);
 
-        update_config(Box::new(move |cfg| {
-            cfg.logo_customization = default_logo;
-        }));
+        update_config(
+            Box::new(move |cfg| {
+                cfg.logo_customization = default_logo;
+            })
+        );
     }; // Update local state when config changes
     use_effect(move || {
         let logo = logo_customization();

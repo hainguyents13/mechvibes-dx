@@ -25,7 +25,9 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             let error_msg = format!("Failed to create backup for {}: {}", soundpack_id, e);
             println!("⚠️  {}", error_msg);
             last_error = Some(error_msg);
-        } // Convert V1 to V2
+        }
+
+        // Convert V1 to V2
         match config_converter::convert_v1_to_v2(&config_path, &config_path, None) {
             Ok(()) => {
                 println!("✅ Successfully converted {} from V1 to V2", soundpack_id);

@@ -6,7 +6,7 @@ mod libs;
 mod state;
 mod utils;
 
-use dioxus::desktop::{ Config, LogicalPosition, LogicalSize, WindowBuilder };
+use dioxus::desktop::{ Config, LogicalSize, WindowBuilder };
 use dioxus::prelude::*;
 use libs::protocol;
 use utils::constants::{ APP_NAME, APP_PROTOCOL_URL };
@@ -15,6 +15,9 @@ use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
 use libs::input_manager::init_input_channels;
 use std::sync::mpsc;
+
+#[cfg(windows)]
+use winapi::um::winuser::{ GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN };
 
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
@@ -41,6 +44,41 @@ fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
             None
         }
     }
+}
+
+#[cfg(windows)]
+fn get_screen_size() -> (i32, i32) {
+    unsafe {
+        let width = GetSystemMetrics(SM_CXSCREEN);
+        let height = GetSystemMetrics(SM_CYSCREEN);
+        (width, height)
+    }
+}
+
+#[cfg(not(windows))]
+fn get_screen_size() -> (i32, i32) {
+    // Default fallback for non-Windows platforms
+    (1920, 1080)
+}
+
+fn calculate_window_size() -> LogicalSize<f64> {
+    let (screen_width, screen_height) = get_screen_size();
+    debug_print!("🖥️ Detected screen size: {}x{}", screen_width, screen_height);
+
+    // Default app dimensions
+    let default_width = 500.0;
+    let default_height = 850.0;
+
+    // Calculate appropriate size based on screen dimensions
+    let (scale_w, scale_h) = if screen_height <= 720 {
+        (1.0, 0.7) // Small screens (720p or smaller) - make app smaller
+    } else if screen_height <= 1080 {
+        (1.0, 0.8) // Medium screens (1080p) - slightly smaller
+    } else {
+        (1.0, 1.0) // Large screens (1440p and above) - default size
+    };
+
+    LogicalSize::new(default_width * scale_w, default_height * scale_h)
 }
 
 fn main() {
@@ -114,16 +152,16 @@ fn main() {
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx);
 
-    // Create a WindowBuilder with custom appearance
+    // Create a WindowBuilder with custom appearance and responsive sizing
+    let window_size = calculate_window_size();
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(false) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_position(LogicalPosition::new(1700.0, 300.0))
-        .with_inner_size(LogicalSize::new(500.0, 850.0))
+        .with_inner_size(window_size)
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
-        .with_resizable(false) // Disable window resizing
+        .with_resizable(false) // Enable window resizing for landscape mode
         .with_visible(!should_start_minimized) // Hide window if starting minimized
         .with_window_icon(load_icon()); // Set window icon for taskbar
 
@@ -136,6 +174,6 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-        ui::app {}
+      ui::app {}
     }
 }
