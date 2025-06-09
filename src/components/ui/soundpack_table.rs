@@ -1,10 +1,10 @@
 use crate::state::paths;
 use crate::state::soundpack::SoundpackMetadata;
-use crate::state::{app::use_state_trigger, paths::utils::open_path};
-use crate::utils::path;
+use crate::state::{ app::use_state_trigger };
+use crate::utils::path::{ open_path, directory_exists };
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{FolderOpen, Music, Plus, Trash};
+use lucide_dioxus::{ FolderOpen, Music, Plus, Trash };
 
 use super::ConfirmDeleteModal;
 
@@ -19,12 +19,13 @@ fn delete_soundpack(soundpack_id: &str) -> Result<(), String> {
     let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
 
     // Check if the directory exists
-    if !path::directory_exists(&soundpack_path) {
+    if !directory_exists(&soundpack_path) {
         return Err(format!("Soundpack directory not found: {}", soundpack_path));
     }
 
     // Remove the entire directory
-    std::fs::remove_dir_all(&soundpack_path)
+    std::fs
+        ::remove_dir_all(&soundpack_path)
         .map_err(|e| format!("Failed to delete soundpack directory: {}", e))?;
 
     println!("🗑️ Successfully deleted soundpack: {}", soundpack_id);
@@ -35,7 +36,7 @@ fn delete_soundpack(soundpack_id: &str) -> Result<(), String> {
 pub fn SoundpackTable(
     soundpacks: Vec<SoundpackMetadata>,
     soundpack_type: &'static str,
-    on_add_click: Option<EventHandler<MouseEvent>>,
+    on_add_click: Option<EventHandler<MouseEvent>>
 ) -> Element {
     // Search state
     let mut search_query = use_signal(String::new);
@@ -48,65 +49,59 @@ pub fn SoundpackTable(
         soundpacks
             .iter()
             .filter(|pack| {
-                pack.name.to_lowercase().contains(&query)
-                    || pack.id.to_lowercase().contains(&query)
-                    || pack
-                        .author
+                pack.name.to_lowercase().contains(&query) ||
+                    pack.id.to_lowercase().contains(&query) ||
+                    pack.author
                         .as_ref()
-                        .map_or(false, |author| author.to_lowercase().contains(&query))
-                    || pack
-                        .tags
-                        .iter()
-                        .any(|tag| tag.to_lowercase().contains(&query))
+                        .map_or(false, |author| author.to_lowercase().contains(&query)) ||
+                    pack.tags.iter().any(|tag| tag.to_lowercase().contains(&query))
             })
             .cloned()
             .collect()
     };
 
-    if soundpacks.is_empty() {
-        rsx! {
-          div { class: "p-4 text-center text-base-content/70",
-            "No {soundpack_type} soundpack found!"
+    rsx! {
+      div { class: "space-y-4",
+        // Search field
+        div { class: "flex items-center px-3 gap-2",
+          input {
+            class: "input w-full",
+            placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
+            value: "{search_query}",
+            oninput: move |evt| search_query.set(evt.value()),
+          }
+          if let Some(add_handler) = on_add_click {
+            button {
+              class: "btn btn-neutral",
+              onclick: move |evt| add_handler.call(evt),
+              Plus { class: "w-4 h-4 mr-2" }
+              "Add"
+            }
           }
         }
-    } else {
-        rsx! {
-          div { class: "space-y-4",
-            // Search field
-            div { class: "flex items-center px-3 gap-2",
-              input {
-                class: "input w-full",
-                placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
-                value: "{search_query}",
-                oninput: move |evt| search_query.set(evt.value()),
+        if soundpacks.is_empty() {
+          div { class: "p-4 text-center text-sm text-base-content/70",
+            "No {soundpack_type} soundpack found!"
+          }
+        } else {
+          // Table
+          div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
+            if filtered_soundpacks.is_empty() {
+              div { class: "p-4 text-center text-sm text-base-content/70",
+                "No result match your search!"
               }
-              if let Some(add_handler) = on_add_click {
-                button {
-                  class: "btn btn-neutral",
-                  onclick: move |evt| add_handler.call(evt),
-                  Plus { class: "w-4 h-4 mr-2" }
-                  "Add"
-                }
-              }
-            }
-            // Table
-            div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
-              if filtered_soundpacks.is_empty() {
-                div { class: "p-4 text-center text-base-content/70",
-                  "No result match your search!"
-                }
-              } else {
-                table { class: "table table-sm w-full",
-                  tbody {
-                    for pack in filtered_soundpacks {
-                      SoundpackTableRow { soundpack: pack }
-                    }
+            } else {
+              table { class: "table table-sm w-full",
+                tbody {
+                  for pack in filtered_soundpacks {
+                    SoundpackTableRow { soundpack: pack }
                   }
                 }
               }
             }
           }
         }
+      }
     }
 }
 
@@ -121,14 +116,10 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             let soundpack_id = soundpack_id.clone();
             spawn(async move {
                 match open_soundpack_folder(&soundpack_id) {
-                    Ok(_) => println!(
-                        "✅ Successfully opened folder for soundpack: {}",
-                        soundpack_id
-                    ),
-                    Err(e) => eprintln!(
-                        "❌ Failed to open folder for soundpack {}: {}",
-                        soundpack_id, e
-                    ),
+                    Ok(_) =>
+                        println!("✅ Successfully opened folder for soundpack: {}", soundpack_id),
+                    Err(e) =>
+                        eprintln!("❌ Failed to open folder for soundpack {}: {}", soundpack_id, e),
                 }
             });
         }

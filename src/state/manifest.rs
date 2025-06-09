@@ -1,6 +1,7 @@
 use crate::state::paths;
 use crate::{ debug_print, always_eprint };
 use crate::utils::platform;
+use crate::utils;
 use crate::utils::constants::{ APP_NAME_DISPLAY, APP_VERSION };
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
@@ -67,8 +68,8 @@ impl AppManifest {
                 config: paths::data::config_json().to_string_lossy().to_string(),
                 themes: paths::data::themes_json().to_string_lossy().to_string(),
                 soundpack_cache: paths::data::soundpack_cache_json().to_string_lossy().to_string(),
-                soundpacks_dir: paths::utils::get_soundpacks_dir_absolute(),
-                data_dir: paths::utils::get_data_dir_absolute(),
+                soundpacks_dir: utils::path::get_soundpacks_dir_absolute(),
+                data_dir: utils::path::get_data_dir_absolute(),
             },
             metadata: Metadata {
                 created_at: Utc::now(),

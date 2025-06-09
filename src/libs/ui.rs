@@ -6,6 +6,7 @@ use crate::libs::input_manager::get_input_channels;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
+use crate::utils::path;
 use crate::utils::constants::APP_NAME;
 use crate::{ debug_print, always_eprint };
 
@@ -79,7 +80,9 @@ pub fn app() -> Element {
                 }
             }
         });
-    } // Process mouse events and play sounds
+    }
+
+    // Process mouse events and play sounds
     {
         let ctx = audio_context.clone();
         let mouse_rx = mouse_rx.clone();
@@ -104,7 +107,9 @@ pub fn app() -> Element {
                 }
             }
         });
-    } // Process hotkey Ctrl+Alt+M to toggle global sound
+    }
+
+    // Process hotkey Ctrl+Alt+M to toggle global sound
     {
         let hotkey_rx = hotkey_rx.clone();
 
@@ -179,7 +184,9 @@ pub fn app() -> Element {
                 }
             }
         });
-    } // Set up asset handler for serving soundpack images
+    }
+
+    // Set up asset handler for serving soundpack images
     use_asset_handler("soundpack-images", |request, response| {
         let request_path = request.uri().path();
 
@@ -191,9 +198,7 @@ pub fn app() -> Element {
             let filename = path_parts[2];
 
             // Get the soundpack directory path using the correct function
-            let soundpacks_path = std::path::PathBuf::from(
-                crate::state::paths::utils::get_soundpacks_dir_absolute()
-            );
+            let soundpacks_path = std::path::PathBuf::from(path::get_soundpacks_dir_absolute());
             let image_path = soundpacks_path.join(soundpack_id).join(filename);
 
             if image_path.exists() {
@@ -246,10 +251,10 @@ pub fn app() -> Element {
     });
 
     rsx! {
-        // prettier-ignore
-        WindowController {}
-        // prettier-ignore
-        Header {}
-        Router::<Route> {}
+      // prettier-ignore
+      WindowController {}
+      // prettier-ignore
+      Header {}
+      Router::<Route> {}
     }
 }

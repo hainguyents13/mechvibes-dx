@@ -111,9 +111,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
         if !id.trim().is_empty() {
             soundpack_id = id.to_string();
         }
-    }
-
-    // If no ID in config, generate a UUID-based ID
+    } // If no ID in config, generate a UUID-based ID
     if soundpack_id.is_empty() {
         soundpack_id = format!("imported-{}", Uuid::new_v4());
 
@@ -121,9 +119,8 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
         config["id"] = Value::String(soundpack_id.clone());
     }
 
-    // Handle V1 to V2 conversion if needed
-    let final_config_content = handle_config_conversion(&config.to_string(), &soundpack_id)?; // Determine installation directory using soundpack ID
-    let soundpacks_dir = crate::state::paths::utils::get_soundpacks_dir_absolute();
+    // Determine installation directory using soundpack ID
+    let soundpacks_dir = path::get_soundpacks_dir_absolute();
     let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);
 
     // Create installation directory
@@ -131,7 +128,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
         ::ensure_directory_exists(&install_dir.to_string_lossy())
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
-    // Second pass: extract all files
+    // Extract all files
     let mut archive = ZipArchive::new(
         File::open(file_path).map_err(|e| format!("Failed to reopen ZIP: {}", e))?
     ).map_err(|e| format!("Failed to reread ZIP archive: {}", e))?;
@@ -158,7 +155,9 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
             }
         } else {
             install_dir.join(&file_path)
-        }; // Create parent directories if needed
+        };
+
+        // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
             path
                 ::ensure_directory_exists(&parent.to_string_lossy())
@@ -172,8 +171,16 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
         std::io
             ::copy(&mut file, &mut output_file)
             .map_err(|e| format!("Failed to extract file: {}", e))?;
-    }
-    // Write the final config.json at the root level of the soundpack directory
+    } // Now handle V1 to V2 conversion after files are extracted
+    println!(
+        "🔧 Converting config after file extraction - soundpack_dir: {}",
+        install_dir.to_string_lossy()
+    );
+    let final_config_content = handle_config_conversion(
+        &config.to_string(),
+        &soundpack_id,
+        &install_dir.to_string_lossy()
+    )?; // Write the final config.json at the root level of the soundpack directory
     let config_path = install_dir.join("config.json");
     path
         ::write_file_contents(&config_path.to_string_lossy(), &final_config_content)
@@ -186,7 +193,11 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 }
 
 /// Handle V1 to V2 config conversion if needed
-fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<String, String> {
+fn handle_config_conversion(
+    config_content: &str,
+    soundpack_id: &str,
+    soundpack_dir: &str
+) -> Result<String, String> {
     // Write the config content to a temporary file so we can validate it
     let temp_validate_file = format!("temp_validate_{}.json", soundpack_id);
     std::fs
@@ -202,6 +213,8 @@ fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<
 
     let mut final_config_content = config_content.to_string();
 
+    println!("⚒️ Soundpack validation result: {:?}", validation_result);
+
     if
         validation_result.status ==
         crate::utils::soundpack_validator::SoundpackValidationStatus::VersionOneNeedsConversion
@@ -213,8 +226,13 @@ fn handle_config_conversion(config_content: &str, soundpack_id: &str) -> Result<
         std::fs
             ::write(&temp_input, config_content)
             .map_err(|e| format!("Failed to write temp config: {}", e))?;
-
-        match crate::utils::config_converter::convert_v1_to_v2(&temp_input, &temp_output) {
+        match
+            crate::utils::config_converter::convert_v1_to_v2(
+                &temp_input,
+                &temp_output,
+                Some(soundpack_dir)
+            )
+        {
             Ok(()) => {
                 final_config_content = std::fs
                     ::read_to_string(&temp_output)

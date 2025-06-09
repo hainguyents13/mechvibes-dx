@@ -7,6 +7,7 @@ use std::fs;
 /// Load soundpack metadata from config.json
 pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, String> {
     let config_path = paths::soundpacks::config_json(soundpack_id);
+    let mut last_error: Option<String> = None;
 
     // Validate the soundpack configuration first
     let validation_result = validate_soundpack_config(&config_path);
@@ -21,20 +22,23 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
         // Create backup of original config
         let backup_path = format!("{}.v1.backup", config_path);
         if let Err(e) = fs::copy(&config_path, &backup_path) {
-            println!("⚠️  Failed to create backup for {}: {}", soundpack_id, e);
-        }
-
-        // Convert V1 to V2
-        match config_converter::convert_v1_to_v2(&config_path, &config_path) {
+            let error_msg = format!("Failed to create backup for {}: {}", soundpack_id, e);
+            println!("⚠️  {}", error_msg);
+            last_error = Some(error_msg);
+        } // Convert V1 to V2
+        match config_converter::convert_v1_to_v2(&config_path, &config_path, None) {
             Ok(()) => {
                 println!("✅ Successfully converted {} from V1 to V2", soundpack_id);
             }
             Err(e) => {
-                println!("❌ Failed to convert {} from V1 to V2: {}", soundpack_id, e);
+                let error_msg = format!("Failed to convert {} from V1 to V2: {}", soundpack_id, e);
+                println!("❌ {}", error_msg);
                 // Restore backup if conversion failed
                 if fs::copy(&backup_path, &config_path).is_ok() {
                     println!("🔙 Restored original config from backup");
                 }
+                // Return error for conversion failure
+                return Err(error_msg);
             }
         }
     }
@@ -147,5 +151,7 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             }
         },
         can_be_converted: final_validation.can_be_converted,
+        // Error tracking - clear error if we successfully loaded metadata
+        last_error: last_error,
     })
 }

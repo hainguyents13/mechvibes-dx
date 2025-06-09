@@ -46,11 +46,7 @@ pub mod soundpacks {
 
     /// Get soundpack directory path for a specific soundpack ID
     pub fn soundpack_dir(soundpack_id: &str) -> String {
-        get_app_root()
-            .join("soundpacks")
-            .join(soundpack_id)
-            .to_string_lossy()
-            .to_string()
+        get_app_root().join("soundpacks").join(soundpack_id).to_string_lossy().to_string()
     }
 
     /// Get config.json path for a specific soundpack
@@ -61,35 +57,5 @@ pub mod soundpacks {
             .join("config.json")
             .to_string_lossy()
             .to_string()
-    }
-}
-
-/// Legacy compatibility functions - delegate to new utility modules
-pub mod utils {    // Delegate to new utility modules for backward compatibility
-    pub fn count_soundpacks_by_type() -> (usize, usize) {
-        crate::utils::path::count_soundpacks_by_type()
-    }
-
-    pub fn data_dir_exists() -> bool {
-        crate::utils::path::data_dir_exists()
-    }
-
-    pub fn config_file_exists() -> bool {
-        crate::utils::path::config_file_exists()
-    }
-    pub fn open_path(path_to_open: &str) -> Result<(), String> {
-        crate::utils::path::open_path(path_to_open)
-    }
-
-    pub fn get_data_dir_absolute() -> String {
-        crate::utils::path::get_data_dir_absolute()
-    }
-
-    pub fn get_config_file_absolute() -> String {
-        crate::utils::path::get_config_file_absolute()
-    }
-
-    pub fn get_soundpacks_dir_absolute() -> String {
-        crate::utils::path::get_soundpacks_dir_absolute()
     }
 }

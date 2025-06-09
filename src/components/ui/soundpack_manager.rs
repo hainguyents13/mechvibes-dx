@@ -1,7 +1,8 @@
-use crate::state::{app::use_app_state, paths};
+use crate::state::{ app::use_app_state };
 use dioxus::prelude::*;
-use lucide_dioxus::{ExternalLink, FolderOpen, RefreshCcw};
+use lucide_dioxus::{ ExternalLink, FolderOpen, RefreshCcw };
 use std::sync::Arc;
+use crate::utils;
 
 #[component]
 pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
@@ -51,9 +52,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     };
 
     // Count soundpacks
-    let (soundpack_count_keyboard, soundpack_count_mouse) =
-        paths::utils::count_soundpacks_by_type();
-    let soundpacks_dir_absolute = paths::utils::get_soundpacks_dir_absolute();
+    let (soundpack_count_keyboard, soundpack_count_mouse) = utils::path::count_soundpacks_by_type();
+    let soundpacks_dir_absolute = utils::path::get_soundpacks_dir_absolute();
 
     rsx! {
       div { class: "space-y-4",
@@ -128,7 +128,7 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
           button {
             class: "btn btn-soft btn-sm",
             onclick: move |_| {
-                let _ = paths::utils::open_path(&soundpacks_dir_absolute.clone());
+                let _ = utils::path::open_path(&soundpacks_dir_absolute.clone());
             },
             FolderOpen { class: "w-4 h-4 mr-1" }
             "Open"

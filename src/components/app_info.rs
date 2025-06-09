@@ -1,4 +1,9 @@
-use crate::state::paths;
+use crate::utils::path::{
+    get_data_dir_absolute,
+    get_config_file_absolute,
+    data_dir_exists,
+    config_file_exists,
+};
 use crate::{ debug_print, always_eprint };
 use crate::utils::path;
 use dioxus::prelude::*;
@@ -29,12 +34,12 @@ pub fn AppInfoDisplay() -> Element {
         .unwrap_or_else(|_| "Unknown".to_string());
 
     // Get absolute paths for directories and files
-    let data_dir_absolute = paths::utils::get_data_dir_absolute();
-    let config_file_absolute = paths::utils::get_config_file_absolute();
+    let data_dir_absolute = get_data_dir_absolute();
+    let config_file_absolute = get_config_file_absolute();
 
     // Check file/directory existence
-    let data_dir_exists = paths::utils::data_dir_exists();
-    let config_file_exists = paths::utils::config_file_exists();
+    let data_dir_exists = data_dir_exists();
+    let config_file_exists = config_file_exists();
 
     // Get OS info
     let os = env::consts::OS;
@@ -102,7 +107,8 @@ pub fn AppInfoDisplay() -> Element {
         // Open App Directory Button
         div {
           button {
-            class: "btn btn-soft btn-sm",            onclick: move |_| {
+            class: "btn btn-soft btn-sm",
+            onclick: move |_| {
                 spawn(async move {
                     match open_app_directory() {
                         Ok(_) => debug_print!("✅ Successfully opened app directory"),

@@ -185,6 +185,8 @@ pub fn SoundpackImportModal(
                 current_step.set(ImportStep::Installing);
                 delay::Delay::ms(500).await;
 
+                println!("⚒️ Installing soundpack ...");
+
                 let soundpack_info = match extract_and_install_soundpack(&file_path) {
                     Ok(info) => info,
                     Err(e) => {

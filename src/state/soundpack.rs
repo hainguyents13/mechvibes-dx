@@ -1,6 +1,6 @@
 use crate::state::paths;
-use crate::utils::{data, path, soundpack};
-use serde::{Deserialize, Serialize};
+use crate::utils::{ data, path, soundpack };
+use serde::{ Deserialize, Serialize };
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -70,6 +70,9 @@ pub struct SoundpackMetadata {
     pub is_valid_v2: bool,
     pub validation_status: String,
     pub can_be_converted: bool,
+    // Error tracking
+    #[serde(default)]
+    pub last_error: Option<String>,
 }
 
 // ===== SOUNDPACK CACHE =====
@@ -83,16 +86,14 @@ pub struct SoundpackCache {
 
 impl SoundpackCache {
     fn cache_file() -> String {
-        paths::data::soundpack_cache_json()
-            .to_string_lossy()
-            .to_string()
+        paths::data::soundpack_cache_json().to_string_lossy().to_string()
     }
     pub fn load() -> Self {
         let cache_file = Self::cache_file();
         // Load metadata cache using data utilities
-        let mut cache = match data::load_json_from_file::<SoundpackCache>(
-            std::path::Path::new(&cache_file),
-        ) {
+        let mut cache = match
+            data::load_json_from_file::<SoundpackCache>(std::path::Path::new(&cache_file))
+        {
             Ok(cache) => {
                 println!(
                     "📦 Loaded soundpack metadata cache with {} entries",
@@ -104,13 +105,11 @@ impl SoundpackCache {
                 eprintln!("⚠️  Failed to load cache file: {}", e);
                 Self::new()
             }
-        };
-
-        // Auto-refresh if cache is empty, outdated, or version mismatch
-        if cache.soundpacks.is_empty() || cache.last_scan == 0 || cache.cache_version < 3 {
-            if cache.cache_version < 3 {
+        }; // Auto-refresh if cache is empty, outdated, or version mismatch
+        if cache.soundpacks.is_empty() || cache.last_scan == 0 || cache.cache_version < 4 {
+            if cache.cache_version < 4 {
                 println!(
-                    "🔄 Cache version outdated (v{} -> v3), refreshing...",
+                    "🔄 Cache version outdated (v{} -> v4), refreshing...",
                     cache.cache_version
                 );
             }
@@ -121,12 +120,11 @@ impl SoundpackCache {
 
         cache
     }
-
     pub fn new() -> Self {
         Self {
             soundpacks: HashMap::new(),
             last_scan: 0,
-            cache_version: 3, // Current version with validation support
+            cache_version: 4, // Current version with error tracking support
         }
     }
     pub fn save(&self) {
@@ -142,28 +140,25 @@ impl SoundpackCache {
 
         // Debug: Log what's being saved
         for (id, metadata) in &self.soundpacks {
-            println!(
-                "💾 Saving {}: icon = {:?}",
-                id,
-                if let Some(icon) = &metadata.icon {
-                    if icon.is_empty() {
-                        "EMPTY".to_string()
-                    } else if icon.starts_with("data:") {
-                        format!("DATA_URI ({}...)", &icon[..50.min(icon.len())])
-                    } else {
-                        format!("PATH: {}", icon)
-                    }
+            println!("💾 Saving {}: icon = {:?}", id, if let Some(icon) = &metadata.icon {
+                if icon.is_empty() {
+                    "EMPTY".to_string()
+                } else if icon.starts_with("data:") {
+                    format!("DATA_URI ({}...)", &icon[..(50).min(icon.len())])
                 } else {
-                    "NONE".to_string()
+                    format!("PATH: {}", icon)
                 }
-            );
+            } else {
+                "NONE".to_string()
+            });
         }
 
         match data::save_json_to_file(self, std::path::Path::new(&cache_file)) {
-            Ok(_) => println!(
-                "💾 Saved soundpack metadata cache with {} entries",
-                self.soundpacks.len()
-            ),
+            Ok(_) =>
+                println!(
+                    "💾 Saved soundpack metadata cache with {} entries",
+                    self.soundpacks.len()
+                ),
             Err(e) => eprintln!("⚠️  Failed to save metadata cache: {}", e),
         }
     }
@@ -171,13 +166,11 @@ impl SoundpackCache {
     // Add or update soundpack metadata
     pub fn add_soundpack(&mut self, metadata: SoundpackMetadata) {
         self.soundpacks.insert(metadata.id.clone(), metadata);
-    }
-
-    // Refresh cache by scanning soundpacks directory
+    } // Refresh cache by scanning soundpacks directory
     pub fn refresh_from_directory(&mut self) {
         println!("📂 Scanning soundpacks directory...");
 
-        let soundpacks_dir = paths::utils::get_soundpacks_dir_absolute();
+        let soundpacks_dir = path::get_soundpacks_dir_absolute();
         match std::fs::read_dir(&soundpacks_dir) {
             Ok(entries) => {
                 self.soundpacks.clear(); // Clear all existing entries
@@ -185,14 +178,41 @@ impl SoundpackCache {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_id) = entry.file_name().to_str() {
                         println!("🔄 Regenerating metadata for: {}", soundpack_id);
-                        if let Ok(metadata) = soundpack::load_soundpack_metadata(soundpack_id)
-                        {
-                            self.soundpacks.insert(soundpack_id.to_string(), metadata);
+                        match soundpack::load_soundpack_metadata(soundpack_id) {
+                            Ok(metadata) => {
+                                self.soundpacks.insert(soundpack_id.to_string(), metadata);
+                            }
+                            Err(e) => {
+                                println!("❌ Failed to load metadata for {}: {}", soundpack_id, e);
+
+                                // Create a minimal metadata entry with error information
+                                let error_metadata = SoundpackMetadata {
+                                    id: soundpack_id.to_string(),
+                                    name: format!("Error: {}", soundpack_id),
+                                    author: None,
+                                    description: Some(format!("Failed to load: {}", e)),
+                                    version: "unknown".to_string(),
+                                    tags: vec!["error".to_string()],
+                                    keycap: None,
+                                    icon: None,
+                                    mouse: false,
+                                    last_modified: 0,
+                                    last_accessed: 0,
+                                    config_version: None,
+                                    is_valid_v2: false,
+                                    validation_status: "error".to_string(),
+                                    can_be_converted: false,
+                                    last_error: Some(e),
+                                };
+
+                                self.soundpacks.insert(soundpack_id.to_string(), error_metadata);
+                            }
                         }
                     }
                 }
 
-                self.last_scan = std::time::SystemTime::now()
+                self.last_scan = std::time::SystemTime
+                    ::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs();

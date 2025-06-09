@@ -254,6 +254,7 @@ fn create_concatenated_audio_file(
     // Process each unique file
     for (index, sound_file) in unique_files.iter().enumerate() {
         let file_path = format!("{}/{}", soundpack_dir, sound_file);
+        println!("🔍 Processing file: {} + {}", soundpack_dir, file_path);
 
         if !Path::new(&file_path).exists() {
             println!("⚠️ Skipping missing file: {}", file_path);
@@ -343,15 +344,33 @@ fn create_concatenated_audio_file(
 /// - Has "config_version" field set to 2
 /// - Has "mouse" field (defaults to false for keyboard)
 /// - Has "author" field (required)
+///
+/// Parameters:
+/// - `v1_config_path`: Path to the V1 config file to convert
+/// - `output_path`: Path where the converted V2 config will be written
+/// - `soundpack_dir`: Optional explicit soundpack directory. If None, uses the parent directory of v1_config_path
 pub fn convert_v1_to_v2(
     v1_config_path: &str,
-    output_path: &str
+    output_path: &str,
+    soundpack_dir: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Get the directory containing the V1 config (for relative sound file paths)
-    let soundpack_dir = Path::new(v1_config_path)
-        .parent()
-        .and_then(|p| p.to_str())
-        .ok_or("Could not determine soundpack directory")?;
+    println!("⚒️ Converting V1 soundpack config to V2 format");
+
+    // Determine soundpack directory - use provided or infer from config path
+    let soundpack_dir = if let Some(dir) = soundpack_dir {
+        println!("🔍 Using explicit soundpack directory: {}", dir);
+        dir
+    } else {
+        let inferred_dir = Path::new(v1_config_path)
+            .parent()
+            .and_then(|p| p.to_str())
+            .ok_or("Could not determine soundpack directory")?;
+        println!("🔍 Inferred soundpack directory from config path: {}", inferred_dir);
+        inferred_dir
+    };
+
+    println!("🔍 Config path: {}", v1_config_path);
+    println!("🔍 Soundpack directory: {}", soundpack_dir);
 
     // Read the V1 config
     let content = path
@@ -397,23 +416,20 @@ pub fn convert_v1_to_v2(
     if let Some(icon) = config.get("icon") {
         converted_config.insert("icon".to_string(), icon.clone());
     }
-    // Convert "sound" to "source" (only if not already set by multi method processing)
-    if !converted_config.contains_key("source") {
-        if let Some(sound) = config.get("sound") {
-            converted_config.insert("source".to_string(), sound.clone());
-        }
-    }
 
     // Add method field - determine from key_define_type or default to "single"
-    if let Some(key_define_type) = config.get("key_define_type") {
+    let method = if let Some(key_define_type) = config.get("key_define_type") {
         if key_define_type.as_str() == Some("multi") {
             converted_config.insert("method".to_string(), Value::String("multi".to_string()));
+            "multi"
         } else {
             converted_config.insert("method".to_string(), Value::String("single".to_string()));
+            "single"
         }
     } else {
         converted_config.insert("method".to_string(), Value::String("single".to_string()));
-    }
+        "single"
+    };
 
     // Copy includes_numpad if present
     if let Some(includes_numpad) = config.get("includes_numpad") {
@@ -427,7 +443,17 @@ pub fn convert_v1_to_v2(
     converted_config.insert(
         "config_version".to_string(),
         Value::Number(serde_json::Number::from(2))
-    );
+    ); // Handle source field and multi-method audio processing
+    let output_audio_filename = if method == "multi" {
+        // For multi method, always use combined_audio.wav
+        "combined_audio.wav".to_string()
+    } else {
+        // For single method, preserve the original sound field
+        if let Some(sound) = config.get("sound") {
+            converted_config.insert("source".to_string(), sound.clone());
+        }
+        String::new() // Not used for single method
+    };
 
     // Convert "defines" to "defs" with proper timing format based on method
     let mut defs = Map::new();
@@ -435,13 +461,6 @@ pub fn convert_v1_to_v2(
     if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
         // Key mapping for common virtual key codes to Web API key names
         let key_mappings = create_vk_to_web_key_mapping();
-
-        // Determine the method to understand the data format in defines
-        let method = config
-            .get("method")
-            .or_else(|| config.get("key_define_type"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("single");
 
         if method == "multi" {
             // Multi method: collect all sound files and create segments
@@ -459,12 +478,13 @@ pub fn convert_v1_to_v2(
                     }
                 }
             }
+
             // Create concatenated audio and get segment mappings
             let output_dir = Path::new(output_path)
                 .parent()
                 .and_then(|p| p.to_str())
                 .ok_or("Could not determine output directory")?;
-            let output_audio_path = format!("{}/combined_audio.wav", output_dir);
+            let output_audio_path = format!("{}/{}", output_dir, output_audio_filename);
 
             match
                 create_concatenated_audio_and_segments(
@@ -474,10 +494,10 @@ pub fn convert_v1_to_v2(
                 )
             {
                 Ok(segments) => {
-                    // Set the source to the combined audio file
+                    // Set the source to the audio file (using preserved filename)
                     converted_config.insert(
                         "source".to_string(),
-                        Value::String("combined_audio.wav".to_string())
+                        Value::String(output_audio_filename)
                     );
 
                     // Second pass: create timing definitions using calculated segments
@@ -501,7 +521,7 @@ pub fn convert_v1_to_v2(
                                                     ]
                                                 )
                                             ];
-                                            defs.insert(key_name.clone(), Value::Array(timing)); // Log to console
+                                            defs.insert(key_name.clone(), Value::Array(timing));
                                             println!(
                                                 "Writing to defs: key={}, timing=[{}, {}]",
                                                 key_name,
@@ -521,6 +541,12 @@ pub fn convert_v1_to_v2(
                 }
                 Err(e) => {
                     println!("⚠️ Warning: Could not process audio files: {}. Using default segments.", e);
+
+                    // Set source to the preserved filename even if processing failed
+                    converted_config.insert(
+                        "source".to_string(),
+                        Value::String(output_audio_filename)
+                    );
 
                     // Fallback: use default timing for multi method
                     for (vk_code, value) in defines {
@@ -595,6 +621,7 @@ pub fn convert_v1_to_v2(
     println!("✅ Successfully converted config from V1 to V2");
     println!("   Input: {}", v1_config_path);
     println!("   Output: {}", output_path);
+    println!("   Soundpack dir: {}", soundpack_dir);
     println!("   Converted {} key mappings", defs.len());
     Ok(())
 }
