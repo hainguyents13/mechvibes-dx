@@ -467,16 +467,27 @@ pub fn convert_v1_to_v2(
 
         if method == "multi" {
             // Multi method: collect all sound files and create segments
-            let mut sound_files = HashMap::new();
-
-            // First pass: collect all unique sound files mapped to their keys
+            let mut sound_files = HashMap::new(); // First pass: collect all unique sound files mapped to their keys
             for (vk_code, value) in defines {
                 if let Ok(vk_num) = vk_code.parse::<u32>() {
                     if let Some(key_name) = key_mappings.get(&vk_num) {
-                        if let Some(sound_file_str) = value.as_str() {
-                            if !sound_file_str.is_empty() && sound_file_str != "null" {
-                                sound_files.insert(key_name.clone(), sound_file_str.to_string());
+                        // Skip null values and only process actual string sound file names
+                        if !value.is_null() {
+                            if let Some(sound_file_str) = value.as_str() {
+                                if !sound_file_str.is_empty() && sound_file_str != "null" {
+                                    sound_files.insert(
+                                        key_name.clone(),
+                                        sound_file_str.to_string()
+                                    );
+                                    println!(
+                                        "✅ Added mapping: {} -> {}",
+                                        key_name,
+                                        sound_file_str
+                                    );
+                                }
                             }
+                        } else {
+                            println!("⏭️ Skipping null mapping for VK {} ({})", vk_code, key_name);
                         }
                     }
                 }
@@ -498,30 +509,16 @@ pub fn convert_v1_to_v2(
                     converted_config.insert(
                         "source".to_string(),
                         Value::String(output_audio_filename)
-                    );
-
-                    // Second pass: create timing definitions using calculated segments
-                    for (vk_code, value) in defines {
-                        if let Ok(vk_num) = vk_code.parse::<u32>() {
-                            if let Some(key_name) = key_mappings.get(&vk_num) {
-                                if let Some(sound_file_str) = value.as_str() {
-                                    if !sound_file_str.is_empty() && sound_file_str != "null" {
-                                        if let Some((start, duration)) = segments.get(key_name) {
-                                            let timing = vec![
-                                                Value::Array(
-                                                    vec![
-                                                        Value::from(*start),
-                                                        Value::from(*duration)
-                                                    ]
-                                                )
-                                            ];
-                                            defs.insert(key_name.clone(), Value::Array(timing));
-                                        } else {
-                                            println!("⚠️ No segment found for key: {}", key_name);
-                                        }
-                                    }
-                                }
-                            }
+                    ); // Second pass: create timing definitions using calculated segments
+                    // Only process keys that were included in sound_files (i.e., not null)
+                    for (key_name, _sound_file) in &sound_files {
+                        if let Some((start, duration)) = segments.get(key_name) {
+                            let timing = vec![
+                                Value::Array(vec![Value::from(*start), Value::from(*duration)])
+                            ];
+                            defs.insert(key_name.clone(), Value::Array(timing));
+                        } else {
+                            println!("⚠️ No segment found for key: {}", key_name);
                         }
                     }
 
@@ -534,31 +531,30 @@ pub fn convert_v1_to_v2(
                     converted_config.insert(
                         "source".to_string(),
                         Value::String(output_audio_filename)
-                    );
-
-                    // Fallback: use default timing for multi method
-                    for (vk_code, value) in defines {
-                        if let Ok(vk_num) = vk_code.parse::<u32>() {
-                            if let Some(key_name) = key_mappings.get(&vk_num) {
-                                if let Some(sound_file_str) = value.as_str() {
-                                    if !sound_file_str.is_empty() && sound_file_str != "null" {
-                                        let timing = vec![
-                                            Value::Array(vec![Value::from(0.0), Value::from(100.0)])
-                                        ];
-                                        defs.insert(key_name.clone(), Value::Array(timing));
-                                    }
-                                }
-                            }
-                        }
+                    ); // Fallback: use default timing for multi method
+                    // Only process keys that were included in sound_files (i.e., not null)
+                    for (key_name, _sound_file) in &sound_files {
+                        let timing = vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])];
+                        defs.insert(key_name.clone(), Value::Array(timing));
                     }
                 }
             }
         } else {
-            // Single method: preserve existing logic
+            // Single method: preserve existing logic with null filtering
             for (vk_code, value) in defines {
                 // Convert VK code to key name
                 if let Ok(vk_num) = vk_code.parse::<u32>() {
                     if let Some(key_name) = key_mappings.get(&vk_num) {
+                        // Skip null values in single method too
+                        if value.is_null() {
+                            println!(
+                                "⏭️ Skipping null mapping for VK {} ({}) in single method",
+                                vk_code,
+                                key_name
+                            );
+                            continue;
+                        }
+
                         let timing = if let Some(timing_array) = value.as_array() {
                             if timing_array.len() >= 2 {
                                 // Keep [start_ms, duration_ms] format: [[start_ms, duration_ms]]
@@ -568,6 +564,12 @@ pub fn convert_v1_to_v2(
                                         timing_array[1].as_f64(),
                                     )
                                 {
+                                    println!(
+                                        "✅ Added single method mapping: {} -> [{:.1}ms, {:.1}ms]",
+                                        key_name,
+                                        start,
+                                        duration
+                                    );
                                     vec![
                                         Value::Array(
                                             vec![Value::from(start), Value::from(duration)]
@@ -575,20 +577,33 @@ pub fn convert_v1_to_v2(
                                     ]
                                 } else {
                                     // Fallback to default timing if conversion fails
+                                    println!("⚠️ Using default timing for {}: invalid array values", key_name);
                                     vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])]
                                 }
                             } else {
                                 // Array too short, use default timing
+                                println!("⚠️ Using default timing for {}: array too short", key_name);
                                 vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])]
                             }
                         } else if let Some(sound_file_str) = value.as_str() {
                             // Fallback: if it's a string (like in multi), use default timing
                             if !sound_file_str.is_empty() && sound_file_str != "null" {
+                                println!("✅ Added single method mapping: {} -> [0.0ms, 100.0ms] (from string)", key_name);
                                 vec![Value::Array(vec![Value::from(0.0), Value::from(100.0)])]
                             } else {
+                                println!(
+                                    "⏭️ Skipping empty/null string mapping for VK {} ({})",
+                                    vk_code,
+                                    key_name
+                                );
                                 continue; // Skip empty entries
                             }
                         } else {
+                            println!(
+                                "⏭️ Skipping unknown type mapping for VK {} ({})",
+                                vk_code,
+                                key_name
+                            );
                             continue; // Skip unknown types
                         };
 
@@ -618,120 +633,112 @@ pub fn convert_v1_to_v2(
 fn create_vk_to_web_key_mapping() -> HashMap<u32, String> {
     let mut mapping = HashMap::new();
 
-    // Escape, Function keys
-    mapping.insert(1, "Escape".to_string());
-    mapping.insert(59, "F1".to_string());
-    mapping.insert(60, "F2".to_string());
-    mapping.insert(61, "F3".to_string());
-    mapping.insert(62, "F4".to_string());
-    mapping.insert(63, "F5".to_string());
-    mapping.insert(64, "F6".to_string());
-    mapping.insert(65, "F7".to_string());
-    mapping.insert(66, "F8".to_string());
-    mapping.insert(67, "F9".to_string());
-    mapping.insert(68, "F10".to_string());
-    mapping.insert(87, "F11".to_string());
-    mapping.insert(88, "F12".to_string());
+    // Function keys
+    mapping.insert(112, "F1".to_string()); // VK_F1
+    mapping.insert(113, "F2".to_string()); // VK_F2
+    mapping.insert(114, "F3".to_string()); // VK_F3
+    mapping.insert(115, "F4".to_string()); // VK_F4
+    mapping.insert(116, "F5".to_string()); // VK_F5
+    mapping.insert(117, "F6".to_string()); // VK_F6
+    mapping.insert(118, "F7".to_string()); // VK_F7
+    mapping.insert(119, "F8".to_string()); // VK_F8
+    mapping.insert(120, "F9".to_string()); // VK_F9
+    mapping.insert(121, "F10".to_string()); // VK_F10
+    mapping.insert(122, "F11".to_string()); // VK_F11
+    mapping.insert(123, "F12".to_string()); // VK_F12
 
     // Number row
-    mapping.insert(2, "Digit1".to_string());
-    mapping.insert(3, "Digit2".to_string());
-    mapping.insert(4, "Digit3".to_string());
-    mapping.insert(5, "Digit4".to_string());
-    mapping.insert(6, "Digit5".to_string());
-    mapping.insert(7, "Digit6".to_string());
-    mapping.insert(8, "Digit7".to_string());
-    mapping.insert(9, "Digit8".to_string());
-    mapping.insert(10, "Digit9".to_string());
-    mapping.insert(11, "Digit0".to_string());
-    mapping.insert(12, "Minus".to_string());
-    mapping.insert(13, "Equal".to_string());
-    mapping.insert(14, "Backspace".to_string());
+    mapping.insert(48, "Digit0".to_string()); // VK_0
+    mapping.insert(49, "Digit1".to_string()); // VK_1
+    mapping.insert(50, "Digit2".to_string()); // VK_2
+    mapping.insert(51, "Digit3".to_string()); // VK_3
+    mapping.insert(52, "Digit4".to_string()); // VK_4
+    mapping.insert(53, "Digit5".to_string()); // VK_5
+    mapping.insert(54, "Digit6".to_string()); // VK_6
+    mapping.insert(55, "Digit7".to_string()); // VK_7
+    mapping.insert(56, "Digit8".to_string()); // VK_8
+    mapping.insert(57, "Digit9".to_string()); // VK_9
 
-    // Tab and top row
-    mapping.insert(15, "Tab".to_string());
-    mapping.insert(16, "KeyQ".to_string());
-    mapping.insert(17, "KeyW".to_string());
-    mapping.insert(18, "KeyE".to_string());
-    mapping.insert(19, "KeyR".to_string());
-    mapping.insert(20, "KeyT".to_string());
-    mapping.insert(21, "KeyY".to_string());
-    mapping.insert(22, "KeyU".to_string());
-    mapping.insert(23, "KeyI".to_string());
-    mapping.insert(24, "KeyO".to_string());
-    mapping.insert(25, "KeyP".to_string());
-    mapping.insert(26, "BracketLeft".to_string());
-    mapping.insert(27, "BracketRight".to_string());
-    mapping.insert(28, "Enter".to_string());
+    // Letter keys A-Z
+    mapping.insert(65, "KeyA".to_string()); // VK_A
+    mapping.insert(66, "KeyB".to_string()); // VK_B
+    mapping.insert(67, "KeyC".to_string()); // VK_C
+    mapping.insert(68, "KeyD".to_string()); // VK_D
+    mapping.insert(69, "KeyE".to_string()); // VK_E
+    mapping.insert(70, "KeyF".to_string()); // VK_F
+    mapping.insert(71, "KeyG".to_string()); // VK_G
+    mapping.insert(72, "KeyH".to_string()); // VK_H
+    mapping.insert(73, "KeyI".to_string()); // VK_I
+    mapping.insert(74, "KeyJ".to_string()); // VK_J
+    mapping.insert(75, "KeyK".to_string()); // VK_K - CORRECT VK CODE!
+    mapping.insert(76, "KeyL".to_string()); // VK_L
+    mapping.insert(77, "KeyM".to_string()); // VK_M
+    mapping.insert(78, "KeyN".to_string()); // VK_N
+    mapping.insert(79, "KeyO".to_string()); // VK_O
+    mapping.insert(80, "KeyP".to_string()); // VK_P
+    mapping.insert(81, "KeyQ".to_string()); // VK_Q
+    mapping.insert(82, "KeyR".to_string()); // VK_R
+    mapping.insert(83, "KeyS".to_string()); // VK_S
+    mapping.insert(84, "KeyT".to_string()); // VK_T
+    mapping.insert(85, "KeyU".to_string()); // VK_U
+    mapping.insert(86, "KeyV".to_string()); // VK_V
+    mapping.insert(87, "KeyW".to_string()); // VK_W
+    mapping.insert(88, "KeyX".to_string()); // VK_X
+    mapping.insert(89, "KeyY".to_string()); // VK_Y
+    mapping.insert(90, "KeyZ".to_string()); // VK_Z
 
-    // Caps Lock and home row
-    mapping.insert(58, "CapsLock".to_string());
-    mapping.insert(30, "KeyA".to_string());
-    mapping.insert(31, "KeyS".to_string());
-    mapping.insert(32, "KeyD".to_string());
-    mapping.insert(33, "KeyF".to_string());
-    mapping.insert(34, "KeyG".to_string());
-    mapping.insert(35, "KeyH".to_string());
-    mapping.insert(36, "KeyJ".to_string());
-    mapping.insert(37, "KeyK".to_string());
-    mapping.insert(38, "KeyL".to_string());
-    mapping.insert(39, "Semicolon".to_string());
-    mapping.insert(40, "Quote".to_string());
-    mapping.insert(41, "Backquote".to_string());
+    // Special keys
+    mapping.insert(27, "Escape".to_string()); // VK_ESCAPE
+    mapping.insert(9, "Tab".to_string()); // VK_TAB
+    mapping.insert(20, "CapsLock".to_string()); // VK_CAPITAL
+    mapping.insert(16, "ShiftLeft".to_string()); // VK_SHIFT (we'll treat as left)
+    mapping.insert(17, "ControlLeft".to_string()); // VK_CONTROL (we'll treat as left)
+    mapping.insert(18, "AltLeft".to_string()); // VK_MENU (Alt key)
+    mapping.insert(32, "Space".to_string()); // VK_SPACE
+    mapping.insert(13, "Enter".to_string()); // VK_RETURN
+    mapping.insert(8, "Backspace".to_string()); // VK_BACK
 
-    // Shift and bottom row
-    mapping.insert(42, "ShiftLeft".to_string());
-    mapping.insert(43, "Backslash".to_string());
-    mapping.insert(44, "KeyZ".to_string());
-    mapping.insert(45, "KeyX".to_string());
-    mapping.insert(46, "KeyC".to_string());
-    mapping.insert(47, "KeyV".to_string());
-    mapping.insert(48, "KeyB".to_string());
-    mapping.insert(49, "KeyN".to_string());
-    mapping.insert(50, "KeyM".to_string());
-    mapping.insert(51, "Comma".to_string());
-    mapping.insert(52, "Period".to_string());
-    mapping.insert(53, "Slash".to_string());
-    mapping.insert(54, "ShiftRight".to_string());
-
-    // Control keys
-    mapping.insert(29, "ControlLeft".to_string());
-    mapping.insert(56, "AltLeft".to_string());
-    mapping.insert(57, "Space".to_string());
-    mapping.insert(3640, "AltRight".to_string());
-    mapping.insert(3613, "ControlRight".to_string());
+    // Punctuation keys (common US layout)
+    mapping.insert(189, "Minus".to_string()); // VK_OEM_MINUS
+    mapping.insert(187, "Equal".to_string()); // VK_OEM_PLUS
+    mapping.insert(219, "BracketLeft".to_string()); // VK_OEM_4
+    mapping.insert(221, "BracketRight".to_string()); // VK_OEM_6
+    mapping.insert(220, "Backslash".to_string()); // VK_OEM_5
+    mapping.insert(186, "Semicolon".to_string()); // VK_OEM_1
+    mapping.insert(222, "Quote".to_string()); // VK_OEM_7
+    mapping.insert(192, "Backquote".to_string()); // VK_OEM_3
+    mapping.insert(188, "Comma".to_string()); // VK_OEM_COMMA
+    mapping.insert(190, "Period".to_string()); // VK_OEM_PERIOD
+    mapping.insert(191, "Slash".to_string()); // VK_OEM_2
 
     // Arrow keys
-    mapping.insert(57416, "ArrowUp".to_string());
-    mapping.insert(57424, "ArrowLeft".to_string());
-    mapping.insert(57421, "ArrowDown".to_string());
-    mapping.insert(57419, "ArrowRight".to_string());
-
-    // Insert/Delete cluster
-    mapping.insert(3597, "Insert".to_string());
-    mapping.insert(3639, "Delete".to_string());
-    mapping.insert(61001, "Home".to_string());
-    mapping.insert(61007, "End".to_string());
-    mapping.insert(61009, "PageUp".to_string());
-    mapping.insert(61003, "PageDown".to_string());
+    mapping.insert(37, "ArrowLeft".to_string()); // VK_LEFT - CORRECT: VK 37 is LEFT ARROW!
+    mapping.insert(38, "ArrowUp".to_string()); // VK_UP
+    mapping.insert(39, "ArrowRight".to_string()); // VK_RIGHT
+    mapping.insert(40, "ArrowDown".to_string()); // VK_DOWN    // Insert/Delete cluster
+    mapping.insert(45, "Insert".to_string()); // VK_INSERT
+    mapping.insert(46, "Delete".to_string()); // VK_DELETE
+    mapping.insert(36, "Home".to_string()); // VK_HOME
+    mapping.insert(35, "End".to_string()); // VK_END
+    mapping.insert(33, "PageUp".to_string()); // VK_PRIOR
+    mapping.insert(34, "PageDown".to_string()); // VK_NEXT
 
     // Numpad
-    mapping.insert(61010, "Numpad0".to_string());
-    mapping.insert(61011, "Numpad1".to_string());
-    mapping.insert(61000, "Numpad2".to_string());
-    mapping.insert(61005, "Numpad3".to_string());
-    mapping.insert(60999, "Numpad4".to_string());
-    mapping.insert(61001, "Numpad5".to_string());
-    mapping.insert(61003, "Numpad6".to_string());
-    mapping.insert(61007, "Numpad7".to_string());
-    mapping.insert(61008, "Numpad8".to_string());
-    mapping.insert(61009, "Numpad9".to_string());
-    mapping.insert(3677, "NumpadMultiply".to_string());
-    mapping.insert(3675, "NumpadAdd".to_string());
-    mapping.insert(3676, "NumpadSubtract".to_string());
-    mapping.insert(3667, "NumpadDecimal".to_string());
-    mapping.insert(3665, "NumpadDivide".to_string());
-    mapping.insert(3612, "NumpadEnter".to_string());
+    mapping.insert(96, "Numpad0".to_string()); // VK_NUMPAD0
+    mapping.insert(97, "Numpad1".to_string()); // VK_NUMPAD1
+    mapping.insert(98, "Numpad2".to_string()); // VK_NUMPAD2
+    mapping.insert(99, "Numpad3".to_string()); // VK_NUMPAD3
+    mapping.insert(100, "Numpad4".to_string()); // VK_NUMPAD4
+    mapping.insert(101, "Numpad5".to_string()); // VK_NUMPAD5
+    mapping.insert(102, "Numpad6".to_string()); // VK_NUMPAD6
+    mapping.insert(103, "Numpad7".to_string()); // VK_NUMPAD7
+    mapping.insert(104, "Numpad8".to_string()); // VK_NUMPAD8
+    mapping.insert(105, "Numpad9".to_string()); // VK_NUMPAD9
+    mapping.insert(106, "NumpadMultiply".to_string()); // VK_MULTIPLY
+    mapping.insert(107, "NumpadAdd".to_string()); // VK_ADD
+    mapping.insert(109, "NumpadSubtract".to_string()); // VK_SUBTRACT
+    mapping.insert(110, "NumpadDecimal".to_string()); // VK_DECIMAL
+    mapping.insert(111, "NumpadDivide".to_string()); // VK_DIVIDE
 
     mapping
 }

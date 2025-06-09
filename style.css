@@ -4,6 +4,7 @@
     themes: all;
 }
 
+html,
 body {
     overflow: hidden;
 }

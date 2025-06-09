@@ -31,15 +31,33 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed);
-
-        // Get timestamp and duration
+        drop(pressed); // Get timestamp and duration
         let key_map = self.key_map.lock().unwrap();
         let (start, duration) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {
                 let idx = if is_keydown { 0 } else { 1 };
                 let arr = arr[idx];
-                (arr[0] / 1000.0, arr[1] / 1000.0)
+                let start = arr[0] / 1000.0;
+                let duration = arr[1] / 1000.0;
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10.0 {
+                    eprintln!(
+                        "⚠️ Suspicious mapping for key '{}' ({}): start={:.3}s, duration={:.3}s (raw: [{}, {}])",
+                        key,
+                        if is_keydown {
+                            "down"
+                        } else {
+                            "up"
+                        },
+                        start,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (start, duration)
             }
             Some(arr) if arr.len() == 1 => {
                 // Only keydown mapping available, ignore keyup events
@@ -47,7 +65,22 @@ impl AudioContext {
                     return; // Skip keyup events for keys with only keydown mapping
                 }
                 let arr = arr[0];
-                (arr[0] / 1000.0, arr[1] / 1000.0)
+                let start = arr[0] / 1000.0;
+                let duration = arr[1] / 1000.0;
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10.0 {
+                    eprintln!(
+                        "⚠️ Suspicious mapping for key '{}': start={:.3}s, duration={:.3}s (raw: [{}, {}])",
+                        key,
+                        start,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (start, duration)
             }
             Some(arr) => {
                 eprintln!(
@@ -66,24 +99,87 @@ impl AudioContext {
 
         self.play_sound_segment(key, start, duration, is_keydown);
     }
-
     fn play_sound_segment(&self, key: &str, start: f32, duration: f32, is_keydown: bool) {
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
 
         if let Some((samples, channels, sample_rate)) = pcm_opt {
-            let start_sample = (start * (sample_rate as f32) * (channels as f32)) as usize;
-            let end_sample = ((start + duration) *
-                (sample_rate as f32) *
-                (channels as f32)) as usize;
-            let end_sample = end_sample.min(samples.len());
+            // Calculate total audio duration in seconds
+            let total_duration = (samples.len() as f32) / (sample_rate as f32) / (channels as f32);
 
+            // Validate input parameters
+            if start < 0.0 || duration <= 0.0 {
+                eprintln!(
+                    "❌ Invalid time parameters for key '{}': start={:.3}s, duration={:.3}s",
+                    key,
+                    start,
+                    duration
+                );
+                return;
+            }
+
+            // Check if start time exceeds audio duration - this is an error condition
+            if start >= total_duration {
+                eprintln!(
+                    "❌ TIMING ERROR: Start time {:.3}s exceeds audio duration {:.3}s for key '{}'",
+                    start,
+                    total_duration,
+                    key
+                );
+                eprintln!("🔧 SOLUTION: This soundpack has invalid timing data. Please:");
+                eprintln!("   1. Regenerate the soundpack to fix timing issues, OR");
+                eprintln!("   2. Use the timing fixer utility to correct the config.json, OR");
+                eprintln!("   3. Check if the audio file has been corrupted or modified");
+                eprintln!("📁 Soundpack location: Check your soundpacks directory for this config");
+                return;
+            }
+
+            // Check if start + duration exceeds audio duration
+            if start + duration > total_duration {
+                eprintln!(
+                    "❌ TIMING ERROR: Audio segment {:.3}s-{:.3}s exceeds duration {:.3}s for key '{}'",
+                    start,
+                    start + duration,
+                    total_duration,
+                    key
+                );
+                eprintln!(
+                    "🔧 SOLUTION: This soundpack has invalid timing data. Please regenerate the soundpack or use the timing fixer utility."
+                );
+                return;
+            } // Use exact timing - no clamping or fallbacks
+            let end_time = start + duration;
+
+            // Calculate sample positions
+            let start_sample = (start * (sample_rate as f32) * (channels as f32)) as usize;
+            let end_sample = (end_time * (sample_rate as f32) * (channels as f32)) as usize;
+
+            // Validate sample range
+            if end_sample > samples.len() {
+                eprintln!("❌ TIMING ERROR: Audio segment exceeds sample buffer for key '{}'", key);
+                eprintln!(
+                    "   Requested samples: {}..{}, Available: {} samples",
+                    start_sample,
+                    end_sample,
+                    samples.len()
+                );
+                eprintln!("🔧 SOLUTION: Regenerate the soundpack to fix timing issues.");
+                return;
+            }
+
+            // Final validation before extracting samples
             if start_sample >= end_sample || start_sample >= samples.len() {
                 eprintln!(
-                    "❌ Invalid sample range for key '{}': {}..{} (max {})",
+                    "❌ INTERNAL ERROR: Invalid sample range for key '{}': {}..{} (max {})",
                     key,
                     start_sample,
                     end_sample,
                     samples.len()
+                );
+                eprintln!(
+                    "   Audio: {:.3}s, Channels: {}, Rate: {}",
+                    total_duration,
+                    channels,
+                    sample_rate
                 );
                 return;
             }
@@ -176,7 +272,6 @@ impl AudioContext {
 
         self.play_mouse_sound_segment(button, start, duration, is_buttondown);
     }
-
     fn play_mouse_sound_segment(
         &self,
         button: &str,
@@ -187,22 +282,83 @@ impl AudioContext {
         let pcm_opt = self.mouse_samples.lock().unwrap().clone();
 
         if let Some((samples, channels, sample_rate)) = pcm_opt {
-            let start_sample = (start * (sample_rate as f32) * (channels as f32)) as usize;
-            let end_sample = ((start + duration) *
-                (sample_rate as f32) *
-                (channels as f32)) as usize;
-            let end_sample = end_sample.min(samples.len());
+            // Calculate total audio duration in seconds
+            let total_duration = (samples.len() as f32) / (sample_rate as f32) / (channels as f32);
 
+            // Validate input parameters
+            if start < 0.0 || duration <= 0.0 {
+                eprintln!(
+                    "❌ Invalid time parameters for mouse button '{}': start={:.3}s, duration={:.3}s",
+                    button,
+                    start,
+                    duration
+                );
+                return;
+            } // Check if start time exceeds audio duration - this is an error condition
+            if start >= total_duration {
+                eprintln!(
+                    "❌ TIMING ERROR: Start time {:.3}s exceeds audio duration {:.3}s for mouse button '{}'",
+                    start,
+                    total_duration,
+                    button
+                );
+                eprintln!("🔧 SOLUTION: This soundpack has invalid timing data. Please:");
+                eprintln!("   1. Regenerate the soundpack to fix timing issues, OR");
+                eprintln!("   2. Use the timing fixer utility to correct the config.json, OR");
+                eprintln!("   3. Check if the audio file has been corrupted or modified");
+                eprintln!("📁 Soundpack location: Check your soundpacks directory for this config");
+                return;
+            }
+
+            // Check if start + duration exceeds audio duration
+            if start + duration > total_duration {
+                eprintln!(
+                    "❌ TIMING ERROR: Audio segment {:.3}s-{:.3}s exceeds duration {:.3}s for mouse button '{}'",
+                    start,
+                    start + duration,
+                    total_duration,
+                    button
+                );
+                eprintln!(
+                    "🔧 SOLUTION: This soundpack has invalid timing data. Please regenerate the soundpack or use the timing fixer utility."
+                );
+                return;
+            } // Use exact timing - no clamping or fallbacks
+            let end_time = start + duration;
+
+            // Calculate sample positions
+            let start_sample = (start * (sample_rate as f32) * (channels as f32)) as usize;
+            let end_sample = (end_time * (sample_rate as f32) * (channels as f32)) as usize;
+
+            // Validate sample range
+            if end_sample > samples.len() {
+                eprintln!("❌ TIMING ERROR: Audio segment exceeds sample buffer for mouse button '{}'", button);
+                eprintln!(
+                    "   Requested samples: {}..{}, Available: {} samples",
+                    start_sample,
+                    end_sample,
+                    samples.len()
+                );
+                eprintln!("🔧 SOLUTION: Regenerate the soundpack to fix timing issues.");
+                return;
+            } // Final validation before extracting samples
             if start_sample >= end_sample || start_sample >= samples.len() {
                 eprintln!(
-                    "Invalid sample range for mouse button '{}': {}..{} (max {})",
+                    "❌ INTERNAL ERROR: Invalid sample range for mouse button '{}': {}..{} (max {})",
                     button,
                     start_sample,
                     end_sample,
                     samples.len()
                 );
+                eprintln!(
+                    "   Audio: {:.3}s, Channels: {}, Rate: {}",
+                    total_duration,
+                    channels,
+                    sample_rate
+                );
                 return;
             }
+
             let segment_samples = samples[start_sample..end_sample].to_vec();
             let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
 
