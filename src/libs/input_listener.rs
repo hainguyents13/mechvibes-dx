@@ -255,24 +255,25 @@ pub fn start_unified_input_listener(
                         let _ = mouse_tx.send(format!("UP:{}", button_code));
                     }
                 }
-                EventType::Wheel { delta_x: _, delta_y } => {
-                    let wheel_event = if delta_y > 0 {
-                        "MouseWheelUp"
-                    } else if delta_y < 0 {
-                        "MouseWheelDown"
-                    } else {
-                        return; // No vertical scroll, ignore
-                    };
+                // Skip mouse wheel events for now
+                EventType::Wheel { delta_x: _, delta_y: _ } => {
+                    // let wheel_event = if delta_y > 0 {
+                    //     "MouseWheelUp"
+                    // } else if delta_y < 0 {
+                    //     "MouseWheelDown"
+                    // } else {
+                    //     return; // No vertical scroll, ignore
+                    // };
 
-                    println!("🖱️ Mouse Wheel: {}", wheel_event);
+                    // println!("🖱️ Mouse Wheel: {}", wheel_event);
 
-                    // Apply longer debounce for wheel events
-                    let now = Instant::now();
-                    let mut last = mouse_last_press.lock().unwrap();
-                    if now.duration_since(*last) > Duration::from_millis(50) {
-                        *last = now;
-                        let _ = mouse_tx.send(wheel_event.to_string());
-                    }
+                    // // Apply longer debounce for wheel events
+                    // let now = Instant::now();
+                    // let mut last = mouse_last_press.lock().unwrap();
+                    // if now.duration_since(*last) > Duration::from_millis(50) {
+                    //     *last = now;
+                    //     let _ = mouse_tx.send(wheel_event.to_string());
+                    // }
                 }
                 EventType::MouseMove { x: _, y: _ } => {
                     // Mouse move events are too noisy, ignore them
