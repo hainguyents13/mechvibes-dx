@@ -1,8 +1,8 @@
-use rdev::{listen, Button, Event, EventType, Key};
+use rdev::{ listen, Button, Event, EventType, Key };
 use std::collections::HashSet;
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use std::sync::{ mpsc::Sender, Arc, Mutex };
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{ Duration, Instant };
 
 // Maps a keyboard key to its standardized code
 fn map_key_to_code(key: Key) -> &'static str {
@@ -93,13 +93,13 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::Num9 => "Digit9",
 
         // Punctuation and symbols
-        Key::Minus => "Minus",         // -
-        Key::Equal => "Equal",         // =
-        Key::Comma => "Comma",         // ,
-        Key::Dot => "Period",          // .
-        Key::Quote => "Quote",         // '
+        Key::Minus => "Minus", // -
+        Key::Equal => "Equal", // =
+        Key::Comma => "Comma", // ,
+        Key::Dot => "Period", // .
+        Key::Quote => "Quote", // '
         Key::BackQuote => "Backquote", // `
-        Key::Slash => "Slash",         // /
+        Key::Slash => "Slash", // /
 
         // Unknown or unmapped keys
         _ => "",
@@ -131,7 +131,7 @@ fn map_button_to_code(button: Button) -> &'static str {
 pub fn start_unified_input_listener(
     keyboard_tx: Sender<String>,
     mouse_tx: Sender<String>,
-    hotkey_tx: Sender<String>,
+    hotkey_tx: Sender<String>
 ) {
     println!("🎮 Starting unified input listener (keyboard + mouse + hotkeys)...");
 
@@ -158,8 +158,12 @@ pub fn start_unified_input_listener(
 
                         // Track modifier keys for hotkey detection
                         match key_code {
-                            "ControlLeft" | "ControlRight" => ctrl_pressed = true,
-                            "AltLeft" | "AltRight" => alt_pressed = true,
+                            "ControlLeft" | "ControlRight" => {
+                                ctrl_pressed = true;
+                            }
+                            "AltLeft" | "AltRight" => {
+                                alt_pressed = true;
+                            }
                             "KeyM" => {
                                 // Check for Ctrl+Alt+M hotkey combination
                                 if ctrl_pressed && alt_pressed {
@@ -197,8 +201,12 @@ pub fn start_unified_input_listener(
 
                         // Track modifier key releases for hotkey detection
                         match key_code {
-                            "ControlLeft" | "ControlRight" => ctrl_pressed = false,
-                            "AltLeft" | "AltRight" => alt_pressed = false,
+                            "ControlLeft" | "ControlRight" => {
+                                ctrl_pressed = false;
+                            }
+                            "AltLeft" | "AltRight" => {
+                                alt_pressed = false;
+                            }
                             _ => {}
                         }
 
@@ -247,10 +255,7 @@ pub fn start_unified_input_listener(
                         let _ = mouse_tx.send(format!("UP:{}", button_code));
                     }
                 }
-                EventType::Wheel {
-                    delta_x: _,
-                    delta_y,
-                } => {
+                EventType::Wheel { delta_x: _, delta_y } => {
                     let wheel_event = if delta_y > 0 {
                         "MouseWheelUp"
                     } else if delta_y < 0 {
