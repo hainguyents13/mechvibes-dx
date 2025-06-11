@@ -183,12 +183,33 @@ pub fn start_unified_input_listener(
                             return; // Key already pressed, ignore
                         }
                         pressed.insert(key_code.to_string());
-                        drop(pressed);
-
-                        // Apply debounce
+                        drop(pressed); // Apply debounce and detect rapid key events
                         let now = Instant::now();
                         let mut last = keyboard_last_press.lock().unwrap();
-                        if now.duration_since(*last) > Duration::from_millis(1) {
+                        let time_since_last = now.duration_since(*last);
+
+                        // Special handling for Backspace key - skip if too rapid (< 10ms)
+                        if key_code == "Backspace" && time_since_last < Duration::from_millis(10) {
+                            println!(
+                                "🚫 IGNORING rapid Backspace: fired only {:.1}ms after previous key event (< 10ms threshold)",
+                                time_since_last.as_millis()
+                            );
+                            return; // Skip this Backspace event entirely
+                        }
+
+                        // General rapid event detection (< 60ms) - log but still process
+                        if
+                            time_since_last < Duration::from_millis(60) &&
+                            time_since_last > Duration::from_millis(1)
+                        {
+                            println!(
+                                "⚡ RAPID KEY EVENT detected: '{}' fired {:.1}ms after previous key event",
+                                key_code,
+                                time_since_last.as_millis()
+                            );
+                        }
+
+                        if time_since_last > Duration::from_millis(1) {
                             *last = now;
                             let _ = keyboard_tx.send(key_code.to_string());
                         }
@@ -231,12 +252,24 @@ pub fn start_unified_input_listener(
                             return; // Button already pressed, ignore
                         }
                         pressed.insert(button_code.to_string());
-                        drop(pressed);
-
-                        // Apply debounce
+                        drop(pressed); // Apply debounce and detect rapid mouse events
                         let now = Instant::now();
                         let mut last = mouse_last_press.lock().unwrap();
-                        if now.duration_since(*last) > Duration::from_millis(1) {
+                        let time_since_last = now.duration_since(*last);
+
+                        // General rapid event detection (< 60ms) - log but still process
+                        if
+                            time_since_last < Duration::from_millis(60) &&
+                            time_since_last > Duration::from_millis(1)
+                        {
+                            println!(
+                                "⚡ RAPID MOUSE EVENT detected: '{}' fired {:.1}ms after previous mouse event",
+                                button_code,
+                                time_since_last.as_millis()
+                            );
+                        }
+
+                        if time_since_last > Duration::from_millis(1) {
                             *last = now;
                             let _ = mouse_tx.send(button_code.to_string());
                         }

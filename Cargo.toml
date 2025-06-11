@@ -23,6 +23,7 @@ rand = "0.9.0"
 rdev = "0.5.3"
 rfd = "0.15"
 rodio = "0.20.1"
+cpal = "0.15"
 hound = "3.5"
 symphonia = { version = "0.5", features = ["mp3", "wav", "ogg"] }
 image = "0.24"
@@ -34,7 +35,16 @@ tray-icon = "0.14"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 zip = "2.2.0"
-winapi = { version = "0.3", features = ["wincon", "winuser"] }
+winapi = { version = "0.3", features = [
+  "wincon",
+  "winuser",
+  "hidusage",
+  "hidpi",
+  "setupapi",
+  "devguid",
+  "cfgmgr32",
+  "winreg",
+] }
 
 
 [build-dependencies]
@@ -65,23 +75,3 @@ inherits = "dev"
 
 [profile.android-dev]
 inherits = "dev"
-
-[[bin]]
-name = "validate_timing"
-path = "validate_timing.rs"
-
-[[bin]]
-name = "test_specific_soundpack"
-path = "test_specific_soundpack.rs"
-
-[[bin]]
-name = "test_v1_analysis"
-path = "test_v1_analysis.rs"
-
-[[bin]]
-name = "validate_simple"
-path = "validate_simple.rs"
-
-[[bin]]
-name = "test_reconvert"
-path = "test_reconvert.rs"

@@ -40,7 +40,10 @@ pub struct AppConfig {
     pub mouse_volume: f32, // Separate volume for mouse sounds
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
-    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically
+    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically    // Device settings
+    pub selected_audio_device: Option<String>, // Selected audio output device
+    pub enabled_keyboards: Vec<String>, // Enabled physical keyboards (by device instance ID)
+    pub enabled_mice: Vec<String>, // Enabled physical mice (by device instance ID)
     // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
@@ -49,7 +52,6 @@ pub struct AppConfig {
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
     pub show_notifications: bool,
-    pub show_debug_console: bool, // Show/hide debug console window
     pub landscape_mode: bool, // Enable/disable landscape mode layout
 }
 
@@ -108,6 +110,9 @@ impl Default for AppConfig {
             enable_sound: true,
             enable_keyboard_sound: true, // Default keyboard sounds enabled
             enable_mouse_sound: true, // Default mouse sounds enabled
+            selected_audio_device: None, // Default to system default audio device
+            enabled_keyboards: Vec::new(), // Default to no keyboards enabled (all keyboards will work)
+            enabled_mice: Vec::new(), // Default to no mice enabled (all mice will work)
             theme: Theme::BuiltIn(BuiltInTheme::System), // Default to System theme
             custom_css: String::new(),
             logo_customization: LogoCustomization::default(),
@@ -115,7 +120,6 @@ impl Default for AppConfig {
             auto_start: false,
             start_minimized: false, // Default to not starting minimized
             show_notifications: true,
-            show_debug_console: false, // Default debug console disabled
             landscape_mode: false, // Default landscape mode disabled
         }
     }

@@ -1,4 +1,5 @@
 pub mod app_info;
+pub mod device_selector;
 pub mod dock;
 pub mod header;
 pub mod logo;

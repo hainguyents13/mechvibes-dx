@@ -16,4 +16,4 @@ create_portable.ps1
 /tests*
 
 # Test files and directories
-/soundpacks/custom*
+/soundpacks/*

@@ -133,6 +133,7 @@ fn create_concatenated_audio_and_segments(
 ) -> Result<HashMap<String, (f64, f64)>, Box<dyn std::error::Error>> {
     use std::collections::BTreeSet;
 
+    println!("🔧 Creating concatenated audio from {} sound mappings", sound_files.len());
     let mut segments = HashMap::new();
 
     // Step 1: Collect unique sound files and their durations
@@ -140,26 +141,34 @@ fn create_concatenated_audio_and_segments(
     let mut file_durations: HashMap<String, f64> = HashMap::new();
 
     // First pass: collect all unique sound files
-    for (_, sound_file) in sound_files {
+    for (key, sound_file) in sound_files {
         if !sound_file.is_empty() && sound_file != "null" {
+            println!("📁 Found sound file: {} -> {}", key, sound_file);
             unique_files.insert(sound_file.clone());
         }
     }
 
-    // Step 2: Read durations for all unique files
+    println!("📊 Found {} unique sound files", unique_files.len()); // Step 2: Read durations for all unique files
     for sound_file in &unique_files {
         let file_path = format!("{}/{}", soundpack_dir, sound_file);
 
         if !Path::new(&file_path).exists() {
+            println!("❌ File not found: {} (using default 100ms duration)", file_path);
             file_durations.insert(sound_file.clone(), 100.0);
             continue;
         }
 
         match get_audio_duration_ms(&file_path) {
             Ok(duration) => {
+                println!("⏱️ File {}: duration = {:.3}ms", sound_file, duration);
                 file_durations.insert(sound_file.clone(), duration);
             }
-            Err(_) => {
+            Err(e) => {
+                println!(
+                    "⚠️ Failed to get duration for {}: {} (using default 100ms)",
+                    sound_file,
+                    e
+                );
                 file_durations.insert(sound_file.clone(), 100.0);
             }
         }
@@ -179,11 +188,13 @@ fn create_concatenated_audio_and_segments(
         Ok(precise_file_durations) => {
             // Step 4: Calculate segment positions using PRECISE durations from samples
             let mut current_position = 0.0;
+            let mut total_duration = 0.0;
 
             for sound_file in &unique_files {
                 if let Some(&precise_duration) = precise_file_durations.get(sound_file) {
                     file_segments.insert(sound_file.clone(), (current_position, precise_duration));
                     current_position += precise_duration;
+                    total_duration = current_position; // Track total concatenated duration
                 } else {
                     if let Some(&fallback_duration) = file_durations.get(sound_file) {
                         file_segments.insert(sound_file.clone(), (
@@ -191,14 +202,52 @@ fn create_concatenated_audio_and_segments(
                             fallback_duration,
                         ));
                         current_position += fallback_duration;
+                        total_duration = current_position; // Track total concatenated duration
                     }
                 }
             }
 
-            // Step 5: Map keys to their corresponding PRECISE segments
+            println!("📏 Total concatenated audio duration: {:.3}ms", total_duration); // Step 5: Map keys to their corresponding PRECISE segments with validation
             for (key_name, sound_file) in sound_files {
                 if let Some(&(start, duration)) = file_segments.get(sound_file) {
-                    segments.insert(key_name.clone(), (start, duration));
+                    // ===== DURATION VALIDATION =====
+                    let mut validated_start = start;
+                    let mut validated_duration = duration;
+
+                    println!(
+                        "🔍 Validating timing for key '{}': start={:.3}ms, duration={:.3}ms, total={:.3}ms",
+                        key_name,
+                        start,
+                        duration,
+                        total_duration
+                    );
+
+                    // Check if start exceeds total duration
+                    if start >= total_duration {
+                        println!(
+                            "⚠️ Key '{}': start time {:.3}ms exceeds total duration {:.3}ms, using default timing",
+                            key_name,
+                            start,
+                            total_duration
+                        );
+                        validated_start = 0.0;
+                        validated_duration = 100.0;
+                    } else if start + duration > total_duration {
+                        // Adjust duration to fit within audio bounds
+                        validated_duration = total_duration - start;
+                        println!(
+                            "✂️ Key '{}': duration adjusted from {:.3}ms to {:.3}ms to fit within audio bounds (total: {:.3}ms)",
+                            key_name,
+                            duration,
+                            validated_duration,
+                            total_duration
+                        );
+                    } else {
+                        println!("✅ Key '{}': timing is valid within audio bounds", key_name);
+                    }
+                    // ===== END VALIDATION =====
+
+                    segments.insert(key_name.clone(), (validated_start, validated_duration));
                 } else {
                     segments.insert(key_name.clone(), (0.0, 100.0));
                 }
@@ -231,17 +280,60 @@ fn create_concatenated_audio_and_segments(
             } else {
                 // Use metadata-based timing as fallback
                 let mut current_position = 0.0;
+                let mut total_duration = 0.0;
+
                 for sound_file in &unique_files {
                     if let Some(&duration) = file_durations.get(sound_file) {
                         file_segments.insert(sound_file.clone(), (current_position, duration));
                         current_position += duration;
+                        total_duration = current_position; // Track total concatenated duration
                     }
                 }
 
-                // Map keys to segments
+                println!(
+                    "📏 Total concatenated audio duration (fallback): {:.3}ms",
+                    total_duration
+                ); // Map keys to segments with validation
                 for (key_name, sound_file) in sound_files {
                     if let Some(&(start, duration)) = file_segments.get(sound_file) {
-                        segments.insert(key_name.clone(), (start, duration));
+                        // ===== DURATION VALIDATION =====
+                        let mut validated_start = start;
+                        let mut validated_duration = duration;
+
+                        println!(
+                            "🔍 Validating timing for key '{}' (fallback): start={:.3}ms, duration={:.3}ms, total={:.3}ms",
+                            key_name,
+                            start,
+                            duration,
+                            total_duration
+                        );
+
+                        // Check if start exceeds total duration
+                        if start >= total_duration {
+                            println!(
+                                "⚠️ Key '{}': start time {:.3}ms exceeds total duration {:.3}ms, using default timing",
+                                key_name,
+                                start,
+                                total_duration
+                            );
+                            validated_start = 0.0;
+                            validated_duration = 100.0;
+                        } else if start + duration > total_duration {
+                            // Adjust duration to fit within audio bounds
+                            validated_duration = total_duration - start;
+                            println!(
+                                "✂️ Key '{}': duration adjusted from {:.3}ms to {:.3}ms to fit within audio bounds (total: {:.3}ms)",
+                                key_name,
+                                duration,
+                                validated_duration,
+                                total_duration
+                            );
+                        } else {
+                            println!("✅ Key '{}': timing is valid within audio bounds", key_name);
+                        }
+                        // ===== END VALIDATION =====
+
+                        segments.insert(key_name.clone(), (validated_start, validated_duration));
                     } else {
                         segments.insert(key_name.clone(), (0.0, 100.0));
                     }
@@ -335,22 +427,40 @@ pub fn convert_v1_to_v2(
     output_path: &str,
     soundpack_dir: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔄 Starting V1 to V2 conversion...");
+    println!("📁 Input config: {}", v1_config_path);
+    println!("📁 Output path: {}", output_path);
+
     // Determine soundpack directory - use provided or infer from config path
     let soundpack_dir = if let Some(dir) = soundpack_dir {
+        println!("📁 Using provided soundpack directory: {}", dir);
         dir
     } else {
-        Path::new(v1_config_path)
+        let inferred_dir = Path::new(v1_config_path)
             .parent()
             .and_then(|p| p.to_str())
-            .ok_or("Could not determine soundpack directory")?
+            .ok_or("Could not determine soundpack directory")?;
+        println!("📁 Inferred soundpack directory: {}", inferred_dir);
+        inferred_dir
     };
 
     // Read the V1 config
+    println!("📖 Reading V1 config file...");
     let content = path
         ::read_file_contents(v1_config_path)
         .map_err(|e| format!("Failed to read V1 config: {}", e))?;
 
     let config: Value = serde_json::from_str(&content)?;
+    println!("✅ Successfully parsed V1 config");
+
+    // Log basic config info
+    if let Some(name) = config.get("name") {
+        println!("🎵 Soundpack name: {}", name.as_str().unwrap_or("Unknown"));
+    }
+    if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
+        println!("🎹 Found {} key definitions", defines.len());
+    }
+
     let mut converted_config = Map::new();
 
     // Copy basic fields
@@ -388,19 +498,20 @@ pub fn convert_v1_to_v2(
 
     if let Some(icon) = config.get("icon") {
         converted_config.insert("icon".to_string(), icon.clone());
-    }
-
-    // Add method field - determine from key_define_type or default to "single"
+    } // Add method field - determine from key_define_type or default to "single"
     let method = if let Some(key_define_type) = config.get("key_define_type") {
         if key_define_type.as_str() == Some("multi") {
             converted_config.insert("method".to_string(), Value::String("multi".to_string()));
+            println!("🎵 Method: MULTI (detected from key_define_type)");
             "multi"
         } else {
             converted_config.insert("method".to_string(), Value::String("single".to_string()));
+            println!("🎵 Method: SINGLE (from key_define_type: {:?})", key_define_type.as_str());
             "single"
         }
     } else {
         converted_config.insert("method".to_string(), Value::String("single".to_string()));
+        println!("🎵 Method: SINGLE (default - no key_define_type found)");
         "single"
     };
 
@@ -434,8 +545,8 @@ pub fn convert_v1_to_v2(
     if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
         // Key mapping for common virtual key codes to Web API key names
         let key_mappings = create_vk_to_web_key_mapping();
-
         if method == "multi" {
+            println!("🔄 Processing MULTI method - collecting sound files...");
             // Multi method: collect all sound files and create segments
             let mut sound_files = HashMap::new();
 
@@ -447,19 +558,48 @@ pub fn convert_v1_to_v2(
                         if !value.is_null() {
                             if let Some(sound_file_str) = value.as_str() {
                                 if !sound_file_str.is_empty() && sound_file_str != "null" {
+                                    println!(
+                                        "🎵 Key {}: {} -> {}",
+                                        vk_code,
+                                        key_name,
+                                        sound_file_str
+                                    );
                                     sound_files.insert(
                                         key_name.clone(),
                                         sound_file_str.to_string()
                                     );
+                                } else {
+                                    println!(
+                                        "⚠️ Skipping empty/null sound file for key {}: {}",
+                                        vk_code,
+                                        key_name
+                                    );
                                 }
+                            } else {
+                                println!(
+                                    "⚠️ Invalid sound file type for key {}: {} (not a string)",
+                                    vk_code,
+                                    key_name
+                                );
                             }
+                        } else {
+                            println!("⚠️ Skipping null value for key {}: {}", vk_code, key_name);
                         }
+                    } else {
+                        println!("⚠️ Unknown VK code: {} -> no mapping found", vk_code);
                     }
+                } else {
+                    println!("⚠️ Invalid VK code format: {}", vk_code);
                 }
             }
 
-            // Create concatenated audio and get segment mappings
+            println!(
+                "📊 Collected {} unique sound files from {} keys",
+                sound_files.len(),
+                defines.len()
+            ); // Create concatenated audio and get segment mappings
             let output_audio_path = format!("{}/{}", soundpack_dir, output_audio_filename);
+            println!("🎚️ Creating concatenated audio: {}", output_audio_path);
 
             match
                 create_concatenated_audio_and_segments(
@@ -469,6 +609,10 @@ pub fn convert_v1_to_v2(
                 )
             {
                 Ok(segments) => {
+                    println!(
+                        "✅ Successfully created concatenated audio with {} segments",
+                        segments.len()
+                    );
                     // Set the source to the audio file
                     converted_config.insert(
                         "source".to_string(),
@@ -478,14 +622,23 @@ pub fn convert_v1_to_v2(
                     // Create timing definitions using calculated segments
                     for (key_name, _) in &sound_files {
                         if let Some((start, duration)) = segments.get(key_name) {
+                            println!(
+                                "⏱️ Key {}: start={:.3}ms, duration={:.3}ms",
+                                key_name,
+                                start,
+                                duration
+                            );
                             let timing = vec![
                                 Value::Array(vec![Value::from(*start), Value::from(*duration)])
                             ];
                             defs.insert(key_name.clone(), Value::Array(timing));
+                        } else {
+                            println!("⚠️ No segment found for key: {}", key_name);
                         }
                     }
                 }
-                Err(_) => {
+                Err(e) => {
+                    println!("❌ Failed to create concatenated audio: {}", e);
                     // Set source to the preserved filename even if processing failed
                     converted_config.insert(
                         "source".to_string(),
@@ -500,6 +653,31 @@ pub fn convert_v1_to_v2(
                 }
             }
         } else {
+            println!("🔄 Processing SINGLE method - validating timing data...");
+
+            // For single method, we need to get the audio file duration to validate timing
+            let audio_file_duration = if let Some(sound) = config.get("sound") {
+                if let Some(sound_file) = sound.as_str() {
+                    let audio_path = format!("{}/{}", soundpack_dir, sound_file);
+                    match get_audio_duration_ms(&audio_path) {
+                        Ok(duration) => {
+                            println!("📏 Audio file '{}' duration: {:.3}ms", sound_file, duration);
+                            Some(duration)
+                        }
+                        Err(e) => {
+                            println!("⚠️ Failed to get audio duration for '{}': {}", sound_file, e);
+                            None
+                        }
+                    }
+                } else {
+                    println!("⚠️ Sound field is not a string");
+                    None
+                }
+            } else {
+                println!("⚠️ No sound field found in config");
+                None
+            };
+
             // Single method: preserve existing logic with null filtering
             for (vk_code, value) in defines {
                 // Convert VK code to key name
@@ -513,11 +691,51 @@ pub fn convert_v1_to_v2(
                             if timing_array.len() >= 2 {
                                 // Keep [start_ms, duration_ms] format: [[start_ms, duration_ms]]
                                 if
-                                    let (Some(start), Some(duration)) = (
+                                    let (Some(mut start), Some(mut duration)) = (
                                         timing_array[0].as_f64(),
                                         timing_array[1].as_f64(),
                                     )
                                 {
+                                    // ===== DURATION VALIDATION =====
+                                    // If we have the audio file duration, validate and adjust timing
+                                    if let Some(total_duration) = audio_file_duration {
+                                        println!(
+                                            "🔍 Validating timing for key '{}': start={:.3}ms, duration={:.3}ms, total={:.3}ms",
+                                            key_name,
+                                            start,
+                                            duration,
+                                            total_duration
+                                        );
+
+                                        // Check if start exceeds total duration
+                                        if start >= total_duration {
+                                            println!(
+                                                "⚠️ Key '{}': start time {:.3}ms exceeds audio duration {:.3}ms, using default timing",
+                                                key_name,
+                                                start,
+                                                total_duration
+                                            );
+                                            start = 0.0;
+                                            duration = 100.0;
+                                        } else if start + duration > total_duration {
+                                            // Adjust duration to fit within audio bounds
+                                            let old_duration = duration;
+                                            duration = total_duration - start;
+                                            println!(
+                                                "✂️ Key '{}': duration adjusted from {:.3}ms to {:.3}ms to fit within audio bounds (total: {:.3}ms)",
+                                                key_name,
+                                                old_duration,
+                                                duration,
+                                                total_duration
+                                            );
+                                        } else {
+                                            println!("✅ Key '{}': timing is valid within audio bounds", key_name);
+                                        }
+                                    } else {
+                                        println!("⚠️ Key '{}': no audio duration available, skipping validation", key_name);
+                                    }
+                                    // ===== END VALIDATION =====
+
                                     vec![
                                         Value::Array(
                                             vec![Value::from(start), Value::from(duration)]
@@ -547,14 +765,21 @@ pub fn convert_v1_to_v2(
             }
         }
     }
-
     converted_config.insert("defs".to_string(), Value::Object(defs));
 
     // Write the converted config
+    println!("💾 Writing converted config to: {}", output_path);
     let converted_json = serde_json::to_string_pretty(&converted_config)?;
     path
         ::write_file_contents(output_path, &converted_json)
         .map_err(|e| format!("Failed to write converted config: {}", e))?;
+
+    println!("✅ Successfully converted V1 to V2 config!");
+    println!("📊 Final stats:");
+    println!("  - Method: {}", method);
+    if let Some(defs_obj) = converted_config.get("defs").and_then(|d| d.as_object()) {
+        println!("  - Keys defined: {}", defs_obj.len());
+    }
 
     Ok(())
 }

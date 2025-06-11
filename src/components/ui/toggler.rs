@@ -10,9 +10,6 @@ pub struct TogglerProps {
     pub checked: bool,
     /// Callback when toggle state changes
     pub on_change: EventHandler<bool>,
-    /// Optional size variant (sm, md, lg)
-    #[props(default = "sm")]
-    pub size: &'static str,
     /// Optional color variant (primary, secondary, accent, etc.)
     #[props(default = "")]
     pub variant: &'static str,
@@ -26,19 +23,15 @@ pub struct TogglerProps {
 
 #[component]
 pub fn Toggler(props: TogglerProps) -> Element {
-    let toggle_class = format!(
-        "toggle toggle-{} {}",
-        props.size,
-        if !props.variant.is_empty() {
-            format!("toggle-{}", props.variant)
-        } else {
-            String::new()
-        }
-    );
+    let toggle_class = format!("toggle toggle-sm {}", if !props.variant.is_empty() {
+        format!("toggle-{}", props.variant)
+    } else {
+        String::new()
+    });
 
     rsx! {
       label { class: format!("label w-full justify-between cursor-pointer {}", props.class),
-        div { class: "space-y-1 flex-1 pr-4",
+        div { class: "space-y-0 ",
           div { class: "text-sm font-medium text-base-content", "{props.title}" }
           if let Some(description) = &props.description {
             div { class: "text-xs whitespace-break-spaces text-base-content/70",
@@ -46,14 +39,17 @@ pub fn Toggler(props: TogglerProps) -> Element {
             }
           }
         }
-        input {
-          r#type: "checkbox",
-          class: "{toggle_class}",
-          checked: props.checked,
-          disabled: props.disabled,
-          onchange: move |evt| {
+        div{
+
+          input {
+            r#type: "checkbox",
+            class: "{toggle_class}",
+            checked: props.checked,
+            disabled: props.disabled,
+            onchange: move |evt| {
               props.on_change.call(evt.checked());
-          },
+            },
+          }
         }
       }
     }

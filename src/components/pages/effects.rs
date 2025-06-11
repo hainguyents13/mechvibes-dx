@@ -97,7 +97,6 @@ pub fn EffectsPage() -> Element {
                     on_change: move |new_value: bool| {
                         lofi_auto_play.set(new_value);
                     },
-                    size: "xs",
                   }
                 }
               }
@@ -134,7 +133,6 @@ pub fn EffectsPage() -> Element {
                     on_change: move |new_value: bool| {
                         rain_auto_play.set(new_value);
                     },
-                    size: "xs",
                   }
                 }
                 div { class: "divider" }
@@ -163,7 +161,6 @@ pub fn EffectsPage() -> Element {
                     on_change: move |new_value: bool| {
                         crowd_auto_play.set(new_value);
                     },
-                    size: "xs",
                   }
                 }
               }

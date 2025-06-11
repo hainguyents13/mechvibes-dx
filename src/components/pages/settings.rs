@@ -1,4 +1,5 @@
 use crate::components::ui::{ Collapse, PageHeader, Toggler };
+use crate::components::device_selector::{ AudioOutputSelector, KeyboardSelector, MouseSelector };
 use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
@@ -14,7 +15,6 @@ pub fn SettingsPage() -> Element {
     let auto_start = use_memo(move || config().auto_start);
     let start_minimized = use_memo(move || config().start_minimized);
     let show_notifications = use_memo(move || config().show_notifications);
-    let show_debug_console = use_memo(move || config().show_debug_console);
 
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
@@ -115,10 +115,9 @@ pub fn SettingsPage() -> Element {
                         }
                     },
                   }
-                }
-                // Notifications
+                }                // Notifications
                 Toggler {
-                  title: "Show Notifications".to_string(),
+                  title: "Show notifications".to_string(),
                   description: Some("Display system notifications for important events".to_string()),
                   checked: show_notifications(),
                   on_change: {
@@ -132,21 +131,35 @@ pub fn SettingsPage() -> Element {
                       }
                   },
                 }
-                // Debug Console
-                Toggler {
-                  title: "Show Debug Console".to_string(),
-                  description: Some("Show terminal window for debugging (requires restart)".to_string()),
-                  checked: show_debug_console(),
-                  on_change: {
-                      let update_config = update_config.clone();
-                      move |new_value: bool| {
-                          update_config(
-                              Box::new(move |config| {
-                                  config.show_debug_console = new_value;
-                              }),
-                          );
-                      }
-                  },
+              }
+            },        
+          }          
+           // Devices Section
+          Collapse {
+            title: "Devices".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            children: rsx! {
+              div { class: "space-y-6",
+                // Audio Output Device
+                AudioOutputSelector {}
+                
+                // Keyboard Devices
+                KeyboardSelector {}
+                
+                // Mouse Devices
+                MouseSelector {}
+                
+                // Device Information
+                div { class: "mt-4 p-3 bg-base-200 rounded-box",
+                  div { class: "text-sm font-semibold mb-2", "Device Information" }
+                  div { class: "text-xs text-base-content/70 space-y-1",
+                    p { "• Audio output devices control where soundpack audio is played" }
+                    p { "• Physical input devices control which keyboards/mice generate sounds" }
+                    p { "• If no input devices are selected, all devices will work" }
+                    p { "• Changes take effect immediately" }
+                    p { "• If a device becomes unavailable, the system will fall back gracefully" }
+                  }
                 }
               }
             },

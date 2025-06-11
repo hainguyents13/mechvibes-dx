@@ -1,4 +1,6 @@
 pub mod audio;
+pub mod device_manager;
+pub mod input_device_manager;
 pub mod input_listener;
 pub mod input_manager;
 pub mod protocol;

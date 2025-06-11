@@ -1,22 +1,12 @@
-/// Conditional logging utility based on show_debug_console setting
+/// Debug logging utility
 use std::sync::OnceLock;
 
 static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
 
-/// Initialize debug logging based on config
+/// Initialize debug logging - always enabled
 pub fn init_debug_logging() {
-    let should_debug = match
-        std::panic::catch_unwind(|| { crate::state::config::AppConfig::load().show_debug_console })
-    {
-        Ok(show_debug) => show_debug,
-        Err(_) => false, // Default to false if config loading fails
-    };
-
-    let _ = DEBUG_ENABLED.set(should_debug);
-
-    if should_debug {
-        println!("🐛 Debug logging enabled");
-    }
+    let _ = DEBUG_ENABLED.set(true);
+    println!("🐛 Debug logging enabled");
 }
 
 /// Check if debug logging is enabled

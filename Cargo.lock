@@ -3358,6 +3358,7 @@ dependencies = [
  "base64",
  "bincode",
  "chrono",
+ "cpal",
  "crossbeam-channel",
  "dioxus",
  "env_logger",
