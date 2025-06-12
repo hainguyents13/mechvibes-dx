@@ -132,6 +132,7 @@ fn main() {
         .with_transparent(false) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
         .with_inner_size(window_size)
+        // .with_inner_size(LogicalSize::new(400, 600))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false) // Enable window resizing for landscape mode

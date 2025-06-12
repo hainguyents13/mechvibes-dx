@@ -1,7 +1,3 @@
-use rodio::{ Decoder, Source };
-use std::fs::File;
-use std::io::{ BufReader, Read };
-
 use crate::state::config::AppConfig;
 use crate::state::paths;
 use crate::state::soundpack::SoundPack;
@@ -45,33 +41,238 @@ fn load_audio_file(
     soundpack_path: &str,
     soundpack: &SoundPack
 ) -> Result<(Vec<f32>, u16, u32), String> {
+    println!("🔍 [DEBUG] load_audio_file called");
+    println!("🔍 [DEBUG] soundpack_path: {}", soundpack_path);
+    println!("🔍 [DEBUG] soundpack.source: {:?}", soundpack.source);
+
     let sound_file_path = soundpack.source
         .as_ref()
         .map(|src| format!("{}/{}", soundpack_path, src.trim_start_matches("./")))
         .ok_or_else(|| "No source field in soundpack config".to_string())?;
 
+    println!("🔍 [DEBUG] Full sound file path: {}", sound_file_path);
+
     if !std::path::Path::new(&sound_file_path).exists() {
+        println!("❌ [DEBUG] Sound file not found: {}", sound_file_path);
         return Err(format!("Sound file not found: {}", sound_file_path));
     }
 
-    let file = File::open(&sound_file_path).map_err(|e|
-        format!("Failed to open sound file: {}", e)
-    )?;
+    println!("✅ [DEBUG] Sound file exists, loading with Symphonia...");
 
-    let mut buf = Vec::new();
-    file
-        .take(10_000_000)
-        .read_to_end(&mut buf)
-        .map_err(|e| format!("Failed to read sound file: {}", e))?;
+    // Use Symphonia for audio loading instead of Rodio
+    match load_audio_with_symphonia(&sound_file_path) {
+        Ok((samples, channels, sample_rate)) => {
+            println!(
+                "✅ [DEBUG] Audio loaded with Symphonia: {} samples, {} channels, {} Hz",
+                samples.len(),
+                channels,
+                sample_rate
+            );
+            Ok((samples, channels, sample_rate))
+        }
+        Err(e) => {
+            println!("❌ [DEBUG] Failed to load audio with Symphonia: {}", e);
+            Err(format!("Failed to load audio: {}", e))
+        }
+    }
+}
 
-    let cursor = std::io::Cursor::new(buf);
-    let decoder = Decoder::new(BufReader::new(cursor)).map_err(|e|
-        format!("Failed to decode audio: {}", e)
-    )?;
+/// Load audio file using Symphonia for consistent duration detection
+fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), String> {
+    use symphonia::core::audio::{ AudioBufferRef, Signal };
+    use symphonia::core::codecs::{ DecoderOptions, CODEC_TYPE_NULL };
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+    use std::fs::File;
 
-    let sample_rate = decoder.sample_rate();
-    let channels = decoder.channels();
-    let samples: Vec<f32> = decoder.convert_samples().collect();
+    let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(extension) = std::path::Path::new(file_path).extension() {
+        if let Some(ext_str) = extension.to_str() {
+            hint.with_extension(ext_str);
+        }
+    }
+
+    let meta_opts: MetadataOptions = Default::default();
+    let fmt_opts: FormatOptions = Default::default();
+
+    let probed = symphonia::default
+        ::get_probe()
+        .format(&hint, mss, &fmt_opts, &meta_opts)
+        .map_err(|e| format!("Failed to probe format: {}", e))?;
+
+    let mut format = probed.format;
+    let track = format
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+        .ok_or("No supported audio tracks found")?;
+
+    let dec_opts: DecoderOptions = Default::default();
+    let mut decoder = symphonia::default
+        ::get_codecs()
+        .make(&track.codec_params, &dec_opts)
+        .map_err(|e| format!("Failed to create decoder: {}", e))?;
+
+    let track_id = track.id;
+    let mut samples = Vec::new();
+    let mut sample_rate = 44100u32;
+    let mut channels = 2u16;
+
+    // Decode audio packets
+    loop {
+        let packet = match format.next_packet() {
+            Ok(packet) => packet,
+            Err(_) => {
+                break;
+            } // End of stream
+        };
+
+        if packet.track_id() != track_id {
+            continue;
+        }
+
+        match decoder.decode(&packet) {
+            Ok(decoded) => {
+                if samples.is_empty() {
+                    // Get format info from first decoded buffer
+                    sample_rate = decoded.spec().rate;
+                    channels = decoded.spec().channels.count() as u16;
+                } // Convert audio buffer to f32 samples
+                match decoded {
+                    AudioBufferRef::F32(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push(sample);
+                        }
+                        // Handle additional channels if stereo
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push(sample);
+                            }
+                        }
+                    }
+                    AudioBufferRef::S32(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push((sample as f32) / (i32::MAX as f32));
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push((sample as f32) / (i32::MAX as f32));
+                            }
+                        }
+                    }
+                    AudioBufferRef::S16(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push((sample as f32) / (i16::MAX as f32));
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push((sample as f32) / (i16::MAX as f32));
+                            }
+                        }
+                    }
+                    AudioBufferRef::U32(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push(
+                                ((sample as f32) - (u32::MAX as f32) / 2.0) /
+                                    ((u32::MAX as f32) / 2.0)
+                            );
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push(
+                                    ((sample as f32) - (u32::MAX as f32) / 2.0) /
+                                        ((u32::MAX as f32) / 2.0)
+                                );
+                            }
+                        }
+                    }
+                    AudioBufferRef::U16(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push(
+                                ((sample as f32) - (u16::MAX as f32) / 2.0) /
+                                    ((u16::MAX as f32) / 2.0)
+                            );
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push(
+                                    ((sample as f32) - (u16::MAX as f32) / 2.0) /
+                                        ((u16::MAX as f32) / 2.0)
+                                );
+                            }
+                        }
+                    }
+                    AudioBufferRef::U8(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push(((sample as f32) - 128.0) / 128.0);
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push(((sample as f32) - 128.0) / 128.0);
+                            }
+                        }
+                    }
+                    AudioBufferRef::S8(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push((sample as f32) / (i8::MAX as f32));
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push((sample as f32) / (i8::MAX as f32));
+                            }
+                        }
+                    }
+                    AudioBufferRef::F64(buf) => {
+                        for &sample in buf.chan(0) {
+                            samples.push(sample as f32);
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                samples.push(sample as f32);
+                            }
+                        }
+                    }
+                    AudioBufferRef::U24(buf) => {
+                        for &sample in buf.chan(0) {
+                            let sample_f32 = ((sample.inner() as f32) - 8388608.0) / 8388608.0; // 2^23
+                            samples.push(sample_f32);
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                let sample_f32 = ((sample.inner() as f32) - 8388608.0) / 8388608.0;
+                                samples.push(sample_f32);
+                            }
+                        }
+                    }
+                    AudioBufferRef::S24(buf) => {
+                        for &sample in buf.chan(0) {
+                            let sample_f32 = (sample.inner() as f32) / 8388607.0; // 2^23 - 1
+                            samples.push(sample_f32);
+                        }
+                        if channels > 1 && buf.spec().channels.count() > 1 {
+                            for &sample in buf.chan(1) {
+                                let sample_f32 = (sample.inner() as f32) / 8388607.0;
+                                samples.push(sample_f32);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("⚠️ [DEBUG] Decode error (continuing): {}", e);
+                continue;
+            }
+        }
+    }
+
+    if samples.is_empty() {
+        return Err("No audio data decoded".to_string());
+    }
 
     Ok((samples, channels, sample_rate))
 }
@@ -92,9 +293,15 @@ pub fn load_keyboard_soundpack_optimized(
         ::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let soundpack: SoundPack = serde_json
-        ::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    // First try to parse as V2, if fails try V1 format
+    let soundpack: SoundPack = match serde_json::from_str(&config_content) {
+        Ok(sp) => sp,
+        Err(_) => {
+            // Try to parse as V1 and convert on-the-fly for loading only
+            println!("⚠️ Config appears to be V1 format, converting for loading (not saving)");
+            convert_v1_for_loading(&config_content, soundpack_id)?
+        }
+    };
 
     // Verify this is a keyboard soundpack
     if soundpack.mouse {
@@ -534,4 +741,153 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
 
     cache.save();
     println!("💾 Updated cache with error information for {}", soundpack_id);
+}
+
+/// Convert V1 config to SoundPack struct for loading only (doesn't save to file)
+fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<SoundPack, String> {
+    println!("🔍 [DEBUG] convert_v1_for_loading called for {}", soundpack_id);
+
+    let v1_config: serde_json::Value = serde_json
+        ::from_str(config_content)
+        .map_err(|e| format!("Failed to parse V1 config: {}", e))?;
+
+    // Extract basic fields from V1
+    let name = v1_config
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(soundpack_id)
+        .to_string();
+
+    let source = v1_config
+        .get("sound")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    println!("🔍 [DEBUG] V1 source field: {:?}", source);
+
+    // Convert V1 defines to V2 defs format
+    let mut defs = std::collections::HashMap::new();
+
+    if let Some(defines) = v1_config.get("defines").and_then(|d| d.as_object()) {
+        println!("🔍 [DEBUG] Found {} defines in V1 config", defines.len());
+
+        // Simple IOHook to Web key mapping for common keys
+        let key_mappings = create_simple_key_mapping();
+
+        for (iohook_code, timing) in defines {
+            if let Ok(iohook_num) = iohook_code.parse::<u32>() {
+                if let Some(key_name) = key_mappings.get(&iohook_num) {
+                    if let Some(timing_array) = timing.as_array() {
+                        if timing_array.len() >= 2 {
+                            let start = timing_array[0].as_f64().unwrap_or(0.0) as f32;
+                            let duration = timing_array[1].as_f64().unwrap_or(100.0) as f32;
+
+                            println!(
+                                "🔍 [DEBUG] Key {} (IOHook {}): [{}, {}]",
+                                key_name,
+                                iohook_code,
+                                start,
+                                duration
+                            );
+                            defs.insert(key_name.clone(), vec![[start, duration]]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!("🔍 [DEBUG] Converted {} key mappings to V2 format", defs.len()); // Create SoundPack struct
+    Ok(SoundPack {
+        id: v1_config
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or(soundpack_id)
+            .to_string(),
+        name,
+        author: "N/A".to_string(), // Default for V1 configs
+        description: v1_config
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        version: v1_config
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        tags: v1_config
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            }),
+        keycap: v1_config
+            .get("keycap")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        icon: v1_config
+            .get("icon")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        mouse: false, // V1 configs are keyboard soundpacks
+        config_version: 1, // Mark as V1 so we know this needs proper conversion later
+        method: v1_config
+            .get("key_define_type")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        source,
+        defs,
+        includes_numpad: v1_config.get("includes_numpad").and_then(|v| v.as_bool()),
+    })
+}
+
+/// Create simple IOHook to Web key mapping for basic conversion
+fn create_simple_key_mapping() -> std::collections::HashMap<u32, String> {
+    let mut mapping = std::collections::HashMap::new();
+
+    // Common keys only - enough for basic loading
+    mapping.insert(1, "Escape".to_string());
+    mapping.insert(2, "Digit1".to_string());
+    mapping.insert(3, "Digit2".to_string());
+    mapping.insert(4, "Digit3".to_string());
+    mapping.insert(5, "Digit4".to_string());
+    mapping.insert(6, "Digit5".to_string());
+    mapping.insert(7, "Digit6".to_string());
+    mapping.insert(8, "Digit7".to_string());
+    mapping.insert(9, "Digit8".to_string());
+    mapping.insert(10, "Digit9".to_string());
+    mapping.insert(11, "Digit0".to_string());
+    mapping.insert(16, "KeyQ".to_string());
+    mapping.insert(17, "KeyW".to_string());
+    mapping.insert(18, "KeyE".to_string());
+    mapping.insert(19, "KeyR".to_string());
+    mapping.insert(20, "KeyT".to_string());
+    mapping.insert(21, "KeyY".to_string());
+    mapping.insert(22, "KeyU".to_string());
+    mapping.insert(23, "KeyI".to_string());
+    mapping.insert(24, "KeyO".to_string());
+    mapping.insert(25, "KeyP".to_string());
+    mapping.insert(30, "KeyA".to_string());
+    mapping.insert(31, "KeyS".to_string());
+    mapping.insert(32, "KeyD".to_string());
+    mapping.insert(33, "KeyF".to_string());
+    mapping.insert(34, "KeyG".to_string());
+    mapping.insert(35, "KeyH".to_string());
+    mapping.insert(36, "KeyJ".to_string());
+    mapping.insert(37, "KeyK".to_string());
+    mapping.insert(38, "KeyL".to_string());
+    mapping.insert(44, "KeyZ".to_string());
+    mapping.insert(45, "KeyX".to_string());
+    mapping.insert(46, "KeyC".to_string());
+    mapping.insert(47, "KeyV".to_string());
+    mapping.insert(48, "KeyB".to_string());
+    mapping.insert(49, "KeyN".to_string());
+    mapping.insert(50, "KeyM".to_string());
+    mapping.insert(57, "Space".to_string());
+    mapping.insert(28, "Enter".to_string());
+    mapping.insert(14, "Backspace".to_string());
+    mapping.insert(15, "Tab".to_string());
+
+    mapping
 }

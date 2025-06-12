@@ -7,10 +7,14 @@ use std::fs;
 /// Load soundpack metadata from config.json
 pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, String> {
     let config_path = paths::soundpacks::config_json(soundpack_id);
-    let mut last_error: Option<String> = None;
-
-    // Validate the soundpack configuration first
+    let mut last_error: Option<String> = None; // Validate the soundpack configuration first
     let validation_result = validate_soundpack_config(&config_path);
+    println!(
+        "🔍 [DEBUG] Validation result for {}: status={:?}, can_convert={}",
+        soundpack_id,
+        validation_result.status,
+        validation_result.can_be_converted
+    );
 
     // If it's a V1 config that can be converted, auto-convert it
     if

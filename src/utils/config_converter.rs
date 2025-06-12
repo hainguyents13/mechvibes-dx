@@ -1,38 +1,38 @@
 use super::path;
 use serde_json::{ Map, Value };
 use std::collections::HashMap;
-use std::fs::File;
 use std::path::Path;
 
-/// Get the duration of an audio file in milliseconds
+/// Get the duration of an audio file in milliseconds using Symphonia
 fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
+    println!("🔍 [DEBUG] get_audio_duration_ms called with: {}", file_path);
+
     // Check if file exists first
     if !Path::new(file_path).exists() {
+        println!("❌ [DEBUG] File does not exist: {}", file_path);
         return Err("File does not exist".into());
     }
 
-    // Try symphonia first for better metadata support
-    if let Ok(duration) = get_duration_with_symphonia(file_path) {
-        if duration > 0.0 {
-            return Ok(duration);
+    println!("✅ [DEBUG] File exists, calling Symphonia...");
+
+    // Use symphonia for audio duration detection
+    match get_duration_with_symphonia(file_path) {
+        Ok(duration) if duration > 0.0 => {
+            println!("✅ [DEBUG] Symphonia returned valid duration: {:.3}ms", duration);
+            Ok(duration)
+        }
+        Ok(duration) => {
+            println!(
+                "⚠️ [DEBUG] Symphonia returned invalid duration: {:.3}ms, using default 100ms",
+                duration
+            );
+            Ok(100.0)
+        }
+        Err(e) => {
+            println!("❌ [DEBUG] Symphonia failed: {}, using default 100ms", e);
+            Ok(100.0)
         }
     }
-
-    // Fallback to rodio if symphonia fails
-    if let Ok(duration) = get_duration_with_rodio(file_path) {
-        if duration > 0.0 {
-            return Ok(duration);
-        }
-    }
-
-    // Final fallback: try reading with sample counting
-    if let Ok(duration) = get_duration_by_sample_counting(file_path) {
-        if duration > 0.0 {
-            return Ok(duration);
-        }
-    }
-
-    Ok(100.0)
 }
 
 /// Get duration using Symphonia (better for MP3 metadata)
@@ -77,52 +77,211 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
         let duration_ms = duration_seconds * 1000.0;
         return Ok(duration_ms);
     }
-
     Err("No duration information available in track".into())
 }
 
-/// Get duration using Rodio (fallback method)
-fn get_duration_with_rodio(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    use rodio::{ Decoder, Source };
-    use std::io::BufReader;
+/// Round timing data to ensure proper alignment and avoid gaps
+fn round_timing_data(segments: &mut HashMap<String, (f64, f64)>, _total_duration: f64) {
+    for (_key, (start, duration)) in segments.iter_mut() {
+        // Round to nearest millisecond to avoid floating point precision issues
+        *start = start.round();
+        *duration = duration.round();
 
-    let file = File::open(file_path)?;
-    let reader = BufReader::new(file);
-    let source = Decoder::new(reader)?;
+        // Ensure minimum duration of 1ms
+        if *duration < 1.0 {
+            *duration = 1.0;
+        }
+    }
+}
 
-    if let Some(duration) = source.total_duration() {
-        let duration_ms = duration.as_millis() as f64;
-        if duration_ms > 0.0 {
-            return Ok(duration_ms);
+/// Create concatenated audio file with precise timing using sample-based calculation
+fn create_concatenated_audio_file_with_precise_timing(
+    soundpack_dir: &str,
+    unique_files: &std::collections::BTreeSet<String>,
+    output_path: &str
+) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
+    use symphonia::core::audio::{ AudioBufferRef, Signal };
+    use symphonia::core::codecs::{ DecoderOptions, CODEC_TYPE_NULL };
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+    use std::fs::File;
+
+    let mut all_samples: Vec<f32> = Vec::new();
+    let mut sample_rate = 44100u32;
+    let mut channels = 2u16;
+    let mut file_durations = HashMap::new();
+
+    // Process each unique file and track precise durations
+    for (index, sound_file) in unique_files.iter().enumerate() {
+        let file_path = format!("{}/{}", soundpack_dir, sound_file);
+
+        if !std::path::Path::new(&file_path).exists() {
+            file_durations.insert(sound_file.clone(), 100.0);
+            continue;
+        }
+
+        match File::open(&file_path) {
+            Ok(audio_file) => {
+                let mss = MediaSourceStream::new(Box::new(audio_file), Default::default());
+
+                let mut hint = Hint::new();
+                if let Some(extension) = std::path::Path::new(&file_path).extension() {
+                    if let Some(ext_str) = extension.to_str() {
+                        hint.with_extension(ext_str);
+                    }
+                }
+
+                let meta_opts: MetadataOptions = Default::default();
+                let fmt_opts: FormatOptions = Default::default();
+
+                match symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts) {
+                    Ok(probed) => {
+                        let mut format = probed.format;
+                        let track = format
+                            .tracks()
+                            .iter()
+                            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL);
+
+                        if let Some(track) = track {
+                            let dec_opts: DecoderOptions = Default::default();
+                            match
+                                symphonia::default
+                                    ::get_codecs()
+                                    .make(&track.codec_params, &dec_opts)
+                            {
+                                Ok(mut decoder) => {
+                                    let track_id = track.id;
+                                    let mut file_samples = Vec::new();
+
+                                    // Set sample rate and channels from first file
+                                    if index == 0 {
+                                        sample_rate =
+                                            track.codec_params.sample_rate.unwrap_or(44100);
+                                        channels = track.codec_params.channels
+                                            .map(|ch| ch.count() as u16)
+                                            .unwrap_or(2);
+                                    }
+
+                                    // Decode audio packets
+                                    loop {
+                                        let packet = match format.next_packet() {
+                                            Ok(packet) => packet,
+                                            Err(_) => {
+                                                break;
+                                            } // End of stream
+                                        };
+
+                                        if packet.track_id() != track_id {
+                                            continue;
+                                        }
+
+                                        match decoder.decode(&packet) {
+                                            Ok(decoded) => {
+                                                // Convert audio buffer to f32 samples
+                                                match decoded {
+                                                    AudioBufferRef::F32(buf) => {
+                                                        for &sample in buf.chan(0) {
+                                                            file_samples.push(sample);
+                                                        }
+                                                        if
+                                                            channels > 1 &&
+                                                            buf.spec().channels.count() > 1
+                                                        {
+                                                            for &sample in buf.chan(1) {
+                                                                file_samples.push(sample);
+                                                            }
+                                                        }
+                                                    }
+                                                    AudioBufferRef::S16(buf) => {
+                                                        for &sample in buf.chan(0) {
+                                                            file_samples.push(
+                                                                (sample as f32) / (i16::MAX as f32)
+                                                            );
+                                                        }
+                                                        if
+                                                            channels > 1 &&
+                                                            buf.spec().channels.count() > 1
+                                                        {
+                                                            for &sample in buf.chan(1) {
+                                                                file_samples.push(
+                                                                    (sample as f32) /
+                                                                        (i16::MAX as f32)
+                                                                );
+                                                            }
+                                                        }
+                                                    }
+                                                    _ => {
+                                                        // Handle other formats with basic conversion
+                                                        // Skip complex conversion for concatenation
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+                                            Err(_) => {
+                                                continue;
+                                            }
+                                        }
+                                    }
+
+                                    // Calculate precise duration from sample count
+                                    let duration_ms = if sample_rate > 0 && channels > 0 {
+                                        ((file_samples.len() as f64) /
+                                            (sample_rate as f64) /
+                                            (channels as f64)) *
+                                            1000.0
+                                    } else {
+                                        100.0
+                                    };
+
+                                    file_durations.insert(sound_file.clone(), duration_ms);
+                                    all_samples.extend(file_samples);
+                                }
+                                Err(_) => {
+                                    file_durations.insert(sound_file.clone(), 100.0);
+                                }
+                            }
+                        } else {
+                            file_durations.insert(sound_file.clone(), 100.0);
+                        }
+                    }
+                    Err(_) => {
+                        file_durations.insert(sound_file.clone(), 100.0);
+                    }
+                }
+            }
+            Err(_) => {
+                file_durations.insert(sound_file.clone(), 100.0);
+            }
         }
     }
 
-    Err("No duration available from rodio".into())
-}
-
-/// Get duration by counting samples (most accurate but slower)
-fn get_duration_by_sample_counting(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    use rodio::{ Decoder, Source };
-    use std::io::BufReader;
-
-    let file = File::open(file_path)?;
-    let reader = BufReader::new(file);
-    let source = Decoder::new(reader)?;
-
-    let sample_rate = source.sample_rate();
-    let channels = source.channels();
-
-    // Count all samples
-    let samples: Vec<f32> = source.convert_samples().collect();
-    let sample_count = samples.len();
-
-    if sample_count > 0 && sample_rate > 0 && channels > 0 {
-        let duration_seconds = (sample_count as f64) / (sample_rate as f64) / (channels as f64);
-        let duration_ms = duration_seconds * 1000.0;
-        return Ok(duration_ms);
+    if all_samples.is_empty() {
+        return Err("No audio samples were collected".into());
     }
 
-    Err("Could not calculate duration from samples".into())
+    // Write concatenated samples to WAV file using hound
+    let spec = hound::WavSpec {
+        channels,
+        sample_rate,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+
+    let mut writer = hound::WavWriter
+        ::create(output_path, spec)
+        .map_err(|e| format!("Failed to create WAV writer: {}", e))?;
+
+    // Write samples
+    for sample in all_samples.iter() {
+        writer.write_sample(*sample).map_err(|e| format!("Failed to write sample: {}", e))?;
+    }
+
+    // Finalize the WAV file
+    writer.finalize().map_err(|e| format!("Failed to finalize WAV file: {}", e))?;
+
+    Ok(file_durations)
 }
 
 /// Create concatenated audio file from multiple sound files and return segment mappings
@@ -213,7 +372,6 @@ fn create_concatenated_audio_and_segments(
                     // ===== DURATION VALIDATION =====
                     let mut validated_start = start;
                     let mut validated_duration = duration;
-
                     println!(
                         "🔍 Validating timing for key '{}': start={:.3}ms, duration={:.3}ms, total={:.3}ms",
                         key_name,
@@ -299,7 +457,6 @@ fn create_concatenated_audio_and_segments(
                         // ===== DURATION VALIDATION =====
                         let mut validated_start = start;
                         let mut validated_duration = duration;
-
                         println!(
                             "🔍 Validating timing for key '{}' (fallback): start={:.3}ms, duration={:.3}ms, total={:.3}ms",
                             key_name,
@@ -342,6 +499,9 @@ fn create_concatenated_audio_and_segments(
         }
     }
 
+    // Round timing data to ensure gaps between segments are acceptable and timing is within bounds
+    round_timing_data(&mut segments, 1000.0);
+
     Ok(segments)
 }
 
@@ -352,9 +512,13 @@ fn create_concatenated_audio_file(
     _file_durations: &HashMap<String, f64>,
     output_path: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use rodio::{ Decoder, Source };
+    use symphonia::core::audio::{ AudioBufferRef, Signal };
+    use symphonia::core::codecs::{ DecoderOptions, CODEC_TYPE_NULL };
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
     use std::fs::File;
-    use std::io::BufReader;
 
     // Collect all audio samples from all files
     let mut all_samples: Vec<f32> = Vec::new();
@@ -371,20 +535,125 @@ fn create_concatenated_audio_file(
 
         match File::open(&file_path) {
             Ok(audio_file) => {
-                match Decoder::new(BufReader::new(audio_file)) {
-                    Ok(source) => {
-                        // Set sample rate and channels from first file
-                        if index == 0 {
-                            sample_rate = source.sample_rate();
-                            channels = source.channels();
-                        }
+                let mss = MediaSourceStream::new(Box::new(audio_file), Default::default());
 
-                        // Convert to f32 samples and collect
-                        let samples: Vec<f32> = source.convert_samples().collect();
-                        all_samples.extend(samples);
+                let mut hint = Hint::new();
+                if let Some(extension) = Path::new(&file_path).extension() {
+                    if let Some(ext_str) = extension.to_str() {
+                        hint.with_extension(ext_str);
+                    }
+                }
+
+                let meta_opts: MetadataOptions = Default::default();
+                let fmt_opts: FormatOptions = Default::default();
+
+                match symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts) {
+                    Ok(probed) => {
+                        let mut format = probed.format;
+                        let track = format
+                            .tracks()
+                            .iter()
+                            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL);
+
+                        if let Some(track) = track {
+                            let dec_opts: DecoderOptions = Default::default();
+                            match
+                                symphonia::default
+                                    ::get_codecs()
+                                    .make(&track.codec_params, &dec_opts)
+                            {
+                                Ok(mut decoder) => {
+                                    let track_id = track.id;
+
+                                    // Set sample rate and channels from first file
+                                    if index == 0 {
+                                        sample_rate =
+                                            track.codec_params.sample_rate.unwrap_or(44100);
+                                        channels = track.codec_params.channels
+                                            .map(|ch| ch.count() as u16)
+                                            .unwrap_or(2);
+                                    }
+
+                                    // Decode audio packets
+                                    loop {
+                                        let packet = match format.next_packet() {
+                                            Ok(packet) => packet,
+                                            Err(_) => {
+                                                break;
+                                            }
+                                        };
+
+                                        if packet.track_id() != track_id {
+                                            continue;
+                                        }
+
+                                        match decoder.decode(&packet) {
+                                            Ok(decoded) => {
+                                                // Convert to f32 samples - simplified version
+                                                match decoded {
+                                                    AudioBufferRef::F32(buf) => {
+                                                        for &sample in buf.chan(0) {
+                                                            all_samples.push(sample);
+                                                        }
+                                                        if
+                                                            channels > 1 &&
+                                                            buf.spec().channels.count() > 1
+                                                        {
+                                                            for &sample in buf.chan(1) {
+                                                                all_samples.push(sample);
+                                                            }
+                                                        }
+                                                    }
+                                                    AudioBufferRef::S16(buf) => {
+                                                        for &sample in buf.chan(0) {
+                                                            all_samples.push(
+                                                                (sample as f32) / (i16::MAX as f32)
+                                                            );
+                                                        }
+                                                        if
+                                                            channels > 1 &&
+                                                            buf.spec().channels.count() > 1
+                                                        {
+                                                            for &sample in buf.chan(1) {
+                                                                all_samples.push(
+                                                                    (sample as f32) /
+                                                                        (i16::MAX as f32)
+                                                                );
+                                                            }
+                                                        }
+                                                    }
+                                                    _ => {
+                                                        // Skip other formats for simplicity in concatenation
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                return Err(
+                                                    format!(
+                                                        "Failed to decode {}: {}",
+                                                        sound_file,
+                                                        e
+                                                    ).into()
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    return Err(
+                                        format!(
+                                            "Failed to create decoder for {}: {}",
+                                            sound_file,
+                                            e
+                                        ).into()
+                                    );
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
-                        return Err(format!("Failed to decode {}: {}", sound_file, e).into());
+                        return Err(format!("Failed to probe {}: {}", sound_file, e).into());
                     }
                 }
             }
@@ -422,6 +691,7 @@ fn create_concatenated_audio_file(
 }
 
 /// Convert soundpack config from version 1 to version 2
+/// Uses comprehensive IOHook keycode mapping (supports all platforms)
 pub fn convert_v1_to_v2(
     v1_config_path: &str,
     output_path: &str,
@@ -538,29 +808,27 @@ pub fn convert_v1_to_v2(
             converted_config.insert("source".to_string(), sound.clone());
         }
         String::new() // Not used for single method
-    };
-
-    // Convert "defines" to "defs" with proper timing format based on method
+    }; // Convert "defines" to "defs" with proper timing format based on method
     let mut defs = Map::new();
     if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
-        // Key mapping for common virtual key codes to Web API key names
-        let key_mappings = create_vk_to_web_key_mapping();
+        // Key mapping from IOHook scan codes to Web API key names
+        // Uses comprehensive mapping that supports all platforms
+        let key_mappings = create_iohook_to_web_key_mapping();
+        println!("🔧 Using comprehensive IOHook keycode mapping (all platforms supported)");
         if method == "multi" {
             println!("🔄 Processing MULTI method - collecting sound files...");
             // Multi method: collect all sound files and create segments
-            let mut sound_files = HashMap::new();
-
-            // First pass: collect all unique sound files mapped to their keys
-            for (vk_code, value) in defines {
-                if let Ok(vk_num) = vk_code.parse::<u32>() {
-                    if let Some(key_name) = key_mappings.get(&vk_num) {
+            let mut sound_files = HashMap::new(); // First pass: collect all unique sound files mapped to their keys
+            for (iohook_code, value) in defines {
+                if let Ok(iohook_num) = iohook_code.parse::<u32>() {
+                    if let Some(key_name) = key_mappings.get(&iohook_num) {
                         // Skip null values and only process actual string sound file names
                         if !value.is_null() {
                             if let Some(sound_file_str) = value.as_str() {
                                 if !sound_file_str.is_empty() && sound_file_str != "null" {
                                     println!(
-                                        "🎵 Key {}: {} -> {}",
-                                        vk_code,
+                                        "🎵 IOHook {}: {} -> {}",
+                                        iohook_code,
                                         key_name,
                                         sound_file_str
                                     );
@@ -570,26 +838,30 @@ pub fn convert_v1_to_v2(
                                     );
                                 } else {
                                     println!(
-                                        "⚠️ Skipping empty/null sound file for key {}: {}",
-                                        vk_code,
+                                        "⚠️ Skipping empty/null sound file for IOHook {}: {}",
+                                        iohook_code,
                                         key_name
                                     );
                                 }
                             } else {
                                 println!(
-                                    "⚠️ Invalid sound file type for key {}: {} (not a string)",
-                                    vk_code,
+                                    "⚠️ Invalid sound file type for IOHook {}: {} (not a string)",
+                                    iohook_code,
                                     key_name
                                 );
                             }
                         } else {
-                            println!("⚠️ Skipping null value for key {}: {}", vk_code, key_name);
+                            println!(
+                                "⚠️ Skipping null value for IOHook {}: {}",
+                                iohook_code,
+                                key_name
+                            );
                         }
                     } else {
-                        println!("⚠️ Unknown VK code: {} -> no mapping found", vk_code);
+                        println!("⚠️ Unknown IOHook code: {} -> no mapping found", iohook_code);
                     }
                 } else {
-                    println!("⚠️ Invalid VK code format: {}", vk_code);
+                    println!("⚠️ Invalid IOHook code format: {}", iohook_code);
                 }
             }
 
@@ -613,17 +885,28 @@ pub fn convert_v1_to_v2(
                         "✅ Successfully created concatenated audio with {} segments",
                         segments.len()
                     );
+
+                    // ===== FINAL ROUNDING PHASE =====
+                    // This is where we round all timing data to ensure proper alignment
+                    let mut final_segments = segments;
+                    let total_concatenated_duration = final_segments
+                        .values()
+                        .map(|(start, duration)| start + duration)
+                        .fold(0.0, f64::max);
+                    round_timing_data(&mut final_segments, total_concatenated_duration);
+                    // ===== END FINAL ROUNDING =====
+
                     // Set the source to the audio file
                     converted_config.insert(
                         "source".to_string(),
                         Value::String(output_audio_filename)
                     );
 
-                    // Create timing definitions using calculated segments
+                    // Create timing definitions using rounded segments
                     for (key_name, _) in &sound_files {
-                        if let Some((start, duration)) = segments.get(key_name) {
+                        if let Some((start, duration)) = final_segments.get(key_name) {
                             println!(
-                                "⏱️ Key {}: start={:.3}ms, duration={:.3}ms",
+                                "⏱️ Key {}: final timing start={:.0}ms, duration={:.0}ms",
                                 key_name,
                                 start,
                                 duration
@@ -676,13 +959,11 @@ pub fn convert_v1_to_v2(
             } else {
                 println!("⚠️ No sound field found in config");
                 None
-            };
-
-            // Single method: preserve existing logic with null filtering
-            for (vk_code, value) in defines {
-                // Convert VK code to key name
-                if let Ok(vk_num) = vk_code.parse::<u32>() {
-                    if let Some(key_name) = key_mappings.get(&vk_num) {
+            }; // Single method: preserve existing logic with null filtering
+            for (iohook_code, value) in defines {
+                // Convert IOHook code to key name
+                if let Ok(iohook_num) = iohook_code.parse::<u32>() {
+                    if let Some(key_name) = key_mappings.get(&iohook_num) {
                         // Skip null values in single method too
                         if value.is_null() {
                             continue;
@@ -697,7 +978,7 @@ pub fn convert_v1_to_v2(
                                     )
                                 {
                                     // ===== DURATION VALIDATION =====
-                                    // If we have the audio file duration, validate and adjust timing
+                                    // If we have the audio file duration, validate timing
                                     if let Some(total_duration) = audio_file_duration {
                                         println!(
                                             "🔍 Validating timing for key '{}': start={:.3}ms, duration={:.3}ms, total={:.3}ms",
@@ -716,13 +997,13 @@ pub fn convert_v1_to_v2(
                                                 total_duration
                                             );
                                             start = 0.0;
-                                            duration = 100.0;
+                                            duration = 100.0; // Use default duration, don't expand
                                         } else if start + duration > total_duration {
-                                            // Adjust duration to fit within audio bounds
+                                            // Only adjust if timing actually exceeds audio bounds
                                             let old_duration = duration;
                                             duration = total_duration - start;
                                             println!(
-                                                "✂️ Key '{}': duration adjusted from {:.3}ms to {:.3}ms to fit within audio bounds (total: {:.3}ms)",
+                                                "✂️ Key '{}': duration adjusted from {:.3}ms to {:.0}ms to fit within audio bounds (total: {:.0}ms)",
                                                 key_name,
                                                 old_duration,
                                                 duration,
@@ -784,219 +1065,155 @@ pub fn convert_v1_to_v2(
     Ok(())
 }
 
-/// Create mapping from Windows Virtual Key codes to Web API key names
-fn create_vk_to_web_key_mapping() -> HashMap<u32, String> {
+// Windows VK mapping removed - we now use IOHook scan codes as the default standard
+
+/// Create comprehensive mapping from IOHook scan codes to Web API key names
+/// Combines all platform-specific codes to support any IOHook keycode regardless of platform
+fn create_iohook_to_web_key_mapping() -> HashMap<u32, String> {
     let mut mapping = HashMap::new();
 
     // Function keys
-    mapping.insert(112, "F1".to_string());
-    mapping.insert(113, "F2".to_string());
-    mapping.insert(114, "F3".to_string());
-    mapping.insert(115, "F4".to_string());
-    mapping.insert(116, "F5".to_string());
-    mapping.insert(117, "F6".to_string());
-    mapping.insert(118, "F7".to_string());
-    mapping.insert(119, "F8".to_string());
-    mapping.insert(120, "F9".to_string());
-    mapping.insert(121, "F10".to_string());
-    mapping.insert(122, "F11".to_string());
-    mapping.insert(123, "F12".to_string());
+    mapping.insert(59, "F1".to_string());
+    mapping.insert(60, "F2".to_string());
+    mapping.insert(61, "F3".to_string());
+    mapping.insert(62, "F4".to_string());
+    mapping.insert(63, "F5".to_string());
+    mapping.insert(64, "F6".to_string());
+    mapping.insert(65, "F7".to_string());
+    mapping.insert(66, "F8".to_string());
+    mapping.insert(67, "F9".to_string());
+    mapping.insert(68, "F10".to_string());
+    mapping.insert(87, "F11".to_string());
+    mapping.insert(88, "F12".to_string());
+    mapping.insert(91, "F13".to_string());
+    mapping.insert(92, "F14".to_string());
+    mapping.insert(93, "F15".to_string());
 
     // Number row
-    mapping.insert(48, "Digit0".to_string());
-    mapping.insert(49, "Digit1".to_string());
-    mapping.insert(50, "Digit2".to_string());
-    mapping.insert(51, "Digit3".to_string());
-    mapping.insert(52, "Digit4".to_string());
-    mapping.insert(53, "Digit5".to_string());
-    mapping.insert(54, "Digit6".to_string());
-    mapping.insert(55, "Digit7".to_string());
-    mapping.insert(56, "Digit8".to_string());
-    mapping.insert(57, "Digit9".to_string());
+    mapping.insert(11, "Digit0".to_string());
+    mapping.insert(2, "Digit1".to_string());
+    mapping.insert(3, "Digit2".to_string());
+    mapping.insert(4, "Digit3".to_string());
+    mapping.insert(5, "Digit4".to_string());
+    mapping.insert(6, "Digit5".to_string());
+    mapping.insert(7, "Digit6".to_string());
+    mapping.insert(8, "Digit7".to_string());
+    mapping.insert(9, "Digit8".to_string());
+    mapping.insert(10, "Digit9".to_string());
 
-    // Letter keys A-Z
-    mapping.insert(65, "KeyA".to_string());
-    mapping.insert(66, "KeyB".to_string());
-    mapping.insert(67, "KeyC".to_string());
-    mapping.insert(68, "KeyD".to_string());
-    mapping.insert(69, "KeyE".to_string());
-    mapping.insert(70, "KeyF".to_string());
-    mapping.insert(71, "KeyG".to_string());
-    mapping.insert(72, "KeyH".to_string());
-    mapping.insert(73, "KeyI".to_string());
-    mapping.insert(74, "KeyJ".to_string());
-    mapping.insert(75, "KeyK".to_string());
-    mapping.insert(76, "KeyL".to_string());
-    mapping.insert(77, "KeyM".to_string());
-    mapping.insert(78, "KeyN".to_string());
-    mapping.insert(79, "KeyO".to_string());
-    mapping.insert(80, "KeyP".to_string());
-    mapping.insert(81, "KeyQ".to_string());
-    mapping.insert(82, "KeyR".to_string());
-    mapping.insert(83, "KeyS".to_string());
-    mapping.insert(84, "KeyT".to_string());
-    mapping.insert(85, "KeyU".to_string());
-    mapping.insert(86, "KeyV".to_string());
-    mapping.insert(87, "KeyW".to_string());
-    mapping.insert(88, "KeyX".to_string());
-    mapping.insert(89, "KeyY".to_string());
-    mapping.insert(90, "KeyZ".to_string());
+    // Letter keys A-Z (IOHook scan codes)
+    mapping.insert(30, "KeyA".to_string());
+    mapping.insert(48, "KeyB".to_string());
+    mapping.insert(46, "KeyC".to_string());
+    mapping.insert(32, "KeyD".to_string());
+    mapping.insert(18, "KeyE".to_string());
+    mapping.insert(33, "KeyF".to_string());
+    mapping.insert(34, "KeyG".to_string());
+    mapping.insert(35, "KeyH".to_string());
+    mapping.insert(23, "KeyI".to_string());
+    mapping.insert(36, "KeyJ".to_string());
+    mapping.insert(37, "KeyK".to_string());
+    mapping.insert(38, "KeyL".to_string());
+    mapping.insert(50, "KeyM".to_string());
+    mapping.insert(49, "KeyN".to_string());
+    mapping.insert(24, "KeyO".to_string());
+    mapping.insert(25, "KeyP".to_string());
+    mapping.insert(16, "KeyQ".to_string());
+    mapping.insert(19, "KeyR".to_string());
+    mapping.insert(31, "KeyS".to_string());
+    mapping.insert(20, "KeyT".to_string());
+    mapping.insert(22, "KeyU".to_string());
+    mapping.insert(47, "KeyV".to_string());
+    mapping.insert(17, "KeyW".to_string());
+    mapping.insert(45, "KeyX".to_string());
+    mapping.insert(21, "KeyY".to_string());
+    mapping.insert(44, "KeyZ".to_string());
 
     // Special keys
-    mapping.insert(27, "Escape".to_string());
-    mapping.insert(9, "Tab".to_string());
-    mapping.insert(20, "CapsLock".to_string());
-    mapping.insert(16, "ShiftLeft".to_string());
-    mapping.insert(17, "ControlLeft".to_string());
-    mapping.insert(18, "AltLeft".to_string());
-    mapping.insert(32, "Space".to_string());
-    mapping.insert(13, "Enter".to_string());
-    mapping.insert(8, "Backspace".to_string());
+    mapping.insert(1, "Escape".to_string());
+    mapping.insert(15, "Tab".to_string());
+    mapping.insert(58, "CapsLock".to_string());
+    mapping.insert(42, "ShiftLeft".to_string());
+    mapping.insert(54, "ShiftRight".to_string());
+    mapping.insert(29, "ControlLeft".to_string());
+    mapping.insert(3613, "ControlRight".to_string());
+    mapping.insert(56, "AltLeft".to_string());
+    mapping.insert(3640, "AltRight".to_string());
+    mapping.insert(3675, "MetaLeft".to_string()); // Windows/Command key
+    mapping.insert(3676, "MetaRight".to_string()); // Windows/Command key
+    mapping.insert(3677, "ContextMenu".to_string());
+    mapping.insert(57, "Space".to_string());
+    mapping.insert(28, "Enter".to_string());
+    mapping.insert(14, "Backspace".to_string());
 
-    // Punctuation keys (common US layout)
-    mapping.insert(189, "Minus".to_string());
-    mapping.insert(187, "Equal".to_string());
-    mapping.insert(219, "BracketLeft".to_string());
-    mapping.insert(221, "BracketRight".to_string());
-    mapping.insert(220, "Backslash".to_string());
-    mapping.insert(186, "Semicolon".to_string());
-    mapping.insert(222, "Quote".to_string());
-    mapping.insert(192, "Backquote".to_string());
-    mapping.insert(188, "Comma".to_string());
-    mapping.insert(190, "Period".to_string());
-    mapping.insert(191, "Slash".to_string());
+    // Punctuation keys
+    mapping.insert(12, "Minus".to_string());
+    mapping.insert(13, "Equal".to_string());
+    mapping.insert(26, "BracketLeft".to_string());
+    mapping.insert(27, "BracketRight".to_string());
+    mapping.insert(43, "Backslash".to_string());
+    mapping.insert(39, "Semicolon".to_string());
+    mapping.insert(40, "Quote".to_string());
+    mapping.insert(41, "Backquote".to_string());
+    mapping.insert(51, "Comma".to_string());
+    mapping.insert(52, "Period".to_string());
+    mapping.insert(53, "Slash".to_string());
 
-    // Arrow keys
-    mapping.insert(37, "ArrowLeft".to_string());
-    mapping.insert(38, "ArrowUp".to_string());
-    mapping.insert(39, "ArrowRight".to_string());
-    mapping.insert(40, "ArrowDown".to_string());
+    // Arrow keys (standard IOHook codes)
+    mapping.insert(57416, "ArrowUp".to_string());
+    mapping.insert(57419, "ArrowLeft".to_string());
+    mapping.insert(57421, "ArrowRight".to_string());
+    mapping.insert(57424, "ArrowDown".to_string());
 
-    // Insert/Delete cluster
-    mapping.insert(45, "Insert".to_string());
-    mapping.insert(46, "Delete".to_string());
-    mapping.insert(36, "Home".to_string());
-    mapping.insert(35, "End".to_string());
-    mapping.insert(33, "PageUp".to_string());
-    mapping.insert(34, "PageDown".to_string());
+    // Arrow keys (Windows extended codes)
+    mapping.insert(61000, "ArrowUp".to_string());
+    mapping.insert(61003, "ArrowLeft".to_string());
+    mapping.insert(61005, "ArrowRight".to_string());
+    mapping.insert(61008, "ArrowDown".to_string());
+
+    // Insert/Delete cluster (standard IOHook codes)
+    mapping.insert(3666, "Insert".to_string());
+    mapping.insert(3667, "Delete".to_string());
+    mapping.insert(3655, "Home".to_string());
+    mapping.insert(3663, "End".to_string());
+    mapping.insert(3657, "PageUp".to_string());
+    mapping.insert(3665, "PageDown".to_string());
+
+    // Insert/Delete cluster (Windows extended codes)
+    mapping.insert(61010, "Insert".to_string());
+    mapping.insert(61011, "Delete".to_string());
+    mapping.insert(60999, "Home".to_string());
+    mapping.insert(61007, "End".to_string());
+    mapping.insert(61001, "PageUp".to_string());
+    mapping.insert(61009, "PageDown".to_string());
+
+    // Print Screen, Scroll Lock, Pause
+    mapping.insert(3639, "PrintScreen".to_string());
+    mapping.insert(70, "ScrollLock".to_string());
+    mapping.insert(3653, "Pause".to_string());
 
     // Numpad
-    mapping.insert(96, "Numpad0".to_string());
-    mapping.insert(97, "Numpad1".to_string());
-    mapping.insert(98, "Numpad2".to_string());
-    mapping.insert(99, "Numpad3".to_string());
-    mapping.insert(100, "Numpad4".to_string());
-    mapping.insert(101, "Numpad5".to_string());
-    mapping.insert(102, "Numpad6".to_string());
-    mapping.insert(103, "Numpad7".to_string());
-    mapping.insert(104, "Numpad8".to_string());
-    mapping.insert(105, "Numpad9".to_string());
-    mapping.insert(106, "NumpadMultiply".to_string());
-    mapping.insert(107, "NumpadAdd".to_string());
-    mapping.insert(109, "NumpadSubtract".to_string());
-    mapping.insert(110, "NumpadDecimal".to_string());
-    mapping.insert(111, "NumpadDivide".to_string());
+    mapping.insert(82, "Numpad0".to_string());
+    mapping.insert(79, "Numpad1".to_string());
+    mapping.insert(80, "Numpad2".to_string());
+    mapping.insert(81, "Numpad3".to_string());
+    mapping.insert(75, "Numpad4".to_string());
+    mapping.insert(76, "Numpad5".to_string());
+    mapping.insert(77, "Numpad6".to_string());
+    mapping.insert(71, "Numpad7".to_string());
+    mapping.insert(72, "Numpad8".to_string());
+    mapping.insert(73, "Numpad9".to_string());
+    mapping.insert(3637, "NumpadDivide".to_string());
+    mapping.insert(55, "NumpadMultiply".to_string());
+    mapping.insert(74, "NumpadSubtract".to_string());
+    mapping.insert(78, "NumpadAdd".to_string());
+    mapping.insert(3612, "NumpadEnter".to_string());
+    mapping.insert(83, "NumpadDecimal".to_string());
+    mapping.insert(69, "NumLock".to_string());
+    mapping.insert(3597, "NumpadEqual".to_string());
+
+    // Special function key (macOS Fn key)
+    mapping.insert(3666, "Fn".to_string());
 
     mapping
-}
-
-/// Create concatenated audio file with precise sample-based duration tracking
-/// Returns a HashMap of actual durations for each file based on samples processed
-fn create_concatenated_audio_file_with_precise_timing(
-    soundpack_dir: &str,
-    unique_files: &std::collections::BTreeSet<String>,
-    output_path: &str
-) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
-    use rodio::{ Decoder, Source };
-    use std::fs::File;
-    use std::io::BufReader;
-
-    // Track actual durations for each file
-    let mut actual_file_durations: HashMap<String, f64> = HashMap::new();
-
-    // Collect all audio samples from all files
-    let mut all_samples: Vec<f32> = Vec::new();
-    let mut sample_rate = 44100u32;
-    let mut channels = 2u16;
-
-    // Process each unique file and track precise durations
-    for (index, sound_file) in unique_files.iter().enumerate() {
-        let file_path = format!("{}/{}", soundpack_dir, sound_file);
-
-        if !Path::new(&file_path).exists() {
-            actual_file_durations.insert(sound_file.clone(), 0.0);
-            continue;
-        }
-
-        match File::open(&file_path) {
-            Ok(audio_file) => {
-                match Decoder::new(BufReader::new(audio_file)) {
-                    Ok(source) => {
-                        let file_sample_rate = source.sample_rate();
-                        let file_channels = source.channels();
-
-                        // Set sample rate and channels from first file
-                        if index == 0 {
-                            sample_rate = file_sample_rate;
-                            channels = file_channels;
-                        }
-
-                        // Convert to f32 samples and track count for this specific file
-                        let file_samples: Vec<f32> = source.convert_samples().collect();
-                        let file_sample_count = file_samples.len();
-
-                        // Calculate PRECISE duration from actual sample count
-                        let precise_duration_ms = if sample_rate > 0 && channels > 0 {
-                            ((file_sample_count as f64) /
-                                (channels as f64) /
-                                (sample_rate as f64)) *
-                                1000.0
-                        } else {
-                            0.0
-                        };
-
-                        // Store the precise duration for this file
-                        actual_file_durations.insert(sound_file.clone(), precise_duration_ms);
-
-                        // Add samples to concatenated audio
-                        all_samples.extend(file_samples);
-                    }
-                    Err(e) => {
-                        actual_file_durations.insert(sound_file.clone(), 0.0);
-                        return Err(format!("Failed to decode {}: {}", sound_file, e).into());
-                    }
-                }
-            }
-            Err(e) => {
-                actual_file_durations.insert(sound_file.clone(), 0.0);
-                return Err(format!("Failed to open {}: {}", file_path, e).into());
-            }
-        }
-    }
-
-    if all_samples.is_empty() {
-        return Err("No audio samples were collected".into());
-    }
-
-    // Write concatenated samples to WAV file using hound
-    let spec = hound::WavSpec {
-        channels,
-        sample_rate,
-        bits_per_sample: 32,
-        sample_format: hound::SampleFormat::Float,
-    };
-
-    let mut writer = hound::WavWriter
-        ::create(output_path, spec)
-        .map_err(|e| format!("Failed to create WAV writer: {}", e))?;
-
-    // Write all samples
-    for sample in all_samples.iter() {
-        writer.write_sample(*sample).map_err(|e| format!("Failed to write sample: {}", e))?;
-    }
-
-    // Finalize the WAV file
-    writer.finalize().map_err(|e| format!("Failed to finalize WAV file: {}", e))?;
-
-    Ok(actual_file_durations)
 }
