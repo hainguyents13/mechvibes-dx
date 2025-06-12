@@ -23,7 +23,7 @@ resources = ["./soundpacks", "./assets"]
 # configure bundling for windows
 [bundle.windows]
 installer = "nsis"
-tsp = true
+tsp = false
 icon_path = "./assets/icon.ico"
 allow_downgrades = true
 

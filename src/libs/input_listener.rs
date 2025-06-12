@@ -147,7 +147,6 @@ pub fn start_unified_input_listener(
         // Track pressed modifier keys for hotkey detection
         let mut ctrl_pressed = false;
         let mut alt_pressed = false;
-
         let result = listen(move |event: Event| {
             match event.event_type {
                 // ===== KEYBOARD EVENTS =====
@@ -155,6 +154,7 @@ pub fn start_unified_input_listener(
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
                         // println!("⌨️ Key Pressed: {}", key_code);
+                        // println!("🔍 DEBUG: Key event detected: {}", key_code);
 
                         // Track modifier keys for hotkey detection
                         match key_code {
@@ -245,6 +245,7 @@ pub fn start_unified_input_listener(
                     let button_code = map_button_to_code(button);
                     if !button_code.is_empty() && button_code != "MouseUnknown" {
                         // println!("🖱️ Mouse Button Pressed: {}", button_code);
+                        // println!("🔍 DEBUG: Mouse event detected: {}", button_code);
 
                         // Check if button is already pressed
                         let mut pressed = pressed_buttons.lock().unwrap();

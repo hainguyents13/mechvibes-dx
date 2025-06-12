@@ -58,10 +58,10 @@ pub fn WindowController() -> Element {
                             }
                         }
                     }
-                } // Handle tray update requests from other parts of the application
+                }                // Handle tray update requests from other parts of the application
                 if let Some(_) = TRAY_UPDATE_SERVICE.try_receive() {
                     tray_manager_clone.with_mut(|tray_opt| {
-                        if let Some(ref mut tray) = tray_opt {
+                        if let Some(tray) = tray_opt {
                             if let Err(e) = tray.update_menu() {
                                 eprintln!("❌ Failed to update tray menu from global request: {}", e);
                             } else {
@@ -93,10 +93,9 @@ pub fn WindowController() -> Element {
                                     } else {
                                         "disabled"
                                     };
-                                    debug_print!("🔇 Sounds {} via tray menu", status);
-                                    // Update tray menu to reflect new state
+                                    debug_print!("🔇 Sounds {} via tray menu", status);                                    // Update tray menu to reflect new state
                                     tray_manager_clone.with_mut(|tray_opt| {
-                                        if let Some(ref mut tray) = tray_opt {
+                                        if let Some(tray) = tray_opt {
                                             if let Err(e) = tray.update_menu() {
                                                 always_eprint!("❌ Failed to update tray menu: {}", e);
                                             }
