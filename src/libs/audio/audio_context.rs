@@ -37,8 +37,6 @@ impl PartialEq for AudioContext {
 
 impl AudioContext {
     pub fn new() -> Self {
-        println!("🎵 Creating new AudioContext...");
-
         // Initialize device manager
         let device_manager = DeviceManager::new();
         let config = AppConfig::load();
@@ -48,7 +46,6 @@ impl AudioContext {
             Some(device_id) => {
                 match device_manager.get_output_device_by_id(device_id) {
                     Ok(Some(device)) => {
-                        println!("🎵 Using selected audio device: {}", device_id);
                         match rodio::OutputStream::try_from_device(&device) {
                             Ok((stream, handle)) => (stream, handle),
                             Err(e) => {
@@ -79,7 +76,6 @@ impl AudioContext {
                 }
             }
             None => {
-                println!("🎵 Using default audio device");
                 rodio::OutputStream
                     ::try_default()
                     .expect("Failed to create default audio output stream")
@@ -106,10 +102,10 @@ impl AudioContext {
         let config = AppConfig::load();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
-        // Load soundpack from config with cache optimization
-        println!("🔍 Loading initial soundpack from cache...");
+
+        // Load soundpack from config
         match super::soundpack_loader::load_soundpack(&context) {
-            Ok(_) => println!("✅ Initial soundpack loaded successfully from cache"),
+            Ok(_) => {}
             Err(e) => eprintln!("❌ Failed to load initial soundpack: {}", e),
         }
 
@@ -166,10 +162,7 @@ impl AudioContext {
             .map(|v| *v)
             .unwrap_or(1.0)
     }
-
     pub fn create_with_device(device_id: Option<String>) -> Result<Self, String> {
-        println!("🔄 Creating AudioContext with specific device...");
-
         // Initialize device manager
         let device_manager = DeviceManager::new();
 
@@ -178,7 +171,6 @@ impl AudioContext {
             Some(id) => {
                 match device_manager.get_output_device_by_id(id) {
                     Ok(Some(device)) => {
-                        println!("🎵 Using audio device: {}", id);
                         match rodio::OutputStream::try_from_device(&device) {
                             Ok((stream, handle)) => (stream, handle),
                             Err(e) => {
@@ -198,7 +190,6 @@ impl AudioContext {
                 }
             }
             None => {
-                println!("🎵 Using default audio device");
                 rodio::OutputStream
                     ::try_default()
                     .map_err(|e| format!("Failed to create default stream: {}", e))?
@@ -225,15 +216,12 @@ impl AudioContext {
         // Initialize volume from config
         let config = AppConfig::load();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
-        MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
-
-        // Load soundpack from config with cache optimization
-        println!("🔍 Loading initial soundpack from cache...");
+        MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume)); // Load soundpack from config
         match super::soundpack_loader::load_soundpack(&context) {
-            Ok(_) => println!("✅ Initial soundpack loaded successfully from cache"),
+            Ok(_) => {}
             Err(e) => eprintln!("❌ Failed to load initial soundpack: {}", e),
         }
-        println!("✅ AudioContext created successfully");
+
         Ok(context)
     }
 

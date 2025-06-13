@@ -83,39 +83,19 @@ fn load_audio_file(
     soundpack_path: &str,
     soundpack: &SoundPack
 ) -> Result<(Vec<f32>, u16, u32), String> {
-    println!("🔍 [DEBUG] load_audio_file called");
-    println!("🔍 [DEBUG] soundpack_path: {}", soundpack_path);
-    println!("🔍 [DEBUG] soundpack.audio_file: {:?}", soundpack.audio_file);
-
     let sound_file_path = soundpack.audio_file
         .as_ref()
         .map(|src| format!("{}/{}", soundpack_path, src.trim_start_matches("./")))
         .ok_or_else(|| "No audio_file field in soundpack config".to_string())?;
 
-    println!("🔍 [DEBUG] Full sound file path: {}", sound_file_path);
-
     if !std::path::Path::new(&sound_file_path).exists() {
-        println!("❌ [DEBUG] Sound file not found: {}", sound_file_path);
         return Err(format!("Sound file not found: {}", sound_file_path));
     }
 
-    println!("✅ [DEBUG] Sound file exists, loading with Symphonia...");
-
     // Use Symphonia for audio loading instead of Rodio
     match load_audio_with_symphonia(&sound_file_path) {
-        Ok((samples, channels, sample_rate)) => {
-            println!(
-                "✅ [DEBUG] Audio loaded with Symphonia: {} samples, {} channels, {} Hz",
-                samples.len(),
-                channels,
-                sample_rate
-            );
-            Ok((samples, channels, sample_rate))
-        }
-        Err(e) => {
-            println!("❌ [DEBUG] Failed to load audio with Symphonia: {}", e);
-            Err(format!("Failed to load audio: {}", e))
-        }
+        Ok((samples, channels, sample_rate)) => { Ok((samples, channels, sample_rate)) }
+        Err(e) => { Err(format!("Failed to load audio: {}", e)) }
     }
 }
 
@@ -133,21 +113,16 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
     let metadata = std::fs
         ::metadata(file_path)
         .map_err(|e| format!("Failed to get file metadata: {}", e))?;
-
     if metadata.len() == 0 {
         return Err(format!("Audio file is empty: {}", file_path));
     }
 
-    println!("🔍 [DEBUG] Audio file info: {} bytes", metadata.len());
-
     let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
-
     let mut hint = Hint::new();
     if let Some(extension) = std::path::Path::new(file_path).extension() {
         if let Some(ext_str) = extension.to_str() {
             hint.with_extension(ext_str);
-            println!("🔍 [DEBUG] File extension hint: {}", ext_str);
         }
     }
 
@@ -158,28 +133,12 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
         ::get_probe()
         .format(&hint, mss, &fmt_opts, &meta_opts)
         .map_err(|e| {
-            // Add more detailed error info
-            let error_msg = format!(
+            format!(
                 "Failed to probe format for '{}': {} (file size: {} bytes)",
                 file_path,
                 e,
                 metadata.len()
-            );
-            println!("❌ [DEBUG] Probe error: {}", error_msg);
-
-            // Try to provide helpful suggestions
-            if let Some(ext) = std::path::Path::new(file_path).extension() {
-                if let Some(ext_str) = ext.to_str() {
-                    match ext_str.to_lowercase().as_str() {
-                        "ogg" => println!("💡 Suggestion: Ensure this is a valid OGG Vorbis file"),
-                        "mp3" => println!("💡 Suggestion: Ensure this is a valid MP3 file"),
-                        "wav" => println!("💡 Suggestion: Ensure this is a valid WAV file"),
-                        _ => println!("💡 Suggestion: Check if this is a supported audio format"),
-                    }
-                }
-            }
-
-            error_msg
+            )
         })?;
 
     let mut format = probed.format;

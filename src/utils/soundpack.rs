@@ -9,39 +9,27 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
     let config_path = paths::soundpacks::config_json(soundpack_id);
     let mut last_error: Option<String> = None; // Validate the soundpack configuration first
     let validation_result = validate_soundpack_config(&config_path);
-    println!(
-        "🔍 [DEBUG] Validation result for {}: status={:?}, can_convert={}",
-        soundpack_id,
-        validation_result.status,
-        validation_result.can_be_converted
-    );
 
     // If it's a V1 config that can be converted, auto-convert it
     if
         validation_result.status == SoundpackValidationStatus::VersionOneNeedsConversion &&
         validation_result.can_be_converted
     {
-        println!("🔄 Auto-converting V1 soundpack '{}' to V2 format", soundpack_id);
-
         // Create backup of original config
         let backup_path = format!("{}.v1.backup", config_path);
         if let Err(e) = fs::copy(&config_path, &backup_path) {
             let error_msg = format!("Failed to create backup for {}: {}", soundpack_id, e);
-            println!("⚠️  {}", error_msg);
             last_error = Some(error_msg);
-        }
-
-        // Convert V1 to V2
+        } // Convert V1 to V2
         match config_converter::convert_v1_to_v2(&config_path, &config_path, None) {
             Ok(()) => {
-                println!("✅ Successfully converted {} from V1 to V2", soundpack_id);
+                // Successfully converted
             }
             Err(e) => {
                 let error_msg = format!("Failed to convert {} from V1 to V2: {}", soundpack_id, e);
-                println!("❌ {}", error_msg);
                 // Restore backup if conversion failed
                 if fs::copy(&backup_path, &config_path).is_ok() {
-                    println!("🔙 Restored original config from backup");
+                    // Restored backup
                 }
                 // Return error for conversion failure
                 return Err(error_msg);

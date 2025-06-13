@@ -5,33 +5,14 @@ use std::path::Path;
 
 /// Get the duration of an audio file in milliseconds using Symphonia
 fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    println!("🔍 [DEBUG] get_audio_duration_ms called with: {}", file_path);
-
     // Check if file exists first
     if !Path::new(file_path).exists() {
-        println!("❌ [DEBUG] File does not exist: {}", file_path);
         return Err("File does not exist".into());
-    }
-
-    println!("✅ [DEBUG] File exists, calling Symphonia...");
-
-    // Use symphonia for audio duration detection
+    } // Use symphonia for audio duration detection
     match get_duration_with_symphonia(file_path) {
-        Ok(duration) if duration > 0.0 => {
-            println!("✅ [DEBUG] Symphonia returned valid duration: {:.3}ms", duration);
-            Ok(duration)
-        }
-        Ok(duration) => {
-            println!(
-                "⚠️ [DEBUG] Symphonia returned invalid duration: {:.3}ms, using default 100ms",
-                duration
-            );
-            Ok(100.0)
-        }
-        Err(e) => {
-            println!("❌ [DEBUG] Symphonia failed: {}, using default 100ms", e);
-            Ok(100.0)
-        }
+        Ok(duration) if duration > 0.0 => { Ok(duration) }
+        Ok(_) => { Ok(100.0) }
+        Err(_) => { Ok(100.0) }
     }
 }
 
@@ -73,7 +54,6 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
             let duration_seconds =
                 ((n_frames as f64) * (time_base.numer as f64)) / (time_base.denom as f64);
             let duration_ms = duration_seconds * 1000.0;
-            println!("🎵 [DEBUG] Duration from metadata: {:.3}ms", duration_ms);
             return Ok(duration_ms);
         }
     }
@@ -83,13 +63,11 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
         if let Some(n_frames) = track.codec_params.n_frames {
             let duration_seconds = (n_frames as f64) / (sample_rate as f64);
             let duration_ms = duration_seconds * 1000.0;
-            println!("🎵 [DEBUG] Duration from sample rate: {:.3}ms", duration_ms);
             return Ok(duration_ms);
         }
     }
 
     // Fallback: use default duration
-    println!("⚠️ [DEBUG] Could not determine duration, using default 100ms");
     Ok(100.0)
 }
 
@@ -100,39 +78,22 @@ pub fn convert_v1_to_v2(
     output_path: &str,
     soundpack_dir: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔄 Starting V1 to V2 conversion...");
-    println!("📁 Input config: {}", v1_config_path);
-    println!("📁 Output path: {}", output_path);
-
     // Determine soundpack directory - use provided or infer from config path
     let soundpack_dir = if let Some(dir) = soundpack_dir {
-        println!("📁 Using provided soundpack directory: {}", dir);
         dir
     } else {
         let inferred_dir = Path::new(v1_config_path)
             .parent()
             .and_then(|p| p.to_str())
             .ok_or("Could not determine soundpack directory")?;
-        println!("📁 Inferred soundpack directory: {}", inferred_dir);
         inferred_dir
     };
 
     // Read the V1 config
-    println!("📖 Reading V1 config file...");
     let content = path
         ::read_file_contents(v1_config_path)
         .map_err(|e| format!("Failed to read V1 config: {}", e))?;
-
     let config: Value = serde_json::from_str(&content)?;
-    println!("✅ Successfully parsed V1 config");
-
-    // Log basic config info
-    if let Some(name) = config.get("name") {
-        println!("🎵 Soundpack name: {}", name.as_str().unwrap_or("Unknown"));
-    }
-    if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
-        println!("🎹 Found {} key definitions", defines.len());
-    }
 
     let mut converted_config = Map::new();
 
@@ -184,7 +145,7 @@ pub fn convert_v1_to_v2(
         "definition_method".to_string(),
         Value::String(definition_method.to_string())
     );
-    println!("🎵 V1 define type: {}, converting to V2 single method", v1_define_type); // Handle audio_file for "single" method
+    // Handle audio_file for "single" method
     let (audio_file_name, audio_file_offsets) = if v1_define_type == "multi" {
         // For V1 multi method, we need to create a concatenated audio file
         // First, collect all unique audio files from defines and calculate their offsets
@@ -238,7 +199,7 @@ pub fn convert_v1_to_v2(
         // Actually concatenate the audio files
         match concatenate_audio_files(&audio_files_ordered, soundpack_dir, &concat_filename) {
             Ok(()) => {
-                println!("✅ Successfully created concatenated audio file");
+                // Successfully created concatenated audio
             }
             Err(e) => {
                 println!("❌ Failed to create concatenated audio file: {}", e);

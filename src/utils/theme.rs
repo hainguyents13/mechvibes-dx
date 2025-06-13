@@ -2,19 +2,17 @@ use crate::state::themes::ThemesConfig;
 use dioxus::prelude::*;
 use once_cell::sync::Lazy;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc, Mutex };
 
-static THEMES_CONFIG: Lazy<Arc<Mutex<ThemesConfig>>> =
-    Lazy::new(|| Arc::new(Mutex::new(ThemesConfig::load())));
+static THEMES_CONFIG: Lazy<Arc<Mutex<ThemesConfig>>> = Lazy::new(||
+    Arc::new(Mutex::new(ThemesConfig::load()))
+);
 
 /// Global signal to trigger refresh of all theme components
 static REFRESH_TRIGGER: GlobalSignal<u32> = Signal::global(|| 0);
 
 /// Hook for accessing and updating themes configuration
-pub fn use_themes() -> (
-    Signal<ThemesConfig>,
-    Rc<dyn Fn(Box<dyn FnOnce(&mut ThemesConfig)>)>,
-) {
+pub fn use_themes() -> (Signal<ThemesConfig>, Rc<dyn Fn(Box<dyn FnOnce(&mut ThemesConfig)>)>) {
     // Load initial themes config
     let mut themes = use_signal(|| THEMES_CONFIG.lock().unwrap().clone());
 
@@ -35,13 +33,9 @@ pub fn use_themes() -> (
                 eprintln!("❌ Failed to save themes: {}", e);
                 return;
             }
-        }
-
-        // Trigger refresh of all components using themes
+        } // Trigger refresh of all components using themes
         let current = REFRESH_TRIGGER();
         *REFRESH_TRIGGER.write() = current + 1;
-
-        println!("[theme_utils] ✅ Themes updated and saved to disk - triggering UI refresh");
     });
 
     (themes, update_themes)
