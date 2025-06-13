@@ -44,6 +44,11 @@ pub mod data {
 pub mod soundpacks {
     use super::get_app_root;
 
+    /// Get the main soundpacks directory
+    pub fn get_soundpacks_dir() -> String {
+        get_app_root().join("soundpacks").to_string_lossy().to_string()
+    }
+
     /// Get soundpack directory path for a specific soundpack ID
     pub fn soundpack_dir(soundpack_id: &str) -> String {
         get_app_root().join("soundpacks").join(soundpack_id).to_string_lossy().to_string()

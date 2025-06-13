@@ -25,7 +25,13 @@ rfd = "0.15"
 rodio = "0.20.1"
 cpal = "0.15"
 hound = "3.5"
-symphonia = { version = "0.5", features = ["mp3", "wav", "ogg"] }
+symphonia = { version = "0.5", features = [
+  "mp3",
+  "wav",
+  "ogg",
+  "isomp4",
+  "aac",
+] }
 image = "0.24"
 serde = "1.0.218"
 serde_json = "1.0.140"

@@ -5,6 +5,18 @@ use crate::state::soundpack::{ SoundpackCache, SoundpackMetadata };
 
 use super::audio_context::AudioContext;
 
+/// Determine soundpack type based on the soundpack path
+fn determine_soundpack_type(soundpack_id: &str) -> crate::state::soundpack::SoundpackType {
+    if soundpack_id.starts_with("keyboard/") || soundpack_id.starts_with("keyboard\\") {
+        crate::state::soundpack::SoundpackType::Keyboard
+    } else if soundpack_id.starts_with("mouse/") || soundpack_id.starts_with("mouse\\") {
+        crate::state::soundpack::SoundpackType::Mouse
+    } else {
+        // Default to keyboard for backwards compatibility
+        crate::state::soundpack::SoundpackType::Keyboard
+    }
+}
+
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
     let config = AppConfig::load();
     // Load both keyboard and mouse soundpacks
@@ -22,6 +34,12 @@ pub fn load_keyboard_soundpack_with_cache_control(
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
+    // Skip loading if soundpack ID is empty
+    if soundpack_id.is_empty() {
+        println!("⚠️ Skipping keyboard soundpack loading: empty soundpack ID");
+        return Ok(()); // Return success to avoid error handling
+    }
+
     println!("🎹 Loading keyboard soundpack: {}", soundpack_id);
     match load_keyboard_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
         Ok(()) => Ok(()),
@@ -42,6 +60,12 @@ pub fn load_mouse_soundpack_with_cache_control(
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
+    // Skip loading if soundpack ID is empty
+    if soundpack_id.is_empty() {
+        println!("⚠️ Skipping mouse soundpack loading: empty soundpack ID");
+        return Ok(()); // Return success to avoid error handling
+    }
+
     println!("🖱️ Loading mouse soundpack: {}", soundpack_id);
     match load_mouse_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
         Ok(()) => Ok(()),
@@ -105,6 +129,17 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
     use symphonia::core::probe::Hint;
     use std::fs::File;
 
+    // First, check if file exists and has content
+    let metadata = std::fs
+        ::metadata(file_path)
+        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+
+    if metadata.len() == 0 {
+        return Err(format!("Audio file is empty: {}", file_path));
+    }
+
+    println!("🔍 [DEBUG] Audio file info: {} bytes", metadata.len());
+
     let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -112,6 +147,7 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
     if let Some(extension) = std::path::Path::new(file_path).extension() {
         if let Some(ext_str) = extension.to_str() {
             hint.with_extension(ext_str);
+            println!("🔍 [DEBUG] File extension hint: {}", ext_str);
         }
     }
 
@@ -121,7 +157,30 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
     let probed = symphonia::default
         ::get_probe()
         .format(&hint, mss, &fmt_opts, &meta_opts)
-        .map_err(|e| format!("Failed to probe format: {}", e))?;
+        .map_err(|e| {
+            // Add more detailed error info
+            let error_msg = format!(
+                "Failed to probe format for '{}': {} (file size: {} bytes)",
+                file_path,
+                e,
+                metadata.len()
+            );
+            println!("❌ [DEBUG] Probe error: {}", error_msg);
+
+            // Try to provide helpful suggestions
+            if let Some(ext) = std::path::Path::new(file_path).extension() {
+                if let Some(ext_str) = ext.to_str() {
+                    match ext_str.to_lowercase().as_str() {
+                        "ogg" => println!("💡 Suggestion: Ensure this is a valid OGG Vorbis file"),
+                        "mp3" => println!("💡 Suggestion: Ensure this is a valid MP3 file"),
+                        "wav" => println!("💡 Suggestion: Ensure this is a valid WAV file"),
+                        _ => println!("💡 Suggestion: Check if this is a supported audio format"),
+                    }
+                }
+            }
+
+            error_msg
+        })?;
 
     let mut format = probed.format;
     let track = format
@@ -163,119 +222,208 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
                 } // Convert audio buffer to f32 samples
                 match decoded {
                     AudioBufferRef::F32(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push(sample);
-                        }
-                        // Handle additional channels if stereo
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            // Mono audio
+                            for &sample in buf.chan(0) {
                                 samples.push(sample);
+                            }
+                        } else {
+                            // Stereo audio - interleave samples correctly
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push(*left);
+                                samples.push(*right);
                             }
                         }
                     }
                     AudioBufferRef::S32(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push((sample as f32) / (i32::MAX as f32));
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push((sample as f32) / (i32::MAX as f32));
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push((*left as f32) / (i32::MAX as f32));
+                                samples.push((*right as f32) / (i32::MAX as f32));
                             }
                         }
                     }
                     AudioBufferRef::S16(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push((sample as f32) / (i16::MAX as f32));
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push((sample as f32) / (i16::MAX as f32));
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push((*left as f32) / (i16::MAX as f32));
+                                samples.push((*right as f32) / (i16::MAX as f32));
                             }
                         }
                     }
                     AudioBufferRef::U32(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push(
-                                ((sample as f32) - (u32::MAX as f32) / 2.0) /
-                                    ((u32::MAX as f32) / 2.0)
-                            );
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push(
                                     ((sample as f32) - (u32::MAX as f32) / 2.0) /
+                                        ((u32::MAX as f32) / 2.0)
+                                );
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push(
+                                    ((*left as f32) - (u32::MAX as f32) / 2.0) /
+                                        ((u32::MAX as f32) / 2.0)
+                                );
+                                samples.push(
+                                    ((*right as f32) - (u32::MAX as f32) / 2.0) /
                                         ((u32::MAX as f32) / 2.0)
                                 );
                             }
                         }
                     }
                     AudioBufferRef::U16(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push(
-                                ((sample as f32) - (u16::MAX as f32) / 2.0) /
-                                    ((u16::MAX as f32) / 2.0)
-                            );
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push(
                                     ((sample as f32) - (u16::MAX as f32) / 2.0) /
+                                        ((u16::MAX as f32) / 2.0)
+                                );
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push(
+                                    ((*left as f32) - (u16::MAX as f32) / 2.0) /
+                                        ((u16::MAX as f32) / 2.0)
+                                );
+                                samples.push(
+                                    ((*right as f32) - (u16::MAX as f32) / 2.0) /
                                         ((u16::MAX as f32) / 2.0)
                                 );
                             }
                         }
                     }
                     AudioBufferRef::U8(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push(((sample as f32) - 128.0) / 128.0);
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push(((sample as f32) - 128.0) / 128.0);
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push(((*left as f32) - 128.0) / 128.0);
+                                samples.push(((*right as f32) - 128.0) / 128.0);
                             }
                         }
                     }
                     AudioBufferRef::S8(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push((sample as f32) / (i8::MAX as f32));
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push((sample as f32) / (i8::MAX as f32));
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push((*left as f32) / (i8::MAX as f32));
+                                samples.push((*right as f32) / (i8::MAX as f32));
                             }
                         }
                     }
                     AudioBufferRef::F64(buf) => {
-                        for &sample in buf.chan(0) {
-                            samples.push(sample as f32);
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
                                 samples.push(sample as f32);
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                samples.push(*left as f32);
+                                samples.push(*right as f32);
                             }
                         }
                     }
                     AudioBufferRef::U24(buf) => {
-                        for &sample in buf.chan(0) {
-                            let sample_f32 = ((sample.inner() as f32) - 8388608.0) / 8388608.0; // 2^23
-                            samples.push(sample_f32);
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
-                                let sample_f32 = ((sample.inner() as f32) - 8388608.0) / 8388608.0;
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
+                                let sample_f32 = ((sample.inner() as f32) - 8388608.0) / 8388608.0; // 2^23
                                 samples.push(sample_f32);
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                let left_f32 = ((left.inner() as f32) - 8388608.0) / 8388608.0;
+                                let right_f32 = ((right.inner() as f32) - 8388608.0) / 8388608.0;
+                                samples.push(left_f32);
+                                samples.push(right_f32);
                             }
                         }
                     }
                     AudioBufferRef::S24(buf) => {
-                        for &sample in buf.chan(0) {
-                            let sample_f32 = (sample.inner() as f32) / 8388607.0; // 2^23 - 1
-                            samples.push(sample_f32);
-                        }
-                        if channels > 1 && buf.spec().channels.count() > 1 {
-                            for &sample in buf.chan(1) {
-                                let sample_f32 = (sample.inner() as f32) / 8388607.0;
+                        if channels == 1 {
+                            for &sample in buf.chan(0) {
+                                let sample_f32 = (sample.inner() as f32) / 8388607.0; // 2^23 - 1
                                 samples.push(sample_f32);
+                            }
+                        } else {
+                            let left_chan = buf.chan(0);
+                            let right_chan = if buf.spec().channels.count() > 1 {
+                                buf.chan(1)
+                            } else {
+                                buf.chan(0)
+                            };
+                            for (left, right) in left_chan.iter().zip(right_chan.iter()) {
+                                let left_f32 = (left.inner() as f32) / 8388607.0;
+                                let right_f32 = (right.inner() as f32) / 8388607.0;
+                                samples.push(left_f32);
+                                samples.push(right_f32);
                             }
                         }
                     }
@@ -310,17 +458,20 @@ pub fn load_keyboard_soundpack_optimized(
     let config_path = paths::soundpacks::config_json(soundpack_id);
     let config_content = std::fs
         ::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
-
-    // First try to parse as V2, if fails try V1 format
-    let soundpack: SoundPack = match serde_json::from_str(&config_content) {
-        Ok(sp) => sp,
-        Err(_) => {
-            // Try to parse as V1 and convert on-the-fly for loading only
-            println!("⚠️ Config appears to be V1 format, converting for loading (not saving)");
-            convert_v1_for_loading(&config_content, soundpack_id)?
+        .map_err(|e| format!("Failed to read config: {}", e))?; // Only load V2 config format - V1 configs must be converted first
+    let mut soundpack: SoundPack = serde_json::from_str(&config_content).map_err(|e| {
+        // Check if this might be a V1 config
+        if config_content.contains("\"key_define_type\"") || config_content.contains("\"defines\"") {
+            format!("This appears to be a V1 soundpack config. Please convert it to V2 format first using the refresh/convert function. Parse error: {}", e)
+        } else {
+            format!("Failed to parse V2 soundpack config: {}", e)
         }
-    }; // Verify this is a keyboard soundpack
+    })?;
+
+    // Override soundpack_type based on folder path (more reliable than JSON content)
+    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
+
+    // Verify this is a keyboard soundpack
     if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Keyboard {
         return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
     }
@@ -352,7 +503,7 @@ pub fn load_keyboard_soundpack_optimized(
                     version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
                     tags: soundpack.tags.clone().unwrap_or_default(),
                     icon: soundpack.icon.clone(),
-                    soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
+                    soundpack_type: determine_soundpack_type(soundpack_id),
                     last_modified: 0,
                     last_accessed: std::time::SystemTime
                         ::now()
@@ -393,10 +544,14 @@ pub fn load_mouse_soundpack_optimized(
     let config_content = std::fs
         ::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
-
-    let soundpack: SoundPack = serde_json
+    let mut soundpack: SoundPack = serde_json
         ::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?; // Verify this is a mouse soundpack
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+
+    // Override soundpack_type based on folder path (more reliable than JSON content)
+    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
+
+    // Verify this is a mouse soundpack
     if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Mouse {
         return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
     }
@@ -428,7 +583,7 @@ pub fn load_mouse_soundpack_optimized(
                     version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
                     tags: soundpack.tags.clone().unwrap_or_default(),
                     icon: soundpack.icon.clone(),
-                    soundpack_type: crate::state::soundpack::SoundpackType::Mouse,
+                    soundpack_type: determine_soundpack_type(soundpack_id),
                     last_modified: 0,
                     last_accessed: std::time::SystemTime
                         ::now()
@@ -581,12 +736,22 @@ fn create_soundpack_metadata(
     soundpack_path: &str,
     soundpack: &SoundPack
 ) -> Result<SoundpackMetadata, String> {
-    let path = std::path::Path::new(soundpack_path);
-    let id = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("unknown")
-        .to_string();
+    // Extract the soundpack ID from the full path
+    // e.g., "/path/to/soundpacks/keyboard/Apex by teia" -> "keyboard/Apex by teia"
+    let soundpacks_dir = crate::utils::path::get_soundpacks_dir_absolute();
+    let id = if
+        let Ok(relative_path) = std::path::Path::new(soundpack_path).strip_prefix(&soundpacks_dir)
+    {
+        relative_path.to_string_lossy().replace('\\', "/")
+    } else {
+        // Fallback to just the folder name if we can't get relative path
+        std::path::Path
+            ::new(soundpack_path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown")
+            .to_string()
+    };
 
     // Get file metadata
     let last_modified = match std::fs::metadata(soundpack_path) {
@@ -716,6 +881,12 @@ fn create_mouse_mappings(
 
 /// Capture soundpack loading error and update the cache
 fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
+    // Skip creating cache entries for empty soundpack IDs
+    if soundpack_id.is_empty() {
+        println!("⚠️ Skipping cache entry for empty soundpack ID: {}", error);
+        return;
+    }
+
     println!("📝 Capturing loading error for {}: {}", soundpack_id, error);
 
     let mut cache = SoundpackCache::load();
@@ -735,7 +906,7 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
             version: "unknown".to_string(),
             tags: vec!["error".to_string()],
             icon: None,
-            soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
+            soundpack_type: determine_soundpack_type(soundpack_id),
             last_modified: 0,
             last_accessed: std::time::SystemTime
                 ::now()
@@ -754,160 +925,4 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
 
     cache.save();
     println!("💾 Updated cache with error information for {}", soundpack_id);
-}
-
-/// Convert V1 config to SoundPack struct for loading only (doesn't save to file)
-fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<SoundPack, String> {
-    println!("🔍 [DEBUG] convert_v1_for_loading called for {}", soundpack_id);
-
-    let v1_config: serde_json::Value = serde_json
-        ::from_str(config_content)
-        .map_err(|e| format!("Failed to parse V1 config: {}", e))?;
-
-    // Extract basic fields from V1
-    let name = v1_config
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or(soundpack_id)
-        .to_string();
-
-    let source = v1_config
-        .get("sound")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
-    println!("🔍 [DEBUG] V1 source field: {:?}", source); // Convert V1 defines to V2 definitions format
-    let mut defs: std::collections::HashMap<
-        String,
-        crate::state::soundpack::KeyDefinition
-    > = std::collections::HashMap::new();
-
-    if let Some(defines) = v1_config.get("defines").and_then(|d| d.as_object()) {
-        println!("🔍 [DEBUG] Found {} defines in V1 config", defines.len());
-
-        // Simple IOHook to Web key mapping for common keys
-        let key_mappings = create_simple_key_mapping();
-
-        for (iohook_code, timing) in defines {
-            if let Ok(iohook_num) = iohook_code.parse::<u32>() {
-                if let Some(key_name) = key_mappings.get(&iohook_num) {
-                    if let Some(timing_array) = timing.as_array() {
-                        if timing_array.len() >= 2 {
-                            let start = timing_array[0].as_f64().unwrap_or(0.0) as f32;
-                            let duration = timing_array[1].as_f64().unwrap_or(100.0) as f32;
-                            println!(
-                                "🔍 [DEBUG] Key {} (IOHook {}): [{}, {}]",
-                                key_name,
-                                iohook_code,
-                                start,
-                                duration
-                            );
-                            defs.insert(key_name.clone(), crate::state::soundpack::KeyDefinition {
-                                timing: vec![[start, duration]],
-                                audio_file: None, // V1 configs use single audio file
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-    println!("🔍 [DEBUG] Converted {} key mappings to V2 format", defs.len());
-
-    // Create SoundPack struct with V2 format
-    Ok(SoundPack {
-        id: v1_config
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or(soundpack_id)
-            .to_string(),
-        name,
-        author: Some("N/A".to_string()), // Default for V1 configs
-        description: v1_config
-            .get("description")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        version: v1_config
-            .get("version")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        config_version: Some("1".to_string()), // Mark as V1 so we know this needs proper conversion later
-        icon: v1_config
-            .get("icon")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        audio_file: source, // V1 single audio file becomes audio_file
-        license: None,
-        tags: v1_config
-            .get("tags")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            }),
-        created_at: None,
-        definition_method: v1_config
-            .get("key_define_type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("single")
-            .to_string(),
-        options: crate::state::soundpack::SoundpackOptions {
-            recommended_volume: 1.0,
-            random_pitch: false,
-        },
-        soundpack_type: crate::state::soundpack::SoundpackType::Keyboard, // V1 configs are keyboard soundpacks
-        config_version_num: 1, // Internal version number
-        definitions: defs,
-    })
-}
-
-/// Create simple IOHook to Web key mapping for basic conversion
-fn create_simple_key_mapping() -> std::collections::HashMap<u32, String> {
-    let mut mapping = std::collections::HashMap::new();
-
-    // Common keys only - enough for basic loading
-    mapping.insert(1, "Escape".to_string());
-    mapping.insert(2, "Digit1".to_string());
-    mapping.insert(3, "Digit2".to_string());
-    mapping.insert(4, "Digit3".to_string());
-    mapping.insert(5, "Digit4".to_string());
-    mapping.insert(6, "Digit5".to_string());
-    mapping.insert(7, "Digit6".to_string());
-    mapping.insert(8, "Digit7".to_string());
-    mapping.insert(9, "Digit8".to_string());
-    mapping.insert(10, "Digit9".to_string());
-    mapping.insert(11, "Digit0".to_string());
-    mapping.insert(16, "KeyQ".to_string());
-    mapping.insert(17, "KeyW".to_string());
-    mapping.insert(18, "KeyE".to_string());
-    mapping.insert(19, "KeyR".to_string());
-    mapping.insert(20, "KeyT".to_string());
-    mapping.insert(21, "KeyY".to_string());
-    mapping.insert(22, "KeyU".to_string());
-    mapping.insert(23, "KeyI".to_string());
-    mapping.insert(24, "KeyO".to_string());
-    mapping.insert(25, "KeyP".to_string());
-    mapping.insert(30, "KeyA".to_string());
-    mapping.insert(31, "KeyS".to_string());
-    mapping.insert(32, "KeyD".to_string());
-    mapping.insert(33, "KeyF".to_string());
-    mapping.insert(34, "KeyG".to_string());
-    mapping.insert(35, "KeyH".to_string());
-    mapping.insert(36, "KeyJ".to_string());
-    mapping.insert(37, "KeyK".to_string());
-    mapping.insert(38, "KeyL".to_string());
-    mapping.insert(44, "KeyZ".to_string());
-    mapping.insert(45, "KeyX".to_string());
-    mapping.insert(46, "KeyC".to_string());
-    mapping.insert(47, "KeyV".to_string());
-    mapping.insert(48, "KeyB".to_string());
-    mapping.insert(49, "KeyN".to_string());
-    mapping.insert(50, "KeyM".to_string());
-    mapping.insert(57, "Space".to_string());
-    mapping.insert(28, "Enter".to_string());
-    mapping.insert(14, "Backspace".to_string());
-    mapping.insert(15, "Tab".to_string());
-
-    mapping
 }

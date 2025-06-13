@@ -31,19 +31,20 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Get timestamp and duration
+        drop(pressed); // Get timestamp and end time
         let key_map = self.key_map.lock().unwrap();
-        let (start, duration) = match key_map.get(key) {
+        let (start, end) = match key_map.get(key) {
             Some(arr) if arr.len() == 2 => {
                 let idx = if is_keydown { 0 } else { 1 };
                 let arr = arr[idx];
                 let start = arr[0]; // Keep in milliseconds
-                let duration = arr[1]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
 
                 // Debug logging for problematic keys
                 if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
                     eprintln!(
-                        "⚠️ Suspicious mapping for key '{}' ({}): start={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        "⚠️ Suspicious mapping for key '{}' ({}): start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
                         key,
                         if is_keydown {
                             "down"
@@ -51,13 +52,14 @@ impl AudioContext {
                             "up"
                         },
                         start,
+                        end,
                         duration,
                         arr[0],
                         arr[1]
                     );
                 }
 
-                (start, duration)
+                (start, end)
             }
             Some(arr) if arr.len() == 1 => {
                 // Only keydown mapping available, ignore keyup events
@@ -66,21 +68,23 @@ impl AudioContext {
                 }
                 let arr = arr[0];
                 let start = arr[0]; // Keep in milliseconds
-                let duration = arr[1]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
 
                 // Debug logging for problematic keys
                 if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
                     eprintln!(
-                        "⚠️ Suspicious mapping for key '{}': start={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        "⚠️ Suspicious mapping for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
                         key,
                         start,
+                        end,
                         duration,
                         arr[0],
                         arr[1]
                     );
                 }
 
-                (start, duration)
+                (start, end)
             }
             Some(arr) => {
                 eprintln!(
@@ -97,21 +101,25 @@ impl AudioContext {
         };
         drop(key_map);
 
-        self.play_sound_segment(key, start, duration, is_keydown);
+        self.play_sound_segment(key, start, end, is_keydown);
     }
-    fn play_sound_segment(&self, key: &str, start: f32, duration: f32, is_keydown: bool) {
+    fn play_sound_segment(&self, key: &str, start: f32, end: f32, is_keydown: bool) {
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
         if let Some((samples, channels, sample_rate)) = pcm_opt {
             // Calculate total audio duration in milliseconds
             let total_duration =
                 ((samples.len() as f32) / (sample_rate as f32) / (channels as f32)) * 1000.0;
 
+            // Calculate duration from start and end times
+            let duration = end - start;
+
             // Validate input parameters
-            if start < 0.0 || duration <= 0.0 {
+            if start < 0.0 || duration <= 0.0 || end <= start {
                 eprintln!(
-                    "❌ Invalid time parameters for key '{}': start={:.3}ms, duration={:.3}ms",
+                    "❌ Invalid time parameters for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms",
                     key,
                     start,
+                    end,
                     duration
                 );
                 return;
@@ -119,9 +127,10 @@ impl AudioContext {
             // Use epsilon tolerance for floating point comparison (1ms tolerance)
             const EPSILON: f32 = 1.0; // 1ms tolerance
             eprintln!(
-                "🔍 Playing sound for key '{}': start={:.3}ms, duration={:.3}ms (total duration: {:.3}ms)",
+                "🔍 Playing sound for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (total duration: {:.3}ms)",
                 key,
                 start,
+                end,
                 duration,
                 total_duration
             );
@@ -140,12 +149,14 @@ impl AudioContext {
                 eprintln!("   3. Check if the audio file has been corrupted or modified");
                 eprintln!("📁 Soundpack location: Check your soundpacks directory for this config");
                 return;
-            } // Check if start + duration exceeds audio duration
-            if start + duration > total_duration + EPSILON {
+            }
+
+            // Check if end time exceeds audio duration
+            if end > total_duration + EPSILON {
                 eprintln!(
                     "❌ TIMING ERROR: Audio segment {:.3}ms-{:.3}ms exceeds duration {:.3}ms for key '{}'",
                     start,
-                    start + duration,
+                    end,
                     total_duration,
                     key
                 );
@@ -153,16 +164,11 @@ impl AudioContext {
                     "🔧 SOLUTION: This soundpack has invalid timing data. Please regenerate the soundpack or use the timing fixer utility."
                 );
                 return;
-            } // Use exact timing - no clamping or fallbacks
-            let end_time = start + duration;
-
-            // Calculate sample positions (convert milliseconds to seconds for sample calculation)
+            } // Calculate sample positions (convert milliseconds to seconds for sample calculation)
             let start_sample = ((start / 1000.0) *
                 (sample_rate as f32) *
                 (channels as f32)) as usize;
-            let end_sample = ((end_time / 1000.0) *
-                (sample_rate as f32) *
-                (channels as f32)) as usize;
+            let end_sample = ((end / 1000.0) * (sample_rate as f32) * (channels as f32)) as usize;
 
             // Validate sample range with safety checks
             if end_sample > samples.len() {
@@ -176,14 +182,16 @@ impl AudioContext {
 
                 eprintln!("⚠️ TIMING WARNING: Audio segment clamped for key '{}'", key);
                 eprintln!(
-                    "   Original: start={:.3}ms, duration={:.3}ms, end_sample={}",
+                    "   Original: start={:.3}ms, end={:.3}ms, duration={:.3}ms, end_sample={}",
                     start,
+                    end,
                     duration,
                     end_sample
                 );
                 eprintln!(
-                    "   Clamped: start={:.3}ms, duration={:.3}ms, end_sample={}",
+                    "   Clamped: start={:.3}ms, end={:.3}ms, duration={:.3}ms, end_sample={}",
                     start,
+                    clamped_end_time,
                     clamped_duration,
                     clamped_end_sample
                 );
@@ -195,7 +203,7 @@ impl AudioContext {
                     let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
 
                     if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                        sink.set_volume(self.get_volume() * 5.0);
+                        sink.set_volume(self.get_volume());
                         sink.append(segment);
 
                         let mut key_sinks = self.key_sinks.lock().unwrap();
@@ -241,7 +249,7 @@ impl AudioContext {
             let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
 
             if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                sink.set_volume(self.get_volume() * 5.0);
+                sink.set_volume(self.get_volume());
                 sink.append(segment);
 
                 let mut key_sinks = self.key_sinks.lock().unwrap();
@@ -298,7 +306,10 @@ impl AudioContext {
             Some(arr) if arr.len() == 2 => {
                 let idx = if is_buttondown { 0 } else { 1 };
                 let arr = arr[idx];
-                (arr[0], arr[1]) // Keep in milliseconds
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (start, duration)
             }
             Some(arr) if arr.len() == 1 => {
                 // Only buttondown mapping available, ignore buttonup events
@@ -306,7 +317,10 @@ impl AudioContext {
                     return; // Skip buttonup events for buttons with only buttondown mapping
                 }
                 let arr = arr[0];
-                (arr[0], arr[1]) // Keep in milliseconds
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (start, duration)
             }
             Some(arr) => {
                 eprintln!(
@@ -325,6 +339,7 @@ impl AudioContext {
 
         self.play_mouse_sound_segment(button, start, duration, is_buttondown);
     }
+
     fn play_mouse_sound_segment(
         &self,
         button: &str,
@@ -358,13 +373,10 @@ impl AudioContext {
                     total_duration,
                     button
                 );
-                eprintln!("🔧 SOLUTION: This soundpack has invalid timing data. Please:");
-                eprintln!("   1. Regenerate the soundpack to fix timing issues, OR");
-                eprintln!("   2. Use the timing fixer utility to correct the config.json, OR");
-                eprintln!("   3. Check if the audio file has been corrupted or modified");
-                eprintln!("📁 Soundpack location: Check your soundpacks directory for this config");
                 return;
-            } // Check if start + duration exceeds audio duration
+            }
+
+            // Check if start + duration exceeds audio duration
             if start + duration > total_duration + EPSILON {
                 eprintln!(
                     "❌ TIMING ERROR: Audio segment {:.3}ms-{:.3}ms exceeds duration {:.3}ms for mouse button '{}'",
@@ -372,9 +384,6 @@ impl AudioContext {
                     start + duration,
                     total_duration,
                     button
-                );
-                eprintln!(
-                    "🔧 SOLUTION: This soundpack has invalid timing data. Please regenerate the soundpack or use the timing fixer utility."
                 );
                 return;
             }
@@ -423,7 +432,7 @@ impl AudioContext {
             let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
 
             if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                sink.set_volume(self.get_mouse_volume() * 5.0);
+                sink.set_volume(self.get_mouse_volume());
                 sink.append(segment);
 
                 let mut mouse_sinks = self.mouse_sinks.lock().unwrap();

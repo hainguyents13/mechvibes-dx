@@ -209,21 +209,29 @@ impl SoundpackCache {
 
         println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
     }
-
     fn scan_soundpack_type(&mut self, soundpacks_dir: &str, soundpack_type: &str, is_mouse: bool) {
         let type_dir = std::path::Path::new(soundpacks_dir).join(soundpack_type);
+        println!(
+            "📂 [CACHE DEBUG] Scanning {} soundpacks in: {}",
+            soundpack_type,
+            type_dir.display()
+        );
+
         if type_dir.exists() {
             if let Ok(entries) = std::fs::read_dir(&type_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_name) = entry.file_name().to_str() {
                         let full_soundpack_id = format!("{}/{}", soundpack_type, soundpack_name);
+                        println!("🔍 [CACHE DEBUG] Processing soundpack: {}", full_soundpack_id);
+
                         match soundpack::load_soundpack_metadata(&full_soundpack_id) {
                             Ok(metadata) => {
+                                println!("✅ [CACHE DEBUG] Successfully loaded metadata for: {}", full_soundpack_id);
                                 self.soundpacks.insert(full_soundpack_id, metadata);
                             }
                             Err(e) => {
                                 println!(
-                                    "❌ Failed to load {} metadata for {}: {}",
+                                    "❌ [CACHE DEBUG] Failed to load {} metadata for {}: {}",
                                     soundpack_type,
                                     soundpack_name,
                                     e
@@ -238,7 +246,11 @@ impl SoundpackCache {
                         }
                     }
                 }
+            } else {
+                println!("⚠️ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
             }
+        } else {
+            println!("⚠️ [CACHE DEBUG] Directory does not exist: {}", type_dir.display());
         }
     }
 

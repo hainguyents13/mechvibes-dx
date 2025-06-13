@@ -48,14 +48,69 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             }
         }
     }
-
     let content = fs
         ::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let config: serde_json::Value = serde_json
+    let mut config: serde_json::Value = serde_json
         ::from_str(&content)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
+
+    // Check if this is V2 config with multi method and convert to single method
+    if let Some(definition_method) = config.get("definition_method").and_then(|v| v.as_str()) {
+        if definition_method == "multi" {
+            println!("🔄 [CACHE DEBUG] Found V2 multi method config, converting to single method");
+            let soundpack_dir = paths::soundpacks::soundpack_dir(soundpack_id);
+
+            if
+                let Err(e) = config_converter::convert_v2_multi_to_single(
+                    &config_path,
+                    &soundpack_dir
+                )
+            {
+                println!("❌ [CACHE DEBUG] Failed to convert multi to single: {}", e);
+                return Err(format!("Failed to convert multi to single method: {}", e));
+            }
+
+            // Re-read the converted config
+            let new_content = fs
+                ::read_to_string(&config_path)
+                .map_err(|e| format!("Failed to re-read converted config: {}", e))?;
+            config = serde_json
+                ::from_str(&new_content)
+                .map_err(|e| format!("Failed to parse converted config: {}", e))?;
+
+            println!("✅ [CACHE DEBUG] Successfully converted to single method");
+        }
+    }
+
+    // Debug: Check if config has audio_file field
+    let audio_file = config.get("audio_file").and_then(|v| v.as_str());
+    println!("🔍 [CACHE DEBUG] soundpack_id: {}", soundpack_id);
+    println!("🔍 [CACHE DEBUG] config_path: {}", config_path);
+    println!("🔍 [CACHE DEBUG] audio_file in config: {:?}", audio_file);
+
+    // If audio_file exists, check if the actual file exists
+    if let Some(audio_filename) = audio_file {
+        let soundpack_dir = paths::soundpacks::soundpack_dir(soundpack_id);
+        let full_audio_path = format!(
+            "{}/{}",
+            soundpack_dir,
+            audio_filename.trim_start_matches("./")
+        );
+        println!("🔍 [CACHE DEBUG] soundpack_dir: {}", soundpack_dir);
+        println!("🔍 [CACHE DEBUG] full_audio_path: {}", full_audio_path);
+        println!(
+            "🔍 [CACHE DEBUG] audio file exists: {}",
+            std::path::Path::new(&full_audio_path).exists()
+        );
+
+        if !std::path::Path::new(&full_audio_path).exists() {
+            println!("⚠️ [CACHE DEBUG] Audio file not found during cache refresh: {}", full_audio_path);
+        }
+    } else {
+        println!("⚠️ [CACHE DEBUG] No audio_file field found in config");
+    }
 
     let name = config
         .get("name")
@@ -129,9 +184,19 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
                 Some(String::new()) // Empty string if no icon specified
             }
         },
-        soundpack_type: match config.get("soundpack_type").and_then(|v| v.as_str()) {
-            Some("mouse") => crate::state::soundpack::SoundpackType::Mouse,
-            _ => crate::state::soundpack::SoundpackType::Keyboard, // Default to keyboard
+        soundpack_type: {
+            // Determine soundpack type based on folder path (more reliable than JSON content)
+            if soundpack_id.starts_with("keyboard/") || soundpack_id.starts_with("keyboard\\") {
+                crate::state::soundpack::SoundpackType::Keyboard
+            } else if soundpack_id.starts_with("mouse/") || soundpack_id.starts_with("mouse\\") {
+                crate::state::soundpack::SoundpackType::Mouse
+            } else {
+                // Fallback to JSON content or default to keyboard
+                match config.get("soundpack_type").and_then(|v| v.as_str()) {
+                    Some("mouse") => crate::state::soundpack::SoundpackType::Mouse,
+                    _ => crate::state::soundpack::SoundpackType::Keyboard,
+                }
+            }
         },
         last_modified: metadata
             .modified()

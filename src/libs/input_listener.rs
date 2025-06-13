@@ -37,8 +37,7 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::End => "End",
         Key::PageUp => "PageUp",
         Key::PageDown => "PageDown",
-
-        // Function keys
+        Key::Insert => "Insert", // Function keys F1-F12 (rdev 0.5.3 only supports F1-F12)
         Key::F1 => "F1",
         Key::F2 => "F2",
         Key::F3 => "F3",
@@ -100,9 +99,39 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::Quote => "Quote", // '
         Key::BackQuote => "Backquote", // `
         Key::Slash => "Slash", // /
+        Key::LeftBracket => "BracketLeft", // [
+        Key::RightBracket => "BracketRight", // ]
+        Key::BackSlash => "Backslash", // \
+        Key::SemiColon => "Semicolon", // ;
+        Key::IntlBackslash => "IntlBackslash", // Additional backslash key on some keyboards
+
+        // Numpad keys
+        Key::KpReturn => "NumpadEnter",
+        Key::KpMinus => "NumpadSubtract",
+        Key::KpPlus => "NumpadAdd",
+        Key::KpMultiply => "NumpadMultiply",
+        Key::KpDivide => "NumpadDivide",
+        Key::Kp0 => "Numpad0",
+        Key::Kp1 => "Numpad1",
+        Key::Kp2 => "Numpad2",
+        Key::Kp3 => "Numpad3",
+        Key::Kp4 => "Numpad4",
+        Key::Kp5 => "Numpad5",
+        Key::Kp6 => "Numpad6",
+        Key::Kp7 => "Numpad7",
+        Key::Kp8 => "Numpad8",
+        Key::Kp9 => "Numpad9",
+        Key::KpDelete => "NumpadDecimal",
+
+        // Additional system keys
+        Key::NumLock => "NumLock",
+        Key::ScrollLock => "ScrollLock",
+        Key::PrintScreen => "PrintScreen",
+        Key::Pause => "Pause",
+        Key::Function => "Fn", // Special function key on some keyboards
 
         // Unknown or unmapped keys
-        _ => "",
+        Key::Unknown(_) => "", // Handle unknown keys gracefully
     }
 }
 
