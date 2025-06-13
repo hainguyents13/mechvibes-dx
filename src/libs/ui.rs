@@ -61,7 +61,6 @@ pub fn app() -> Element {
                 loop {
                     if let Ok(receiver) = keyboard_rx.try_lock() {
                         if let Ok(keycode) = receiver.try_recv() {
-                            print!("🌻 Processing key event: {}\n", keycode);
                             if keycode.starts_with("UP:") {
                                 let key = &keycode[3..];
                                 ctx.play_key_event_sound(key, false);

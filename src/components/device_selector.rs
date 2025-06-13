@@ -207,7 +207,9 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                 }
             }
         }
-    }); // Get device status for display
+    });
+
+    // Get device status for display
     let show_error_status = use_memo(move || {
         if props.device_type == DeviceType::AudioOutput {
             let (selected_device, _) = current_selection();
@@ -276,14 +278,18 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
 
                 summary {
                     class: format!(
-                        "btn btn-soft w-full justify-between gap-3 h-12 rounded-box {}",
+                        "btn btn-soft w-full justify-between line-clamp-1 max-w-40 truncate gap-3 h-12 rounded-box {}",
                         if is_loading() { "btn-disabled" } else { "" }
                     ),
 
                     div { class: "flex items-center gap-3 flex-1 min-w-0",
                         div { class: "flex items-center gap-2",
                             {device_icon()}
-                            span { class: "text-sm truncate", "{current_device_name()}" }                        }
+                            span { 
+                              class: "text-sm truncate", 
+                              "{current_device_name()}"
+                            }                       
+                          }
 
                         // Device status indicator (only for audio output)
                         if show_error_status() {

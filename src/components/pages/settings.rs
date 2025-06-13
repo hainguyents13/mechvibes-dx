@@ -115,7 +115,8 @@ pub fn SettingsPage() -> Element {
                         }
                     },
                   }
-                }                // Notifications
+                }               
+                // Notifications
                 Toggler {
                   title: "Show notifications".to_string(),
                   description: Some("Display system notifications for important events".to_string()),
@@ -134,9 +135,9 @@ pub fn SettingsPage() -> Element {
               }
             },        
           }          
-           // Devices Section
+          // Devices Section
           Collapse {
-            title: "Devices".to_string(),
+            title: "Devices (Experimental)".to_string(),
             group_name: "setting-accordion".to_string(),
             content_class: "collapse-content text-sm",
             children: rsx! {
@@ -157,7 +158,7 @@ pub fn SettingsPage() -> Element {
                     p { "• Audio output devices control where soundpack audio is played" }
                     p { "• Physical input devices control which keyboards/mice generate sounds" }
                     p { "• If no input devices are selected, all devices will work" }
-                    p { "• Changes take effect immediately" }
+                    p { "• Restart the application for changes to take effect" }
                     p { "• If a device becomes unavailable, the system will fall back gracefully" }
                   }
                 }
