@@ -1,14 +1,10 @@
 [application]
 name = "mechvibes-dx"
-out_dir = "bundles"
+out_dir = "bundle"
 
-# Asset bundling configuration for desktop app
 [application.desktop]
-# Include assets directory for desktop builds
 bundle_assets = true
-bundle_assets_path = ["/assets", "/soundpacks"]
 
-# bundle configuration
 [bundle]
 identifier = "com.hainguyents13.mechvibesdx"
 name = "MechvibesDX"
@@ -17,21 +13,17 @@ publisher = "Hai Nguyen"
 icon = ["./assets/icon.ico"]
 category = "Productivity"
 short_description = "MechvibesDX"
-long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
+long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards."
 resources = ["./soundpacks", "./assets"]
 
-# configure bundling for windows
 [bundle.windows]
 installer = "nsis"
-tsp = false
 icon_path = "./assets/icon.ico"
+webview_install_mode = "Skip"
+tsp = false
 allow_downgrades = true
 
-[bundle.windows.webview_install_mode]
-EmbedBootstrapper = { silent = true }
-
 [bundle.windows.nsis]
-header_image = "./assets/icon.ico"
 installer_icon = "./assets/icon.ico"
 install_mode = "CurrentUser"
-display_language_selector = true
+display_language_selector = false
