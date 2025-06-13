@@ -14,8 +14,16 @@ pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
 }
 
 pub fn load_keyboard_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    load_keyboard_soundpack_with_cache_control(context, soundpack_id, true)
+}
+
+pub fn load_keyboard_soundpack_with_cache_control(
+    context: &AudioContext,
+    soundpack_id: &str,
+    update_cache_on_error: bool
+) -> Result<(), String> {
     println!("🎹 Loading keyboard soundpack: {}", soundpack_id);
-    match load_keyboard_soundpack_optimized(context, soundpack_id) {
+    match load_keyboard_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
         Ok(()) => Ok(()),
         Err(e) => {
             // Capture the error in cache
@@ -26,12 +34,22 @@ pub fn load_keyboard_soundpack(context: &AudioContext, soundpack_id: &str) -> Re
 }
 
 pub fn load_mouse_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
+    load_mouse_soundpack_with_cache_control(context, soundpack_id, true)
+}
+
+pub fn load_mouse_soundpack_with_cache_control(
+    context: &AudioContext,
+    soundpack_id: &str,
+    update_cache_on_error: bool
+) -> Result<(), String> {
     println!("🖱️ Loading mouse soundpack: {}", soundpack_id);
-    match load_mouse_soundpack_optimized(context, soundpack_id) {
+    match load_mouse_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
         Ok(()) => Ok(()),
         Err(e) => {
-            // Capture the error in cache
-            capture_soundpack_loading_error(soundpack_id, &e);
+            // Capture the error in cache only if requested
+            if update_cache_on_error {
+                capture_soundpack_loading_error(soundpack_id, &e);
+            }
             Err(e)
         }
     }
@@ -280,7 +298,8 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
 /// Direct keyboard soundpack loading
 pub fn load_keyboard_soundpack_optimized(
     context: &AudioContext,
-    soundpack_id: &str
+    soundpack_id: &str,
+    update_cache_on_error: bool
 ) -> Result<(), String> {
     println!("📂 Direct loading keyboard soundpack: {}", soundpack_id);
 
@@ -321,31 +340,35 @@ pub fn load_keyboard_soundpack_optimized(
         }
         Err(e) => {
             println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
-            // Create minimal metadata with error information
-            let error_metadata = SoundpackMetadata {
-                id: soundpack_id.to_string(),
-                name: soundpack.name.clone(),
-                author: soundpack.author.clone(),
-                description: soundpack.description.clone(),
-                version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
-                tags: soundpack.tags.clone().unwrap_or_default(),
-                icon: soundpack.icon.clone(),
-                soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
-                last_modified: 0,
-                last_accessed: std::time::SystemTime
-                    ::now()
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-                config_version: soundpack.config_version
-                    .as_ref()
-                    .and_then(|v| v.parse::<u32>().ok()),
-                is_valid_v2: true,
-                validation_status: "loaded_with_metadata_error".to_string(),
-                can_be_converted: false,
-                last_error: Some(format!("Metadata creation failed: {}", e)),
-            };
-            cache.add_soundpack(error_metadata);
+
+            // Only add error metadata to cache if requested (not during startup)
+            if update_cache_on_error {
+                // Create minimal metadata with error information
+                let error_metadata = SoundpackMetadata {
+                    id: soundpack_id.to_string(),
+                    name: soundpack.name.clone(),
+                    author: soundpack.author.clone(),
+                    description: soundpack.description.clone(),
+                    version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
+                    tags: soundpack.tags.clone().unwrap_or_default(),
+                    icon: soundpack.icon.clone(),
+                    soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
+                    last_modified: 0,
+                    last_accessed: std::time::SystemTime
+                        ::now()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    config_version: soundpack.config_version
+                        .as_ref()
+                        .and_then(|v| v.parse::<u32>().ok()),
+                    is_valid_v2: true,
+                    validation_status: "loaded_with_metadata_error".to_string(),
+                    can_be_converted: false,
+                    last_error: Some(format!("Metadata creation failed: {}", e)),
+                };
+                cache.add_soundpack(error_metadata);
+            }
         }
     }
     cache.save();
@@ -357,7 +380,8 @@ pub fn load_keyboard_soundpack_optimized(
 /// Direct mouse soundpack loading
 pub fn load_mouse_soundpack_optimized(
     context: &AudioContext,
-    soundpack_id: &str
+    soundpack_id: &str,
+    update_cache_on_error: bool
 ) -> Result<(), String> {
     println!("📂 Direct loading mouse soundpack: {}", soundpack_id);
 
@@ -392,31 +416,35 @@ pub fn load_mouse_soundpack_optimized(
         }
         Err(e) => {
             println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
-            // Create minimal metadata with error information
-            let error_metadata = SoundpackMetadata {
-                id: soundpack_id.to_string(),
-                name: soundpack.name.clone(),
-                author: soundpack.author.clone(),
-                description: soundpack.description.clone(),
-                version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
-                tags: soundpack.tags.clone().unwrap_or_default(),
-                icon: soundpack.icon.clone(),
-                soundpack_type: crate::state::soundpack::SoundpackType::Mouse,
-                last_modified: 0,
-                last_accessed: std::time::SystemTime
-                    ::now()
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-                config_version: soundpack.config_version
-                    .as_ref()
-                    .and_then(|v| v.parse::<u32>().ok()),
-                is_valid_v2: true,
-                validation_status: "loaded_with_metadata_error".to_string(),
-                can_be_converted: false,
-                last_error: Some(format!("Metadata creation failed: {}", e)),
-            };
-            cache.add_soundpack(error_metadata);
+
+            // Only add error metadata to cache if requested (not during startup)
+            if update_cache_on_error {
+                // Create minimal metadata with error information
+                let error_metadata = SoundpackMetadata {
+                    id: soundpack_id.to_string(),
+                    name: soundpack.name.clone(),
+                    author: soundpack.author.clone(),
+                    description: soundpack.description.clone(),
+                    version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
+                    tags: soundpack.tags.clone().unwrap_or_default(),
+                    icon: soundpack.icon.clone(),
+                    soundpack_type: crate::state::soundpack::SoundpackType::Mouse,
+                    last_modified: 0,
+                    last_accessed: std::time::SystemTime
+                        ::now()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    config_version: soundpack.config_version
+                        .as_ref()
+                        .and_then(|v| v.parse::<u32>().ok()),
+                    is_valid_v2: true,
+                    validation_status: "loaded_with_metadata_error".to_string(),
+                    can_be_converted: false,
+                    last_error: Some(format!("Metadata creation failed: {}", e)),
+                };
+                cache.add_soundpack(error_metadata);
+            }
         }
     }
     cache.save();
