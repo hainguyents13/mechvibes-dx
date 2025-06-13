@@ -1,0 +1,27 @@
+{
+  id: "string",
+  name: "string",
+  description?: "string",
+  author?: "string",
+  version?: "string",
+  config_version?: "string",
+  icon?: "string",
+  audio_file?: "string", // used only in "single" definition_method
+  license?: "string",
+  tags?: ["string"],
+  created_at?: "ISO-8601 string",
+  definition_method: "single" | "multi",
+  options: {
+    recommended_volume: 1,
+    random_pitch: false
+  },
+  definitions: {
+    KeyA: {
+      timing: [
+        [0, 120],    // keydown or mouse click
+        [130, 260]   // keyup or mouse release
+      ],
+      audio_file: "key-a.wav" // for multi method
+    }
+  }
+}

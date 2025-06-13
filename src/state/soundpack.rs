@@ -10,7 +10,6 @@ use std::path::Path;
 pub enum SoundpackType {
     Keyboard,
     Mouse,
-    Both,
 }
 
 // Default function for config_version field
@@ -18,32 +17,75 @@ fn default_config_version() -> u32 {
     2
 }
 
+// Default function for soundpack_type field
+fn default_soundpack_type() -> SoundpackType {
+    SoundpackType::Keyboard
+}
+
+// Default function for options field
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SoundpackOptions {
+    #[serde(default = "default_recommended_volume")]
+    pub recommended_volume: f32,
+    #[serde(default = "default_random_pitch")]
+    pub random_pitch: bool,
+}
+
+fn default_recommended_volume() -> f32 {
+    1.0
+}
+
+fn default_random_pitch() -> bool {
+    false
+}
+
+impl Default for SoundpackOptions {
+    fn default() -> Self {
+        Self {
+            recommended_volume: 1.0,
+            random_pitch: false,
+        }
+    }
+}
+
+// Key definition structure for V2 format
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KeyDefinition {
+    pub timing: Vec<[f32; 2]>, // Array of [start_ms, end_ms] pairs
+    #[serde(default)]
+    pub audio_file: Option<String>, // For "multi" definition method
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundPack {
     pub id: String,
     pub name: String,
-    pub author: String,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
-    pub tags: Option<Vec<String>>,
-    #[serde(default)]
-    pub keycap: Option<String>,
+    pub config_version: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
-    pub source: Option<String>,
+    pub audio_file: Option<String>, // Used only in "single" definition_method
     #[serde(default)]
-    pub method: Option<String>,
+    pub license: Option<String>,
     #[serde(default)]
-    pub includes_numpad: Option<bool>,
+    pub tags: Option<Vec<String>>,
     #[serde(default)]
-    pub mouse: bool, // true for mouse soundpacks, false for keyboard soundpacks
+    pub created_at: Option<String>, // ISO-8601 string
+    pub definition_method: String, // "single" or "multi"
+    #[serde(default)]
+    pub options: SoundpackOptions,
+    #[serde(default = "default_soundpack_type")]
+    pub soundpack_type: SoundpackType, // Type of soundpack (Keyboard or Mouse) - for internal use
     #[serde(default = "default_config_version")]
-    pub config_version: u32, // Configuration version, default to 2
-    pub defs: HashMap<String, Vec<[f32; 2]>>,
+    pub config_version_num: u32, // Internal config version number
+    pub definitions: HashMap<String, KeyDefinition>,
 }
 
 impl SoundPack {}
@@ -60,9 +102,9 @@ pub struct SoundpackMetadata {
     pub description: Option<String>,
     pub version: String,
     pub tags: Vec<String>,
-    pub keycap: Option<String>,
     pub icon: Option<String>,
-    pub mouse: bool, // true for mouse soundpacks, false for keyboard
+    #[serde(default = "default_soundpack_type")]
+    pub soundpack_type: SoundpackType, // Type of soundpack (Keyboard or Mouse)
     pub last_modified: u64,
     pub last_accessed: u64,
     // Validation fields
@@ -151,57 +193,80 @@ impl SoundpackCache {
         println!("📂 Scanning soundpacks directory...");
 
         let soundpacks_dir = path::get_soundpacks_dir_absolute();
-        match std::fs::read_dir(&soundpacks_dir) {
-            Ok(entries) => {
-                self.soundpacks.clear(); // Clear all existing entries
+        self.soundpacks.clear(); // Clear all existing entries
 
+        // Scan keyboard soundpacks
+        self.scan_soundpack_type(&soundpacks_dir, "keyboard", false);
+
+        // Scan mouse soundpacks
+        self.scan_soundpack_type(&soundpacks_dir, "mouse", true);
+
+        self.last_scan = std::time::SystemTime
+            ::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
+    }
+
+    fn scan_soundpack_type(&mut self, soundpacks_dir: &str, soundpack_type: &str, is_mouse: bool) {
+        let type_dir = std::path::Path::new(soundpacks_dir).join(soundpack_type);
+        if type_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&type_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
-                    if let Some(soundpack_id) = entry.file_name().to_str() {
-                        // println!("🔄 Regenerating metadata for: {}", soundpack_id);
-                        match soundpack::load_soundpack_metadata(soundpack_id) {
+                    if let Some(soundpack_name) = entry.file_name().to_str() {
+                        let full_soundpack_id = format!("{}/{}", soundpack_type, soundpack_name);
+                        match soundpack::load_soundpack_metadata(&full_soundpack_id) {
                             Ok(metadata) => {
-                                self.soundpacks.insert(soundpack_id.to_string(), metadata);
+                                self.soundpacks.insert(full_soundpack_id, metadata);
                             }
                             Err(e) => {
-                                println!("❌ Failed to load metadata for {}: {}", soundpack_id, e);
-
-                                // Create a minimal metadata entry with error information
-                                let error_metadata = SoundpackMetadata {
-                                    id: soundpack_id.to_string(),
-                                    name: format!("Error: {}", soundpack_id),
-                                    author: None,
-                                    description: Some(format!("Failed to load: {}", e)),
-                                    version: "unknown".to_string(),
-                                    tags: vec!["error".to_string()],
-                                    keycap: None,
-                                    icon: None,
-                                    mouse: false,
-                                    last_modified: 0,
-                                    last_accessed: 0,
-                                    config_version: None,
-                                    is_valid_v2: false,
-                                    validation_status: "error".to_string(),
-                                    can_be_converted: false,
-                                    last_error: Some(e),
-                                };
-
-                                self.soundpacks.insert(soundpack_id.to_string(), error_metadata);
+                                println!(
+                                    "❌ Failed to load {} metadata for {}: {}",
+                                    soundpack_type,
+                                    soundpack_name,
+                                    e
+                                );
+                                self.insert_error_metadata(
+                                    &full_soundpack_id,
+                                    soundpack_name,
+                                    e,
+                                    is_mouse
+                                );
                             }
                         }
                     }
                 }
-
-                self.last_scan = std::time::SystemTime
-                    ::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-
-                println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
-            }
-            Err(e) => {
-                eprintln!("⚠️  Failed to read soundpacks directory: {}", e);
             }
         }
+    }
+
+    fn insert_error_metadata(
+        &mut self,
+        full_soundpack_id: &str,
+        soundpack_name: &str,
+        error: String,
+        is_mouse: bool
+    ) {
+        let soundpack_type = if is_mouse { SoundpackType::Mouse } else { SoundpackType::Keyboard };
+        let error_metadata = SoundpackMetadata {
+            id: full_soundpack_id.to_string(),
+            name: format!("Error: {}", soundpack_name),
+            author: None,
+            description: Some(format!("Failed to load: {}", error)),
+            version: "unknown".to_string(),
+            tags: vec!["error".to_string()],
+            icon: None,
+            soundpack_type,
+            last_modified: 0,
+            last_accessed: 0,
+            config_version: None,
+            is_valid_v2: false,
+            validation_status: "error".to_string(),
+            can_be_converted: false,
+            last_error: Some(error),
+        };
+        self.soundpacks.insert(full_soundpack_id.to_string(), error_metadata);
     }
 }

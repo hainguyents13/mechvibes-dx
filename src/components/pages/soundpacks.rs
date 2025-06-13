@@ -15,18 +15,16 @@ pub fn Soundpacks() -> Element {
 
     // Get all soundpacks (this will be reactive to app_state changes)
     let all_soundpacks = app_state.get_soundpacks();
-    println!("🔄 Soundpacks component rendering with {} soundpacks", all_soundpacks.len());
-
-    // Filter soundpacks by type (these will update when all_soundpacks changes)
+    println!("🔄 Soundpacks component rendering with {} soundpacks", all_soundpacks.len()); // Filter soundpacks by type (these will update when all_soundpacks changes)
     let keyboard_soundpacks: Vec<_> = all_soundpacks
         .iter()
-        .filter(|pack| !pack.mouse)
+        .filter(|pack| pack.soundpack_type == crate::state::soundpack::SoundpackType::Keyboard)
         .cloned()
         .collect();
 
     let mouse_soundpacks: Vec<_> = all_soundpacks
         .iter()
-        .filter(|pack| pack.mouse)
+        .filter(|pack| pack.soundpack_type == crate::state::soundpack::SoundpackType::Mouse)
         .cloned()
         .collect();
 

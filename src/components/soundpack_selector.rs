@@ -63,15 +63,15 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     // Filter soundpacks based on search query and type
     let filtered_soundpacks = use_memo(move || {
         let query = search_query().to_lowercase();
-        let all_packs = soundpacks();
-
-        // Filter by type first
+        let all_packs = soundpacks(); // Filter by type first
         let type_filtered_packs: Vec<_> = all_packs
             .into_iter()
             .filter(|pack| {
                 match soundpack_type {
-                    SelectorType::Keyboard => !pack.mouse, // Keyboard soundpacks have mouse: false
-                    SelectorType::Mouse => pack.mouse, // Mouse soundpacks have mouse: true
+                    SelectorType::Keyboard =>
+                        pack.soundpack_type == crate::state::soundpack::SoundpackType::Keyboard,
+                    SelectorType::Mouse =>
+                        pack.soundpack_type == crate::state::soundpack::SoundpackType::Mouse,
                 }
             })
             .collect();
@@ -373,25 +373,25 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
 #[component]
 pub fn KeyboardSoundpackSelector() -> Element {
     rsx! {
-      SoundpackSelector {
-        soundpack_type: SelectorType::Keyboard,
-        label: "Keyboard".to_string(),
-        icon: rsx! {
-          Keyboard { class: "w-4 h-4" }
-        },
-      }
+        SoundpackSelector {
+            soundpack_type: SelectorType::Keyboard,
+            label: "Keyboard".to_string(),
+            icon: rsx! {
+                Keyboard { class: "w-4 h-4" }
+            },
+        }
     }
 }
 
 #[component]
 pub fn MouseSoundpackSelector() -> Element {
     rsx! {
-      SoundpackSelector {
-        soundpack_type: SelectorType::Mouse,
-        label: "Mouse".to_string(),
-        icon: rsx! {
-          Mouse { class: "w-4 h-4" }
-        },
-      }
+        SoundpackSelector {
+            soundpack_type: SelectorType::Mouse,
+            label: "Mouse".to_string(),
+            icon: rsx! {
+                Mouse { class: "w-4 h-4" }
+            },
+        }
     }
 }

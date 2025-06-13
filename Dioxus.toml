@@ -14,7 +14,7 @@ icon = ["./assets/icon.ico"]
 category = "Productivity"
 short_description = "MechvibesDX"
 long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards."
-resources = ["./soundpacks", "./assets"]
+resources = ["./soundpacks/keyboard", "./soundpacks/mouse", "./assets"]
 
 [bundle.windows]
 installer = "nsis"

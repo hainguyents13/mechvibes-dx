@@ -117,11 +117,13 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 
         // Add the generated ID to the config
         config["id"] = Value::String(soundpack_id.clone());
-    }
+    } // Determine soundpack type from config
+    let is_mouse_soundpack = determine_soundpack_type(&config);
+    let soundpack_type = if is_mouse_soundpack { "mouse" } else { "keyboard" };
 
-    // Determine installation directory using soundpack ID
+    // Determine installation directory using soundpack type and ID
     let soundpacks_dir = path::get_soundpacks_dir_absolute();
-    let install_dir = Path::new(&soundpacks_dir).join(&soundpack_id);
+    let install_dir = Path::new(&soundpacks_dir).join(soundpack_type).join(&soundpack_id);
 
     // Create installation directory
     path
@@ -267,4 +269,31 @@ fn handle_config_conversion(
         }
     }
     Ok(final_config_content)
+}
+
+fn determine_soundpack_type(config: &serde_json::Value) -> bool {
+    // Check for explicit type field
+    if let Some(soundpack_type) = config.get("type") {
+        if let Some(type_str) = soundpack_type.as_str() {
+            return type_str == "mouse";
+        }
+    }
+
+    // Check if defs contain mouse-specific keys
+    if let Some(defs) = config.get("defs") {
+        if let Some(defs_obj) = defs.as_object() {
+            for key in defs_obj.keys() {
+                if
+                    key.starts_with("Mouse") ||
+                    key.starts_with("Button") ||
+                    key.starts_with("Wheel")
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Default to keyboard
+    false
 }

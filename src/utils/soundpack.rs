@@ -101,10 +101,6 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             .map(|s| s.to_string()),
         version,
         tags,
-        keycap: config
-            .get("keycap")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
         icon: {
             // Generate dynamic asset URL
             if let Some(icon_filename) = config.get("icon").and_then(|v| v.as_str()) {
@@ -133,10 +129,10 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
                 Some(String::new()) // Empty string if no icon specified
             }
         },
-        mouse: config
-            .get("mouse")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false), // Default to false (keyboard soundpack)
+        soundpack_type: match config.get("soundpack_type").and_then(|v| v.as_str()) {
+            Some("mouse") => crate::state::soundpack::SoundpackType::Mouse,
+            _ => crate::state::soundpack::SoundpackType::Keyboard, // Default to keyboard
+        },
         last_modified: metadata
             .modified()
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH)

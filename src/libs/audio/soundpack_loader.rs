@@ -43,12 +43,12 @@ fn load_audio_file(
 ) -> Result<(Vec<f32>, u16, u32), String> {
     println!("🔍 [DEBUG] load_audio_file called");
     println!("🔍 [DEBUG] soundpack_path: {}", soundpack_path);
-    println!("🔍 [DEBUG] soundpack.source: {:?}", soundpack.source);
+    println!("🔍 [DEBUG] soundpack.audio_file: {:?}", soundpack.audio_file);
 
-    let sound_file_path = soundpack.source
+    let sound_file_path = soundpack.audio_file
         .as_ref()
         .map(|src| format!("{}/{}", soundpack_path, src.trim_start_matches("./")))
-        .ok_or_else(|| "No source field in soundpack config".to_string())?;
+        .ok_or_else(|| "No audio_file field in soundpack config".to_string())?;
 
     println!("🔍 [DEBUG] Full sound file path: {}", sound_file_path);
 
@@ -301,10 +301,8 @@ pub fn load_keyboard_soundpack_optimized(
             println!("⚠️ Config appears to be V1 format, converting for loading (not saving)");
             convert_v1_for_loading(&config_content, soundpack_id)?
         }
-    };
-
-    // Verify this is a keyboard soundpack
-    if soundpack.mouse {
+    }; // Verify this is a keyboard soundpack
+    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Keyboard {
         return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
     }
 
@@ -312,9 +310,7 @@ pub fn load_keyboard_soundpack_optimized(
     let samples = load_audio_file(&soundpack_path, &soundpack)?;
 
     // Create key mappings (only for keyboard soundpacks)
-    let key_mappings = create_key_mappings(&soundpack, &samples.0);
-
-    // Update audio context with keyboard data
+    let key_mappings = create_key_mappings(&soundpack, &samples.0); // Update audio context with keyboard data
     update_keyboard_context(context, samples, key_mappings, &soundpack)?;
 
     // Update metadata cache - create metadata with no error since loading succeeded
@@ -329,20 +325,21 @@ pub fn load_keyboard_soundpack_optimized(
             let error_metadata = SoundpackMetadata {
                 id: soundpack_id.to_string(),
                 name: soundpack.name.clone(),
-                author: Some(soundpack.author.clone()),
+                author: soundpack.author.clone(),
                 description: soundpack.description.clone(),
                 version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
                 tags: soundpack.tags.clone().unwrap_or_default(),
-                keycap: soundpack.keycap.clone(),
                 icon: soundpack.icon.clone(),
-                mouse: soundpack.mouse,
+                soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
                 last_modified: 0,
                 last_accessed: std::time::SystemTime
                     ::now()
                     .duration_since(std::time::SystemTime::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs(),
-                config_version: Some(soundpack.config_version),
+                config_version: soundpack.config_version
+                    .as_ref()
+                    .and_then(|v| v.parse::<u32>().ok()),
                 is_valid_v2: true,
                 validation_status: "loaded_with_metadata_error".to_string(),
                 can_be_converted: false,
@@ -375,10 +372,8 @@ pub fn load_mouse_soundpack_optimized(
 
     let soundpack: SoundPack = serde_json
         ::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
-
-    // Verify this is a mouse soundpack
-    if !soundpack.mouse {
+        .map_err(|e| format!("Failed to parse config: {}", e))?; // Verify this is a mouse soundpack
+    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Mouse {
         return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
     }
 
@@ -386,9 +381,7 @@ pub fn load_mouse_soundpack_optimized(
     let samples = load_audio_file(&soundpack_path, &soundpack)?;
 
     // Create mouse mappings (only for mouse soundpacks)
-    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0);
-
-    // Update audio context with mouse data
+    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0); // Update audio context with mouse data
     update_mouse_context(context, samples, mouse_mappings, &soundpack)?;
 
     // Update metadata cache - create metadata with no error since loading succeeded
@@ -403,20 +396,21 @@ pub fn load_mouse_soundpack_optimized(
             let error_metadata = SoundpackMetadata {
                 id: soundpack_id.to_string(),
                 name: soundpack.name.clone(),
-                author: Some(soundpack.author.clone()),
+                author: soundpack.author.clone(),
                 description: soundpack.description.clone(),
                 version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
                 tags: soundpack.tags.clone().unwrap_or_default(),
-                keycap: soundpack.keycap.clone(),
                 icon: soundpack.icon.clone(),
-                mouse: soundpack.mouse,
+                soundpack_type: crate::state::soundpack::SoundpackType::Mouse,
                 last_modified: 0,
                 last_accessed: std::time::SystemTime
                     ::now()
                     .duration_since(std::time::SystemTime::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs(),
-                config_version: Some(soundpack.config_version),
+                config_version: soundpack.config_version
+                    .as_ref()
+                    .and_then(|v| v.parse::<u32>().ok()),
                 is_valid_v2: true,
                 validation_status: "loaded_with_metadata_error".to_string(),
                 can_be_converted: false,
@@ -577,15 +571,13 @@ fn create_soundpack_metadata(
                 .as_secs(),
         Err(_) => 0,
     };
-
     Ok(SoundpackMetadata {
         id,
         name: soundpack.name.clone(),
-        author: Some(soundpack.author.clone()),
+        author: soundpack.author.clone(),
         description: soundpack.description.clone(),
         version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
         tags: soundpack.tags.clone().unwrap_or_default(),
-        keycap: soundpack.keycap.clone(),
         icon: {
             // Generate dynamic URL for icon instead of base64 conversion
             if let Some(icon_filename) = &soundpack.icon {
@@ -610,15 +602,14 @@ fn create_soundpack_metadata(
                 Some(String::new()) // Empty string if no icon specified
             }
         },
-        mouse: soundpack.mouse, // Include the mouse field
+        soundpack_type: soundpack.soundpack_type.clone(), // Include the mouse field
         last_modified,
         last_accessed: std::time::SystemTime
             ::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs(),
-        // Add validation fields with default values
-        config_version: Some(soundpack.config_version),
+            .as_secs(), // Add validation fields with default values
+        config_version: Some(soundpack.config_version_num),
         is_valid_v2: true, // Assume valid since it loaded successfully
         validation_status: "valid".to_string(),
         can_be_converted: false,
@@ -631,14 +622,12 @@ fn create_key_mappings(
     soundpack: &SoundPack,
     _samples: &[f32]
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
-    let mut key_mappings = std::collections::HashMap::new();
-
-    // For keyboard soundpacks, use the defs field for keyboard mappings
+    let mut key_mappings = std::collections::HashMap::new(); // For keyboard soundpacks, use the definitions field for keyboard mappings
     // For mouse soundpacks, return empty key mappings
-    if !soundpack.mouse {
-        for (key, sound_def) in &soundpack.defs {
-            // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
-            let converted_mappings: Vec<(f64, f64)> = sound_def
+    if soundpack.soundpack_type == crate::state::soundpack::SoundpackType::Keyboard {
+        for (key, key_def) in &soundpack.definitions {
+            // Convert KeyDefinition timing to Vec<(f64, f64)>
+            let converted_mappings: Vec<(f64, f64)> = key_def.timing
                 .iter()
                 .map(|pair| (pair[0] as f64, pair[1] as f64))
                 .collect();
@@ -653,14 +642,12 @@ fn create_mouse_mappings(
     soundpack: &SoundPack,
     _samples: &[f32]
 ) -> std::collections::HashMap<String, Vec<(f64, f64)>> {
-    let mut mouse_mappings = std::collections::HashMap::new();
-
-    // For mouse soundpacks, use the defs field directly
-    if soundpack.mouse {
-        // This is a mouse soundpack, use defs field for mouse mappings
-        for (button, sound_def) in &soundpack.defs {
-            // Convert Vec<[f32; 2]> to Vec<(f64, f64)>
-            let converted_mappings: Vec<(f64, f64)> = sound_def
+    let mut mouse_mappings = std::collections::HashMap::new(); // For mouse soundpacks, use the definitions field directly
+    if soundpack.soundpack_type == crate::state::soundpack::SoundpackType::Mouse {
+        // This is a mouse soundpack, use definitions field for mouse mappings
+        for (button, key_def) in &soundpack.definitions {
+            // Convert KeyDefinition timing to Vec<(f64, f64)>
+            let converted_mappings: Vec<(f64, f64)> = key_def.timing
                 .iter()
                 .map(|pair| (pair[0] as f64, pair[1] as f64))
                 .collect();
@@ -685,10 +672,9 @@ fn create_mouse_mappings(
             ("Mouse7", "End"),
             ("Mouse8", "PageUp"),
         ];
-
         for (mouse_button, keyboard_key) in &fallback_mappings {
-            if let Some(key_mapping) = soundpack.defs.get(*keyboard_key) {
-                let converted_mappings: Vec<(f64, f64)> = key_mapping
+            if let Some(key_def) = soundpack.definitions.get(*keyboard_key) {
+                let converted_mappings: Vec<(f64, f64)> = key_def.timing
                     .iter()
                     .map(|pair| (pair[0] as f64, pair[1] as f64))
                     .collect();
@@ -720,9 +706,8 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
             description: Some(format!("Loading failed: {}", error)),
             version: "unknown".to_string(),
             tags: vec!["error".to_string()],
-            keycap: None,
             icon: None,
-            mouse: false,
+            soundpack_type: crate::state::soundpack::SoundpackType::Keyboard,
             last_modified: 0,
             last_accessed: std::time::SystemTime
                 ::now()
@@ -763,10 +748,11 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    println!("🔍 [DEBUG] V1 source field: {:?}", source);
-
-    // Convert V1 defines to V2 defs format
-    let mut defs = std::collections::HashMap::new();
+    println!("🔍 [DEBUG] V1 source field: {:?}", source); // Convert V1 defines to V2 definitions format
+    let mut defs: std::collections::HashMap<
+        String,
+        crate::state::soundpack::KeyDefinition
+    > = std::collections::HashMap::new();
 
     if let Some(defines) = v1_config.get("defines").and_then(|d| d.as_object()) {
         println!("🔍 [DEBUG] Found {} defines in V1 config", defines.len());
@@ -781,7 +767,6 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
                         if timing_array.len() >= 2 {
                             let start = timing_array[0].as_f64().unwrap_or(0.0) as f32;
                             let duration = timing_array[1].as_f64().unwrap_or(100.0) as f32;
-
                             println!(
                                 "🔍 [DEBUG] Key {} (IOHook {}): [{}, {}]",
                                 key_name,
@@ -789,15 +774,19 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
                                 start,
                                 duration
                             );
-                            defs.insert(key_name.clone(), vec![[start, duration]]);
+                            defs.insert(key_name.clone(), crate::state::soundpack::KeyDefinition {
+                                timing: vec![[start, duration]],
+                                audio_file: None, // V1 configs use single audio file
+                            });
                         }
                     }
                 }
             }
         }
     }
+    println!("🔍 [DEBUG] Converted {} key mappings to V2 format", defs.len());
 
-    println!("🔍 [DEBUG] Converted {} key mappings to V2 format", defs.len()); // Create SoundPack struct
+    // Create SoundPack struct with V2 format
     Ok(SoundPack {
         id: v1_config
             .get("id")
@@ -805,7 +794,7 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
             .unwrap_or(soundpack_id)
             .to_string(),
         name,
-        author: "N/A".to_string(), // Default for V1 configs
+        author: Some("N/A".to_string()), // Default for V1 configs
         description: v1_config
             .get("description")
             .and_then(|v| v.as_str())
@@ -814,6 +803,13 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
             .get("version")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
+        config_version: Some("1".to_string()), // Mark as V1 so we know this needs proper conversion later
+        icon: v1_config
+            .get("icon")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        audio_file: source, // V1 single audio file becomes audio_file
+        license: None,
         tags: v1_config
             .get("tags")
             .and_then(|v| v.as_array())
@@ -822,23 +818,19 @@ fn convert_v1_for_loading(config_content: &str, soundpack_id: &str) -> Result<So
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect()
             }),
-        keycap: v1_config
-            .get("keycap")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        icon: v1_config
-            .get("icon")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        mouse: false, // V1 configs are keyboard soundpacks
-        config_version: 1, // Mark as V1 so we know this needs proper conversion later
-        method: v1_config
+        created_at: None,
+        definition_method: v1_config
             .get("key_define_type")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        source,
-        defs,
-        includes_numpad: v1_config.get("includes_numpad").and_then(|v| v.as_bool()),
+            .unwrap_or("single")
+            .to_string(),
+        options: crate::state::soundpack::SoundpackOptions {
+            recommended_volume: 1.0,
+            random_pitch: false,
+        },
+        soundpack_type: crate::state::soundpack::SoundpackType::Keyboard, // V1 configs are keyboard soundpacks
+        config_version_num: 1, // Internal version number
+        definitions: defs,
     })
 }
 
