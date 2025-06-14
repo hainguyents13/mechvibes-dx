@@ -219,23 +219,7 @@ pub fn start_unified_input_listener(
 
                         // Special handling for Backspace key - skip if too rapid (< 10ms)
                         if key_code == "Backspace" && time_since_last < Duration::from_millis(10) {
-                            println!(
-                                "🚫 IGNORING rapid Backspace: fired only {:.1}ms after previous key event (< 10ms threshold)",
-                                time_since_last.as_millis()
-                            );
                             return; // Skip this Backspace event entirely
-                        }
-
-                        // General rapid event detection (< 60ms) - log but still process
-                        if
-                            time_since_last < Duration::from_millis(60) &&
-                            time_since_last > Duration::from_millis(1)
-                        {
-                            println!(
-                                "⚡ RAPID KEY EVENT detected: '{}' fired {:.1}ms after previous key event",
-                                key_code,
-                                time_since_last.as_millis()
-                            );
                         }
 
                         if time_since_last > Duration::from_millis(1) {

@@ -2,7 +2,7 @@ use crate::libs::device_manager::{ DeviceInfo, DeviceManager };
 use crate::libs::input_device_manager::{ InputDeviceInfo, InputDeviceManager };
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
-use lucide_dioxus::{ Check, ChevronDown, Headphones, Keyboard, Mouse, RefreshCw, X };
+use lucide_dioxus::{ Headphones, Keyboard, Mouse, RefreshCw };
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum DeviceType {
@@ -170,7 +170,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
     };
 
     // Get current device name for display
-    let current_device_name = use_memo(move || {
+    let _current_device_name = use_memo(move || {
         let (selected_device, enabled_devices) = current_selection();
 
         match props.device_type {
@@ -231,6 +231,35 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         }
     });
 
+    // Combined device list for audio (includes system default)
+    let all_audio_devices = use_memo(move || {
+        if props.device_type == DeviceType::AudioOutput {
+            let mut devices = Vec::new();
+
+            // Add system default as the first "device"
+            devices.push((
+                "default".to_string(),
+                "System Default".to_string(),
+                "Use system default audio device".to_string(),
+                true,
+            ));
+
+            // Add hardware devices
+            for device in audio_devices().iter() {
+                devices.push((
+                    device.id.clone(),
+                    device.name.clone(),
+                    "".to_string(),
+                    device.is_default,
+                ));
+            }
+
+            devices
+        } else {
+            Vec::new()
+        }
+    });
+
     // Helper function to render device icon
     let device_icon = move || {
         match props.device_type {
@@ -269,161 +298,114 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
             }
 
             if let Some(desc) = &props.description {
-                p { class: "text-xs text-base-content/60", "{desc}" }
-            }
+                p { class: "text-xs text-base-content/60", "{desc}" }            }
 
-            // Device selector dropdown using DaisyUI
-            details {
-                class: "dropdown w-full",
-
-                summary {
-                    class: format!(
-                        "btn btn-soft w-full justify-between line-clamp-1 max-w-40 truncate gap-3 h-12 rounded-box {}",
-                        if is_loading() { "btn-disabled" } else { "" }
-                    ),
-
-                    div { class: "flex items-center gap-3 flex-1 min-w-0",
-                        div { class: "flex items-center gap-2",
-                            {device_icon()}
-                            span { 
-                              class: "text-sm truncate", 
-                              "{current_device_name()}"
-                            }                       
-                          }
-
-                        // Device status indicator (only for audio output)
-                        if show_error_status() {
-                            X { class: "w-4 h-4 text-error" }
-                        }
-                    }
-
-                    ChevronDown { class: "w-4 h-4" }
-                }
-
-                ul {
-                    class: "menu dropdown-content bg-base-100 rounded-box z-50 w-full p-2 shadow-lg max-h-60 overflow-y-auto",
-
-                    match props.device_type {
-                        DeviceType::AudioOutput => rsx! {
-                            if audio_devices().is_empty() && !is_loading() {
-                                li {
-                                    div { class: "p-4 text-center text-base-content/50 text-sm",
-                                        "No audio devices found"
-                                    }
-                                }
-                            } else {
-                                // System default option
-                                li {
-                                    a {
-                                        class: format!(
-                                            "flex items-center gap-3 {}",
-                                            if current_selection().0.is_none() { "active" } else { "" }
-                                        ),
-                                        onclick: move |_| {
-                                            handle_device_action.call("default".to_string());
-                                        },
-
-                                        {device_icon()}
-                                        div { class: "flex-1 min-w-0",
-                                            div { class: "text-sm font-medium", "System Default" }
-                                            div { class: "text-xs text-base-content/50", "Use system default audio device" }
-                                        }
-                                        if current_selection().0.is_none() {
-                                            Check { class: "w-4 h-4 text-success" }
-                                        }
-                                    }
-                                }
-
-                                // Available audio devices
-                                for device in audio_devices().iter() {
-                                    li {
-                                        key: "{device.id}",
-                                        a {
-                                            class: format!(
-                                                "flex items-center gap-3 {}",
-                                                if current_selection().0.as_ref() == Some(&device.id) { "active" } else { "" }
-                                            ),
-                                            onclick: {
-                                                let device_id = device.id.clone();
-                                                move |_| {
-                                                    handle_device_action.call(device_id.clone());
-                                                }
+            // Device list with radio buttons
+            div { class: "bg-base-100 px-4 py-3 rounded-box space-y-2",
+                match props.device_type {
+                    DeviceType::AudioOutput => rsx! {
+                        if audio_devices().is_empty() && !is_loading() {
+                            div { class: "text-center text-base-content/50 py-8",
+                                {device_icon()}
+                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                            }                        } else {
+                            div { class: "space-y-2",
+                                // Unified device list (system default + hardware devices)
+                                for (device_id, device_name, badge_text, is_default) in all_audio_devices().iter() {
+                                    label { 
+                                        key: "{device_id}",
+                                        class: "flex items-center gap-3 rounded-lg hover:bg-base-100 cursor-pointer transition-colors",
+                                        input {
+                                            r#type: "radio",
+                                            name: "audio-device",
+                                            class: "radio radio-xs",
+                                            checked: if device_id == "default" {
+                                                current_selection().0.is_none()
+                                            } else {
+                                                current_selection().0.as_ref() == Some(device_id)
                                             },
-
-                                            {device_icon()}
+                                            onchange: {
+                                                let device_id_clone = device_id.clone();
+                                                move |_| {
+                                                    handle_device_action.call(device_id_clone.clone());
+                                                }
+                                            }
+                                        }
+                                        div { class: "flex items-center gap-2 flex-1",
                                             div { class: "flex-1 min-w-0",
-                                                div { class: "text-sm font-medium flex items-center gap-2",
-                                                    span { class: "truncate", "{device.name}" }
-                                                    if device.is_default {
+                                                div { class: "text-xs font-medium flex items-center gap-2",
+                                                    span { class: "line-clamp-1", "{device_name}" }
+                                                    if device_id == "default" {
                                                         span { class: "badge badge-xs badge-outline", "Default" }
+                                                    } else if *is_default && !badge_text.is_empty() {
+                                                        span { class: "badge badge-xs badge-outline", "{badge_text}" }
                                                     }
                                                 }
-                                                div { class: "text-xs text-base-content/50", "Device ID: {device.id}" }
-                                            }
-
-                                            // Status and selection indicator
-                                            div { class: "flex items-center gap-2",
-                                                if let Some(status) = device_status().get(&device.id) {
-                                                    if !status {
-                                                        X { class: "w-4 h-4 text-error" }
-                                                    }
+                                                if device_id == "default" {
+                                                    div { class: "text-xs text-base-content/60", "{badge_text}" }
+                                                } else {
+                                                    div { class: "text-xs text-base-content/60", "Device ID: {device_id}" }
                                                 }
-
-                                                if current_selection().0.as_ref() == Some(&device.id) {
-                                                    Check { class: "w-4 h-4 text-success" }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        DeviceType::Keyboard | DeviceType::Mouse => rsx! {                            if input_devices().is_empty() && !is_loading() {
-                                li {
-                                    div { class: "p-4 text-center text-base-content/50 text-sm",
-                                        "{no_devices_message()}"
-                                    }
-                                }
-                            } else {// Available input devices
-                                for device in input_devices().iter() {
-                                    li {
-                                        key: "{device.id}",
-                                        a {
-                                            class: format!(
-                                                "flex items-center gap-3 {}",
-                                                if current_selection().1.contains(&device.id) { "active" } else { "" }
-                                            ),
-                                            onclick: {
-                                                let device_id = device.id.clone();
-                                                move |_| {
-                                                    handle_device_action.call(device_id.clone());
-                                                }
-                                            },
-
-                                            {device_icon()}
-                                            div { class: "flex-1 min-w-0",
-                                                div { class: "text-sm font-medium", "{device.name}" }
-                                                div { class: "text-xs text-base-content/50", "{device.device_type:?}" }
-                                            }
-
-                                            // Selection indicator (checkbox style for multi-select)
-                                            if current_selection().1.contains(&device.id) {
-                                                Check { class: "w-4 h-4 text-success" }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                    },
+                    DeviceType::Keyboard | DeviceType::Mouse => rsx! {
+                        if input_devices().is_empty() && !is_loading() {
+                            div { class: "text-center text-base-content/50 py-8",
+                                {device_icon()}
+                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                            }
+                        } else {
+                            div { class: "space-y-2",
+                                // Available input devices
+                                for device in input_devices().iter() {
+                                    label { 
+                                        key: "{device.id}",
+                                        class: "flex items-center gap-3 p-3 rounded-lg hover:bg-base-100 cursor-pointer transition-colors",
+                                        input {
+                                            r#type: "checkbox",
+                                            class: "checkbox checkbox-primary",
+                                            checked: current_selection().1.contains(&device.id),
+                                            onchange: {
+                                                let device_id = device.id.clone();
+                                                move |_| {
+                                                    handle_device_action.call(device_id.clone());
+                                                }
+                                            }
+                                        }
+                                        div { class: "flex items-center gap-2 flex-1",
+                                            {device_icon()}
+                                            div { class: "flex-1 min-w-0",
+                                                div { class: "text-sm font-medium truncate", "{device.name}" }
+                                                div { class: "text-xs text-base-content/60", "{device.device_type:?}" }
+                                            }
+                                            div { class: "badge badge-success badge-sm", "Available" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                 }
             }
 
             // Error message
             if !error_message().is_empty() {
-                div { class: "text-xs text-error", "{error_message()}" }
+                div { class: "text-xs text-error mt-2", "{error_message()}" }
             }
-        }
+
+            // Device status warning
+            if show_error_status() {
+                div { class: "alert alert-warning mt-2",
+                    div { class: "text-sm",
+                        "⚠️ Selected device may not be available. Audio may not work properly."
+                    }
+                }
+            }        }
     }
 }
 

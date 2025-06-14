@@ -1,5 +1,5 @@
 use crate::components::ui::{ Collapse, PageHeader, Toggler };
-use crate::components::device_selector::{ AudioOutputSelector, KeyboardSelector, MouseSelector };
+use crate::components::device_selector::AudioOutputSelector;
 use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
@@ -139,25 +139,17 @@ pub fn SettingsPage() -> Element {
           Collapse {
             title: "Devices (Experimental)".to_string(),
             group_name: "setting-accordion".to_string(),
-            content_class: "collapse-content text-sm",
+            content_class: "collapse-content text-sm",           
             children: rsx! {
-              div { class: "space-y-6",
+              div { class: "space-y-2",
                 // Audio Output Device
                 AudioOutputSelector {}
                 
-                // Keyboard Devices
-                KeyboardSelector {}
-                
-                // Mouse Devices
-                MouseSelector {}
-                
                 // Device Information
-                div { class: "mt-4 p-3 bg-base-200 rounded-box",
+                div { 
                   div { class: "text-sm font-semibold mb-2", "Device Information" }
                   div { class: "text-xs text-base-content/70 space-y-1",
                     p { "• Audio output devices control where soundpack audio is played" }
-                    p { "• Physical input devices control which keyboards/mice generate sounds" }
-                    p { "• If no input devices are selected, all devices will work" }
                     p { "• Restart the application for changes to take effect" }
                     p { "• If a device becomes unavailable, the system will fall back gracefully" }
                   }

@@ -144,17 +144,12 @@ pub fn convert_v1_to_v2(
     converted_config.insert(
         "definition_method".to_string(),
         Value::String(definition_method.to_string())
-    );
-    // Handle audio_file for "single" method
-    let (audio_file_name, audio_file_offsets) = if v1_define_type == "multi" {
-        // For V1 multi method, we need to create a concatenated audio file
-        // First, collect all unique audio files from defines and calculate their offsets
+    ); // Handle audio_file for "single" method
+    let (audio_file_name, audio_file_info) = if v1_define_type == "multi" {        // For V1 multi method, we need to create a concatenated audio file
+        // First, collect all unique audio files from defines
         let mut audio_files_ordered = Vec::new();
-        let mut audio_file_offsets = std::collections::HashMap::new();
-        let mut current_offset = 0.0f64;
-
-        // Collect unique audio files in order they appear
         let mut seen_files = std::collections::HashSet::new();
+        
         if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
             // Sort keys to ensure consistent order
             let mut sorted_keys: Vec<_> = defines.keys().collect();
@@ -168,46 +163,31 @@ pub fn convert_v1_to_v2(
                             filename != "null" &&
                             !seen_files.contains(filename)
                         {
-                            // Get duration of this audio file
-                            let audio_path = format!("{}/{}", soundpack_dir, filename);
-                            let duration = get_audio_duration_ms(&audio_path).unwrap_or(100.0);
-
-                            // Record the offset for this file
-                            audio_file_offsets.insert(filename.to_string(), current_offset);
-                            audio_files_ordered.push((filename.to_string(), duration));
+                            // Just collect the files, we'll get timing from concatenation
+                            audio_files_ordered.push(filename.to_string());
                             seen_files.insert(filename.to_string());
-
-                            println!(
-                                "   📍 {} -> offset: {}ms, duration: {}ms",
-                                filename,
-                                current_offset,
-                                duration
-                            );
-                            current_offset += duration;
                         }
                     }
                 }
             }
         }
+        
         println!("🔧 Found {} unique audio files in V1 multi method", audio_files_ordered.len());
-        println!("🔧 Total concatenated duration: {}ms", current_offset);
 
         // Create a concatenated audio file name
-        let concat_filename = "concatenated_audio.wav"; // Use WAV for better compatibility
+        let concat_filename = "concatenated_audio.wav";
         println!("🎵 Creating concatenated audio file: {}", concat_filename);
 
-        // Actually concatenate the audio files
-        match concatenate_audio_files(&audio_files_ordered, soundpack_dir, &concat_filename) {
-            Ok(()) => {
-                // Successfully created concatenated audio
-            }
+        // Actually concatenate the audio files and get accurate timing
+        let audio_file_info = match concatenate_audio_files_with_timing(&audio_files_ordered, soundpack_dir, &concat_filename) {
+            Ok(timing_info) => timing_info,
             Err(e) => {
                 println!("❌ Failed to create concatenated audio file: {}", e);
                 return Err(format!("Audio concatenation failed: {}", e).into());
             }
-        }
+        };
 
-        (concat_filename.to_string(), audio_file_offsets)
+        (concat_filename.to_string(), audio_file_info)
     } else {
         // For V1 single method, use the main sound file
         let main_file = if let Some(sound) = config.get("sound") {
@@ -277,16 +257,39 @@ pub fn convert_v1_to_v2(
                                 let mut key_def = Map::new();
 
                                 // Get offset and duration for this audio file
-                                if let Some(&offset) = audio_file_offsets.get(audio_filename) {
-                                    let audio_path = format!(
-                                        "{}/{}",
-                                        soundpack_dir,
-                                        audio_filename
-                                    );
-                                    let duration = get_audio_duration_ms(&audio_path).unwrap_or(
-                                        100.0
-                                    );
+                                if
+                                    let Some(&(offset, duration)) =
+                                        audio_file_info.get(audio_filename)
+                                {
                                     let end_time = offset + duration;
+
+                                    // Special debug for Enter key
+                                    if key_name == "Enter" {
+                                        println!("🔍 [ENTER DEBUG] Key: {}", key_name);
+                                        println!("🔍 [ENTER DEBUG] IOHook code: {}", iohook_num);
+                                        println!("🔍 [ENTER DEBUG] Audio file: {}", audio_filename);
+                                        println!("🔍 [ENTER DEBUG] Offset: {}ms", offset);
+                                        println!("🔍 [ENTER DEBUG] Duration: {}ms", duration);
+                                        println!("🔍 [ENTER DEBUG] End time: {}ms", end_time);
+
+                                        // Check concatenated audio file duration
+                                        let concat_path =
+                                            format!("{}/concatenated_audio.wav", soundpack_dir);
+                                        if
+                                            let Ok(concat_duration) = get_audio_duration_ms(
+                                                &concat_path
+                                            )
+                                        {
+                                            println!("🔍 [ENTER DEBUG] Concatenated audio duration: {}ms", concat_duration);
+                                            if end_time > concat_duration {
+                                                println!(
+                                                    "❌ [ENTER DEBUG] ERROR: End time ({}) > Concat duration ({})",
+                                                    end_time,
+                                                    concat_duration
+                                                );
+                                            }
+                                        }
+                                    }
 
                                     // Create timing based on offset in concatenated file
                                     let timing = vec![
@@ -592,8 +595,136 @@ fn concatenate_audio_files(
                 } else {
                     samples
                 };
+
+                // Special debug for Enter audio file
+                if filename == "SPMEnter.wav" {
+                    let actual_duration_ms =
+                        ((converted_samples.len() as f64) /
+                            ((sample_rate as f64) * (channels as f64))) *
+                        1000.0;
+                    println!("🔍 [ENTER CONCAT DEBUG] File: {}", filename);
+                    println!("🔍 [ENTER CONCAT DEBUG] Samples: {}", converted_samples.len());
+                    println!("🔍 [ENTER CONCAT DEBUG] Sample rate: {}Hz", sample_rate);
+                    println!("🔍 [ENTER CONCAT DEBUG] Channels: {}", channels);
+                    println!(
+                        "🔍 [ENTER CONCAT DEBUG] Actual duration: {:.2}ms",
+                        actual_duration_ms
+                    );
+                    println!(
+                        "🔍 [ENTER CONCAT DEBUG] Current position in concat: {:.2}ms",
+                        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
+                            1000.0
+                    );
+                }
+
                 all_samples.extend(&converted_samples);
                 println!("   ✅ Added {} samples from {}", converted_samples.len(), filename);
+            }
+            Err(e) => {
+                println!("   ❌ Failed to load {}: {}", filename, e);
+                // Continue with other files
+            }
+        }
+    }
+
+    if all_samples.is_empty() {
+        return Err("No audio samples were loaded".into());
+    } // Save concatenated audio file
+    let output_path = format!("{}/{}", soundpack_dir, output_filename);
+    save_audio_file(&all_samples, channels, sample_rate, &output_path)?;
+
+    let final_duration_ms =
+        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) * 1000.0;
+
+    println!("✅ Successfully concatenated audio to: {}", output_path);
+    println!("🎵 Total samples: {}, Duration: {:.2}ms", all_samples.len(), final_duration_ms);
+
+    // Special debug output for comparison
+    println!("🔍 [CONCAT FINAL DEBUG] Final concatenated duration: {:.2}ms", final_duration_ms);
+
+    Ok(())
+}
+
+/// Concatenate multiple audio files and return timing information
+/// Returns HashMap with (filename -> (offset_ms, duration_ms))
+fn concatenate_audio_files_with_timing(
+    audio_files: &[String], // just filenames
+    soundpack_dir: &str,
+    output_filename: &str
+) -> Result<std::collections::HashMap<String, (f64, f64)>, Box<dyn std::error::Error>> {
+    println!("🔧 Concatenating {} audio files with timing...", audio_files.len());
+
+    let mut all_samples = Vec::new();
+    let mut sample_rate = 44100u32; // Default sample rate
+    let mut channels = 2u16; // Default to stereo
+    let mut timing_info = std::collections::HashMap::new();
+
+    for (i, filename) in audio_files.iter().enumerate() {
+        let file_path = format!("{}/{}", soundpack_dir, filename);
+        println!("   📁 Loading audio file {}/{}: {}", i + 1, audio_files.len(), filename);
+
+        if !Path::new(&file_path).exists() {
+            println!("   ⚠️ Audio file not found, skipping: {}", file_path);
+            continue;
+        }
+
+        // Record the current position as the offset for this file
+        let current_offset_ms = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+
+        // Load audio file using Symphonia
+        match load_audio_file_samples(&file_path) {
+            Ok((samples, file_channels, file_sample_rate)) => {
+                // Use the first file's format as reference
+                if i == 0 {
+                    sample_rate = file_sample_rate;
+                    channels = file_channels;
+                    println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
+                    // Recalculate offset for first file with correct sample rate
+                    let corrected_offset = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+                    // Update if needed
+                }
+
+                // Convert to target format if needed
+                let converted_samples = if
+                    file_sample_rate != sample_rate ||
+                    file_channels != channels
+                {
+                    println!(
+                        "   🔄 Converting from {}Hz {} channels to {}Hz {} channels",
+                        file_sample_rate,
+                        file_channels,
+                        sample_rate,
+                        channels
+                    );
+                    convert_audio_format(
+                        &samples,
+                        file_channels,
+                        file_sample_rate,
+                        channels,
+                        sample_rate
+                    )
+                } else {
+                    samples
+                };
+
+                // Calculate the actual duration of this file after conversion
+                let actual_duration_ms = (converted_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+                
+                // Store timing info for this file
+                timing_info.insert(filename.clone(), (current_offset_ms, actual_duration_ms));
+
+                // Special debug for Enter audio file
+                if filename == "SPMEnter.wav" {
+                    println!("🔍 [ENTER TIMING DEBUG] File: {}", filename);
+                    println!("🔍 [ENTER TIMING DEBUG] Offset: {:.2}ms", current_offset_ms);
+                    println!("🔍 [ENTER TIMING DEBUG] Duration: {:.2}ms", actual_duration_ms);
+                    println!("🔍 [ENTER TIMING DEBUG] End time: {:.2}ms", current_offset_ms + actual_duration_ms);
+                    println!("🔍 [ENTER TIMING DEBUG] Samples: {}", converted_samples.len());
+                }
+
+                all_samples.extend(&converted_samples);
+                println!("   ✅ Added {} samples from {} (offset: {:.2}ms, duration: {:.2}ms)", 
+                    converted_samples.len(), filename, current_offset_ms, actual_duration_ms);
             }
             Err(e) => {
                 println!("   ❌ Failed to load {}: {}", filename, e);
@@ -610,14 +741,24 @@ fn concatenate_audio_files(
     let output_path = format!("{}/{}", soundpack_dir, output_filename);
     save_audio_file(&all_samples, channels, sample_rate, &output_path)?;
 
-    println!("✅ Successfully concatenated audio to: {}", output_path);
-    println!(
-        "🎵 Total samples: {}, Duration: {:.2}s",
-        all_samples.len(),
-        (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))
-    );
+    let final_duration_ms = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
 
-    Ok(())
+    println!("✅ Successfully concatenated audio to: {}", output_path);
+    println!("🎵 Total samples: {}, Final duration: {:.2}ms", all_samples.len(), final_duration_ms);
+
+    // Debug output for Enter file timing
+    if let Some((offset, duration)) = timing_info.get("SPMEnter.wav") {
+        println!("🔍 [FINAL TIMING DEBUG] SPMEnter.wav: offset={:.2}ms, duration={:.2}ms, end={:.2}ms", 
+            offset, duration, offset + duration);
+        println!("🔍 [FINAL TIMING DEBUG] Concatenated total: {:.2}ms", final_duration_ms);
+        if offset + duration > final_duration_ms {
+            println!("❌ [FINAL TIMING DEBUG] ERROR: End time exceeds total duration!");
+        } else {
+            println!("✅ [FINAL TIMING DEBUG] Timing looks correct!");
+        }
+    }
+
+    Ok(timing_info)
 }
 
 /// Load audio file and return samples

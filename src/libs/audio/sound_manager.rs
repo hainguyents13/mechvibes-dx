@@ -126,14 +126,14 @@ impl AudioContext {
             }
             // Use epsilon tolerance for floating point comparison (1ms tolerance)
             const EPSILON: f32 = 1.0; // 1ms tolerance
-            eprintln!(
-                "🔍 Playing sound for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (total duration: {:.3}ms)",
-                key,
-                start,
-                end,
-                duration,
-                total_duration
-            );
+            // eprintln!(
+            //     "🔍 Playing sound for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (total duration: {:.3}ms)",
+            //     key,
+            //     start,
+            //     end,
+            //     duration,
+            //     total_duration
+            // );
 
             // Check if start time exceeds audio duration - this is an error condition
             if start >= total_duration + EPSILON {
@@ -143,11 +143,6 @@ impl AudioContext {
                     total_duration,
                     key
                 );
-                eprintln!("🔧 SOLUTION: This soundpack has invalid timing data. Please:");
-                eprintln!("   1. Regenerate the soundpack to fix timing issues, OR");
-                eprintln!("   2. Use the timing fixer utility to correct the config.json, OR");
-                eprintln!("   3. Check if the audio file has been corrupted or modified");
-                eprintln!("📁 Soundpack location: Check your soundpacks directory for this config");
                 return;
             }
 
@@ -160,11 +155,10 @@ impl AudioContext {
                     total_duration,
                     key
                 );
-                eprintln!(
-                    "🔧 SOLUTION: This soundpack has invalid timing data. Please regenerate the soundpack or use the timing fixer utility."
-                );
                 return;
-            } // Calculate sample positions (convert milliseconds to seconds for sample calculation)
+            }
+
+            // Calculate sample positions (convert milliseconds to seconds for sample calculation)
             let start_sample = ((start / 1000.0) *
                 (sample_rate as f32) *
                 (channels as f32)) as usize;
@@ -179,23 +173,6 @@ impl AudioContext {
                     ((clamped_end_sample as f32) / (sample_rate as f32) / (channels as f32)) *
                     1000.0;
                 let clamped_duration = clamped_end_time - start;
-
-                eprintln!("⚠️ TIMING WARNING: Audio segment clamped for key '{}'", key);
-                eprintln!(
-                    "   Original: start={:.3}ms, end={:.3}ms, duration={:.3}ms, end_sample={}",
-                    start,
-                    end,
-                    duration,
-                    end_sample
-                );
-                eprintln!(
-                    "   Clamped: start={:.3}ms, end={:.3}ms, duration={:.3}ms, end_sample={}",
-                    start,
-                    clamped_end_time,
-                    clamped_duration,
-                    clamped_end_sample
-                );
-                eprintln!("   Available samples: {}", samples.len());
 
                 // Use clamped values if they're reasonable
                 if clamped_duration > 1.0 && clamped_end_sample > start_sample {
@@ -216,14 +193,6 @@ impl AudioContext {
                     return;
                 }
 
-                eprintln!("❌ TIMING ERROR: Audio segment exceeds sample buffer for key '{}'", key);
-                eprintln!(
-                    "   Requested samples: {}..{}, Available: {} samples",
-                    start_sample,
-                    end_sample,
-                    samples.len()
-                );
-                eprintln!("🔧 SOLUTION: Regenerate the soundpack to fix timing issues.");
                 return;
             }
 

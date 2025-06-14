@@ -29,6 +29,7 @@
     --font-weight-bold: 700;
     --font-weight-black: 900;
     --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --animate-spin: spin 1s linear infinite;
@@ -2710,6 +2711,9 @@
   .mt-1 {
     margin-top: calc(var(--spacing) * 1);
   }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
   .mt-3 {
     margin-top: calc(var(--spacing) * 3);
   }
@@ -3162,9 +3166,6 @@
   .h-11 {
     height: calc(var(--spacing) * 11);
   }
-  .h-12 {
-    height: calc(var(--spacing) * 12);
-  }
   .h-17 {
     height: calc(var(--spacing) * 17);
   }
@@ -3234,6 +3235,9 @@
   }
   .w-26 {
     width: calc(var(--spacing) * 26);
+  }
+  .w-50 {
+    width: calc(var(--spacing) * 50);
   }
   .w-60 {
     width: calc(var(--spacing) * 60);
@@ -3478,6 +3482,9 @@
   .rounded-full {
     border-radius: calc(infinity * 1px);
   }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
   .rounded-md {
     border-radius: var(--radius-md);
   }
@@ -3509,6 +3516,11 @@
     border-color: var(--color-success);
     color: var(--color-success-content);
     --alert-color: var(--color-success);
+  }
+  .alert-warning {
+    border-color: var(--color-warning);
+    color: var(--color-warning-content);
+    --alert-color: var(--color-warning);
   }
   .border-base-100 {
     border-color: var(--color-base-100);
@@ -3635,6 +3647,18 @@
   .object-cover {
     object-fit: cover;
   }
+  .radio-sm {
+    padding: 0.1875rem;
+    &:is([type="radio"]) {
+      --size: calc(var(--size-selector, 0.25rem) * 5);
+    }
+  }
+  .radio-xs {
+    padding: 0.125rem;
+    &:is([type="radio"]) {
+      --size: calc(var(--size-selector, 0.25rem) * 4);
+    }
+  }
   .p-1 {
     padding: calc(var(--spacing) * 1);
   }
@@ -3664,6 +3688,11 @@
       padding-inline: calc(0.25rem * 3);
       padding-block: calc(0.25rem * 2);
     }
+  }
+  .badge-sm {
+    --size: calc(var(--size-selector, 0.25rem) * 5);
+    font-size: 0.75rem;
+    padding-inline: calc(0.25rem * 2.5 - var(--border));
   }
   .badge-xs {
     --size: calc(var(--size-selector, 0.25rem) * 4);
@@ -3700,11 +3729,17 @@
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
   }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
   }
   .py-6 {
     padding-block: calc(var(--spacing) * 6);
+  }
+  .py-8 {
+    padding-block: calc(var(--spacing) * 8);
   }
   .pt-2 {
     padding-top: calc(var(--spacing) * 2);
@@ -3792,6 +3827,10 @@
   }
   .whitespace-nowrap {
     white-space: nowrap;
+  }
+  .checkbox-primary {
+    color: var(--color-primary-content);
+    --input-color: var(--color-primary);
   }
   .text-base-100 {
     color: var(--color-base-100);
@@ -4022,6 +4061,14 @@
     --btn-p: 0.5rem;
     --size: calc(var(--size-field, 0.25rem) * 6);
   }
+  .badge-error {
+    --badge-color: var(--color-error);
+    --badge-fg: var(--color-error-content);
+  }
+  .badge-success {
+    --badge-color: var(--color-success);
+    --badge-fg: var(--color-success-content);
+  }
   .btn-error {
     --btn-color: var(--color-error);
     --btn-fg: var(--color-error-content);
@@ -4043,6 +4090,9 @@
   }
   .\[--tab-border-color\:var\(--color-base-300\)\] {
     --tab-border-color: var(--color-base-300);
+  }
+  .radio-primary {
+    --input-color: var(--color-primary);
   }
   .range-xs {
     --range-thumb-size: calc(var(--size-selector, 0.25rem) * 4);

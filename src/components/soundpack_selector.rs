@@ -152,6 +152,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   div { class: "text-xs font-normal truncate text-base-content/50",
                     if let Some(author) = &pack.author {
                       "by {author}"
+                    }  else {
+                      "by N/A"
                     }
                   }
                 }
@@ -337,6 +339,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           div { class: "text-xs font-normal line-clamp-1 text-base-content/50",
                             if let Some(author) = &pack.author {
                               "by {author}"
+                            } else {
+                              "by N/A"
                             }
                           }
                         }

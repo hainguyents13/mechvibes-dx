@@ -8,7 +8,7 @@ bundle_assets = true
 [bundle]
 identifier = "com.hainguyents13.mechvibesdx"
 name = "MechvibesDX"
-version = "0.1.0"
+version = "0.1.1"
 publisher = "Hai Nguyen"
 icon = ["./assets/icon.ico"]
 category = "Productivity"
