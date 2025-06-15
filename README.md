@@ -1,30 +1,34 @@
-# Mechvibes DX
+# MechvibesDX
 
-**Add custom sounds to your keyboard and mouse**
+**A fun and practical way to bring your favorite sounds anywhere!**
 
-Mechvibes DX lets you play any sound when you type or click. Use it for education, presentations, gaming, or just for fun.
+MechvibesDX lets you play any sound when you type or click. Use it for education, presentations, gaming, or just for fun.
 
 ## Features
 
--   Play sounds on every keystroke and mouse click
+-   Play sounds on every keystroke (keydown/keyup) and mouse click (press/release)
 -   Works with education, business, gaming, and accessibility needs
 -   Global hotkey toggle (`Ctrl+Alt+M`)
 -   System tray integration
 -   Custom soundpack support
 -   Multiple themes available
+-   Logo and background customizations
 
 ## Installation
 
 1. Download from [Releases](https://github.com/hainguyents13/mechvibes-dx/releases)
 2. Run installer
 3. Select soundpacks
-4. Press `Ctrl+Alt+M` to toggle sounds
+4. Enjoy the sounds or playing with Customizations
 
 ## Use cases
 
 **Education** - Musical scales, animal sounds, language learning
-**Business** - Professional typewriter sounds, meeting-friendly modes  
+
+**Business** - Professional typewriter sounds, meeting-friendly modes
+
 **Gaming** - Retro arcade sounds, custom sound effects
+
 **Accessibility** - Audio feedback for visually impaired users
 
 ## Creating soundpacks
@@ -43,7 +47,9 @@ Piano pack/
 ## Troubleshooting
 
 **No sounds?** Check if muted (`Ctrl+Alt+M`), soundpack selected, system volume
+
 **Hotkey not working?** Run as administrator, check for conflicts
+
 **Soundpack won't load?** Verify config.json syntax, supported audio formats
 
 ## License

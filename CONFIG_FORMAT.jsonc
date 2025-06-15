@@ -1,3 +1,4 @@
+// Config format for audio definitions in MechvibesDX
 {
     "id": "string",
     "name": "string",

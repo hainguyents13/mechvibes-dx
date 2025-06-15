@@ -13,7 +13,6 @@ fn VolumeSliderBase(
     volume: Signal<f32>,
     on_change: Option<EventHandler<f32>>,
     id: String,
-    label_text: Option<String>,
     volume_type: VolumeType
 ) -> Element {
     // Use shared config hook for enable_sound
@@ -28,26 +27,51 @@ fn VolumeSliderBase(
         }
     });
 
-    let label_text = label_text.unwrap_or_else(|| "Volume".to_string());
+    // Get volume boost setting
+    let enable_volume_boost = use_memo(move || config().enable_volume_boost);
+
+    // Calculate max volume and percentage display
+    let max_volume = if enable_volume_boost() { 2.0 } else { 1.0 };
+    let volume_percentage = (volume() * 100.0) as u8;
 
     rsx! {
       div { class: "grid grid-cols-12",
-        div { class: "rounded col-span-4 flex items-center",
-          label { r#for: "{id}", class: "label label-text text-base", "{label_text} " }
+        div { 
+          class: format!(
+            "rounded {} flex items-center", 
+            if !enable_volume_boost() { "col-span-4" } else { "col-span-2" }
+          ),
+
+          if !enable_volume_boost()  {
+            label { 
+              r#for: "{id}", 
+              class: "label label-text text-base", 
+              "Volume " 
+            }
+          }
           span {
             class: format!(
                 "font-bold ml-1 {}",
-                if enable_sound() { "text-base-content" } else { "text-base-content/50" },
+                if enable_sound() { 
+                    if enable_volume_boost() && volume() > 1.0 {
+                        "text-warning"
+                    } else {
+                        "text-base-content"
+                    }
+                } else { 
+                    "text-base-content/50" 
+                },
             ),
-            "{(volume() * 100.0) as u8}%"
+            "{volume_percentage}%"
           }
         }
-        div { class: "col-span-8 flex items-center gap-2",
+        div { 
+          class: format!("{} flex items-center gap-2", if !enable_volume_boost() { "col-span-8" } else { "col-span-10" }),         
           input {
-            class: "range range-xs grow",
+            class: format!("range range-xs grow {}", if volume() > 1.0 { "range-warning" } else { "" }),
             r#type: "range",
             min: 0.0,
-            max: 1.0,
+            max: max_volume,
             step: 0.01,
             id: "{id}",
             value: volume(),
@@ -114,7 +138,6 @@ pub fn VolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -
             volume,
             on_change,
             id: "volume-slider".to_string(),
-            label_text: Some("Volume".to_string()),
             volume_type: VolumeType::Keyboard,
         }
     }
@@ -127,7 +150,6 @@ pub fn MouseVolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32
             volume,
             on_change,
             id: "mouse-volume-slider".to_string(),
-            label_text: Some("Volume".to_string()),
             volume_type: VolumeType::Mouse,
         }
     }
@@ -140,7 +162,6 @@ pub fn KeyboardVolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<
             volume,
             on_change,
             id: "keyboard-volume-slider".to_string(),
-            label_text: Some("Volume".to_string()),
             volume_type: VolumeType::Keyboard,
         }
     }

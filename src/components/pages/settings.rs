@@ -12,6 +12,7 @@ pub fn SettingsPage() -> Element {
     // Use shared config hook
     let (config, update_config) = use_config(); // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
+    let enable_volume_boost = use_memo(move || config().enable_volume_boost);
     let auto_start = use_memo(move || config().auto_start);
     let start_minimized = use_memo(move || config().start_minimized);
     let show_notifications = use_memo(move || config().show_notifications);
@@ -35,9 +36,9 @@ pub fn SettingsPage() -> Element {
             title: "General".to_string(),
             group_name: "setting-accordion".to_string(),
             default_open: true,
-            content_class: "collapse-content text-sm",
-            children: rsx! {
-              div { class: "space-y-6", // Volume Control
+            content_class: "collapse-content text-sm",            children: rsx! {
+              div { class: "space-y-6",
+                // Volume Control
                 Toggler {
                   title: "Enable all sounds".to_string(),
                   description: Some("You can also use Ctrl+Alt+M to toggle sound on/off".to_string()),
@@ -54,6 +55,24 @@ pub fn SettingsPage() -> Element {
                       }
                   },
                 }
+                
+                // Volume Boost
+                Toggler {
+                  title: "Volume boost (200% max)".to_string(),
+                  description: Some("Allow volume sliders to go up to 200%. May cause audio distortion at high levels.".to_string()),
+                  checked: enable_volume_boost(),
+                  on_change: {
+                    let update_config = update_config.clone();
+                    move |new_value: bool| {
+                      update_config(
+                        Box::new(move |config| {
+                                config.enable_volume_boost = new_value;
+                            }),
+                        );
+                      }
+                    },
+                }
+
                 // Auto Start
                 Toggler {
                   title: "Start with Windows".to_string(),
@@ -183,11 +202,11 @@ pub fn SettingsPage() -> Element {
                   onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          theme.set(Theme::BuiltIn(BuiltInTheme::System));
-                          update_config(
+                          theme.set(Theme::BuiltIn(BuiltInTheme::System));                          update_config(
                               Box::new(|config| {
                                   config.volume = 1.0;
                                   config.enable_sound = true;
+                                  config.enable_volume_boost = false;
                                   config.auto_start = false;
                                   config.show_notifications = true;
                                   config.theme = Theme::BuiltIn(BuiltInTheme::System);
