@@ -1,6 +1,7 @@
 use crate::libs::theme::{ BuiltInTheme, Theme };
 use crate::state::paths;
 use crate::utils::{ data, path };
+use crate::utils::auto_updater::AutoUpdateConfig;
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
 
@@ -66,20 +67,23 @@ pub struct AppConfig {
     pub enable_volume_boost: bool, // Enable/disable volume boost to 200%
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
-    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically    // Device settings
+    pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically
+    // Device settings
     pub selected_audio_device: Option<String>, // Selected audio output device
     pub enabled_keyboards: Vec<String>, // Enabled physical keyboards (by device instance ID)
-    pub enabled_mice: Vec<String>, // Enabled physical mice (by device instance ID)    // UI settings
+    pub enabled_mice: Vec<String>, // Enabled physical mice (by device instance ID)
+    // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
     pub enable_logo_customization: bool, // Enable/disable logo customization panel
     pub background_customization: BackgroundCustomization,
-    pub enable_background_customization: bool, // Enable/disable background customization panel// System settings
+    pub enable_background_customization: bool, // Enable/disable background customization panel
+    // System settings
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
-    pub show_notifications: bool,
     pub landscape_mode: bool, // Enable/disable landscape mode layout
+    pub auto_update: AutoUpdateConfig, // Auto-update settings
 }
 
 impl AppConfig {
@@ -149,8 +153,8 @@ impl Default for AppConfig {
             enable_background_customization: false, // Default background customization disabled
             auto_start: false,
             start_minimized: false, // Default to not starting minimized
-            show_notifications: true,
             landscape_mode: false, // Default landscape mode disabled
+            auto_update: AutoUpdateConfig::default(), // Default auto-update settings
         }
     }
 }

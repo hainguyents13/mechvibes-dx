@@ -104,10 +104,11 @@ fn main() {
     // Register protocol on first run
     // if let Err(e) = protocol::register_protocol() {
     //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
-    // }
-
-    // Initialize global app state before rendering
+    // }    // Initialize global app state before rendering
     state::app::init_app_state();
+
+    // Note: Update service will be initialized within the UI components
+    // to ensure proper Dioxus runtime context
 
     // Create input event channels for communication between input listener and UI
     let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();

@@ -4,6 +4,7 @@ use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
 use crate::utils::constants::{ APP_NAME_DISPLAY, APP_NAME };
+use crate::utils::auto_updater::{ check_for_updates_simple, UpdateInfo };
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
 
@@ -14,8 +15,10 @@ pub fn SettingsPage() -> Element {
     let enable_sound = use_memo(move || config().enable_sound);
     let enable_volume_boost = use_memo(move || config().enable_volume_boost);
     let auto_start = use_memo(move || config().auto_start);
-    let start_minimized = use_memo(move || config().start_minimized);
-    let show_notifications = use_memo(move || config().show_notifications);
+    let start_minimized = use_memo(move || config().start_minimized); // Update states
+    let update_info = use_signal(|| None::<UpdateInfo>);
+    let mut is_checking_updates = use_signal(|| false);
+    let mut check_error = use_signal(|| None::<String>);
 
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
@@ -136,28 +139,11 @@ pub fn SettingsPage() -> Element {
                                         Err(e) => {
                                             eprintln!("❌ Failed to update auto startup: {}", e);
                                         }
-                                    }
-                                }
+                                    }                                }
                             });
                         }
                     },
                   }
-                }               
-                // Notifications
-                Toggler {
-                  title: "Show notifications".to_string(),
-                  description: Some("Display system notifications for important events".to_string()),
-                  checked: show_notifications(),
-                  on_change: {
-                      let update_config = update_config.clone();
-                      move |new_value: bool| {
-                          update_config(
-                              Box::new(move |config| {
-                                  config.show_notifications = new_value;
-                              }),
-                          );
-                      }
-                  },
                 }
               }
             },        
@@ -181,9 +167,82 @@ pub fn SettingsPage() -> Element {
                     p { "• If a device becomes unavailable, the system will fall back gracefully" }
                   }
                 }
-              }
-            },
+              }            },
           }
+          // Auto-Update Section
+          Collapse {
+            title: "Updates".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            children: rsx! {
+              div { class: "space-y-4",                p { class: "text-sm text-base-content/70",
+                  "Automatic update checking runs every 24 hours in the background."
+                }
+                div { class: "flex items-center gap-3",
+                  button {
+                    class: "btn btn-soft btn-sm",
+                    disabled: is_checking_updates(),                    onclick: move |_| {
+                        println!("Manual update check requested");
+                        is_checking_updates.set(true);
+                        check_error.set(None);
+                        
+                        let mut update_info = update_info.clone();
+                        let mut is_checking_updates = is_checking_updates.clone();
+                        let mut check_error = check_error.clone();
+                          spawn(async move {
+                            match check_for_updates_simple().await {
+                                Ok(info) => {
+                                    update_info.set(Some(info));
+                                    check_error.set(None);
+                                }
+                                Err(e) => {
+                                    check_error.set(Some(format!("Failed to check for updates: {}", e)));
+                                    update_info.set(None);
+                                }
+                            }
+                            is_checking_updates.set(false);
+                        });
+                    },
+                    if is_checking_updates() {
+                      span { class: "loading loading-spinner loading-xs mr-1" }
+                    }
+                    if is_checking_updates() { "Checking..." } else { "Check for Updates" }
+                  }
+                  
+                }
+                
+                // Display update status
+                if let Some(error) = check_error() {
+                  div { class: "alert alert-error text-sm",
+                    "❌ {error}"
+                  }
+                } else if let Some(info) = update_info() {
+                  if info.update_available {
+                    div { class: "alert alert-success text-sm",
+                      div {
+                        p { "🎉 Update available: v{info.latest_version}" }
+                        if let Some(url) = &info.download_url {
+                          p { class: "mt-2",
+                            a { 
+                              href: "{url}",
+                              target: "_blank",
+                              class: "link link-primary",
+                              "Download from GitHub"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } else {
+                    div { class: "alert alert-success alert-soft ",
+                      "You're running the latest version (v{info.current_version})"
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
           // App info Section
           Collapse {
             title: "App info".to_string(),
@@ -210,13 +269,11 @@ pub fn SettingsPage() -> Element {
                   onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          theme.set(Theme::BuiltIn(BuiltInTheme::System));                          update_config(
-                              Box::new(|config| {
+                          theme.set(Theme::BuiltIn(BuiltInTheme::System));                          update_config(                              Box::new(|config| {
                                   config.volume = 1.0;
                                   config.enable_sound = true;
                                   config.enable_volume_boost = false;
                                   config.auto_start = false;
-                                  config.show_notifications = true;
                                   config.theme = Theme::BuiltIn(BuiltInTheme::System);
                               }),
                           );
