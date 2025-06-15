@@ -145,11 +145,12 @@ pub fn convert_v1_to_v2(
         "definition_method".to_string(),
         Value::String(definition_method.to_string())
     ); // Handle audio_file for "single" method
-    let (audio_file_name, audio_file_info) = if v1_define_type == "multi" {        // For V1 multi method, we need to create a concatenated audio file
+    let (audio_file_name, audio_file_info) = if v1_define_type == "multi" {
+        // For V1 multi method, we need to create a concatenated audio file
         // First, collect all unique audio files from defines
         let mut audio_files_ordered = Vec::new();
         let mut seen_files = std::collections::HashSet::new();
-        
+
         if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
             // Sort keys to ensure consistent order
             let mut sorted_keys: Vec<_> = defines.keys().collect();
@@ -171,7 +172,7 @@ pub fn convert_v1_to_v2(
                 }
             }
         }
-        
+
         println!("🔧 Found {} unique audio files in V1 multi method", audio_files_ordered.len());
 
         // Create a concatenated audio file name
@@ -179,7 +180,13 @@ pub fn convert_v1_to_v2(
         println!("🎵 Creating concatenated audio file: {}", concat_filename);
 
         // Actually concatenate the audio files and get accurate timing
-        let audio_file_info = match concatenate_audio_files_with_timing(&audio_files_ordered, soundpack_dir, &concat_filename) {
+        let audio_file_info = match
+            concatenate_audio_files_with_timing(
+                &audio_files_ordered,
+                soundpack_dir,
+                &concat_filename
+            )
+        {
             Ok(timing_info) => timing_info,
             Err(e) => {
                 println!("❌ Failed to create concatenated audio file: {}", e);
@@ -669,7 +676,8 @@ fn concatenate_audio_files_with_timing(
         }
 
         // Record the current position as the offset for this file
-        let current_offset_ms = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+        let current_offset_ms =
+            ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) * 1000.0;
 
         // Load audio file using Symphonia
         match load_audio_file_samples(&file_path) {
@@ -680,7 +688,9 @@ fn concatenate_audio_files_with_timing(
                     channels = file_channels;
                     println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
                     // Recalculate offset for first file with correct sample rate
-                    let corrected_offset = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+                    let corrected_offset =
+                        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
+                        1000.0;
                     // Update if needed
                 }
 
@@ -708,8 +718,11 @@ fn concatenate_audio_files_with_timing(
                 };
 
                 // Calculate the actual duration of this file after conversion
-                let actual_duration_ms = (converted_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
-                
+                let actual_duration_ms =
+                    ((converted_samples.len() as f64) /
+                        ((sample_rate as f64) * (channels as f64))) *
+                    1000.0;
+
                 // Store timing info for this file
                 timing_info.insert(filename.clone(), (current_offset_ms, actual_duration_ms));
 
@@ -718,13 +731,21 @@ fn concatenate_audio_files_with_timing(
                     println!("🔍 [ENTER TIMING DEBUG] File: {}", filename);
                     println!("🔍 [ENTER TIMING DEBUG] Offset: {:.2}ms", current_offset_ms);
                     println!("🔍 [ENTER TIMING DEBUG] Duration: {:.2}ms", actual_duration_ms);
-                    println!("🔍 [ENTER TIMING DEBUG] End time: {:.2}ms", current_offset_ms + actual_duration_ms);
+                    println!(
+                        "🔍 [ENTER TIMING DEBUG] End time: {:.2}ms",
+                        current_offset_ms + actual_duration_ms
+                    );
                     println!("🔍 [ENTER TIMING DEBUG] Samples: {}", converted_samples.len());
                 }
 
                 all_samples.extend(&converted_samples);
-                println!("   ✅ Added {} samples from {} (offset: {:.2}ms, duration: {:.2}ms)", 
-                    converted_samples.len(), filename, current_offset_ms, actual_duration_ms);
+                println!(
+                    "   ✅ Added {} samples from {} (offset: {:.2}ms, duration: {:.2}ms)",
+                    converted_samples.len(),
+                    filename,
+                    current_offset_ms,
+                    actual_duration_ms
+                );
             }
             Err(e) => {
                 println!("   ❌ Failed to load {}: {}", filename, e);
@@ -741,15 +762,20 @@ fn concatenate_audio_files_with_timing(
     let output_path = format!("{}/{}", soundpack_dir, output_filename);
     save_audio_file(&all_samples, channels, sample_rate, &output_path)?;
 
-    let final_duration_ms = (all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64)) * 1000.0;
+    let final_duration_ms =
+        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) * 1000.0;
 
     println!("✅ Successfully concatenated audio to: {}", output_path);
     println!("🎵 Total samples: {}, Final duration: {:.2}ms", all_samples.len(), final_duration_ms);
 
     // Debug output for Enter file timing
     if let Some((offset, duration)) = timing_info.get("SPMEnter.wav") {
-        println!("🔍 [FINAL TIMING DEBUG] SPMEnter.wav: offset={:.2}ms, duration={:.2}ms, end={:.2}ms", 
-            offset, duration, offset + duration);
+        println!(
+            "🔍 [FINAL TIMING DEBUG] SPMEnter.wav: offset={:.2}ms, duration={:.2}ms, end={:.2}ms",
+            offset,
+            duration,
+            offset + duration
+        );
         println!("🔍 [FINAL TIMING DEBUG] Concatenated total: {:.2}ms", final_duration_ms);
         if offset + duration > final_duration_ms {
             println!("❌ [FINAL TIMING DEBUG] ERROR: End time exceeds total duration!");

@@ -43,18 +43,14 @@ pub mod data {
 /// Soundpack directory paths
 pub mod soundpacks {
     use super::get_app_root;
-
-    /// Get the main soundpacks directory
-    pub fn get_soundpacks_dir() -> String {
-        get_app_root().join("soundpacks").to_string_lossy().to_string()
-    }
-
     /// Get soundpack directory path for a specific soundpack ID
+    /// soundpack_id format: "keyboard/Soundpack Name" or "mouse/Soundpack Name"
     pub fn soundpack_dir(soundpack_id: &str) -> String {
         get_app_root().join("soundpacks").join(soundpack_id).to_string_lossy().to_string()
     }
 
     /// Get config.json path for a specific soundpack
+    /// soundpack_id format: "keyboard/Soundpack Name" or "mouse/Soundpack Name"
     pub fn config_json(soundpack_id: &str) -> String {
         get_app_root()
             .join("soundpacks")
@@ -62,5 +58,20 @@ pub mod soundpacks {
             .join("config.json")
             .to_string_lossy()
             .to_string()
+    }
+
+    /// Get the base soundpacks directory (containing keyboard/ and mouse/ folders)
+    pub fn get_soundpacks_dir() -> String {
+        get_app_root().join("soundpacks").to_string_lossy().to_string()
+    }
+
+    /// Get keyboard soundpacks directory
+    pub fn keyboard_soundpacks_dir() -> String {
+        get_app_root().join("soundpacks").join("keyboard").to_string_lossy().to_string()
+    }
+
+    /// Get mouse soundpacks directory
+    pub fn mouse_soundpacks_dir() -> String {
+        get_app_root().join("soundpacks").join("mouse").to_string_lossy().to_string()
     }
 }

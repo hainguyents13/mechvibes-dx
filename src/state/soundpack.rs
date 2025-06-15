@@ -96,7 +96,7 @@ impl SoundpackType {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundpackMetadata {
-    pub id: String,
+    pub id: String, // Original ID from soundpack config (should not be modified)
     pub name: String,
     pub author: Option<String>,
     pub description: Option<String>,
@@ -105,6 +105,8 @@ pub struct SoundpackMetadata {
     pub icon: Option<String>,
     #[serde(default = "default_soundpack_type")]
     pub soundpack_type: SoundpackType, // Type of soundpack (Keyboard or Mouse)
+    #[serde(default)]
+    pub folder_path: String, // Relative path from soundpacks directory (e.g., "keyboard/Super Paper Mario Talk")
     pub last_modified: u64,
     pub last_accessed: u64,
     // Validation fields
@@ -124,6 +126,14 @@ pub struct SoundpackCache {
     pub soundpacks: HashMap<String, SoundpackMetadata>,
     pub last_scan: u64,
     pub cache_version: u32, // Add version to force regeneration when format changes
+    #[serde(default)]
+    pub count: SoundpackCount, // Count of soundpacks by type
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SoundpackCount {
+    pub keyboard: usize,
+    pub mouse: usize,
 }
 
 impl SoundpackCache {
@@ -159,6 +169,7 @@ impl SoundpackCache {
             soundpacks: HashMap::new(),
             last_scan: 0,
             cache_version: 4, // Current version with error tracking support
+            count: SoundpackCount::default(),
         }
     }
 
@@ -186,9 +197,7 @@ impl SoundpackCache {
     // Add or update soundpack metadata
     pub fn add_soundpack(&mut self, metadata: SoundpackMetadata) {
         self.soundpacks.insert(metadata.id.clone(), metadata);
-    }
-
-    // Refresh cache by scanning soundpacks directory
+    } // Refresh cache by scanning soundpacks directory
     pub fn refresh_from_directory(&mut self) {
         println!("📂 Scanning soundpacks directory...");
 
@@ -201,6 +210,9 @@ impl SoundpackCache {
         // Scan mouse soundpacks
         self.scan_soundpack_type(&soundpacks_dir, "mouse", true);
 
+        // Update count based on loaded soundpacks
+        self.update_count();
+
         self.last_scan = std::time::SystemTime
             ::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -209,6 +221,28 @@ impl SoundpackCache {
 
         println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
     }
+
+    // Update count based on current soundpacks in cache
+    pub fn update_count(&mut self) {
+        let mut keyboard_count = 0;
+        let mut mouse_count = 0;
+
+        for metadata in self.soundpacks.values() {
+            match metadata.soundpack_type {
+                SoundpackType::Keyboard => {
+                    keyboard_count += 1;
+                }
+                SoundpackType::Mouse => {
+                    mouse_count += 1;
+                }
+            }
+        }
+        self.count.keyboard = keyboard_count;
+        self.count.mouse = mouse_count;
+
+        println!("📊 Updated count: {} keyboard, {} mouse soundpacks", keyboard_count, mouse_count);
+    }
+
     fn scan_soundpack_type(&mut self, soundpacks_dir: &str, soundpack_type: &str, is_mouse: bool) {
         let type_dir = std::path::Path::new(soundpacks_dir).join(soundpack_type);
         println!(
@@ -271,6 +305,7 @@ impl SoundpackCache {
             tags: vec!["error".to_string()],
             icon: None,
             soundpack_type,
+            folder_path: full_soundpack_id.to_string(), // Use full_soundpack_id as folder path for error entries
             last_modified: 0,
             last_accessed: 0,
             config_version: None,

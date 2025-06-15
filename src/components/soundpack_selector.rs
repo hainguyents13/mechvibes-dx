@@ -89,13 +89,12 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                 })
                 .collect()
         }
-    });
-
-    // Find current soundpack details
-    let current_soundpack = use_memo(move ||
-        soundpacks()
-            .into_iter()
-            .find(|pack| pack.id == current())
+    }); // Find current soundpack details
+    let current_soundpack = use_memo(
+        move ||
+            soundpacks()
+                .into_iter()
+                .find(|pack| pack.folder_path == current()) // Use folder_path for comparison
     );
 
     // Get appropriate placeholder and search text based on type
@@ -195,14 +194,13 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                 } else {
                   for pack in filtered_soundpacks.read().iter() {
                     button {
-                      key: "{pack.id}",
-                      class: format!(
+                      key: "{pack.id}",                      class: format!(
                           "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
-                          if pack.id == current() { "btn-disabled" } else { "btn-ghost" },
+                          if pack.folder_path == current() { "btn-disabled" } else { "btn-ghost" }, // Use folder_path for comparison
                       ),
-                      disabled: pack.id == current(),
+                      disabled: pack.folder_path == current(), // Use folder_path for comparison
                       onclick: {
-                          let pack_id = pack.id.clone();
+                          let pack_id = pack.folder_path.clone(); // Use folder_path for loading, not id
                           let mut error = error.clone();
                           let soundpacks = soundpacks.clone();
                           let mut is_open = is_open.clone();
@@ -215,7 +213,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                               is_open.set(false);
                               search_query.set(String::new());
                               error.set(String::new());
-                              if let Some(pack_item) = soundpacks().iter().find(|p| p.id == pack_id) {
+                              if let Some(pack_item) = soundpacks().iter().find(|p| p.folder_path == pack_id) { // Use folder_path for comparison too
                                   let type_str = match soundpack_type_click {
                                       SelectorType::Keyboard => "keyboard",
                                       SelectorType::Mouse => "mouse",
@@ -326,7 +324,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           } else {
                             Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                           }
-                          if pack.id == current() {
+                          if pack.folder_path == current() { // Use folder_path for comparison
                             div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
                               Check { class: "text-white w-6 h-6" }
                             }

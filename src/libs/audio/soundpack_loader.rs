@@ -455,7 +455,7 @@ pub fn load_keyboard_soundpack_optimized(
             if update_cache_on_error {
                 // Create minimal metadata with error information
                 let error_metadata = SoundpackMetadata {
-                    id: soundpack_id.to_string(),
+                    id: soundpack.id.clone(), // Use original ID from config
                     name: soundpack.name.clone(),
                     author: soundpack.author.clone(),
                     description: soundpack.description.clone(),
@@ -463,6 +463,7 @@ pub fn load_keyboard_soundpack_optimized(
                     tags: soundpack.tags.clone().unwrap_or_default(),
                     icon: soundpack.icon.clone(),
                     soundpack_type: determine_soundpack_type(soundpack_id),
+                    folder_path: soundpack_id.to_string(), // Add folder_path for correct path resolution
                     last_modified: 0,
                     last_accessed: std::time::SystemTime
                         ::now()
@@ -535,7 +536,7 @@ pub fn load_mouse_soundpack_optimized(
             if update_cache_on_error {
                 // Create minimal metadata with error information
                 let error_metadata = SoundpackMetadata {
-                    id: soundpack_id.to_string(),
+                    id: soundpack.id.clone(), // Use original ID from config
                     name: soundpack.name.clone(),
                     author: soundpack.author.clone(),
                     description: soundpack.description.clone(),
@@ -543,6 +544,7 @@ pub fn load_mouse_soundpack_optimized(
                     tags: soundpack.tags.clone().unwrap_or_default(),
                     icon: soundpack.icon.clone(),
                     soundpack_type: determine_soundpack_type(soundpack_id),
+                    folder_path: soundpack_id.to_string(), // Add folder_path for correct path resolution
                     last_modified: 0,
                     last_accessed: std::time::SystemTime
                         ::now()
@@ -724,7 +726,7 @@ fn create_soundpack_metadata(
         Err(_) => 0,
     };
     Ok(SoundpackMetadata {
-        id,
+        id: soundpack.id.clone(), // Use original ID from soundpack config
         name: soundpack.name.clone(),
         author: soundpack.author.clone(),
         description: soundpack.description.clone(),
@@ -755,6 +757,7 @@ fn create_soundpack_metadata(
             }
         },
         soundpack_type: soundpack.soundpack_type.clone(), // Include the mouse field
+        folder_path: id, // Use the derived folder path for loading
         last_modified,
         last_accessed: std::time::SystemTime
             ::now()
@@ -866,6 +869,7 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
             tags: vec!["error".to_string()],
             icon: None,
             soundpack_type: determine_soundpack_type(soundpack_id),
+            folder_path: soundpack_id.to_string(), // Add folder_path for error entries
             last_modified: 0,
             last_accessed: std::time::SystemTime
                 ::now()

@@ -129,9 +129,12 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
     let metadata = fs
         ::metadata(&config_path)
         .map_err(|e| format!("Failed to get metadata: {}", e))?;
-
     Ok(SoundpackMetadata {
-        id: soundpack_id.to_string(),
+        id: config
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string(), // Use original ID from config
         name,
         author: config
             .get("author")
@@ -186,6 +189,7 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
                 }
             }
         },
+        folder_path: soundpack_id.to_string(), // Store the relative path (e.g., "keyboard/Super Paper Mario Talk")
         last_modified: metadata
             .modified()
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
