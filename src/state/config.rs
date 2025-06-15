@@ -45,7 +45,7 @@ pub struct BackgroundCustomization {
 impl Default for BackgroundCustomization {
     fn default() -> Self {
         Self {
-            background_color: "var(--color-base-100)".to_string(),
+            background_color: "".to_string(),
             background_image: None,
             use_image: false,
         }

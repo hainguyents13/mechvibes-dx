@@ -111,7 +111,7 @@ fn LogoCustomizationSection() -> Element {
     rsx! {
       div { class: "space-y-4", // Toggle switch for logo customization
         Toggler {
-          title: "Enable Logo Customization".to_string(),
+          title: "Enable logo customization".to_string(),
           description: Some("Customize border, text, shadow and background colors".to_string()),
           checked: local_enable(),
           on_change: move |new_value: bool| {
@@ -139,7 +139,15 @@ fn LogoCustomizationPanel() -> Element {
     let mut text_color = use_signal(|| logo_customization().text_color);
     let mut shadow_color = use_signal(|| logo_customization().shadow_color);
     let mut background_color = use_signal(|| logo_customization().background_color);
+    let mut background_image = use_signal(|| logo_customization().background_image.clone());
+    let mut use_background_image = use_signal(|| logo_customization().use_background_image);
     let mut muted_background = use_signal(|| logo_customization().muted_background);
+    let mut muted_background_image = use_signal(||
+        logo_customization().muted_background_image.clone()
+    );
+    let mut use_muted_background_image = use_signal(
+        || logo_customization().use_muted_background_image
+    );
     let mut dimmed_when_muted = use_signal(|| logo_customization().dimmed_when_muted);
     let mut saving = use_signal(|| false);
     // Theme-based color options using CSS variables
@@ -172,7 +180,11 @@ fn LogoCustomizationPanel() -> Element {
             let text = text_color();
             let shadow = shadow_color();
             let background = background_color();
+            let bg_image = background_image();
+            let use_bg_image = use_background_image();
             let muted_bg = muted_background();
+            let muted_bg_image = muted_background_image();
+            let use_muted_bg_image = use_muted_background_image();
             let dimmed = dimmed_when_muted();
 
             update_config_clone(
@@ -181,7 +193,11 @@ fn LogoCustomizationPanel() -> Element {
                     cfg.logo_customization.text_color = text;
                     cfg.logo_customization.shadow_color = shadow;
                     cfg.logo_customization.background_color = background;
+                    cfg.logo_customization.background_image = bg_image;
+                    cfg.logo_customization.use_background_image = use_bg_image;
                     cfg.logo_customization.muted_background = muted_bg;
+                    cfg.logo_customization.muted_background_image = muted_bg_image;
+                    cfg.logo_customization.use_muted_background_image = use_muted_bg_image;
                     cfg.logo_customization.dimmed_when_muted = dimmed;
                 })
             );
@@ -198,7 +214,11 @@ fn LogoCustomizationPanel() -> Element {
         text_color.set(default_logo.text_color.clone());
         shadow_color.set(default_logo.shadow_color.clone());
         background_color.set(default_logo.background_color.clone());
+        background_image.set(default_logo.background_image.clone());
+        use_background_image.set(default_logo.use_background_image);
         muted_background.set(default_logo.muted_background.clone());
+        muted_background_image.set(default_logo.muted_background_image.clone());
+        use_muted_background_image.set(default_logo.use_muted_background_image);
         dimmed_when_muted.set(default_logo.dimmed_when_muted);
 
         update_config(
@@ -213,13 +233,16 @@ fn LogoCustomizationPanel() -> Element {
         text_color.set(logo.text_color);
         shadow_color.set(logo.shadow_color);
         background_color.set(logo.background_color);
+        background_image.set(logo.background_image);
+        use_background_image.set(logo.use_background_image);
         muted_background.set(logo.muted_background);
+        muted_background_image.set(logo.muted_background_image);
+        use_muted_background_image.set(logo.use_muted_background_image);
         dimmed_when_muted.set(logo.dimmed_when_muted);
     });
 
     rsx! {
-      div { class: "space-y-4",
-        // Preview
+      div { class: "space-y-4",        // Preview
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Preview" }
           div { class: "grid grid-cols-2 gap-2 p-4 bg-base-100 rounded-box border border-base-300 space-y-3",
@@ -229,10 +252,18 @@ fn LogoCustomizationPanel() -> Element {
               div {
                 class: "select-none border-3 font-black py-2 px-4 text-2xl rounded-box flex justify-center items-center w-full mt-1",
                 style: format!(
-                    "border-color: {}; color: {}; background: {}; box-shadow: 0 3px 0 {}",
+                    "border-color: {}; color: {}; {}; box-shadow: 0 3px 0 {}",
                     border_color(),
                     text_color(),
-                    background_color(),
+                    if use_background_image() {
+                        if let Some(ref img) = background_image() {
+                            format!("background-image: url('{}'); background-size: cover; background-position: center", img)
+                        } else {
+                            format!("background: {}", background_color())
+                        }
+                    } else {
+                        format!("background: {}", background_color())
+                    },
                     shadow_color(),
                 ),
                 "Mechvibes"
@@ -247,10 +278,18 @@ fn LogoCustomizationPanel() -> Element {
                     if dimmed_when_muted() { " opacity-50" } else { "" },
                 ),
                 style: format!(
-                    "border-color: {}; color: {}; background: {}",
+                    "border-color: {}; color: {}; {}",
                     border_color(),
                     text_color(),
-                    muted_background(),
+                    if use_muted_background_image() {
+                        if let Some(ref img) = muted_background_image() {
+                            format!("background-image: url('{}'); background-size: cover; background-position: center", img)
+                        } else {
+                            format!("background: {}", muted_background())
+                        }
+                    } else {
+                        format!("background: {}", muted_background())
+                    },
                 ),
                 "Mechvibes"
               }
@@ -276,8 +315,7 @@ fn LogoCustomizationPanel() -> Element {
           on_change: move |value| text_color.set(value),
           field: "text_color".to_string(),
           description: None,
-        }
-        // Shadow Color
+        }        // Shadow Color
         ColorPicker {
           label: "Shadow Color".to_string(),
           selected_value: shadow_color(),
@@ -287,25 +325,101 @@ fn LogoCustomizationPanel() -> Element {
           field: "shadow_color".to_string(),
           description: None,
         }
-        // Background Color
-        ColorPicker {
-          label: "Background".to_string(),
-          selected_value: background_color(),
-          options: color_options.clone(),
-          placeholder: "Select a color...".to_string(),
-          on_change: move |value| background_color.set(value),
-          field: "background_color".to_string(),
-          description: None,
+        
+        // Background Section
+        div { class: "space-y-3 p-3 border border-base-300 rounded-box bg-base-100",
+          h4 { class: "text-sm font-semibold text-base-content", "Background (Normal)" }
+          
+          // Toggle between color and image for normal background
+          Toggler {
+            title: "Use image".to_string(),
+            description: Some("Use image instead of solid color".to_string()),
+            checked: use_background_image(),
+            on_change: move |new_value: bool| {
+                use_background_image.set(new_value);
+            },
+          }
+          
+          // Background Color Picker (shown when not using image)
+          if !use_background_image() {
+            ColorPicker {
+              label: "Color".to_string(),
+              selected_value: background_color(),
+              options: color_options.clone(),
+              placeholder: "Select a color...".to_string(),
+              on_change: move |value| background_color.set(value),
+              field: "background_color".to_string(),
+              description: None,
+            }
+          }
+          
+          // Background Image Selector (shown when using image)
+          if use_background_image() {
+            div { class: "space-y-2",
+              div{
+                div { class: "text-sm font-medium text-base-content", "Background Image" }
+                div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
+              }
+              input {
+                r#type: "text",
+                placeholder: "Enter image URL or path...",
+                class: "input w-full input-sm",
+                value: background_image().unwrap_or_default(),
+                oninput: move |evt| {
+                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                    background_image.set(value);
+                }
+              }
+            }
+          }
         }
-        // Muted Background Color
-        ColorPicker {
-          label: "Muted Background".to_string(),
-          selected_value: muted_background(),
-          options: color_options.clone(),
-          placeholder: "Select a color...".to_string(),
-          on_change: move |value| muted_background.set(value),
-          field: "muted_background".to_string(),
-          description: Some("Background color when sound is disabled".to_string()),
+
+        // Muted Background Section
+        div { class: "space-y-3 p-3 border border-base-300 rounded-box bg-base-100",
+          h4 { class: "text-sm font-semibold text-base-content", "Background (Muted)" }
+          
+          // Toggle between color and image for muted background
+          Toggler {
+            title: "Use image".to_string(),
+            description: Some("Use image instead of solid color".to_string()),
+            checked: use_muted_background_image(),
+            on_change: move |new_value: bool| {
+                use_muted_background_image.set(new_value);
+            },
+          }
+          
+          // Muted Background Color Picker (shown when not using image)
+          if !use_muted_background_image() {
+            ColorPicker {
+              label: "Color".to_string(),
+              selected_value: muted_background(),
+              options: color_options.clone(),
+              placeholder: "Select a color...".to_string(),
+              on_change: move |value| muted_background.set(value),
+              field: "muted_background".to_string(),
+              description: Some("Background color when sound is disabled".to_string()),
+            }
+          }
+          
+          // Muted Background Image Selector (shown when using image)
+          if use_muted_background_image() {
+            div { class: "space-y-2",
+              div{
+                div { class: "text-sm font-medium text-base-content", "Image" }
+                div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
+              }
+              input {
+                r#type: "text",
+                placeholder: "Enter image URL or path...",
+                class: "input w-full input-sm",
+                value: muted_background_image().unwrap_or_default(),
+                oninput: move |evt| {
+                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                    muted_background_image.set(value);
+                }
+              }
+            }
+          }
         }
         // Dimmed logo when muted option
         Toggler {
@@ -361,7 +475,7 @@ fn BackgroundCustomizationSection() -> Element {
       div { class: "space-y-4",
         // Toggle switch for background customization
         Toggler {
-          title: "Enable Background Customization".to_string(),
+          title: "Enable background customization".to_string(),
           description: Some("Customize app background with colors or images".to_string()),
           checked: local_enable(),
           on_change: move |new_value: bool| {
@@ -459,23 +573,9 @@ fn BackgroundCustomizationPanel() -> Element {
 
     rsx! {
       div { class: "space-y-4",
-        // Preview
-        div { class: "space-y-2",
-          div { class: "text-sm text-base-content", "Preview" }
-          div { 
-            class: "p-8 rounded-box border border-base-300 text-center",
-            style: if use_image() && background_image().is_some() {
-                format!("background-image: url({}); background-size: cover; background-position: center;", background_image().unwrap_or_default())
-            } else {
-                format!("background-color: {};", background_color())
-            },
-            div { class: "text-base-content font-medium", "Background Preview" }
-          }
-        }
-
         // Toggle between color and image
         Toggler {
-          title: "Use Background Image".to_string(),
+          title: "Use image".to_string(),
           description: Some("Use image instead of solid color".to_string()),
           checked: use_image(),
           on_change: move |new_value: bool| {
@@ -494,23 +594,23 @@ fn BackgroundCustomizationPanel() -> Element {
             field: "background_color".to_string(),
             description: None,
           }
-        }        // Background Image Selector (shown when using image)
+        }        
+        // Background Image Selector (shown when using image)
         if use_image() {
           div { class: "space-y-2",
+          div{
             div { class: "text-sm font-medium text-base-content", "Background Image" }
-            div { class: "text-sm text-base-content/70", "Image upload feature coming soon!" }
+            div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
+          }
             input {
               r#type: "text",
               placeholder: "Enter image URL or path...",
-              class: "input input-bordered w-full",
+              class: "input w-full",
               value: background_image().unwrap_or_default(),
               oninput: move |evt| {
                   let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
                   background_image.set(value);
               }
-            }
-            if let Some(img_path) = background_image() {
-              div { class: "text-xs text-base-content/70", "Image: {img_path}" }
             }
           }
         }

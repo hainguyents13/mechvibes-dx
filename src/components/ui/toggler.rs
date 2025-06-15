@@ -40,7 +40,6 @@ pub fn Toggler(props: TogglerProps) -> Element {
           }
         }
         div{
-
           input {
             r#type: "checkbox",
             class: "{toggle_class}",
