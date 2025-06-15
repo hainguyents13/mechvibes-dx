@@ -1,6 +1,6 @@
 [package]
 name = "mechvibes-dx"
-version = "0.1.0"
+version = "0.2.1"
 authors = ["Hải Nguyễn <hainguyen.ts13@gmail.com>"]
 edition = "2024"
 
@@ -63,19 +63,6 @@ winresource = "0.1"
 [features]
 default = ["dioxus/desktop"]
 desktop = ["dioxus/desktop"]
-
-[package.metadata.bundle]
-name = "MechvibesDX"
-identifier = "com.hainguyents13.mechvibesdx"
-version = "0.1.0"
-copyright = "Copyright © 2025 Hai Nguyen"
-category = "Productivity"
-short_description = "MechvibesDX - Mechanical Keyboard Soundboard"
-long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable."
-author = "Hai Nguyen"
-homepage = "https://github.com/hainguyents13/mechvibes-dx"
-icon = ["assets/icon.ico"]
-resources = ["soundpacks", "data"]
 
 [profile.wasm-dev]
 inherits = "dev"
