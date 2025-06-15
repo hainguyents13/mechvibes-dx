@@ -125,7 +125,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
             }
           }
           div { class: "divider m-0" }
-          div { class: "text-center space-y-2 mt-4",
+          div { class: "text-center space-y-2 mt-8",
             // Version
             div { class: "text-sm text-base-content/70 font-bold",
               "{APP_NAME_DISPLAY} (Beta)"

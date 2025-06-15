@@ -90,7 +90,7 @@ fn VolumeSliderBase(
             "data-tip": if enable_sound() { "Mute" } else { "Unmute" },
             button {
               class: format!(
-                  "btn btn-square btn-ghost {}",
+                  "btn btn-square btn-sm btn-ghost rounded-box {}",
                   if !enable_sound() { "btn-active" } else { "" },
               ),
               onclick: {

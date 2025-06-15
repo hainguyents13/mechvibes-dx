@@ -60,13 +60,21 @@ pub fn SettingsPage() -> Element {
                 Toggler {
                   title: "Volume boost (200% max)".to_string(),
                   description: Some("Allow volume sliders to go up to 200%. May cause audio distortion at high levels.".to_string()),
-                  checked: enable_volume_boost(),
-                  on_change: {
+                  checked: enable_volume_boost(),                  on_change: {
                     let update_config = update_config.clone();
                     move |new_value: bool| {
                       update_config(
                         Box::new(move |config| {
                                 config.enable_volume_boost = new_value;
+                                  // If disabling volume boost, clamp volumes to 100% if they're above
+                                if !new_value {
+                                    if config.volume > 1.0 {
+                                        config.volume = 1.0;
+                                    }
+                                    if config.mouse_volume > 1.0 {
+                                        config.mouse_volume = 1.0;
+                                    }
+                                }
                             }),
                         );
                       }
