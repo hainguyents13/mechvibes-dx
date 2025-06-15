@@ -24,7 +24,7 @@ pub fn CustomizePage() -> Element {
     //     });
     // };
     rsx! {
-      div { class: "p-12",
+      div { class: "",
         PageHeader {
           title: "Customize".to_string(),
           subtitle: "Vibe it your way!".to_string(),
@@ -45,14 +45,22 @@ pub fn CustomizePage() -> Element {
               // Built-in theme toggler
               ThemeToggler {}
             },
-          }
-          Collapse {
+          }          Collapse {
             title: "Logo".to_string(),
             group_name: "customize-accordion".to_string(),
             variant: "border border-base-300 bg-base-200 text-base-content",
             content_class: "collapse-content overflow-visible text-base-content/70",
             children: rsx! {
               LogoCustomizationSection {}
+            },
+          }
+          Collapse {
+            title: "Background".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            children: rsx! {
+              BackgroundCustomizationSection {}
             },
           }
                 // Custom CSS Section
@@ -299,7 +307,6 @@ fn LogoCustomizationPanel() -> Element {
           field: "muted_background".to_string(),
           description: Some("Background color when sound is disabled".to_string()),
         }
-
         // Dimmed logo when muted option
         Toggler {
           title: "Dimmed logo when muted".to_string(),
@@ -331,6 +338,201 @@ fn LogoCustomizationPanel() -> Element {
       }
       div { class: "text-sm text-base-content/50 mt-3",
         "When you reset the logo customization, it will revert to the selected theme colors."
+      }
+    }
+}
+
+#[component]
+fn BackgroundCustomizationSection() -> Element {
+    let (config, update_config) = use_config();
+    let enable_background_customization = use_memo(
+        move || config().enable_background_customization
+    );
+
+    // Create a local signal that syncs with config
+    let mut local_enable = use_signal(|| enable_background_customization());
+
+    // Update local state when config changes
+    use_effect(move || {
+        local_enable.set(enable_background_customization());
+    });
+
+    rsx! {
+      div { class: "space-y-4",
+        // Toggle switch for background customization
+        Toggler {
+          title: "Enable Background Customization".to_string(),
+          description: Some("Customize app background with colors or images".to_string()),
+          checked: local_enable(),
+          on_change: move |new_value: bool| {
+              local_enable.set(new_value);
+              update_config(
+                  Box::new(move |cfg| {
+                      cfg.enable_background_customization = new_value;
+                  }),
+              );
+          },
+        }
+        // Show BackgroundCustomizationPanel only when enabled
+        if local_enable() {
+          BackgroundCustomizationPanel {}
+        }
+      }
+    }
+}
+
+#[component]
+fn BackgroundCustomizationPanel() -> Element {
+    let (config, update_config) = use_config();
+    let background_customization = use_memo(move || config().background_customization.clone());
+    let mut background_color = use_signal(|| background_customization().background_color);
+    let mut background_image = use_signal(|| background_customization().background_image.clone());
+    let mut use_image = use_signal(|| background_customization().use_image);
+    let mut saving = use_signal(|| false);
+
+    // Theme-based color options using CSS variables (same as logo)
+    let color_options = vec![
+        ("Base Content", "var(--color-base-content)"),
+        ("Base 100", "var(--color-base-100)"),
+        ("Base 200", "var(--color-base-200)"),
+        ("Base 300", "var(--color-base-300)"),
+        ("Primary", "var(--color-primary)"),
+        ("Primary Content", "var(--color-primary-content)"),
+        ("Secondary", "var(--color-secondary)"),
+        ("Secondary Content", "var(--color-secondary-content)"),
+        ("Accent", "var(--color-accent)"),
+        ("Accent Content", "var(--color-accent-content)"),
+        ("Neutral", "var(--color-neutral)"),
+        ("Neutral Content", "var(--color-neutral-content)"),
+        ("Info", "var(--color-info)"),
+        ("Info Content", "var(--color-info-content)"),
+        ("Success", "var(--color-success)"),
+        ("Success Content", "var(--color-success-content)"),
+        ("Warning", "var(--color-warning)"),
+        ("Warning Content", "var(--color-warning-content)"),
+        ("Error", "var(--color-error)"),
+        ("Error Content", "var(--color-error-content)")
+    ];
+
+    let on_save = {
+        let update_config_clone = update_config.clone();
+        move |_| {
+            let color = background_color();
+            let image = background_image();
+            let use_img = use_image();
+
+            update_config_clone(
+                Box::new(move |cfg| {
+                    cfg.background_customization.background_color = color;
+                    cfg.background_customization.background_image = image;
+                    cfg.background_customization.use_image = use_img;
+                })
+            );
+            saving.set(true);
+            spawn(async move {
+                delay::Delay::ms(500).await;
+                saving.set(false);
+            });
+        }
+    };
+
+    let on_reset = move |_| {
+        let default_bg = crate::state::config::BackgroundCustomization::default();
+        background_color.set(default_bg.background_color.clone());
+        background_image.set(default_bg.background_image.clone());
+        use_image.set(default_bg.use_image);
+
+        update_config(
+            Box::new(move |cfg| {
+                cfg.background_customization = default_bg;
+            })
+        );
+    };
+
+    // Update local state when config changes
+    use_effect(move || {
+        let bg = background_customization();
+        background_color.set(bg.background_color);
+        background_image.set(bg.background_image);
+        use_image.set(bg.use_image);
+    });
+
+    rsx! {
+      div { class: "space-y-4",
+        // Preview
+        div { class: "space-y-2",
+          div { class: "text-sm text-base-content", "Preview" }
+          div { 
+            class: "p-8 rounded-box border border-base-300 text-center",
+            style: if use_image() && background_image().is_some() {
+                format!("background-image: url({}); background-size: cover; background-position: center;", background_image().unwrap_or_default())
+            } else {
+                format!("background-color: {};", background_color())
+            },
+            div { class: "text-base-content font-medium", "Background Preview" }
+          }
+        }
+
+        // Toggle between color and image
+        Toggler {
+          title: "Use Background Image".to_string(),
+          description: Some("Use image instead of solid color".to_string()),
+          checked: use_image(),
+          on_change: move |new_value: bool| {
+              use_image.set(new_value);
+          },
+        }
+
+        // Background Color Picker (shown when not using image)
+        if !use_image() {
+          ColorPicker {
+            label: "Background Color".to_string(),
+            selected_value: background_color(),
+            options: color_options.clone(),
+            placeholder: "Select a color...".to_string(),
+            on_change: move |color: String| background_color.set(color),
+            field: "background_color".to_string(),
+            description: None,
+          }
+        }        // Background Image Selector (shown when using image)
+        if use_image() {
+          div { class: "space-y-2",
+            div { class: "text-sm font-medium text-base-content", "Background Image" }
+            div { class: "text-sm text-base-content/70", "Image upload feature coming soon!" }
+            input {
+              r#type: "text",
+              placeholder: "Enter image URL or path...",
+              class: "input input-bordered w-full",
+              value: background_image().unwrap_or_default(),
+              oninput: move |evt| {
+                  let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                  background_image.set(value);
+              }
+            }
+            if let Some(img_path) = background_image() {
+              div { class: "text-xs text-base-content/70", "Image: {img_path}" }
+            }
+          }
+        }
+
+        // Action buttons
+        div { class: "flex gap-2 mt-4",
+          button {
+            class: "btn btn-neutral btn-sm",
+            disabled: saving(),
+            onclick: on_save,
+            if saving() {
+              span { class: "loading loading-spinner loading-sm mr-2" }
+            } else {
+              Check { class: "w-4 h-4 mr-1" }
+            }
+            "Save changes"
+          }
+          button { class: "btn btn-ghost btn-sm", onclick: on_reset,
+            RotateCcw { class: "w-4 h-4 mr-1" }
+            "Reset"
+          }
+        }
       }
     }
 }

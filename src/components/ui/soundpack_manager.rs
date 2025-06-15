@@ -58,7 +58,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let soundpack_count_mouse = app_state.optimized_cache.count.mouse;
 
     rsx! {
-      div { class: "space-y-4",        div { class: "text-base-content",
+      div { class: "space-y-4",        
+        div { class: "text-base-content",
           div {
             div { class: "font-medium text-sm pb-1",
               if soundpack_count_keyboard + soundpack_count_mouse == 0 {

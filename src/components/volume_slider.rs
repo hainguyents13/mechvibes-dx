@@ -110,38 +110,38 @@ fn VolumeSliderBase(
 #[component]
 pub fn VolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -> Element {
     rsx! {
-      VolumeSliderBase {
-        volume,
-        on_change,
-        id: "volume-slider".to_string(),
-        label_text: Some("Volume".to_string()),
-        volume_type: VolumeType::Keyboard,
-      }
+        VolumeSliderBase {
+            volume,
+            on_change,
+            id: "volume-slider".to_string(),
+            label_text: Some("Volume".to_string()),
+            volume_type: VolumeType::Keyboard,
+        }
     }
 }
 
 #[component]
 pub fn MouseVolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -> Element {
     rsx! {
-      VolumeSliderBase {
-        volume,
-        on_change,
-        id: "mouse-volume-slider".to_string(),
-        label_text: Some("Volume".to_string()),
-        volume_type: VolumeType::Mouse,
-      }
+        VolumeSliderBase {
+            volume,
+            on_change,
+            id: "mouse-volume-slider".to_string(),
+            label_text: Some("Volume".to_string()),
+            volume_type: VolumeType::Mouse,
+        }
     }
 }
 
 #[component]
 pub fn KeyboardVolumeSlider(volume: Signal<f32>, on_change: Option<EventHandler<f32>>) -> Element {
     rsx! {
-      VolumeSliderBase {
-        volume,
-        on_change,
-        id: "keyboard-volume-slider".to_string(),
-        label_text: Some("Volume".to_string()),
-        volume_type: VolumeType::Keyboard,
-      }
+        VolumeSliderBase {
+            volume,
+            on_change,
+            id: "keyboard-volume-slider".to_string(),
+            label_text: Some("Volume".to_string()),
+            volume_type: VolumeType::Keyboard,
+        }
     }
 }

@@ -9,7 +9,7 @@ pub fn Dock() -> Element {
     let route = use_route::<crate::libs::routes::Route>();
 
     rsx! {
-      div { class: "dock dock-xl bg-base-200",
+      div { class: "dock dock-xl bg-transparent bg-opacity-80 backdrop-blur-xl",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },

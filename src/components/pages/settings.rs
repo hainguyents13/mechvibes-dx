@@ -19,7 +19,7 @@ pub fn SettingsPage() -> Element {
     // Theme state - use theme context (initialized in Layout component)
     let mut theme = use_theme();
     rsx! {
-      div { class: "p-12", // Page header
+      div { class: "", // Page header
         PageHeader {
           title: "Settings".to_string(),
           subtitle: format!("Config your {} experience.", APP_NAME_DISPLAY),

@@ -65,8 +65,8 @@ fn calculate_window_size() -> LogicalSize<f64> {
     debug_print!("🖥️ Detected screen size: {}x{}", screen_width, screen_height);
 
     // Default app dimensions
-    let default_width = 500.0;
-    let default_height = 850.0;
+    let default_width = 450.0;
+    let default_height = 800.0;
 
     // Calculate appropriate size based on screen dimensions
     let (scale_w, scale_h) = if screen_height <= 720 {
@@ -129,7 +129,7 @@ fn main() {
     let window_size = calculate_window_size();
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
-        .with_transparent(false) // Disable transparency for better performance
+        .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
         .with_inner_size(window_size)
         // .with_inner_size(LogicalSize::new(450, 700))

@@ -10,7 +10,11 @@ pub struct LogoCustomization {
     pub text_color: String,
     pub shadow_color: String,
     pub background_color: String,
+    pub background_image: Option<String>, // Path to background image
+    pub use_background_image: bool, // Whether to use image instead of color for background
     pub muted_background: String,
+    pub muted_background_image: Option<String>, // Path to muted background image
+    pub use_muted_background_image: bool, // Whether to use image instead of color for muted background
     pub dimmed_when_muted: bool,
 }
 
@@ -21,8 +25,29 @@ impl Default for LogoCustomization {
             text_color: "var(--color-base-content)".to_string(),
             shadow_color: "var(--color-base-content)".to_string(),
             background_color: "var(--color-base-200)".to_string(),
+            background_image: None,
+            use_background_image: false,
             muted_background: "var(--color-base-300)".to_string(),
+            muted_background_image: None,
+            use_muted_background_image: false,
             dimmed_when_muted: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BackgroundCustomization {
+    pub background_color: String,
+    pub background_image: Option<String>, // Path to background image
+    pub use_image: bool, // Whether to use image instead of color
+}
+
+impl Default for BackgroundCustomization {
+    fn default() -> Self {
+        Self {
+            background_color: "var(--color-base-100)".to_string(),
+            background_image: None,
+            use_image: false,
         }
     }
 }
@@ -43,12 +68,13 @@ pub struct AppConfig {
     pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically    // Device settings
     pub selected_audio_device: Option<String>, // Selected audio output device
     pub enabled_keyboards: Vec<String>, // Enabled physical keyboards (by device instance ID)
-    pub enabled_mice: Vec<String>, // Enabled physical mice (by device instance ID)
-    // UI settings
+    pub enabled_mice: Vec<String>, // Enabled physical mice (by device instance ID)    // UI settings
     pub theme: Theme,
     pub custom_css: String, // Legacy field for existing custom CSS
     pub logo_customization: LogoCustomization,
-    pub enable_logo_customization: bool, // Enable/disable logo customization panel    // System settings
+    pub enable_logo_customization: bool, // Enable/disable logo customization panel
+    pub background_customization: BackgroundCustomization,
+    pub enable_background_customization: bool, // Enable/disable background customization panel// System settings
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
     pub show_notifications: bool,
@@ -117,6 +143,8 @@ impl Default for AppConfig {
             custom_css: String::new(),
             logo_customization: LogoCustomization::default(),
             enable_logo_customization: false, // Default logo customization disabled
+            background_customization: BackgroundCustomization::default(),
+            enable_background_customization: false, // Default background customization disabled
             auto_start: false,
             start_minimized: false, // Default to not starting minimized
             show_notifications: true,

@@ -97,8 +97,8 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     }
 
     rsx! {
-      div { class: "flex flex-col gap-10 p-16 pb-0",
-        div { class: "mb-2",
+      div { class: "flex flex-col gap-10 px-3 pb-0",
+        div { class: "mb-2 mt-4",
           // Mechvibes logo with animated press effect
           Logo {}
         }
@@ -113,7 +113,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               },
             }
           }
-          div { class: "divider" }
+          div { class: "divider m-0" }
           div { class: "space-y-3",
             // Mouse soundpack selector and volume control
             MouseSoundpackSelector {}
@@ -124,8 +124,8 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               },
             }
           }
-          div { class: "divider" }
-          div { class: "text-center space-y-2",
+          div { class: "divider m-0" }
+          div { class: "text-center space-y-2 mt-4",
             // Version
             div { class: "text-sm text-base-content/70 font-bold",
               "{APP_NAME_DISPLAY} (Beta)"

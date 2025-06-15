@@ -20,7 +20,7 @@ pub fn EffectsPage() -> Element {
     let mut crowd_auto_play = use_signal(|| false);
 
     rsx! {
-      div { class: "p-12",
+      div { class: "p-12 pt-20",
         // Page header
         PageHeader {
           title: "Effects".to_string(),

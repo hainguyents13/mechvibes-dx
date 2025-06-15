@@ -1,11 +1,11 @@
-use crate::libs::theme::{use_theme, BuiltInTheme, Theme};
+use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::state::config::AppConfig;
 use crate::state::themes::ThemesConfig;
 use crate::utils::config::use_config;
 use crate::utils::theme::use_themes;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{Ellipsis, ExternalLink, Palette, Pencil, Plus, Trash2};
+use lucide_dioxus::{ Ellipsis, ExternalLink, Palette, Pencil, Plus, Trash2 };
 
 #[component]
 pub fn ThemeToggler() -> Element {
@@ -67,7 +67,9 @@ pub fn ThemeToggler() -> Element {
                         div { class: "bg-secondary size-2 rounded-full" }
                         div { class: "bg-accent size-2 rounded-full" }
                       }
-                      {format!("{:?}", builtin_theme_clone)}
+                      div { class: "line-clamp-1 w-60",
+                        {format!("{:?}", builtin_theme_clone)}
+                      }
                     }
                   }
               }
@@ -263,7 +265,8 @@ struct ThemeCreatorModalProps {
     editing_theme_id: Signal<Option<String>>,
 }
 
-const THEME_DEFAULT_CSS: &str = r#"/* Colors */
+const THEME_DEFAULT_CSS: &str =
+    r#"/* Colors */
 --color-base-100: oklch(98% 0.02 240);
 --color-base-200: oklch(95% 0.03 240);
 --color-base-300: oklch(92% 0.04 240);
@@ -346,18 +349,22 @@ fn ThemeCreatorModal(props: ThemeCreatorModalProps) -> Element {
             if let Some(editing_id) = editing_theme_id.read().as_ref() {
                 // Update existing theme
                 let editing_id = editing_id.clone();
-                update_themes(Box::new(move |themes: &mut ThemesConfig| {
-                    if let Err(e) = themes.update_theme(&editing_id, name, "".to_string(), css) {
-                        eprintln!("Failed to update theme: {}", e);
-                    }
-                }));
+                update_themes(
+                    Box::new(move |themes: &mut ThemesConfig| {
+                        if let Err(e) = themes.update_theme(&editing_id, name, "".to_string(), css) {
+                            eprintln!("Failed to update theme: {}", e);
+                        }
+                    })
+                );
             } else {
                 // Create new theme
-                update_themes(Box::new(move |themes: &mut ThemesConfig| {
-                    if let Err(e) = themes.add_theme(name, "".to_string(), css) {
-                        eprintln!("Failed to create theme: {}", e);
-                    }
-                }));
+                update_themes(
+                    Box::new(move |themes: &mut ThemesConfig| {
+                        if let Err(e) = themes.add_theme(name, "".to_string(), css) {
+                            eprintln!("Failed to create theme: {}", e);
+                        }
+                    })
+                );
             }
 
             saving.set(false);

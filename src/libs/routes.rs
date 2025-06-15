@@ -26,16 +26,37 @@ pub fn Layout() -> Element {
     // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
 
-    rsx! {
+    // Get background customization settings (reactive to config changes)
+    let background_style = use_memo(move || {
+        let config = config_signal.read();
+        if config.enable_background_customization {
+            let bg_config = &config.background_customization;
+            if bg_config.use_image && bg_config.background_image.is_some() {
+                // Use background image
+                format!(
+                    "background: url({}) center center / cover no-repeat;",
+                    bg_config.background_image.as_ref().unwrap()
+                )
+            } else {
+                // Use background color
+                format!("background: {};", bg_config.background_color)
+            }
+        } else {
+            // Default background (let theme handle it)
+            String::new()
+        }
+    });
 
+    rsx! {
       div {
-        class: "h-screen flex flex-col ",
+        class: "h-screen flex flex-col",
         "data-theme": "{daisy_theme}",
+        style: "{background_style()}",
         // Custom title bar for window controls
         crate::components::titlebar::TitleBar {}
 
         // Main content area with padding to account for title bar
-        div { class: "flex-1 overflow-auto mb-20",
+        div { class: "flex-1 overflow-auto pb-28 px-8 pt-20  py-12",
           // Outlet for nested routes
           Outlet::<Route> {}
         }
@@ -53,34 +74,34 @@ pub fn Home() -> Element {
     // Use audio context from the layout provider instead of creating new one
     let audio_context: Arc<AudioContext> = use_context();
     rsx! {
-      crate::components::pages::HomePage { audio_ctx: audio_context }
+        crate::components::pages::HomePage { audio_ctx: audio_context }
     }
 }
 
 #[component]
 pub fn Soundpacks() -> Element {
     rsx! {
-      crate::components::pages::Soundpacks {}
+        crate::components::pages::Soundpacks {}
     }
 }
 
 #[component]
 pub fn Effects() -> Element {
     rsx! {
-      crate::components::pages::EffectsPage {}
+        crate::components::pages::EffectsPage {}
     }
 }
 
 #[component]
 pub fn Customize() -> Element {
     rsx! {
-      crate::components::pages::CustomizePage {}
+        crate::components::pages::CustomizePage {}
     }
 }
 
 #[component]
 pub fn Settings() -> Element {
     rsx! {
-      crate::components::pages::SettingsPage {}
+        crate::components::pages::SettingsPage {}
     }
 }
