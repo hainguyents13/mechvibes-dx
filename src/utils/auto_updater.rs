@@ -6,7 +6,6 @@ use semver::Version;
 use serde::{ Deserialize, Serialize };
 use std::error::Error;
 use std::fmt;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{ interval, Duration as TokioDuration };
@@ -15,7 +14,7 @@ use tokio::time::{ interval, Duration as TokioDuration };
 const REPO_OWNER: &str = "hainguyents13";
 const REPO_NAME: &str = "mechvibes-dx";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UpdateInfo {
     pub current_version: String,
     pub latest_version: String,
@@ -72,7 +71,7 @@ pub struct AutoUpdater {
 impl AutoUpdater {
     pub fn new() -> Self {
         Self {
-            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            current_version: crate::utils::constants::APP_VERSION.to_string(),
         }
     }
     pub async fn check_for_updates(&self) -> Result<UpdateInfo, UpdateError> {
@@ -102,6 +101,13 @@ impl AutoUpdater {
             .iter()
             .find(|release| !release.prerelease)
             .ok_or(UpdateError::NotFound)?;
+
+        println!(
+            "Latest release: {} ({}), published at {}",
+            latest_release.tag_name,
+            latest_release.name,
+            latest_release.published_at
+        );
 
         let current_version = Version::parse(&self.current_version).map_err(|e|
             UpdateError::InvalidVersion(e.to_string())
@@ -230,12 +236,16 @@ impl AutoUpdater {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutoUpdateConfig {
     pub last_check: Option<u64>,
+    pub available_version: Option<String>,
+    pub available_download_url: Option<String>,
 }
 
 impl Default for AutoUpdateConfig {
     fn default() -> Self {
         Self {
             last_check: None,
+            available_version: None,
+            available_download_url: None,
         }
     }
 }
@@ -286,7 +296,7 @@ impl UpdateService {
 
                 match check_for_updates_simple().await {
                     Ok(update_info) => {
-                        // Update last check time
+                        // Update last check time and save available update info
                         {
                             let mut config_guard = config.lock().await;
                             config_guard.auto_update.last_check = Some(
@@ -296,6 +306,19 @@ impl UpdateService {
                                     .unwrap_or_default()
                                     .as_secs()
                             );
+                            if update_info.update_available {
+                                // Save update info to config
+                                config_guard.auto_update.available_version = Some(
+                                    update_info.latest_version.clone()
+                                );
+                                config_guard.auto_update.available_download_url =
+                                    update_info.download_url.clone();
+                            } else {
+                                // Clear update info if no updates
+                                config_guard.auto_update.available_version = None;
+                                config_guard.auto_update.available_download_url = None;
+                            }
+
                             let _ = config_guard.save();
                         }
                         if update_info.update_available {
@@ -304,8 +327,12 @@ impl UpdateService {
                                 update_info.current_version,
                                 update_info.latest_version
                             );
+                            // Set global update state for UI notification (no UI trigger here)
+                            crate::state::app::set_update_info(Some(update_info));
                         } else {
                             println!("✅ No updates available");
+                            // Clear update info if no updates
+                            crate::state::app::set_update_info(None);
                         }
                     }
                     Err(e) => {
@@ -353,8 +380,44 @@ impl UpdateService {
 
     //         println!("✅ Update installed successfully. Please restart the application.");
     //         Ok(())
-    //     } else {
-    //         Err("No download URL available".into())
+    //     } else {    //         Err("No download URL available".into())
     //     }
     // }
+}
+
+// Check if there's a saved update available in config
+pub fn get_saved_update_info() -> Option<UpdateInfo> {
+    let config = crate::state::config::AppConfig::load();
+    if let Some(available_version) = &config.auto_update.available_version {
+        let current_version = crate::utils::constants::APP_VERSION;
+
+        // Check if saved version is newer than current version
+        if
+            let (Ok(current), Ok(available)) = (
+                Version::parse(current_version),
+                Version::parse(available_version),
+            )
+        {
+            if available > current {
+                return Some(UpdateInfo {
+                    current_version: current_version.to_string(),
+                    latest_version: available_version.clone(),
+                    update_available: true,
+                    download_url: config.auto_update.available_download_url.clone(),
+                    release_notes: Some(
+                        format!(
+                            "https://github.com/{}/{}/releases/tag/v{}",
+                            REPO_OWNER,
+                            REPO_NAME,
+                            available_version
+                        )
+                    ),
+                    published_at: None, // Not saved in config
+                    is_prerelease: false, // Not saved in config
+                });
+            }
+        }
+    }
+
+    None
 }

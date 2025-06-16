@@ -45,41 +45,6 @@ fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     }
 }
 
-#[cfg(windows)]
-fn get_screen_size() -> (i32, i32) {
-    unsafe {
-        let width = GetSystemMetrics(SM_CXSCREEN);
-        let height = GetSystemMetrics(SM_CYSCREEN);
-        (width, height)
-    }
-}
-
-#[cfg(not(windows))]
-fn get_screen_size() -> (i32, i32) {
-    // Default fallback for non-Windows platforms
-    (1920, 1080)
-}
-
-fn calculate_window_size() -> LogicalSize<f64> {
-    let (screen_width, screen_height) = get_screen_size();
-    debug_print!("🖥️ Detected screen size: {}x{}", screen_width, screen_height);
-
-    // Default app dimensions
-    let default_width = 450.0;
-    let default_height = 800.0;
-
-    // Calculate appropriate size based on screen dimensions
-    let (scale_w, scale_h) = if screen_height <= 720 {
-        (1.0, 0.7) // Small screens (720p or smaller) - make app smaller
-    } else if screen_height <= 1080 {
-        (1.0, 0.8) // Medium screens (1080p) - slightly smaller
-    } else {
-        (1.0, 1.0) // Large screens (1440p and above) - default size
-    };
-
-    LogicalSize::new(default_width * scale_w, default_height * scale_h)
-}
-
 fn main() {
     // Initialize debug logging first
     utils::logger::init_debug_logging();
@@ -106,6 +71,7 @@ fn main() {
     //     eprintln!("Warning: Failed to register mechvibes:// protocol: {}", e);
     // }    // Initialize global app state before rendering
     state::app::init_app_state();
+    state::app::init_update_state();
 
     // Note: Update service will be initialized within the UI components
     // to ensure proper Dioxus runtime context
@@ -127,13 +93,11 @@ fn main() {
     WINDOW_MANAGER.set_action_sender(window_tx);
 
     // Create a WindowBuilder with custom appearance and responsive sizing
-    let window_size = calculate_window_size();
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_inner_size(window_size)
-        // .with_inner_size(LogicalSize::new(450, 700))
+        .with_inner_size(LogicalSize::new(450, 800))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false) // Enable window resizing for landscape mode

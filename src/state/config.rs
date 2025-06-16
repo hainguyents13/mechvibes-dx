@@ -131,7 +131,7 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            version: crate::utils::constants::APP_VERSION.to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
             keyboard_soundpack: "oreo".to_string(),

@@ -34,6 +34,9 @@
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --animate-spin: spin 1s linear infinite;
+    --animate-ping: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-bounce: bounce 1s infinite;
     --blur-lg: 16px;
     --blur-xl: 24px;
     --default-transition-duration: 150ms;
@@ -3297,6 +3300,15 @@
     background-repeat: no-repeat;
     background-position-x: -50%;
   }
+  .animate-bounce {
+    animation: var(--animate-bounce);
+  }
+  .animate-ping {
+    animation: var(--animate-ping);
+  }
+  .animate-pulse {
+    animation: var(--animate-pulse);
+  }
   .animate-spin {
     animation: var(--animate-spin);
   }
@@ -3752,6 +3764,9 @@
   .py-0\.5 {
     padding-block: calc(var(--spacing) * 0.5);
   }
+  .py-1 {
+    padding-block: calc(var(--spacing) * 1);
+  }
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
   }
@@ -3790,6 +3805,9 @@
   }
   .pb-28 {
     padding-bottom: calc(var(--spacing) * 28);
+  }
+  .pl-0 {
+    padding-left: calc(var(--spacing) * 0);
   }
   .pl-2 {
     padding-left: calc(var(--spacing) * 2);
@@ -3870,6 +3888,17 @@
     color: var(--color-primary-content);
     --input-color: var(--color-primary);
   }
+  .link-neutral {
+    color: var(--color-neutral);
+    @media (hover: hover) {
+      &:hover {
+        color: var(--color-neutral);
+        @supports (color: color-mix(in lab, red, red)) {
+          color: color-mix(in oklab, var(--color-neutral) 80%, #000);
+        }
+      }
+    }
+  }
   .link-primary {
     color: var(--color-primary);
     @media (hover: hover) {
@@ -3881,9 +3910,23 @@
       }
     }
   }
+  .link-secondary {
+    color: var(--color-secondary);
+    @media (hover: hover) {
+      &:hover {
+        color: var(--color-secondary);
+        @supports (color: color-mix(in lab, red, red)) {
+          color: color-mix(in oklab, var(--color-secondary) 80%, #000);
+        }
+      }
+    }
+  }
   .range-warning {
     color: var(--color-warning);
     --range-thumb: var(--color-warning-content);
+  }
+  .text-accent-content {
+    color: var(--color-accent-content);
   }
   .text-base-100 {
     color: var(--color-base-100);
@@ -3959,6 +4002,14 @@
   }
   .lowercase {
     text-transform: lowercase;
+  }
+  .link-hover {
+    text-decoration-line: none;
+    &:hover {
+      @media (hover: hover) {
+        text-decoration-line: underline;
+      }
+    }
   }
   .underline {
     text-decoration-line: underline;
@@ -4168,6 +4219,10 @@
     --btn-color: var(--color-primary);
     --btn-fg: var(--color-primary-content);
   }
+  .btn-success {
+    --btn-color: var(--color-success);
+    --btn-fg: var(--color-success-content);
+  }
   .select-none {
     -webkit-user-select: none;
     user-select: none;
@@ -4198,6 +4253,16 @@
     &:last-child {
       border-bottom-style: var(--tw-border-style);
       border-bottom-width: 0px;
+    }
+  }
+  .hover\:bg-accent\/80 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-accent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-accent) 80%, transparent);
+        }
+      }
     }
   }
   .hover\:bg-base-100 {
@@ -5845,6 +5910,27 @@ html, body {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
 }
 @layer properties {

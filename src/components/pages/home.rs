@@ -16,6 +16,9 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     // Use shared config hook
     let (config, update_config) = use_config();
 
+    // Get current version for display
+    let current_version = crate::utils::constants::APP_VERSION;
+
     // Volume states from config
     let mut volume = use_signal(|| config().volume);
     let mut mouse_volume = use_signal(|| config().mouse_volume);
@@ -128,10 +131,10 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
           div { class: "text-center space-y-2 mt-12",
             // Version
             div { class: "text-sm text-base-content/70 font-bold",
-              "{APP_NAME_DISPLAY} (Beta)"
+              "{APP_NAME_DISPLAY} (v{current_version})"
             }
             // Footer with credits
-            div { class: "text-sm text-base-content/50",
+            div { class: "text-xs text-base-content/50",
               span { "Made with " }
               Heart { class: "inline w-3.5 h-3.5 -mt-1 text-error/70 fill-error/30" }
               span { " by " }

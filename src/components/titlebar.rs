@@ -1,14 +1,20 @@
 use crate::libs::window_manager::WINDOW_MANAGER;
 use crate::utils::constants::APP_NAME;
+use crate::state::app::use_update_info;
 use dioxus::desktop::use_window;
 use dioxus::prelude::*;
-use lucide_dioxus::{ Minus, X, EyeClosed };
+use lucide_dioxus::{ Minus, X, EyeClosed, Download };
 
 /// A custom title bar component that allows for window dragging and includes minimize/close buttons
 #[component]
 pub fn TitleBar() -> Element {
     let window = use_window();
     let window_drag = window.clone();
+    let update_info = use_update_info();
+
+    // Get current version for display
+    let current_version = crate::utils::constants::APP_VERSION;
+
     let start_drag = move |_| {
         window_drag.drag();
     };
@@ -31,20 +37,51 @@ pub fn TitleBar() -> Element {
     let minimize = move |_| {
         window_minimize.set_minimized(true);
     };
-    rsx! {
-      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none bg-gradient-to-b from-base-300 to-transparent transition-all ",
-        // Left side - app title and draggable area
+    rsx! {      
+      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300 to-transparent transition-all ",        
+      // Left side - app title and draggable area
         div {
-          class: "flex items-center flex-1 cursor-move  px-3 py-2",
-          onmousedown: start_drag, // App title
+          class: "flex items-center grow cursor-move px-3 py-2",
+          onmousedown: start_drag, 
+          // App title
           span { class: "text-sm font-semibold text-base-content", "{APP_NAME}" }
           // Optional version badge
           span { class: "ml-2 text-xs bg-base-300 text-base-content/50 px-1.5 py-0.5 rounded",
-            "Beta"
+            "v{current_version}"
           }
         }
+        
+        
         // Right side - window controls
-        div { class: "flex items-center space-x-2 px-3 py-2",
+        div { class: "flex items-center space-x-2 px-3 py-2 pl-0",
+          // Update notification (separate from draggable area)
+          if let Some(update) = update_info.clone() {
+            if update.update_available {
+              div { 
+                class: "tooltip tooltip-bottom ml-2",
+                "data-tip": "New version {update.latest_version} available!",
+                if let Some(url) = &update.download_url {
+                  button { 
+                    class: "btn btn-success btn-xs",
+                    onclick: {
+                      let url = url.clone();
+                      move |_| {
+                        println!("🔗 Opening update URL: {}", url);
+                        // Open URL in default browser
+                        if let Err(e) = open::that(&url) {
+                          eprintln!("Failed to open URL: {}", e);
+                        } else {
+                          println!("✅ Successfully opened URL: {}", url);
+                        }
+                      }
+                    },
+                    Download { class: "w-3 h-3" }
+                    "{update.latest_version}"
+                  }
+                }
+              }
+            }
+          }
           // Minimize to taskbar button
           div {
             class: "tooltip tooltip-bottom",
