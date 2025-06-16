@@ -12,4 +12,4 @@ pub mod soundpack;
 pub mod soundpack_installer;
 pub mod soundpack_validator;
 pub mod theme;
-pub mod update_service;
+pub mod time;

@@ -7,9 +7,8 @@ use lucide_dioxus::{ House, Music, Palette, Settings, Sparkles };
 pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
-
     rsx! {
-      div { class: "dock dock-xl bg-transparent bg-opacity-80 backdrop-blur-xl",
+      div { class: "dock dock-xl bg-base-300/30 backdrop-blur-lg ",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },

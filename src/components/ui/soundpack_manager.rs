@@ -50,7 +50,9 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
                 println!("✅ Soundpack refresh complete");
             });
         })
-    }; // Get soundpacks directory path
+    };
+
+    // Get soundpacks directory path
     let soundpacks_dir_absolute = crate::utils::path::get_soundpacks_dir_absolute();
 
     // Get current counts from cache
@@ -58,7 +60,7 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let soundpack_count_mouse = app_state.optimized_cache.count.mouse;
 
     rsx! {
-      div { class: "space-y-4",        
+      div { class: "space-y-4",
         div { class: "text-base-content",
           div {
             div { class: "font-medium text-sm pb-1",
@@ -91,33 +93,14 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               disabled: refreshing_soundpacks(),
               if refreshing_soundpacks() {
                 span { class: "loading loading-spinner loading-xs mr-2" }
-                "Refreshing..."
-              } else {
+                "Refreshing..."              } else {
                 RefreshCcw { class: "w-4 h-4 mr-1" }
                 "Refresh"
               }
-            }
-            // Last scan info
+            }            // Last scan info
             if app_state.optimized_cache.last_scan > 0 {
               div { class: "text-xs text-base-content/60",
-                "Last scan "
-                {
-                    let last_scan = app_state.optimized_cache.last_scan;
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    let diff = now.saturating_sub(last_scan);
-                    if diff < 60 {
-                        ": just now".to_string()
-                    } else if diff < 3600 {
-                        format!("{} min ago", diff / 60)
-                    } else if diff < 86400 {
-                        format!("{} hr ago", diff / 3600)
-                    } else {
-                        format!("{} days ago", diff / 86400)
-                    }
-                }
+                "Last scan: {crate::utils::time::format_relative_time(app_state.optimized_cache.last_scan)}"
               }
             }
           }
@@ -132,9 +115,9 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
             value: "{soundpacks_dir_absolute}",
             class: "input input-sm w-full",
             readonly: true,
-          }
-          button {
-            class: "btn btn-soft btn-sm",            onclick: move |_| {
+          }          button {
+            class: "btn btn-soft btn-sm",
+            onclick: move |_| {
                 let _ = crate::utils::path::open_path(&soundpacks_dir_absolute.clone());
             },
             FolderOpen { class: "w-4 h-4 mr-1" }

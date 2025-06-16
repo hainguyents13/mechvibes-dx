@@ -5,6 +5,7 @@ use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
 use crate::utils::constants::{ APP_NAME_DISPLAY, APP_NAME };
 use crate::utils::auto_updater::{ check_for_updates_simple, UpdateInfo };
+use crate::utils::time::format_relative_time;
 use dioxus::prelude::*;
 use lucide_dioxus::Settings;
 
@@ -15,7 +16,8 @@ pub fn SettingsPage() -> Element {
     let enable_sound = use_memo(move || config().enable_sound);
     let enable_volume_boost = use_memo(move || config().enable_volume_boost);
     let auto_start = use_memo(move || config().auto_start);
-    let start_minimized = use_memo(move || config().start_minimized); // Update states
+    let start_minimized = use_memo(move || config().start_minimized);
+    let auto_update_config = use_memo(move || config().auto_update.clone()); // Update states
     let update_info = use_signal(|| None::<UpdateInfo>);
     let mut is_checking_updates = use_signal(|| false);
     let mut check_error = use_signal(|| None::<String>);
@@ -166,8 +168,8 @@ pub fn SettingsPage() -> Element {
                     p { "• Restart the application for changes to take effect" }
                     p { "• If a device becomes unavailable, the system will fall back gracefully" }
                   }
-                }
-              }            },
+                }              }
+            },
           }
           // Auto-Update Section
           Collapse {
@@ -175,13 +177,15 @@ pub fn SettingsPage() -> Element {
             group_name: "setting-accordion".to_string(),
             content_class: "collapse-content text-sm",
             children: rsx! {
-              div { class: "space-y-4",                p { class: "text-sm text-base-content/70",
+              div { class: "space-y-4",
+                p { class: "text-sm text-base-content/70",
                   "Automatic update checking runs every 24 hours in the background."
                 }
                 div { class: "flex items-center gap-3",
                   button {
                     class: "btn btn-soft btn-sm",
-                    disabled: is_checking_updates(),                    onclick: move |_| {
+                    disabled: is_checking_updates(),
+                    onclick: move |_| {
                         println!("Manual update check requested");
                         is_checking_updates.set(true);
                         check_error.set(None);
@@ -207,8 +211,16 @@ pub fn SettingsPage() -> Element {
                       span { class: "loading loading-spinner loading-xs mr-1" }
                     }
                     if is_checking_updates() { "Checking..." } else { "Check for Updates" }
+                  }                  // Display last check time
+                  if let Some(last_check) = auto_update_config().last_check {
+                    div { class: "text-xs text-base-content/60",
+                      "Last checked: {format_relative_time(last_check)}"
+                    }
+                  } else {
+                    div { class: "text-xs text-base-content/60",
+                      "Never checked"
+                    }
                   }
-                  
                 }
                 
                 // Display update status
@@ -284,7 +296,6 @@ pub fn SettingsPage() -> Element {
               }
             },
           }
-        }
-      }
+        }      }
     }
 }

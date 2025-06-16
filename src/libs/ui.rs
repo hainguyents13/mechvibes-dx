@@ -137,12 +137,10 @@ pub fn app() -> Element {
                 }
             }
         });
-    }
-
-    // Initialize update service for background update checking
+    } // Initialize update service for background update checking
     #[cfg(feature = "auto-update")]
     {
-        use crate::utils::update_service::UpdateService;
+        use crate::utils::auto_updater::UpdateService;
         use std::sync::Arc;
         use tokio::sync::Mutex;
         use_future(move || async move {

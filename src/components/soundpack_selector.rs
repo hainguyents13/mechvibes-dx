@@ -95,37 +95,58 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
             soundpacks()
                 .into_iter()
                 .find(|pack| pack.folder_path == current()) // Use folder_path for comparison
-    );
-
-    // Get appropriate placeholder and search text based on type
-    let (placeholder_text, search_placeholder, not_found_text) = match soundpack_type {
+    ); // Get appropriate placeholder and search text based on type
+    let (placeholder_text, search_placeholder, not_found_text, no_soundpack_text) = match
+        soundpack_type
+    {
         SelectorType::Keyboard =>
             (
                 "Select a keyboard soundpack...",
                 "Search keyboard soundpacks...",
                 "No keyboard soundpacks found",
+                "No soundpacks available",
             ),
         SelectorType::Mouse =>
             (
                 "Select a mouse soundpack...",
                 "Search mouse soundpacks...",
                 "No mouse soundpacks found",
+                "No soundpacks available",
             ),
     };
 
+    // Check if there are any soundpacks available for this type
+    let has_soundpacks = use_memo(move || {
+        soundpacks()
+            .into_iter()
+            .any(|pack| {
+                match soundpack_type {
+                    SelectorType::Keyboard =>
+                        pack.soundpack_type == crate::state::soundpack::SoundpackType::Keyboard,
+                    SelectorType::Mouse =>
+                        pack.soundpack_type == crate::state::soundpack::SoundpackType::Mouse,
+                }
+            })
+    });
+
     rsx! {
       div { class: "space-y-2",
-        div { class: "relative w-full",
-          // Dropdown toggle button
+        div { class: "relative w-full",          // Dropdown toggle button
           button {
             class: format!(
                 "w-full btn btn-soft justify-start gap-3 h-17 rounded-box {}",
                 if is_open() { "btn-active" } else { "" },
             ),
-            disabled: is_loading(),
-            onclick: move |_| is_open.set(!is_open()),
+            disabled: is_loading() || !has_soundpacks(),
+            onclick: move |_| {
+                if has_soundpacks() {
+                    is_open.set(!is_open());
+                }
+            },
             div { class: "flex items-center gap-3 flex-1 ",
-              if let Some(pack) = current_soundpack() {
+              if !has_soundpacks() {
+                div { class: "text-base-content/50 text-sm", "{no_soundpack_text}" }
+              } else if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
@@ -166,10 +187,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   if is_open() { "rotate-180" } else { "" },
               ),
             }
-          }
-
-          // Dropdown panel
-          if is_open() {
+          }          // Dropdown panel
+          if is_open() && has_soundpacks() {
             div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
               // Search input
               div { class: "p-3 border-b border-base-200",
@@ -213,7 +232,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                               is_open.set(false);
                               search_query.set(String::new());
                               error.set(String::new());
-                              if let Some(pack_item) = soundpacks().iter().find(|p| p.folder_path == pack_id) { // Use folder_path for comparison too
+                              if let Some(pack_item) = soundpacks().iter().find(|p| p.folder_path == pack_id) { 
+                                // Use folder_path for comparison too
                                   let type_str = match soundpack_type_click {
                                       SelectorType::Keyboard => "keyboard",
                                       SelectorType::Mouse => "mouse",
@@ -324,7 +344,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           } else {
                             Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                           }
-                          if pack.folder_path == current() { // Use folder_path for comparison
+                          if pack.folder_path == current() { 
+                            // Use folder_path for comparison
                             div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
                               Check { class: "text-white w-6 h-6" }
                             }
@@ -349,10 +370,9 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
               }
             }
           }
-        }
-
+        }        
         // Click outside to close
-        if is_open() {
+        if is_open() && has_soundpacks() {
           div {
             class: "fixed inset-0 z-40",
             onclick: move |_| {

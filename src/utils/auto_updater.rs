@@ -1,3 +1,4 @@
+use crate::state::config::AppConfig;
 use crate::utils::constants::APP_NAME;
 use chrono::{ DateTime, Utc };
 use reqwest;
@@ -6,6 +7,9 @@ use serde::{ Deserialize, Serialize };
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::time::{ interval, Duration as TokioDuration };
 
 // Fixed repository information
 const REPO_OWNER: &str = "hainguyents13";
@@ -155,77 +159,77 @@ impl AutoUpdater {
         assets.first().map(|asset| asset.browser_download_url.clone())
     }
 
-    pub async fn download_update(
-        &self,
-        download_url: &str,
-        destination: &PathBuf
-    ) -> Result<(), UpdateError> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(download_url)
-            .header("User-Agent", format!("{}/{}", APP_NAME, self.current_version))
-            .send().await
-            .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
+    // pub async fn download_update(
+    //     &self,
+    //     download_url: &str,
+    //     destination: &PathBuf
+    // ) -> Result<(), UpdateError> {
+    //     let client = reqwest::Client::new();
+    //     let response = client
+    //         .get(download_url)
+    //         .header("User-Agent", format!("{}/{}", APP_NAME, self.current_version))
+    //         .send().await
+    //         .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
 
-        if !response.status().is_success() {
-            return Err(
-                UpdateError::NetworkError(format!("Download failed: HTTP {}", response.status()))
-            );
-        }
+    //     if !response.status().is_success() {
+    //         return Err(
+    //             UpdateError::NetworkError(format!("Download failed: HTTP {}", response.status()))
+    //         );
+    //     }
 
-        let content = response.bytes().await.map_err(|e| UpdateError::NetworkError(e.to_string()))?;
+    //     let content = response.bytes().await.map_err(|e| UpdateError::NetworkError(e.to_string()))?;
 
-        std::fs::write(destination, content).map_err(|e| UpdateError::NetworkError(e.to_string()))?;
+    //     std::fs::write(destination, content).map_err(|e| UpdateError::NetworkError(e.to_string()))?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    pub fn install_update(&self, installer_path: &PathBuf) -> Result<(), UpdateError> {
-        #[cfg(windows)]
-        {
-            use std::process::Command;
+    // pub fn install_update(&self, installer_path: &PathBuf) -> Result<(), UpdateError> {
+    //     #[cfg(windows)]
+    //     {
+    //         use std::process::Command;
 
-            let extension = installer_path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+    //         let extension = installer_path
+    //             .extension()
+    //             .and_then(|s| s.to_str())
+    //             .unwrap_or("");
 
-            match extension.to_lowercase().as_str() {
-                "msi" => {
-                    // Install MSI package
-                    Command::new("msiexec")
-                        .args(&["/i", installer_path.to_str().unwrap(), "/quiet"])
-                        .spawn()
-                        .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
-                }
-                "exe" => {
-                    // Run executable installer
-                    Command::new(installer_path)
-                        .arg("/S") // Silent install (for NSIS)
-                        .spawn()
-                        .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
-                }
-                _ => {
-                    return Err(UpdateError::ParseError("Unsupported installer type".to_string()));
-                }
-            }
-        }
+    //         match extension.to_lowercase().as_str() {
+    //             "msi" => {
+    //                 // Install MSI package
+    //                 Command::new("msiexec")
+    //                     .args(&["/i", installer_path.to_str().unwrap(), "/quiet"])
+    //                     .spawn()
+    //                     .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
+    //             }
+    //             "exe" => {
+    //                 // Run executable installer
+    //                 Command::new(installer_path)
+    //                     .arg("/S") // Silent install (for NSIS)
+    //                     .spawn()
+    //                     .map_err(|e| UpdateError::NetworkError(e.to_string()))?;
+    //             }
+    //             _ => {
+    //                 return Err(UpdateError::ParseError("Unsupported installer type".to_string()));
+    //             }
+    //         }
+    //     }
 
-        #[cfg(not(windows))]
-        {
-            return Err(
-                UpdateError::ParseError("Auto-install not supported on this platform".to_string())
-            );
-        }
+    //     #[cfg(not(windows))]
+    //     {
+    //         return Err(
+    //             UpdateError::ParseError("Auto-install not supported on this platform".to_string())
+    //         );
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
 // Configuration for auto-update settings
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutoUpdateConfig {
-    pub last_check: Option<DateTime<Utc>>,
+    pub last_check: Option<u64>,
 }
 
 impl Default for AutoUpdateConfig {
@@ -240,4 +244,117 @@ impl Default for AutoUpdateConfig {
 pub async fn check_for_updates_simple() -> Result<UpdateInfo, UpdateError> {
     let updater = AutoUpdater::new();
     updater.check_for_updates().await
+}
+
+// Service for auto-update background checking
+pub struct UpdateService {
+    config: Arc<Mutex<AppConfig>>,
+}
+
+impl UpdateService {
+    pub fn new(config: Arc<Mutex<AppConfig>>) -> Self {
+        Self {
+            config,
+        }
+    }
+
+    pub async fn start(&self) {
+        let config = self.config.clone();
+
+        tokio::spawn(async move {
+            let mut interval = interval(TokioDuration::from_secs(86400)); // Check every 24 hours
+
+            loop {
+                interval.tick().await;
+                let update_config = {
+                    let config_guard = config.lock().await;
+                    config_guard.auto_update.clone()
+                }; // Check if it's time to check for updates (every 24 hours)
+                if let Some(last_check) = update_config.last_check {
+                    let now = std::time::SystemTime
+                        ::now()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let check_interval = 24 * 3600; // 24 hours in seconds
+                    if now.saturating_sub(last_check) < check_interval {
+                        continue;
+                    }
+                }
+
+                println!("🔄 Checking for updates...");
+
+                match check_for_updates_simple().await {
+                    Ok(update_info) => {
+                        // Update last check time
+                        {
+                            let mut config_guard = config.lock().await;
+                            config_guard.auto_update.last_check = Some(
+                                std::time::SystemTime
+                                    ::now()
+                                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs()
+                            );
+                            let _ = config_guard.save();
+                        }
+                        if update_info.update_available {
+                            println!(
+                                "🆕 Update available: {} -> {}",
+                                update_info.current_version,
+                                update_info.latest_version
+                            );
+                        } else {
+                            println!("✅ No updates available");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to check for updates: {}", e);
+                    }
+                }
+            }
+        });
+    }
+
+    // pub async fn check_now(&self) -> Result<UpdateInfo, Box<dyn std::error::Error>> {
+    //     let update_info = check_for_updates_simple().await?; // Update last check time
+    //     {
+    //         let mut config_guard = self.config.lock().await;
+    //         config_guard.auto_update.last_check = Some(
+    //             std::time::SystemTime
+    //                 ::now()
+    //                 .duration_since(std::time::SystemTime::UNIX_EPOCH)
+    //                 .unwrap_or_default()
+    //                 .as_secs()
+    //         );
+    //         let _ = config_guard.save();
+    //     }
+
+    //     Ok(update_info)
+    // }
+
+    // pub async fn download_and_install_update(
+    //     &self,
+    //     update_info: &UpdateInfo
+    // ) -> Result<(), Box<dyn std::error::Error>> {
+    //     if let Some(download_url) = &update_info.download_url {
+    //         println!("📥 Downloading update...");
+
+    //         let temp_dir = std::env::temp_dir();
+    //         let default_filename = format!("mechvibes_dx_v{}.exe", update_info.latest_version);
+    //         let filename = download_url.split('/').last().unwrap_or(&default_filename);
+    //         let installer_path = temp_dir.join(filename);
+
+    //         let updater = AutoUpdater::new();
+    //         updater.download_update(download_url, &installer_path).await?;
+
+    //         println!("🔧 Installing update...");
+    //         updater.install_update(&installer_path)?;
+
+    //         println!("✅ Update installed successfully. Please restart the application.");
+    //         Ok(())
+    //     } else {
+    //         Err("No download URL available".into())
+    //     }
+    // }
 }

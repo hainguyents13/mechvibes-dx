@@ -65,14 +65,14 @@ pub fn SoundpackTable(
         // Search field
         div { class: "flex items-center px-3 gap-2",
           input {
-            class: "input w-full",
+            class: "input input-sm w-full",
             placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
             value: "{search_query}",
             oninput: move |evt| search_query.set(evt.value()),
-          }
+          }          
           if let Some(add_handler) = on_add_click {
             button {
-              class: "btn btn-neutral",
+              class: "btn btn-sm btn-neutral",
               onclick: move |evt| add_handler.call(evt),
               Plus { class: "w-4 h-4 mr-2" }
               "Add"
@@ -81,7 +81,7 @@ pub fn SoundpackTable(
         }
         if soundpacks.is_empty() {
           div { class: "p-4 text-center text-sm text-base-content/70",
-            "No {soundpack_type} soundpack found!"
+            "No {soundpack_type} soundpack found. You can add new soundpacks by clicking the 'Add' button above."
           }
         } else {
           // Table

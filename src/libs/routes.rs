@@ -56,7 +56,7 @@ pub fn Layout() -> Element {
         crate::components::titlebar::TitleBar {}
 
         // Main content area with padding to account for title bar
-        div { class: "flex-1 overflow-auto pb-28 px-8 pt-20  py-12",
+        div { class: "flex-1 overflow-auto pb-28 px-8 pt-20 py-12",
           // Outlet for nested routes
           Outlet::<Route> {}
         }
