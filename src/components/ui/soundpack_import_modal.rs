@@ -250,24 +250,6 @@ pub fn SoundpackImportModal(
           }
           h3 { class: "font-bold text-lg mb-2", "Import soundpack" }
           
-          // Show target soundpack type information
-          if let Some(target_type) = target_soundpack_type {
-            div { class: "alert alert-info text-sm mb-4",
-              span { class: "text-info-content",
-                match target_type {
-                  crate::state::soundpack::SoundpackType::Keyboard => "📁 Will be installed to: soundpacks/keyboard/",
-                  crate::state::soundpack::SoundpackType::Mouse => "📁 Will be installed to: soundpacks/mouse/",
-                }
-              }
-            }
-          } else {
-            div { class: "alert alert-warning text-sm mb-4",
-              span { class: "text-warning-content",
-                "📁 Installation folder will be auto-detected from soundpack type"
-              }
-            }
-          }
-
           if *current_step.read() == ImportStep::Idle {
             div { class: "card border border-base-300 bg-base-200 text-sm p-4 space-y-4",
               div {
