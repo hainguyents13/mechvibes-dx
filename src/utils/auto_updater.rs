@@ -250,6 +250,28 @@ impl Default for AutoUpdateConfig {
     }
 }
 
+/*
+ * AUTO-UPDATE STRATEGY:
+ *
+ * 1. STARTUP CHECK (check_for_updates_on_startup):
+ *    - Runs when app starts from completely closed state
+ *    - Only checks if last_check was more than 1 hour ago (to avoid spam on frequent restarts)
+ *    - Updates config.json with results
+ *    - Updates global UI state for immediate titlebar notification
+ *
+ * 2. BACKGROUND SERVICE (UpdateService.start):
+ *    - Runs periodic checks every 24 hours while app is running
+ *    - Independent of startup checks
+ *    - Continues normal background operation
+ *
+ * 3. MANUAL CHECK (in settings page):
+ *    - User can trigger immediate check via "Check for Updates" button
+ *    - Always performs check regardless of timing
+ *
+ * This ensures users always get fresh update info when they launch the app,
+ * while avoiding excessive API calls on frequent app restarts.
+ */
+
 // Even simpler function without parameters
 pub async fn check_for_updates_simple() -> Result<UpdateInfo, UpdateError> {
     let updater = AutoUpdater::new();
@@ -420,4 +442,104 @@ pub fn get_saved_update_info() -> Option<UpdateInfo> {
     }
 
     None
+}
+
+// Check for updates on app startup (when app was completely closed)
+pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
+    println!("🔄 Checking for updates on startup...");
+
+    let mut config = crate::state::config::AppConfig::load();
+    let now = std::time::SystemTime
+        ::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Check if we should perform startup check
+    // Only check if:
+    // 1. Never checked before (last_check is None), OR
+    // 2. Last check was more than 1 hour ago (to avoid spam on frequent restarts)
+    let should_check = match config.auto_update.last_check {
+        None => {
+            println!("📅 First time checking for updates");
+            true
+        }
+        Some(last_check) => {
+            let time_since_last_check = now.saturating_sub(last_check);
+            let one_hour = 3600; // 1 hour in seconds
+            if time_since_last_check >= one_hour {
+                println!(
+                    "📅 Last check was {} hours ago, checking again",
+                    time_since_last_check / 3600
+                );
+                true
+            } else {
+                println!(
+                    "📅 Recently checked ({} minutes ago), skipping startup check",
+                    time_since_last_check / 60
+                );
+                false
+            }
+        }
+    };
+
+    if !should_check {
+        // Return cached info if available
+        if let Some(saved_update) = get_saved_update_info() {
+            return Ok(saved_update);
+        } else {
+            // Create a "no update" response
+            return Ok(UpdateInfo {
+                current_version: crate::utils::constants::APP_VERSION.to_string(),
+                latest_version: crate::utils::constants::APP_VERSION.to_string(),
+                update_available: false,
+                download_url: None,
+                release_notes: None,
+                published_at: None,
+                is_prerelease: false,
+            });
+        }
+    }
+
+    // Perform actual check
+    match check_for_updates_simple().await {
+        Ok(update_info) => {
+            // Update last check time and save info
+            config.auto_update.last_check = Some(now);
+
+            if update_info.update_available {
+                config.auto_update.available_version = Some(update_info.latest_version.clone());
+                config.auto_update.available_download_url = update_info.download_url.clone();
+                println!(
+                    "🆕 Startup check: Update available {} -> {}",
+                    update_info.current_version,
+                    update_info.latest_version
+                );
+            } else {
+                config.auto_update.available_version = None;
+                config.auto_update.available_download_url = None;
+                println!("✅ Startup check: No updates available");
+            }
+
+            let _ = config.save();
+
+            // Update global state
+            if update_info.update_available {
+                crate::state::app::set_update_info(Some(update_info.clone()));
+            } else {
+                crate::state::app::set_update_info(None);
+            }
+
+            Ok(update_info)
+        }
+        Err(e) => {
+            eprintln!("❌ Startup update check failed: {}", e);
+            // Return cached info if check failed
+            if let Some(saved_update) = get_saved_update_info() {
+                Ok(saved_update)
+            } else {
+                Err(e)
+            }
+        }
+    }
 }

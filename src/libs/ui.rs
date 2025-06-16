@@ -42,6 +42,21 @@ pub fn app() -> Element {
         });
     }
 
+    // Check for updates on startup (from completely closed state)
+    use_effect(move || {
+        spawn(async move {
+            if
+                let Ok(update_info) =
+                    crate::utils::auto_updater::check_for_updates_on_startup().await
+            {
+                debug_print!("🔄 Startup update check completed");
+                if update_info.update_available {
+                    debug_print!("🆕 Update available on startup: {}", update_info.latest_version);
+                }
+            }
+        });
+    });
+
     // Extract receivers from input channels
     let keyboard_rx = input_channels.keyboard_rx.clone();
     let mouse_rx = input_channels.mouse_rx.clone();
