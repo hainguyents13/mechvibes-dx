@@ -165,22 +165,21 @@ pub fn app() -> Element {
             // Start background update checking
             update_service.start().await;
         });
-    }
-
-    // Set up asset handler for serving soundpack images
+    } // Set up asset handler for serving soundpack images
     use_asset_handler("soundpack-images", |request, response| {
         let request_path = request.uri().path();
 
-        // Parse the path: /soundpack-images/{soundpack_id}/{filename}
+        // Parse the path: /soundpack-images/{device_type}/{soundpack_name}/{filename}
         let path_parts: Vec<&str> = request_path.trim_start_matches('/').split('/').collect();
 
-        if path_parts.len() == 3 && path_parts[0] == "soundpack-images" {
-            let soundpack_id = path_parts[1];
-            let filename = path_parts[2];
+        if path_parts.len() >= 4 && path_parts[0] == "soundpack-images" {
+            // Join device_type/soundpack_name to form the full soundpack_id
+            let soundpack_id = format!("{}/{}", path_parts[1], path_parts[2]);
+            let filename = path_parts[3];
 
             // Get the soundpack directory path using the correct function
             let soundpacks_path = std::path::PathBuf::from(path::get_soundpacks_dir_absolute());
-            let image_path = soundpacks_path.join(soundpack_id).join(filename);
+            let image_path = soundpacks_path.join(&soundpack_id).join(filename);
 
             if image_path.exists() {
                 // Read the file and determine content type

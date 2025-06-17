@@ -130,11 +130,7 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
         ::metadata(&config_path)
         .map_err(|e| format!("Failed to get metadata: {}", e))?;
     Ok(SoundpackMetadata {
-        id: config
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string(), // Use original ID from config
+        id: soundpack_id.to_string(), // Use soundpack_id (with prefix) instead of config ID
         name,
         author: config
             .get("author")

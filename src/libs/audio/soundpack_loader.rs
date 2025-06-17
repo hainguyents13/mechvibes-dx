@@ -725,8 +725,9 @@ fn create_soundpack_metadata(
                 .as_secs(),
         Err(_) => 0,
     };
+
     Ok(SoundpackMetadata {
-        id: soundpack.id.clone(), // Use original ID from soundpack config
+        id: id.clone(), // Use calculated relative path ID instead of config ID
         name: soundpack.name.clone(),
         author: soundpack.author.clone(),
         description: soundpack.description.clone(),
@@ -738,17 +739,7 @@ fn create_soundpack_metadata(
                 let icon_path = format!("{}/{}", soundpack_path, icon_filename);
                 if std::path::Path::new(&icon_path).exists() {
                     // Create dynamic URL that will be served by the asset handler
-                    Some(
-                        format!(
-                            "/soundpack-images/{}/{}",
-                            std::path::Path
-                                ::new(soundpack_path)
-                                .file_name()
-                                .and_then(|name| name.to_str())
-                                .unwrap_or("unknown"),
-                            icon_filename
-                        )
-                    )
+                    Some(format!("/soundpack-images/{}/{}", id, icon_filename))
                 } else {
                     Some(String::new()) // Empty string if icon file not found
                 }

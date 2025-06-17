@@ -131,7 +131,8 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
 
     rsx! {
       div { class: "space-y-2",
-        div { class: "relative w-full",          // Dropdown toggle button
+        div { class: "relative w-full",
+          // Dropdown toggle button
           button {
             class: format!(
                 "w-full btn btn-soft justify-start gap-3 h-17 rounded-box {}",
@@ -147,14 +148,14 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
               if !has_soundpacks() {
                 div { class: "text-base-content/50 text-sm", "{no_soundpack_text}" }
               } else if let Some(pack) = current_soundpack() {
-                div { class: "flex-shrink-0 overflow-hidden bg-blend-multiply w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
+                div { class: "flex-shrink-0 overflow-hidden  w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
                   if is_loading() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
                     if let Some(icon) = &pack.icon {
                       if !icon.is_empty() {
                         img {
-                          class: "w-full h-full object-cover",
+                          class: "w-full h-full bg-blend-multiply object-cover",
                           src: "{icon}",
                         }
                       } else {
@@ -172,7 +173,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   div { class: "text-xs font-normal truncate text-base-content/50",
                     if let Some(author) = &pack.author {
                       "by {author}"
-                    }  else {
+                    } else {
                       "by N/A"
                     }
                   }
@@ -187,9 +188,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   if is_open() { "rotate-180" } else { "" },
               ),
             }
-          }          // Dropdown panel
+          }
+          // Dropdown panel
           if is_open() && has_soundpacks() {
-            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
+            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-200 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
               // Search input
               div { class: "p-3 border-b border-base-200",
                 div { class: "relative",
@@ -213,13 +215,14 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                 } else {
                   for pack in filtered_soundpacks.read().iter() {
                     button {
-                      key: "{pack.id}",                      class: format!(
-                          "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-200 last:border-b-0 h-auto {}",
-                          if pack.folder_path == current() { "btn-disabled" } else { "btn-ghost" }, // Use folder_path for comparison
+                      key: "{pack.id}",
+                      class: format!(
+                          "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-300 last:border-b-0 h-auto {}",
+                          if pack.folder_path == current() { "btn-disabled" } else { "btn-ghost" },
                       ),
                       disabled: pack.folder_path == current(), // Use folder_path for comparison
                       onclick: {
-                          let pack_id = pack.folder_path.clone(); // Use folder_path for loading, not id
+                          let pack_id = pack.folder_path.clone();
                           let mut error = error.clone();
                           let soundpacks = soundpacks.clone();
                           let mut is_open = is_open.clone();
@@ -232,8 +235,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                               is_open.set(false);
                               search_query.set(String::new());
                               error.set(String::new());
-                              if let Some(pack_item) = soundpacks().iter().find(|p| p.folder_path == pack_id) { 
-                                // Use folder_path for comparison too
+                              if let Some(pack_item) = soundpacks()
+                                  .iter()
+                                  .find(|p| p.folder_path == pack_id)
+                              {
                                   let type_str = match soundpack_type_click {
                                       SelectorType::Keyboard => "keyboard",
                                       SelectorType::Mouse => "mouse",
@@ -331,11 +336,11 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           }
                       },
                       div { class: "flex items-center justify-between gap-3 ",
-                        div { class: "flex-shrink-0 w-10 h-10 rounded-box flex items-center justify-center bg-base-100 overflow-hidden bg-blend-multiply relative",
+                        div { class: "flex-shrink-0 w-10 h-10 rounded-box flex items-center justify-center bg-base-100 overflow-hidden relative",
                           if let Some(icon) = &pack.icon {
                             if !icon.is_empty() {
                               img {
-                                class: "w-full h-full object-cover",
+                                class: "w-full h-full object-cover bg-blend-multiply",
                                 src: "{icon}",
                               }
                             } else {
@@ -344,7 +349,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           } else {
                             Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
                           }
-                          if pack.folder_path == current() { 
+                          if pack.folder_path == current() {
                             // Use folder_path for comparison
                             div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
                               Check { class: "text-white w-6 h-6" }
@@ -370,7 +375,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
               }
             }
           }
-        }        
+        }
         // Click outside to close
         if is_open() && has_soundpacks() {
           div {
@@ -395,25 +400,25 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
 #[component]
 pub fn KeyboardSoundpackSelector() -> Element {
     rsx! {
-        SoundpackSelector {
-            soundpack_type: SelectorType::Keyboard,
-            label: "Keyboard".to_string(),
-            icon: rsx! {
-                Keyboard { class: "w-4 h-4" }
-            },
-        }
+      SoundpackSelector {
+        soundpack_type: SelectorType::Keyboard,
+        label: "Keyboard".to_string(),
+        icon: rsx! {
+          Keyboard { class: "w-4 h-4" }
+        },
+      }
     }
 }
 
 #[component]
 pub fn MouseSoundpackSelector() -> Element {
     rsx! {
-        SoundpackSelector {
-            soundpack_type: SelectorType::Mouse,
-            label: "Mouse".to_string(),
-            icon: rsx! {
-                Mouse { class: "w-4 h-4" }
-            },
-        }
+      SoundpackSelector {
+        soundpack_type: SelectorType::Mouse,
+        label: "Mouse".to_string(),
+        icon: rsx! {
+          Mouse { class: "w-4 h-4" }
+        },
+      }
     }
 }

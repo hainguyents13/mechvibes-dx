@@ -7,15 +7,19 @@ use std::sync::Arc;
 pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let app_state = use_app_state();
     let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
-    let state_trigger = crate::state::app::use_state_trigger();
-
-    // UI state for notification and loading
+    let state_trigger = crate::state::app::use_state_trigger(); // UI state for notification and loading
     let refreshing_soundpacks = use_signal(|| false);
     let refresh_soundpacks_cache = {
         let audio_ctx_refresh = audio_ctx.clone();
         let mut refreshing_soundpacks = refreshing_soundpacks.clone();
         let state_trigger_clone = state_trigger.clone();
         Callback::new(move |_| {
+            // Prevent multiple concurrent refreshes
+            if refreshing_soundpacks() {
+                println!("🔄 Refresh already in progress, skipping...");
+                return;
+            }
+
             println!("🔄 Refresh button clicked!");
             // Set loading state to true
             refreshing_soundpacks.set(true);
@@ -93,11 +97,12 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               disabled: refreshing_soundpacks(),
               if refreshing_soundpacks() {
                 span { class: "loading loading-spinner loading-xs mr-2" }
-                "Refreshing..."              } else {
+                "Refreshing..."
+              } else {
                 RefreshCcw { class: "w-4 h-4 mr-1" }
                 "Refresh"
               }
-            }            // Last scan info
+            } // Last scan info
             if app_state.optimized_cache.last_scan > 0 {
               div { class: "text-xs text-base-content/60",
                 "Last scan: {crate::utils::time::format_relative_time(app_state.optimized_cache.last_scan)}"
@@ -115,7 +120,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
             value: "{soundpacks_dir_absolute}",
             class: "input input-sm w-full",
             readonly: true,
-          }          button {
+          }
+          button {
             class: "btn btn-soft btn-sm",
             onclick: move |_| {
                 let _ = crate::utils::path::open_path(&soundpacks_dir_absolute.clone());

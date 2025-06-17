@@ -16,6 +16,7 @@
         "recommended_volume": 1,
         "random_pitch": false
     },
+    "author": "Mechvibes",
     "definitions": {
         "KeyA": {
             "timing": [
