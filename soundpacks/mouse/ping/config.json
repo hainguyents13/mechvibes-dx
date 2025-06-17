@@ -1,0 +1,28 @@
+{
+    "audio_file": "ping.mp3",
+    "config_version": "2",
+    "created_at": "2025-06-17T12:23:39.537516300+00:00",
+    "definition_method": "single",
+    "author": "Mechvibes",
+    "definitions": {
+        "MouseLeft": {
+            "timing": [
+                [47.0, 84.0],
+                [105.0, 177.0]
+            ]
+        },
+        "MouseRight": {
+            "timing": [
+                [261.0, 295.0],
+                [373.0, 402.0]
+            ]
+        }
+    },
+    "id": "mouse-ping",
+    "name": "Ping",
+    "options": {
+        "random_pitch": false,
+        "recommended_volume": 1.0
+    },
+    "tags": []
+}

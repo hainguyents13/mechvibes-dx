@@ -34,3 +34,7 @@ create_portable.ps1
 
 /soundpacks/mouse/*
 # Add mouse soundpack exceptions here when needed
+!/soundpacks/mouse/chat/
+!/soundpacks/mouse/ping/
+!/soundpacks/mouse/vibrate/
+!/soundpacks/mouse/wooden/

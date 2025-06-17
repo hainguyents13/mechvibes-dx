@@ -1,0 +1,28 @@
+{
+    "audio_file": "wooden.mp3",
+    "config_version": "2",
+    "created_at": "2025-06-17T12:23:39.537516300+00:00",
+    "definition_method": "single",
+    "author": "Mechvibes",
+    "definitions": {
+        "MouseLeft": {
+            "timing": [
+                [528.0, 570.0],
+                [782.0, 806.0]
+            ]
+        },
+        "MouseRight": {
+            "timing": [
+                [528.0, 570.0],
+                [782.0, 806.0]
+            ]
+        }
+    },
+    "id": "mouse-wooden",
+    "name": "Wooden",
+    "options": {
+        "random_pitch": false,
+        "recommended_volume": 1.0
+    },
+    "tags": []
+}
