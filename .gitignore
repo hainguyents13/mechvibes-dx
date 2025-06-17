@@ -14,6 +14,7 @@ node_modules
 create_portable.ps1
 /bundle
 /tests*
+/dist
 
 # Test files and directories
 /soundpacks/keyboard/*

@@ -15,9 +15,6 @@ use libs::input_listener::start_unified_input_listener;
 use libs::input_manager::init_input_channels;
 use std::sync::mpsc;
 
-#[cfg(windows)]
-use winapi::um::winuser::{ GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN };
-
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
@@ -55,6 +52,11 @@ fn main() {
 
     // Initialize app manifest first
     let _manifest = state::manifest::AppManifest::load();
+
+    // Ensure soundpack directories exist
+    if let Err(e) = state::paths::soundpacks::ensure_soundpack_directories() {
+        debug_eprint!("⚠️ Failed to create soundpack directories: {}", e);
+    }
 
     // Check for command line arguments (protocol handling and startup options)
     let args: Vec<String> = std::env::args().collect();
@@ -97,7 +99,7 @@ fn main() {
         .with_title(APP_NAME)
         .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_inner_size(LogicalSize::new(450, 800))
+        .with_inner_size(LogicalSize::new(450, 750))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false) // Enable window resizing for landscape mode
@@ -113,6 +115,6 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-        ui::app {}
+      ui::app {}
     }
 }

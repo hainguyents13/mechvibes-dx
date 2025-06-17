@@ -74,4 +74,37 @@ pub mod soundpacks {
     pub fn mouse_soundpacks_dir() -> String {
         get_app_root().join("soundpacks").join("mouse").to_string_lossy().to_string()
     }
+
+    /// Ensure soundpack directories exist (keyboard and mouse)
+    /// Creates the directories if they don't exist
+    pub fn ensure_soundpack_directories() -> Result<(), std::io::Error> {
+        use std::fs;
+
+        let soundpacks_dir = get_app_root().join("soundpacks");
+        let keyboard_dir = soundpacks_dir.join("keyboard");
+        let mouse_dir = soundpacks_dir.join("mouse");
+
+        // Create soundpacks directory if it doesn't exist
+        if !soundpacks_dir.exists() {
+            fs::create_dir_all(&soundpacks_dir)?;
+            crate::debug_print!("📁 Created soundpacks directory: {}", soundpacks_dir.display());
+        }
+
+        // Create keyboard directory if it doesn't exist
+        if !keyboard_dir.exists() {
+            fs::create_dir_all(&keyboard_dir)?;
+            crate::debug_print!(
+                "⌨️ Created keyboard soundpacks directory: {}",
+                keyboard_dir.display()
+            );
+        }
+
+        // Create mouse directory if it doesn't exist
+        if !mouse_dir.exists() {
+            fs::create_dir_all(&mouse_dir)?;
+            crate::debug_print!("🖱️ Created mouse soundpacks directory: {}", mouse_dir.display());
+        }
+
+        Ok(())
+    }
 }
