@@ -57,7 +57,8 @@ pub fn SettingsPage() -> Element {
             title: "General".to_string(),
             group_name: "setting-accordion".to_string(),
             default_open: true,
-            content_class: "collapse-content text-sm",            children: rsx! {
+            content_class: "collapse-content text-sm",
+            children: rsx! {
               div { class: "space-y-6",
                 // Volume Control
                 Toggler {
@@ -76,32 +77,33 @@ pub fn SettingsPage() -> Element {
                       }
                   },
                 }
-                
                 // Volume Boost
                 Toggler {
                   title: "Volume boost (200% max)".to_string(),
-                  description: Some("Allow volume sliders to go up to 200%. May cause audio distortion at high levels.".to_string()),
-                  checked: enable_volume_boost(),                  on_change: {
-                    let update_config = update_config.clone();
-                    move |new_value: bool| {
-                      update_config(
-                        Box::new(move |config| {
-                                config.enable_volume_boost = new_value;
-                                  // If disabling volume boost, clamp volumes to 100% if they're above
-                                if !new_value {
-                                    if config.volume > 1.0 {
-                                        config.volume = 1.0;
-                                    }
-                                    if config.mouse_volume > 1.0 {
-                                        config.mouse_volume = 1.0;
-                                    }
-                                }
-                            }),
-                        );
+                  description: Some(
+                      "Allow volume sliders to go up to 200%. May cause audio distortion at high levels."
+                          .to_string(),
+                  ),
+                  checked: enable_volume_boost(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.enable_volume_boost = new_value;
+                                  if !new_value {
+                                      if config.volume > 1.0 {
+                                          config.volume = 1.0;
+                                      }
+                                      if config.mouse_volume > 1.0 {
+                                          config.mouse_volume = 1.0;
+                                      }
+                                  }
+                              }),
+                          );
                       }
-                    },
+                  },
                 }
-
                 // Auto Start
                 Toggler {
                   title: "Start with Windows".to_string(),
@@ -157,34 +159,30 @@ pub fn SettingsPage() -> Element {
                                         Err(e) => {
                                             eprintln!("❌ Failed to update auto startup: {}", e);
                                         }
-                                    }                                }
+                                    }
+                                }
                             });
                         }
                     },
                   }
                 }
               }
-            },        
-          }          
+            },
+          }
           // Devices Section
           Collapse {
             title: "Devices".to_string(),
             group_name: "setting-accordion".to_string(),
-            content_class: "collapse-content text-sm",           
+            content_class: "collapse-content text-sm",
             children: rsx! {
               div { class: "space-y-2",
                 // Audio Output Device
                 AudioOutputSelector {}
-                
                 // Device Information
-                div { 
-                  div { class: "text-sm font-semibold mb-2", "Device Information" }
-                  div { class: "text-xs text-base-content/70 space-y-1",
-                    p { "• Audio output devices control where soundpack audio is played" }
-                    p { "• Restart the application for changes to take effect" }
-                    p { "• If a device becomes unavailable, the system will fall back gracefully" }
-                  }
-                }              }
+                div { class: "text-xs mt-2 text-base-content font-bold",
+                  "* Restart the application for changes to take effect"
+                }
+              }
             },
           }
           // Auto-Update Section
@@ -205,17 +203,22 @@ pub fn SettingsPage() -> Element {
                         println!("Manual update check requested");
                         is_checking_updates.set(true);
                         check_error.set(None);
-                          let mut update_info = update_info.clone();
+                        let mut update_info = update_info.clone();
                         let mut is_checking_updates = is_checking_updates.clone();
                         let mut check_error = check_error.clone();
-                        let update_info_setter = update_info_setter.clone();                          spawn(async move {
-                            match check_for_updates_simple().await {                                Ok(info) => {
+                        let update_info_setter = update_info_setter.clone();
+                        spawn(async move {
+                            match check_for_updates_simple().await {
+                                Ok(info) => {
                                     update_info.set(Some(info.clone()));
-                                      // Save update info to config
                                     let mut app_config = crate::state::config::AppConfig::load();
                                     if info.update_available {
-                                        app_config.auto_update.available_version = Some(info.latest_version.clone());
-                                        app_config.auto_update.available_download_url = info.download_url.clone();
+                                        app_config.auto_update.available_version = Some(
+                                            info.latest_version.clone(),
+                                        );
+                                        app_config.auto_update.available_download_url = info
+                                            .download_url
+                                            .clone();
                                     } else {
                                         app_config.auto_update.available_version = None;
                                         app_config.auto_update.available_download_url = None;
@@ -224,11 +227,9 @@ pub fn SettingsPage() -> Element {
                                         std::time::SystemTime::now()
                                             .duration_since(std::time::SystemTime::UNIX_EPOCH)
                                             .unwrap_or_default()
-                                            .as_secs()
+                                            .as_secs(),
                                     );
                                     let _ = app_config.save();
-                                    
-                                    // Update global state for titlebar notification
                                     if info.update_available {
                                         update_info_setter.call(Some(info));
                                     } else {
@@ -248,23 +249,24 @@ pub fn SettingsPage() -> Element {
                     if is_checking_updates() {
                       span { class: "loading loading-spinner loading-xs mr-1" }
                     }
-                    if is_checking_updates() { "Checking..." } else { "Check for Updates" }
-                  }                  // Display last check time
+                    if is_checking_updates() {
+                      "Checking..."
+                    } else {
+                      "Check for Updates"
+                    }
+                  } // Display last check time
                   if let Some(last_check) = auto_update_config().last_check {
                     div { class: "text-xs text-base-content/60",
                       "Last checked: {format_relative_time(last_check)}"
                     }
                   } else {
-                    div { class: "text-xs text-base-content/60",
-                      "Never checked"
-                    }
+                    div { class: "text-xs text-base-content/60", "Never checked" }
                   }
-                }                
+                }
                 // Display update status
                 if let Some(error) = check_error() {
-                  div { class: "alert alert-error text-sm",
-                    "❌ {error}"
-                  }                } else if let Some(info) = update_info() {
+                  div { class: "alert alert-error text-sm", "❌ {error}" }
+                } else if let Some(info) = update_info() {
                   if info.update_available {
                     div { class: "alert alert-success alert-soft text-sm",
                       PartyPopper { class: "w-6 h-6 mr-2" }
@@ -272,7 +274,7 @@ pub fn SettingsPage() -> Element {
                         p { "Update available: v{info.latest_version}" }
                         div { class: "mt-2 space-x-2 text-sm",
                           if let Some(url) = &info.download_url {
-                            a { 
+                            a {
                               href: "{url}",
                               target: "_blank",
                               class: "btn btn-sm btn-soft",
@@ -280,7 +282,7 @@ pub fn SettingsPage() -> Element {
                             }
                           }
                           if let Some(release_url) = &info.release_notes {
-                            a { 
+                            a {
                               href: "{release_url}",
                               target: "_blank",
                               class: "link link-neutral link-hover",
@@ -294,7 +296,8 @@ pub fn SettingsPage() -> Element {
                     div { class: "alert alert-success alert-soft ",
                       "You're running the latest version (v{info.current_version})"
                     }
-                  }                } else {
+                  }
+                } else {
                   // Check if there's a saved update in config even if not in current state
                   if let Some(available_version) = &auto_update_config().available_version {
                     div { class: "alert alert-success text-sm",
@@ -302,14 +305,14 @@ pub fn SettingsPage() -> Element {
                         p { "🎉 Update available: v{available_version}" }
                         div { class: "mt-2 space-x-2",
                           if let Some(url) = &auto_update_config().available_download_url {
-                            a { 
+                            a {
                               href: "{url}",
                               target: "_blank",
                               class: "link link-primary",
                               "Download"
                             }
                           }
-                          a { 
+                          a {
                             href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{available_version}",
                             target: "_blank",
                             class: "link link-secondary",
@@ -324,9 +327,8 @@ pub fn SettingsPage() -> Element {
                   }
                 }
               }
-            }
+            },
           }
-          
           // App info Section
           Collapse {
             title: "App info".to_string(),
@@ -353,7 +355,9 @@ pub fn SettingsPage() -> Element {
                   onclick: {
                       let update_config = update_config.clone();
                       move |_| {
-                          theme.set(Theme::BuiltIn(BuiltInTheme::System));                          update_config(                              Box::new(|config| {
+                          theme.set(Theme::BuiltIn(BuiltInTheme::System));
+                          update_config(
+                              Box::new(|config| {
                                   config.volume = 1.0;
                                   config.enable_sound = true;
                                   config.enable_volume_boost = false;
@@ -368,6 +372,7 @@ pub fn SettingsPage() -> Element {
               }
             },
           }
-        }      }
+        }
+      }
     }
 }

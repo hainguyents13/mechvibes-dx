@@ -7,7 +7,7 @@ pub enum Route {
     #[layout(Layout)] #[route("/")] Home {},
     #[route("/customize")] Customize {},
     #[route("/soundpacks")] Soundpacks {},
-    #[route("/effects")] Effects {},
+    #[route("/mood")] Mood {},
     #[route("/settings")] Settings {},
 }
 
@@ -74,34 +74,34 @@ pub fn Home() -> Element {
     // Use audio context from the layout provider instead of creating new one
     let audio_context: Arc<AudioContext> = use_context();
     rsx! {
-        crate::components::pages::HomePage { audio_ctx: audio_context }
+      crate::components::pages::HomePage { audio_ctx: audio_context }
     }
 }
 
 #[component]
 pub fn Soundpacks() -> Element {
     rsx! {
-        crate::components::pages::Soundpacks {}
+      crate::components::pages::Soundpacks {}
     }
 }
 
 #[component]
-pub fn Effects() -> Element {
+pub fn Mood() -> Element {
     rsx! {
-        crate::components::pages::EffectsPage {}
+      crate::components::pages::MoodPage {}
     }
 }
 
 #[component]
 pub fn Customize() -> Element {
     rsx! {
-        crate::components::pages::CustomizePage {}
+      crate::components::pages::CustomizePage {}
     }
 }
 
 #[component]
 pub fn Settings() -> Element {
     rsx! {
-        crate::components::pages::SettingsPage {}
+      crate::components::pages::SettingsPage {}
     }
 }

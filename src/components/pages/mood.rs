@@ -1,10 +1,10 @@
 use dioxus::prelude::*;
-use lucide_dioxus::Sparkles;
+use lucide_dioxus::CloudSunRain;
 
 use crate::components::ui::{ Collapse, PageHeader, Toggler };
 
 #[component]
-pub fn EffectsPage() -> Element {
+pub fn MoodPage() -> Element {
     // Audio effects toggles
     let mut random_pitch_enabled = use_signal(|| false);
     let mut random_keys_enabled = use_signal(|| false);
@@ -20,13 +20,13 @@ pub fn EffectsPage() -> Element {
     let mut crowd_auto_play = use_signal(|| false);
 
     rsx! {
-      div { class: "p-12 pt-20",
+      div { class: "",
         // Page header
         PageHeader {
           title: "Effects".to_string(),
           subtitle: "Sound effects, ambient sounds, and more".to_string(),
           icon: Some(rsx! {
-            Sparkles { class: "w-8 h-8 mx-auto" }
+            CloudSunRain { class: "w-8 h-8 mx-auto" }
           }),
         }
         // Effects Configuration

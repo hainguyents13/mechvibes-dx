@@ -6,7 +6,7 @@ use lucide_dioxus::{ Check, ChevronDown, Keyboard, Mouse, Music, Search };
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq, Copy, Debug)]
 pub enum SelectorType {
     Keyboard,
     Mouse,
@@ -134,10 +134,12 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
         div { class: "relative w-full",
           // Dropdown toggle button
           button {
+            id: format!("soundpack-btn-{:?}", soundpack_type),
             class: format!(
                 "w-full btn btn-soft justify-start gap-3 h-17 rounded-box {}",
                 if is_open() { "btn-active" } else { "" },
             ),
+            style: format!("anchor-name: --soundpack-anchor-{:?};", soundpack_type),
             disabled: is_loading() || !has_soundpacks(),
             onclick: move |_| {
                 if has_soundpacks() {
@@ -188,10 +190,14 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                   if is_open() { "rotate-180" } else { "" },
               ),
             }
-          }
-          // Dropdown panel
+          } // Dropdown panel with anchor positioning
           if is_open() && has_soundpacks() {
-            div { class: "absolute top-full left-0 right-0 mt-1 bg-base-200 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
+            div {
+              class: "bg-base-200 border border-base-300 rounded-box shadow-lg z-50 max-h-80 overflow-hidden",
+              style: format!(
+                  "position: absolute; position-anchor: --soundpack-anchor-{:?}; position-area: block-end; width: anchor-size(width); margin-top: 4px;",
+                  soundpack_type,
+              ),
               // Search input
               div { class: "p-3 border-b border-base-200",
                 div { class: "relative",
