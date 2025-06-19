@@ -8,7 +8,9 @@
 node_modules
 
 # cache
-/data
+/data/*
+!/data/music.json
+!/data/ambiance.json
 
 /wix
 create_portable.ps1

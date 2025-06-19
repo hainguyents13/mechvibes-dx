@@ -69,7 +69,7 @@ pub fn SoundpackTable(
             placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
             value: "{search_query}",
             oninput: move |evt| search_query.set(evt.value()),
-          }          
+          }
           if let Some(add_handler) = on_add_click {
             button {
               class: "btn btn-sm btn-neutral",
@@ -85,7 +85,7 @@ pub fn SoundpackTable(
           }
         } else {
           // Table
-          div { class: "overflow-x-auto max-h-[calc(100vh-500px)]",
+          div { class: "overflow-x-auto max-h-[calc(100vh-470px)]",
             if filtered_soundpacks.is_empty() {
               div { class: "p-4 text-center text-sm text-base-content/70",
                 "No result match your search!"

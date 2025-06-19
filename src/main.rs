@@ -75,6 +75,13 @@ fn main() {
     state::app::init_app_state();
     state::app::init_update_state();
 
+    // Initialize music player
+    if let Err(e) = state::music::initialize_music_player() {
+        debug_eprint!("⚠️ Failed to initialize music player: {}", e);
+    } else {
+        debug_print!("🎵 Music player initialized successfully");
+    }
+
     // Note: Update service will be initialized within the UI components
     // to ensure proper Dioxus runtime context
 
@@ -115,6 +122,6 @@ fn main() {
 
 fn app_with_stylesheets() -> Element {
     rsx! {
-      ui::app {}
+        ui::app {}
     }
 }

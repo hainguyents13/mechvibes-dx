@@ -6,6 +6,27 @@ use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MusicPlayerConfig {
+    pub current_track_id: Option<String>,
+    pub volume: f32, // 0.0 to 100.0
+    pub is_muted: bool,
+    pub auto_play: bool, // Auto-play music when app starts
+    pub music_last_updated: u64, // timestamp for music cache
+}
+
+impl Default for MusicPlayerConfig {
+    fn default() -> Self {
+        Self {
+            current_track_id: None,
+            volume: 50.0,
+            is_muted: false,
+            auto_play: false,
+            music_last_updated: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LogoCustomization {
     pub border_color: String,
     pub text_color: String,
@@ -79,6 +100,8 @@ pub struct AppConfig {
     pub enable_logo_customization: bool, // Enable/disable logo customization panel
     pub background_customization: BackgroundCustomization,
     pub enable_background_customization: bool, // Enable/disable background customization panel
+    // Music player settings
+    pub music_player: MusicPlayerConfig,
     // System settings
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
@@ -151,6 +174,7 @@ impl Default for AppConfig {
             enable_logo_customization: false, // Default logo customization disabled
             background_customization: BackgroundCustomization::default(),
             enable_background_customization: false, // Default background customization disabled
+            music_player: MusicPlayerConfig::default(),
             auto_start: false,
             start_minimized: false, // Default to not starting minimized
             landscape_mode: false, // Default landscape mode disabled
