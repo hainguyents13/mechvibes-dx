@@ -82,6 +82,10 @@ fn main() {
         debug_print!("🎵 Music player initialized successfully");
     }
 
+    // Initialize ambiance player
+    state::ambiance::initialize_global_ambiance_player();
+    debug_print!("🎵 Ambiance player initialized");
+
     // Note: Update service will be initialized within the UI components
     // to ensure proper Dioxus runtime context
 

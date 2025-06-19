@@ -1,3 +1,4 @@
+pub mod ambiance;
 pub mod app;
 pub mod config;
 pub mod keyboard;

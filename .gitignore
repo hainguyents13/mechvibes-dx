@@ -9,11 +9,6 @@ node_modules
 
 # cache
 /data/*
-!/data/music.json
-!/data/ambiance.json
-
-/wix
-create_portable.ps1
 /bundle
 /tests*
 /dist

@@ -45,7 +45,8 @@ pub fn CustomizePage() -> Element {
               // Built-in theme toggler
               ThemeToggler {}
             },
-          }          Collapse {
+          }
+          Collapse {
             title: "Logo".to_string(),
             group_name: "customize-accordion".to_string(),
             variant: "border border-base-300 bg-base-200 text-base-content",
@@ -242,7 +243,8 @@ fn LogoCustomizationPanel() -> Element {
     });
 
     rsx! {
-      div { class: "space-y-4",        // Preview
+      div { class: "space-y-4",
+        // Preview
         div { class: "space-y-2",
           div { class: "text-sm text-base-content", "Preview" }
           div { class: "grid grid-cols-2 gap-2 p-4 bg-base-100 rounded-box border border-base-300 space-y-3",
@@ -257,7 +259,10 @@ fn LogoCustomizationPanel() -> Element {
                     text_color(),
                     if use_background_image() {
                         if let Some(ref img) = background_image() {
-                            format!("background-image: url('{}'); background-size: cover; background-position: center", img)
+                            format!(
+                                "background-image: url('{}'); background-size: cover; background-position: center",
+                                img,
+                            )
                         } else {
                             format!("background: {}", background_color())
                         }
@@ -283,7 +288,10 @@ fn LogoCustomizationPanel() -> Element {
                     text_color(),
                     if use_muted_background_image() {
                         if let Some(ref img) = muted_background_image() {
-                            format!("background-image: url('{}'); background-size: cover; background-position: center", img)
+                            format!(
+                                "background-image: url('{}'); background-size: cover; background-position: center",
+                                img,
+                            )
                         } else {
                             format!("background: {}", muted_background())
                         }
@@ -315,7 +323,7 @@ fn LogoCustomizationPanel() -> Element {
           on_change: move |value| text_color.set(value),
           field: "text_color".to_string(),
           description: None,
-        }        // Shadow Color
+        } // Shadow Color
         ColorPicker {
           label: "Shadow Color".to_string(),
           selected_value: shadow_color(),
@@ -325,11 +333,9 @@ fn LogoCustomizationPanel() -> Element {
           field: "shadow_color".to_string(),
           description: None,
         }
-        
         // Background Section
         div { class: "space-y-3 p-3 border border-base-300 rounded-box bg-base-100",
           h4 { class: "text-sm font-semibold text-base-content", "Background (Normal)" }
-          
           // Toggle between color and image for normal background
           Toggler {
             title: "Use image".to_string(),
@@ -339,7 +345,6 @@ fn LogoCustomizationPanel() -> Element {
                 use_background_image.set(new_value);
             },
           }
-          
           // Background Color Picker (shown when not using image)
           if !use_background_image() {
             ColorPicker {
@@ -352,13 +357,16 @@ fn LogoCustomizationPanel() -> Element {
               description: None,
             }
           }
-          
           // Background Image Selector (shown when using image)
           if use_background_image() {
             div { class: "space-y-2",
-              div{
-                div { class: "text-sm font-medium text-base-content", "Background Image" }
-                div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
+              div {
+                div { class: "text-sm font-medium text-base-content",
+                  "Background Image"
+                }
+                div { class: "text-xs text-base-content/50",
+                  "Image upload feature coming soon!"
+                }
               }
               input {
                 r#type: "text",
@@ -368,7 +376,7 @@ fn LogoCustomizationPanel() -> Element {
                 oninput: move |evt| {
                     let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
                     background_image.set(value);
-                }
+                },
               }
             }
           }
@@ -377,7 +385,6 @@ fn LogoCustomizationPanel() -> Element {
         // Muted Background Section
         div { class: "space-y-3 p-3 border border-base-300 rounded-box bg-base-100",
           h4 { class: "text-sm font-semibold text-base-content", "Background (Muted)" }
-          
           // Toggle between color and image for muted background
           Toggler {
             title: "Use image".to_string(),
@@ -387,7 +394,6 @@ fn LogoCustomizationPanel() -> Element {
                 use_muted_background_image.set(new_value);
             },
           }
-          
           // Muted Background Color Picker (shown when not using image)
           if !use_muted_background_image() {
             ColorPicker {
@@ -400,13 +406,16 @@ fn LogoCustomizationPanel() -> Element {
               description: Some("Background color when sound is disabled".to_string()),
             }
           }
-          
           // Muted Background Image Selector (shown when using image)
           if use_muted_background_image() {
             div { class: "space-y-2",
-              div{
-                div { class: "text-sm font-medium text-base-content", "Image" }
-                div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
+              div {
+                div { class: "text-sm font-medium text-base-content",
+                  "Image"
+                }
+                div { class: "text-xs text-base-content/50",
+                  "Image upload feature coming soon!"
+                }
               }
               input {
                 r#type: "text",
@@ -416,7 +425,7 @@ fn LogoCustomizationPanel() -> Element {
                 oninput: move |evt| {
                     let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
                     muted_background_image.set(value);
-                }
+                },
               }
             }
           }
@@ -594,14 +603,16 @@ fn BackgroundCustomizationPanel() -> Element {
             field: "background_color".to_string(),
             description: None,
           }
-        }        
+        }
         // Background Image Selector (shown when using image)
         if use_image() {
           div { class: "space-y-2",
-          div{
-            div { class: "text-sm font-medium text-base-content", "Background Image" }
-            div { class: "text-xs text-base-content/50", "Image upload feature coming soon!" }
-          }
+            div {
+              div { class: "text-sm font-medium text-base-content", "Background Image" }
+              div { class: "text-xs text-base-content/50",
+                "Image upload feature coming soon!"
+              }
+            }
             input {
               r#type: "text",
               placeholder: "Enter image URL or path...",
@@ -610,7 +621,7 @@ fn BackgroundCustomizationPanel() -> Element {
               oninput: move |evt| {
                   let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
                   background_image.set(value);
-              }
+              },
             }
           }
         }

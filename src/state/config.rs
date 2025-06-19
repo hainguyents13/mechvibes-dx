@@ -4,6 +4,7 @@ use crate::utils::{ data, path };
 use crate::utils::auto_updater::AutoUpdateConfig;
 use chrono::{ DateTime, Utc };
 use serde::{ Deserialize, Serialize };
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MusicPlayerConfig {
@@ -101,7 +102,11 @@ pub struct AppConfig {
     pub background_customization: BackgroundCustomization,
     pub enable_background_customization: bool, // Enable/disable background customization panel
     // Music player settings
-    pub music_player: MusicPlayerConfig,
+    pub music_player: MusicPlayerConfig, // Ambiance settings
+    pub ambiance_active_sounds: HashMap<String, f32>, // sound_id -> volume (0.0 to 1.0)
+    pub ambiance_global_volume: f32, // 0.0 to 1.0 - global multiplier
+    pub ambiance_is_muted: bool,
+    // Note: ambiance play state is not persistent - always starts paused
     // System settings
     pub auto_start: bool,
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
@@ -175,6 +180,10 @@ impl Default for AppConfig {
             background_customization: BackgroundCustomization::default(),
             enable_background_customization: false, // Default background customization disabled
             music_player: MusicPlayerConfig::default(),
+            ambiance_active_sounds: HashMap::new(),
+            ambiance_global_volume: 0.5, // Default global ambiance volume to 50%
+            ambiance_is_muted: false,
+            // Note: ambiance play state is not persistent - always starts paused
             auto_start: false,
             start_minimized: false, // Default to not starting minimized
             landscape_mode: false, // Default landscape mode disabled
