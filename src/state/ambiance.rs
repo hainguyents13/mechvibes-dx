@@ -139,20 +139,6 @@ pub fn stop_ambiance_sound(sound_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-// Stop all sounds
-pub fn stop_all_ambiance_sounds() -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let mut sinks_lock = sinks_ref.lock().unwrap();
-
-    for sink in sinks_lock.values() {
-        sink.stop();
-    }
-    sinks_lock.clear();
-    println!("🔇 Stopped all ambiance sounds");
-
-    Ok(())
-}
-
 // Pause all sounds
 pub fn pause_all_ambiance_sounds() -> Result<(), String> {
     let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
@@ -407,26 +393,6 @@ impl AmbiancePlayerState {
             let _ = self.save_config();
         }
     }
-
-    /// Add a sound to active sounds with specified volume
-    pub fn activate_sound(&mut self, sound_id: String, volume: f32) {
-        let clamped_volume = volume.clamp(0.0, 1.0);
-        self.active_sounds.insert(sound_id, clamped_volume);
-        let _ = self.save_config();
-    }
-
-    /// Remove a sound from active sounds
-    pub fn deactivate_sound(&mut self, sound_id: &str) {
-        self.active_sounds.remove(sound_id);
-        let _ = self.save_config();
-    }
-
-    /// Clear all active sounds
-    pub fn clear_all_sounds(&mut self) {
-        self.active_sounds.clear();
-        let _ = self.save_config();
-    }
-
     /// Set global volume (0.0 to 1.0) - affects all active sounds
     pub fn set_global_volume(&mut self, volume: f32) {
         self.global_volume = volume.clamp(0.0, 1.0);
@@ -440,16 +406,6 @@ impl AmbiancePlayerState {
     /// Toggle global mute
     pub fn toggle_mute(&mut self) {
         self.is_muted = !self.is_muted;
-
-        // Update audio player mute state
-        let _ = set_global_ambiance_mute(self.is_muted);
-
-        let _ = self.save_config();
-    }
-
-    /// Set global mute state
-    pub fn set_muted(&mut self, muted: bool) {
-        self.is_muted = muted;
 
         // Update audio player mute state
         let _ = set_global_ambiance_mute(self.is_muted);
@@ -489,71 +445,5 @@ impl AmbiancePlayerState {
                 );
             }
         }
-    }
-
-    /// Set global play state
-    pub fn set_playing(&mut self, playing: bool) {
-        self.is_playing = playing;
-
-        if playing {
-            self.start_all_active_sounds();
-            let _ = resume_all_ambiance_sounds();
-        } else {
-            let _ = pause_all_ambiance_sounds();
-        }
-
-        // Don't save to config - play state is not persistent
-    }
-
-    /// Pause all ambiance sounds
-    pub fn pause_all(&mut self) {
-        self.is_playing = false;
-
-        let _ = pause_all_ambiance_sounds();
-
-        // Don't save to config - play state is not persistent
-    }
-
-    /// Resume/play all ambiance sounds
-    pub fn play_all(&mut self) {
-        self.is_playing = true;
-
-        self.start_all_active_sounds();
-        let _ = resume_all_ambiance_sounds();
-
-        // Don't save to config - play state is not persistent
-    }
-
-    /// Get effective volume for a sound (individual volume * global volume, considering mute and play state)
-    pub fn get_effective_volume(&self, sound_id: &str) -> f32 {
-        if self.is_muted || !self.is_playing {
-            0.0
-        } else if let Some(&individual_volume) = self.active_sounds.get(sound_id) {
-            individual_volume * self.global_volume
-        } else {
-            0.0
-        }
-    }
-
-    /// Get list of all active sound IDs
-    pub fn get_active_sound_ids(&self) -> Vec<String> {
-        self.active_sounds.keys().cloned().collect()
-    }
-
-    /// Get count of active sounds
-    pub fn get_active_sound_count(&self) -> usize {
-        self.active_sounds.len()
-    }
-
-    /// Get display info for active sounds
-    pub fn get_active_sounds_info(&self) -> Vec<(String, String, f32)> {
-        self.active_sounds
-            .iter()
-            .filter_map(|(sound_id, &volume)| {
-                self.get_sound_by_id(sound_id).map(|sound| {
-                    (sound.name.clone(), sound_id.clone(), volume)
-                })
-            })
-            .collect()
     }
 }

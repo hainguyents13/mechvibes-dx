@@ -68,14 +68,9 @@ fn MusicPlayerPanel(
           }
           // Track Info
           div { class: "space-y-1 relative z-10",
-            div { class: "text-sm font-semibold text-base-content drop-shadow-lg",
-              "{current_track}"
-            }
-            div { class: "text-xs text-base-content/90 drop-shadow-md",
-              "{current_artist}"
-            }
-          }
-          // Control Buttons
+            div { class: "text-sm font-semibold text-base-content", "{current_track}" }
+            div { class: "text-xs text-base-content/90", "{current_artist}" }
+          } // Control Buttons
           div { class: "flex items-center gap-2 relative z-10",
             button {
               class: "btn btn-primary btn-square rounded-box shadow-lg",
@@ -169,17 +164,72 @@ fn SoundSelectionPanel(
     rsx! {
       div { class: "bg-base-200 border border-base-300 rounded-box p-6 space-y-4",
         // Header
-        h3 { class: "text-lg font-semibold", "Ambiance sounds" } // Global Controls
+        div { class: "space-y-1",
+          h3 { class: "text-lg font-semibold", "Ambiance sounds" }
+          p { class: "text-sm text-base-content/70",
+            if ambiance_player().active_sounds.is_empty() {
+              "Select at least one sound to play"
+            } else {
+              {
+                  format!(
+                      "{} active sound{}",
+                      ambiance_player().active_sounds.len(),
+                      if ambiance_player().active_sounds.len() == 1 { "" } else { "s" },
+                  )
+              }
+            }
+          }
+        }
+        // Global Controls
         div { class: "flex items-center gap-4 w-full justify-between",
-          div { class: "text-xs text-base-content/70 whitespace-nowrap",
-            "Volume: {(ambiance_player().global_volume * 100.0) as i32}%"
+          // Play/Pause Button
+          button {
+            class: "btn btn-primary btn-square",
+            onclick: move |_| {
+                update_global_ambiance_player_state(|player| {
+                    player.toggle_play_pause();
+                });
+                if let Some(current_state) = get_global_ambiance_player_state_copy() {
+                    if current_state.is_playing {
+                        let _ = resume_all_ambiance_sounds();
+                    } else {
+                        let _ = pause_all_ambiance_sounds();
+                    }
+                }
+                refresh_trigger.set(refresh_trigger() + 1);
+            },
+            if ambiance_player().is_playing {
+              Pause { class: "w-4 h-4" }
+            } else {
+              Play { class: "w-4 h-4" }
+            }
+          }
+          // Mute Button
+          button {
+            class: "btn btn-ghost btn-sm btn-square",
+            onclick: move |_| {
+                update_global_ambiance_player_state(|player| {
+                    player.toggle_mute();
+                    let _ = player.save_config();
+                });
+                if let Some(current_state) = get_global_ambiance_player_state_copy() {
+                    let _ = set_global_ambiance_mute(current_state.is_muted);
+                }
+                refresh_trigger.set(refresh_trigger() + 1);
+            },
+            if ambiance_player().is_muted {
+              VolumeOff { class: "w-4 h-4" }
+            } else {
+              Volume2 { class: "w-4 h-4" }
+            }
           }
           input {
             r#type: "range",
             class: "range range-xs",
             min: "0",
             max: "100",
-            value: "{(ambiance_player().global_volume * 100.0) as i32}",            disabled: ambiance_player().is_muted || !ambiance_player().is_playing,
+            value: "{(ambiance_player().global_volume * 100.0) as i32}",
+            disabled: ambiance_player().is_muted || !ambiance_player().is_playing,
             oninput: move |evt| {
                 if let Ok(val) = evt.value().parse::<f32>() {
                     update_global_ambiance_player_state(|player| {
@@ -191,52 +241,8 @@ fn SoundSelectionPanel(
                 }
             },
           }
-          div { class: "flex items-center gap-2",            // Play/Pause Button
-            button {
-              class: "btn btn-primary btn-sm btn-square",
-              onclick: move |_| {
-                  update_global_ambiance_player_state(|player| {
-                      player.toggle_play_pause();
-                  });
-                  
-                  // Handle audio playback based on new state
-                  if let Some(current_state) = get_global_ambiance_player_state_copy() {
-                      if current_state.is_playing {
-                          let _ = resume_all_ambiance_sounds();
-                      } else {
-                          let _ = pause_all_ambiance_sounds();
-                      }
-                  }
-                  
-                  refresh_trigger.set(refresh_trigger() + 1);
-              },
-              if ambiance_player().is_playing {
-                Pause { class: "w-4 h-4" }
-              } else {
-                Play { class: "w-4 h-4" }
-              }
-            }            // Mute Button
-            button {
-              class: "btn btn-ghost btn-sm btn-square",
-              onclick: move |_| {
-                  update_global_ambiance_player_state(|player| {
-                      player.toggle_mute();
-                      let _ = player.save_config();
-                  });
-                  
-                  // Handle audio muting
-                  if let Some(current_state) = get_global_ambiance_player_state_copy() {
-                      let _ = set_global_ambiance_mute(current_state.is_muted);
-                  }
-                  
-                  refresh_trigger.set(refresh_trigger() + 1);
-              },
-              if ambiance_player().is_muted {
-                VolumeOff { class: "w-4 h-4" }
-              } else {
-                Volume2 { class: "w-4 h-4" }
-              }
-            }
+          div { class: "text-xs text-base-content/70 whitespace-nowrap",
+            "{(ambiance_player().global_volume * 100.0) as i32}%"
           }
         }
         // Sound Selection List
@@ -246,9 +252,9 @@ fn SoundSelectionPanel(
               class: format!(
                   " rounded-box border p-4 space-y-3 {}",
                   if ambiance_player().is_sound_active(&sound.id) {
-                      "bg-base-100 border-base-300"
+                      "bg-base-300 border-base-300"
                   } else {
-                      "bg-base-100/50 border-base-100"
+                      "bg-base-100 border-base-100"
                   },
               ),
               // First line: Icon, Name, Description (left) + Toggle (right)
@@ -259,34 +265,34 @@ fn SoundSelectionPanel(
                   div { class: "flex-shrink-0",
                     match sound.icon.as_str() {
                         "cloud-rain" => rsx! {
-                          CloudRain { class: "w-5 h-5 text-blue-500" }
+                          CloudRain { class: "w-5 h-5 text-base-content/50" }
                         },
                         "tree-pine" => rsx! {
-                          TreePine { class: "w-5 h-5 text-green-500" }
+                          TreePine { class: "w-5 h-5 text-base-content/50" }
                         },
                         "waves" => rsx! {
-                          Waves { class: "w-5 h-5 text-cyan-500" }
+                          Waves { class: "w-5 h-5 text-base-content/50" }
                         },
                         "zap" => rsx! {
-                          Zap { class: "w-5 h-5 text-yellow-500" }
+                          Zap { class: "w-5 h-5 text-base-content/50" }
                         },
                         "flame" => rsx! {
-                          Flame { class: "w-5 h-5 text-orange-500" }
+                          Flame { class: "w-5 h-5 text-base-content/50" }
                         },
                         "wind" => rsx! {
-                          Wind { class: "w-5 h-5 text-gray-500" }
+                          Wind { class: "w-5 h-5 text-base-content/50" }
                         },
                         "moon" => rsx! {
-                          Moon { class: "w-5 h-5 text-purple-500" }
+                          Moon { class: "w-5 h-5 text-base-content/50" }
                         },
                         "coffee" => rsx! {
-                          Coffee { class: "w-5 h-5 text-amber-700" }
+                          Coffee { class: "w-5 h-5 text-base-content/50" }
                         },
                         "radio" => rsx! {
-                          Radio { class: "w-5 h-5 text-gray-600" }
+                          Radio { class: "w-5 h-5 text-base-content/50" }
                         },
                         _ => rsx! {
-                          TreePine { class: "w-5 h-5 text-green-500" }
+                          TreePine { class: "w-5 h-5 text-base-content/50" }
                         },
                     }
                   }
@@ -301,7 +307,8 @@ fn SoundSelectionPanel(
                   }
                 }
                 // Right side: Toggle Switch
-                div { class: "flex-shrink-0",                  input {
+                div { class: "flex-shrink-0",
+                  input {
                     r#type: "checkbox",
                     class: "toggle toggle-xs",
                     checked: ambiance_player().is_sound_active(&sound.id),
@@ -314,27 +321,31 @@ fn SoundSelectionPanel(
                             } else {
                                 false
                             };
-                            
                             update_global_ambiance_player_state(|player| {
                                 player.toggle_sound(sound_id.clone());
                                 let _ = player.save_config();
                             });
-                            
-                            // Handle actual audio playback
                             if let Some(current_state) = get_global_ambiance_player_state_copy() {
                                 if current_state.is_sound_active(&sound_id) && !is_currently_active {
-                                    // Sound was just enabled - start playing if global play is active
                                     if current_state.is_playing {
                                         let volume = current_state.get_sound_volume(&sound_id);
-                                        let global_volume = if current_state.is_muted { 0.0 } else { current_state.global_volume };
-                                        let _ = play_ambiance_sound(sound_id.clone(), sound_url.clone(), volume * global_volume);
+                                        let global_volume = if current_state.is_muted {
+                                            0.0
+                                        } else {
+                                            current_state.global_volume
+                                        };
+                                        let _ = play_ambiance_sound(
+                                            sound_id.clone(),
+                                            sound_url.clone(),
+                                            volume * global_volume,
+                                        );
                                     }
-                                } else if !current_state.is_sound_active(&sound_id) && is_currently_active {
-                                    // Sound was just disabled - stop playing
+                                } else if !current_state.is_sound_active(&sound_id)
+                                    && is_currently_active
+                                {
                                     let _ = stop_ambiance_sound(&sound_id);
                                 }
                             }
-                            
                             refresh_trigger.set(refresh_trigger() + 1);
                         }
                     },
@@ -344,11 +355,9 @@ fn SoundSelectionPanel(
               // Second line: Volume Control (only show if sound is active)
               if ambiance_player().is_sound_active(&sound.id) {
                 div { class: "flex items-center gap-3",
-                  span { class: "text-xs text-base-content/70",
-                    "{(ambiance_player().get_sound_volume(&sound.id) * 100.0) as i32}%"
-                  }                  input {
+                  input {
                     r#type: "range",
-                    class: "range range-xs",
+                    class: "range range-xs ml-8",
                     min: "0",
                     max: "100",
                     value: "{(ambiance_player().get_sound_volume(&sound.id) * 100.0) as i32}",
@@ -361,14 +370,14 @@ fn SoundSelectionPanel(
                                     player.set_sound_volume(sound_id.clone(), volume);
                                     let _ = player.save_config();
                                 });
-                                
-                                // Update actual audio volume
                                 let _ = set_ambiance_sound_volume(&sound_id, volume);
-                                
                                 refresh_trigger.set(refresh_trigger() + 1);
                             }
                         }
                     },
+                  }
+                  span { class: "text-xs text-base-content/70 w-10 text-right",
+                    "{(ambiance_player().get_sound_volume(&sound.id) * 100.0) as i32}%"
                   }
                 }
               }
@@ -437,7 +446,8 @@ pub fn MoodPage() -> Element {
         }
 
         // Music Player Panel
-        MusicPlayerPanel { music_player, refresh_trigger, is_loading }        // Sound Selection Panel
+        // MusicPlayerPanel { music_player, refresh_trigger, is_loading }
+        // Sound Selection Panel
         SoundSelectionPanel { ambiance_player, refresh_trigger }
       }
     }

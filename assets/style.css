@@ -2798,8 +2798,17 @@
   .ml-4 {
     margin-left: calc(var(--spacing) * 4);
   }
+  .ml-8 {
+    margin-left: calc(var(--spacing) * 8);
+  }
   .ml-9 {
     margin-left: calc(var(--spacing) * 9);
+  }
+  .ml-10 {
+    margin-left: calc(var(--spacing) * 10);
+  }
+  .ml-20 {
+    margin-left: calc(var(--spacing) * 20);
   }
   .status {
     display: inline-block;
@@ -3605,6 +3614,18 @@
   }
   .bg-base-content {
     background-color: var(--color-base-content);
+  }
+  .bg-base-content\/10 {
+    background-color: var(--color-base-content);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    }
+  }
+  .bg-base-content\/30 {
+    background-color: var(--color-base-content);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+    }
   }
   .bg-error {
     background-color: var(--color-error);
