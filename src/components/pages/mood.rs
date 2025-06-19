@@ -252,9 +252,9 @@ fn SoundSelectionPanel(
               class: format!(
                   " rounded-box border p-4 space-y-3 {}",
                   if ambiance_player().is_sound_active(&sound.id) {
-                      "bg-base-300 border-base-300"
-                  } else {
                       "bg-base-100 border-base-100"
+                  } else {
+                      "bg-base-300 border-base-300"
                   },
               ),
               // First line: Icon, Name, Description (left) + Toggle (right)

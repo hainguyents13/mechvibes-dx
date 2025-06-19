@@ -14,7 +14,29 @@ icon = ["./assets/icon.ico"]
 category = "Productivity"
 short_description = "MechvibesDX"
 long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards."
-resources = ["./soundpacks/keyboard", "./soundpacks/mouse", "./assets"]
+resources = [
+  "./soundpacks/keyboard",
+  "./soundpacks/mouse",
+  "./soundpacks/keyboard/cherrymx-black-abs",
+  "./soundpacks/keyboard/cherrymx-black-abs/black.jpg",
+  "./soundpacks/keyboard/cherrymx-black-abs/config.json",
+  "./soundpacks/keyboard/cherrymx-black-abs/sound.ogg",
+  "./soundpacks/keyboard/cherrymx-black-pbt",
+  "./soundpacks/keyboard/cherrymx-blue-abs",
+  "./soundpacks/keyboard/cherrymx-blue-pbt",
+  "./soundpacks/keyboard/cherrymx-brown-abs",
+  "./soundpacks/keyboard/cherrymx-brown-pbt",
+  "./soundpacks/keyboard/cherrymx-red-abs",
+  "./soundpacks/keyboard/cherrymx-red-pbt",
+  "./soundpacks/keyboard/eg-crystal-purple",
+  "./soundpacks/keyboard/eg-oreo",
+  "./soundpacks/keyboard/topre-purple-hybrid-pbt",
+  "./soundpacks/mouse/chat",
+  "./soundpacks/mouse/ping",
+  "./soundpacks/mouse/vibrate",
+  "./soundpacks/mouse/wood",
+  "./assets",
+]
 
 [bundle.windows]
 installer = "nsis"
