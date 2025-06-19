@@ -139,7 +139,7 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
           div { class: "flex items-center gap-2",
             a {
               class: "btn btn-soft btn-sm",
-              href: "https://mechvibes.com/soundpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
+              href: "https://mechvibes.com/soun-dpacks?utm_source=mechvibes&utm_medium=app&utm_campaign=soundpack_manager",
               target: "_blank",
               "Browse soundpacks"
               ExternalLink { class: "w-4 h-4 ml-1" }
