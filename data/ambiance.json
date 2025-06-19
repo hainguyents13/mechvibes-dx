@@ -1,0 +1,20 @@
+{
+    "sounds": {
+        "rain": {
+            "name": "Rain",
+            "description": "A soothing sound of rain falling.",
+            "file": "assets/sounds/rain.mp3"
+        },
+        "forest": {
+            "name": "Forest",
+            "description": "Sounds of a tranquil forest with birds chirping.",
+            "file": "assets/sounds/forest.mp3"
+        },
+        "ocean": {
+            "name": "Ocean Waves",
+            "description": "Relaxing sound of ocean waves crashing on the shore.",
+            "file": "assets/sounds/ocean.mp3"
+        }
+    },
+    "last_updated": 1750311567
+}
