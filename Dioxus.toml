@@ -34,7 +34,7 @@ resources = [
   "./soundpacks/mouse/chat",
   "./soundpacks/mouse/ping",
   "./soundpacks/mouse/vibrate",
-  "./soundpacks/mouse/wood",
+  "./soundpacks/mouse/wooden",
   "./assets",
 ]
 
