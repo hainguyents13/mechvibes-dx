@@ -5,6 +5,9 @@ use tray_icon::{
     TrayIconBuilder,
 };
 use crate::utils::constants::APP_NAME;
+use image;
+use std::fs;
+use std::path::Path;
 
 pub enum TrayMessage {
     Show,
@@ -72,7 +75,7 @@ impl TrayManager {
         )?;
 
         // Load the icon from the specified path
-        let icon = Icon::from_path("assets/icon.ico", Some((32, 32))).expect("Failed to load icon");
+        let icon = load_icon_from_path("assets/icon.ico")?;
 
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
@@ -180,4 +183,20 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
     }
 
     None
+}
+
+fn load_icon_from_path(path: &str) -> Result<Icon, Box<dyn std::error::Error>> {
+    if !Path::new(path).exists() {
+        return Err(format!("Icon file not found: {}", path).into());
+    }
+
+    // Read and decode the image
+    let img = image::open(path)?;
+    let img = img.to_rgba8();
+    let (width, height) = img.dimensions();
+    let rgba = img.into_raw();
+
+    // Create Icon from RGBA data
+    let icon = Icon::from_rgba(rgba, width, height)?;
+    Ok(icon)
 }
