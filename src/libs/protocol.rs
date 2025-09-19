@@ -1,6 +1,6 @@
 use std::env;
 use std::process::Command;
-use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME };
+use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME, APP_NAME_LOWERCASE };
 
 #[allow(dead_code)]
 /// Register the mechvibes:// protocol for the application
