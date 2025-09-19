@@ -1,6 +1,7 @@
 use rodio::buffer::SamplesBuffer;
 use rodio::Sink;
 use std::collections::HashMap;
+use rand::Rng;
 
 use super::audio_context::AudioContext;
 use crate::state::config::AppConfig;
@@ -31,77 +32,14 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Get timestamp and end time
+        drop(pressed); // Get timestamp and end time - with random sound selection
         let key_map = self.key_map.lock().unwrap();
-        let (start, end) = match key_map.get(key) {
-            Some(arr) if arr.len() == 2 => {
-                let idx = if is_keydown { 0 } else { 1 };
-                let arr = arr[idx];
-                let start = arr[0]; // Keep in milliseconds
-                let end = arr[1]; // This is end time
-                let duration = end - start; // Calculate duration for validation only
-
-                // Debug logging for problematic keys
-                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
-                    eprintln!(
-                        "⚠️ Suspicious mapping for key '{}' ({}): start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
-                        key,
-                        if is_keydown {
-                            "down"
-                        } else {
-                            "up"
-                        },
-                        start,
-                        end,
-                        duration,
-                        arr[0],
-                        arr[1]
-                    );
-                }
-
-                (start, end)
-            }
-            Some(arr) if arr.len() == 1 => {
-                // Only keydown mapping available, ignore keyup events
-                if !is_keydown {
-                    return; // Skip keyup events for keys with only keydown mapping
-                }
-                let arr = arr[0];
-                let start = arr[0]; // Keep in milliseconds
-                let end = arr[1]; // This is end time
-                let duration = end - start; // Calculate duration for validation only
-
-                // Debug logging for problematic keys
-                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
-                    eprintln!(
-                        "⚠️ Suspicious mapping for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
-                        key,
-                        start,
-                        end,
-                        duration,
-                        arr[0],
-                        arr[1]
-                    );
-                }
-
-                (start, end)
-            }
-            Some(arr) => {
-                eprintln!(
-                    "Invalid mapping for key '{}': expected 1-2 elements, got {}",
-                    key,
-                    arr.len()
-                );
-                return;
-            }
-            None => {
-                // Silently ignore unmapped keys to reduce noise
-                return;
-            }
-        };
+        let (start, end) = self.get_random_sound_mapping(&key_map, is_keydown);
         drop(key_map);
 
-        self.play_sound_segment(key, start, end, is_keydown);
+        if let (Some(start), Some(end)) = (start, end) {
+            self.play_sound_segment(key, start, end, is_keydown);
+        }
     }
     fn play_sound_segment(&self, key: &str, start: f32, end: f32, is_keydown: bool) {
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
@@ -269,44 +207,14 @@ impl AudioContext {
         }
         drop(pressed);
 
-        // Get timestamp and duration
+        // Get timestamp and duration - with random sound selection
         let mouse_map = self.mouse_map.lock().unwrap();
-        let (start, duration) = match mouse_map.get(button) {
-            Some(arr) if arr.len() == 2 => {
-                let idx = if is_buttondown { 0 } else { 1 };
-                let arr = arr[idx];
-                let start = arr[0]; // Keep in milliseconds
-                let end = arr[1]; // This is actually end time, not duration
-                let duration = end - start; // Calculate duration from start and end
-                (start, duration)
-            }
-            Some(arr) if arr.len() == 1 => {
-                // Only buttondown mapping available, ignore buttonup events
-                if !is_buttondown {
-                    return; // Skip buttonup events for buttons with only buttondown mapping
-                }
-                let arr = arr[0];
-                let start = arr[0]; // Keep in milliseconds
-                let end = arr[1]; // This is actually end time, not duration
-                let duration = end - start; // Calculate duration from start and end
-                (start, duration)
-            }
-            Some(arr) => {
-                eprintln!(
-                    "Invalid mapping for mouse button '{}': expected 1-2 elements, got {}",
-                    button,
-                    arr.len()
-                );
-                return;
-            }
-            None => {
-                // Silently ignore unmapped mouse buttons to reduce noise
-                return;
-            }
-        };
+        let (start, duration) = self.get_random_mouse_sound_mapping(&mouse_map, is_buttondown);
         drop(mouse_map);
 
-        self.play_mouse_sound_segment(button, start, duration, is_buttondown);
+        if let (Some(start), Some(duration)) = (start, duration) {
+            self.play_mouse_sound_segment(button, start, duration, is_buttondown);
+        }
     }
 
     fn play_mouse_sound_segment(
@@ -413,6 +321,135 @@ impl AudioContext {
             }
         } else {
             eprintln!("❌ No mouse PCM buffer available");
+        }
+    }
+
+    fn get_random_sound_mapping(
+        &self,
+        key_map: &HashMap<String, Vec<[f32; 2]>>,
+        is_keydown: bool
+    ) -> (Option<f32>, Option<f32>) {
+        // Get all available key mappings
+        let available_keys: Vec<&String> = key_map.keys().collect();
+
+        if available_keys.is_empty() {
+            return (None, None);
+        }
+
+        // Choose a random key mapping
+        let mut rng = rand::thread_rng();
+        let random_index = rng.gen_range(0..available_keys.len());
+        let random_key = available_keys[random_index];
+
+        if let Some(arr) = key_map.get(random_key) {
+            if arr.len() == 2 {
+                let idx = if is_keydown { 0 } else { 1 };
+                let arr = arr[idx];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
+                    eprintln!(
+                        "⚠️ Suspicious random mapping from key '{}' ({}): start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        random_key,
+                        if is_keydown {
+                            "down"
+                        } else {
+                            "up"
+                        },
+                        start,
+                        end,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (Some(start), Some(end))
+            } else if arr.len() == 1 {
+                // Only keydown mapping available, ignore keyup events
+                if !is_keydown {
+                    return (None, None); // Skip keyup events for keys with only keydown mapping
+                }
+                let arr = arr[0];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
+                    eprintln!(
+                        "⚠️ Suspicious random mapping from key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        random_key,
+                        start,
+                        end,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (Some(start), Some(end))
+            } else {
+                eprintln!(
+                    "Invalid random mapping from key '{}': expected 1-2 elements, got {}",
+                    random_key,
+                    arr.len()
+                );
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    }
+
+    fn get_random_mouse_sound_mapping(
+        &self,
+        mouse_map: &HashMap<String, Vec<[f32; 2]>>,
+        is_buttondown: bool
+    ) -> (Option<f32>, Option<f32>) {
+        // Get all available mouse button mappings
+        let available_buttons: Vec<&String> = mouse_map.keys().collect();
+
+        if available_buttons.is_empty() {
+            return (None, None);
+        }
+
+        // Choose a random button mapping
+        let mut rng = rand::thread_rng();
+        let random_index = rng.gen_range(0..available_buttons.len());
+        let random_button = available_buttons[random_index];
+
+        if let Some(arr) = mouse_map.get(random_button) {
+            if arr.len() == 2 {
+                let idx = if is_buttondown { 0 } else { 1 };
+                let arr = arr[idx];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (Some(start), Some(duration))
+            } else if arr.len() == 1 {
+                // Only buttondown mapping available, ignore buttonup events
+                if !is_buttondown {
+                    return (None, None); // Skip buttonup events for buttons with only buttondown mapping
+                }
+                let arr = arr[0];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (Some(start), Some(duration))
+            } else {
+                eprintln!(
+                    "Invalid random mapping from mouse button '{}': expected 1-2 elements, got {}",
+                    random_button,
+                    arr.len()
+                );
+                (None, None)
+            }
+        } else {
+            (None, None)
         }
     }
 
