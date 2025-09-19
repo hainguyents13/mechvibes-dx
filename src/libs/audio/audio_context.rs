@@ -89,7 +89,7 @@ impl AudioContext {
             mouse_samples: Arc::new(Mutex::new(None)),
             key_map: Arc::new(Mutex::new(HashMap::new())),
             mouse_map: Arc::new(Mutex::new(HashMap::new())),
-            max_voices: 10, // Default max voices
+            max_voices: 20, // Increased max voices to reduce audio interruptions
             key_pressed: Arc::new(Mutex::new(HashMap::new())),
             mouse_pressed: Arc::new(Mutex::new(HashMap::new())),
             key_sinks: Arc::new(Mutex::new(HashMap::new())),
@@ -203,7 +203,7 @@ impl AudioContext {
             mouse_samples: Arc::new(Mutex::new(None)),
             key_map: Arc::new(Mutex::new(HashMap::new())),
             mouse_map: Arc::new(Mutex::new(HashMap::new())),
-            max_voices: 5,
+            max_voices: 20, // Increased max voices to reduce audio interruptions
             key_pressed: Arc::new(Mutex::new(HashMap::new())),
             mouse_pressed: Arc::new(Mutex::new(HashMap::new())),
             key_sinks: Arc::new(Mutex::new(HashMap::new())),
