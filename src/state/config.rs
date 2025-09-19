@@ -90,6 +90,7 @@ pub struct AppConfig {
     pub enable_sound: bool,
     pub enable_keyboard_sound: bool, // Enable/disable keyboard sounds specifically
     pub enable_mouse_sound: bool, // Enable/disable mouse sounds specifically
+    pub enable_random_sounds: bool, // Enable/disable random sound selection
     // Device settings
     pub selected_audio_device: Option<String>, // Selected audio output device
     pub enabled_keyboards: Vec<String>, // Enabled physical keyboards (by device instance ID)
@@ -170,6 +171,7 @@ impl Default for AppConfig {
             enable_sound: true,
             enable_keyboard_sound: true, // Default keyboard sounds enabled
             enable_mouse_sound: true, // Default mouse sounds enabled
+            enable_random_sounds: false, // Default random sounds disabled
             selected_audio_device: None, // Default to system default audio device
             enabled_keyboards: Vec::new(), // Default to no keyboards enabled (all keyboards will work)
             enabled_mice: Vec::new(), // Default to no mice enabled (all mice will work)

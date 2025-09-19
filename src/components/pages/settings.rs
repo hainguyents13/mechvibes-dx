@@ -17,6 +17,7 @@ pub fn SettingsPage() -> Element {
 
     // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
+    let enable_random_sounds = use_memo(move || config().enable_random_sounds);
     let enable_volume_boost = use_memo(move || config().enable_volume_boost);
     let auto_start = use_memo(move || config().auto_start);
     let start_minimized = use_memo(move || config().start_minimized);
@@ -74,6 +75,22 @@ pub fn SettingsPage() -> Element {
                               }),
                           );
                           request_tray_update();
+                      }
+                  },
+                }
+                // Random Sounds
+                Toggler {
+                  title: "Random sounds".to_string(),
+                  description: Some("When enabled, each keypress/click will play a random sound from the current soundpack instead of the same sound every time".to_string()),
+                  checked: enable_random_sounds(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.enable_random_sounds = new_value;
+                              }),
+                          );
                       }
                   },
                 }
@@ -360,6 +377,7 @@ pub fn SettingsPage() -> Element {
                               Box::new(|config| {
                                   config.volume = 1.0;
                                   config.enable_sound = true;
+                                  config.enable_random_sounds = false;
                                   config.enable_volume_boost = false;
                                   config.auto_start = false;
                                   config.theme = Theme::BuiltIn(BuiltInTheme::System);

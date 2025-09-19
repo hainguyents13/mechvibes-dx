@@ -32,9 +32,13 @@ impl AudioContext {
             }
             pressed.insert(key.to_string(), false);
         }
-        drop(pressed); // Get timestamp and end time - with random sound selection
+        drop(pressed); // Get timestamp and end time - check if random sounds are enabled
         let key_map = self.key_map.lock().unwrap();
-        let (start, end) = self.get_random_sound_mapping(&key_map, is_keydown);
+        let (start, end) = if config.enable_random_sounds {
+            self.get_random_sound_mapping(&key_map, is_keydown)
+        } else {
+            self.get_original_sound_mapping(&key_map, key, is_keydown)
+        };
         drop(key_map);
 
         if let (Some(start), Some(end)) = (start, end) {
@@ -207,9 +211,13 @@ impl AudioContext {
         }
         drop(pressed);
 
-        // Get timestamp and duration - with random sound selection
+        // Get timestamp and duration - check if random sounds are enabled
         let mouse_map = self.mouse_map.lock().unwrap();
-        let (start, duration) = self.get_random_mouse_sound_mapping(&mouse_map, is_buttondown);
+        let (start, duration) = if config.enable_random_sounds {
+            self.get_random_mouse_sound_mapping(&mouse_map, is_buttondown)
+        } else {
+            self.get_original_mouse_sound_mapping(&mouse_map, button, is_buttondown)
+        };
         drop(mouse_map);
 
         if let (Some(start), Some(duration)) = (start, duration) {
@@ -324,6 +332,80 @@ impl AudioContext {
         }
     }
 
+    fn get_original_sound_mapping(
+        &self,
+        key_map: &HashMap<String, Vec<[f32; 2]>>,
+        key: &str,
+        is_keydown: bool
+    ) -> (Option<f32>, Option<f32>) {
+        match key_map.get(key) {
+            Some(arr) if arr.len() == 2 => {
+                let idx = if is_keydown { 0 } else { 1 };
+                let arr = arr[idx];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
+                    eprintln!(
+                        "⚠️ Suspicious mapping for key '{}' ({}): start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        key,
+                        if is_keydown {
+                            "down"
+                        } else {
+                            "up"
+                        },
+                        start,
+                        end,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (Some(start), Some(end))
+            }
+            Some(arr) if arr.len() == 1 => {
+                // Only keydown mapping available, ignore keyup events
+                if !is_keydown {
+                    return (None, None); // Skip keyup events for keys with only keydown mapping
+                }
+                let arr = arr[0];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is end time
+                let duration = end - start; // Calculate duration for validation only
+
+                // Debug logging for problematic keys
+                if start < 0.0 || duration <= 0.0 || duration > 10000.0 {
+                    eprintln!(
+                        "⚠️ Suspicious mapping for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (raw: [{}, {}])",
+                        key,
+                        start,
+                        end,
+                        duration,
+                        arr[0],
+                        arr[1]
+                    );
+                }
+
+                (Some(start), Some(end))
+            }
+            Some(arr) => {
+                eprintln!(
+                    "Invalid mapping for key '{}': expected 1-2 elements, got {}",
+                    key,
+                    arr.len()
+                );
+                (None, None)
+            }
+            None => {
+                // Silently ignore unmapped keys to reduce noise
+                (None, None)
+            }
+        }
+    }
+
     fn get_random_sound_mapping(
         &self,
         key_map: &HashMap<String, Vec<[f32; 2]>>,
@@ -402,6 +484,47 @@ impl AudioContext {
             }
         } else {
             (None, None)
+        }
+    }
+
+    fn get_original_mouse_sound_mapping(
+        &self,
+        mouse_map: &HashMap<String, Vec<[f32; 2]>>,
+        button: &str,
+        is_buttondown: bool
+    ) -> (Option<f32>, Option<f32>) {
+        match mouse_map.get(button) {
+            Some(arr) if arr.len() == 2 => {
+                let idx = if is_buttondown { 0 } else { 1 };
+                let arr = arr[idx];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (Some(start), Some(duration))
+            }
+            Some(arr) if arr.len() == 1 => {
+                // Only buttondown mapping available, ignore buttonup events
+                if !is_buttondown {
+                    return (None, None); // Skip buttonup events for buttons with only buttondown mapping
+                }
+                let arr = arr[0];
+                let start = arr[0]; // Keep in milliseconds
+                let end = arr[1]; // This is actually end time, not duration
+                let duration = end - start; // Calculate duration from start and end
+                (Some(start), Some(duration))
+            }
+            Some(arr) => {
+                eprintln!(
+                    "Invalid mapping for mouse button '{}': expected 1-2 elements, got {}",
+                    button,
+                    arr.len()
+                );
+                (None, None)
+            }
+            None => {
+                // Silently ignore unmapped mouse buttons to reduce noise
+                (None, None)
+            }
         }
     }
 
