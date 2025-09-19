@@ -176,13 +176,21 @@ impl AudioContext {
     }
 
     fn manage_active_sinks(&self, key_sinks: &mut std::sync::MutexGuard<HashMap<String, Sink>>) {
+        // First, clean up finished sinks (those that have stopped playing)
+        let finished_keys: Vec<String> = key_sinks
+            .iter()
+            .filter(|(_, sink)| sink.empty())
+            .map(|(key, _)| key.clone())
+            .collect();
+
+        for key in finished_keys {
+            key_sinks.remove(&key);
+        }
+
+        // Only remove active sinks if we still exceed max_voices after cleanup
         if key_sinks.len() >= self.max_voices {
-            if
-                let Some((old_key, _)) = key_sinks
-                    .iter()
-                    .next()
-                    .map(|(k, _)| (k.clone(), ()))
-            {
+            // Find the oldest sink (first in iteration order) and remove it
+            if let Some((old_key, _)) = key_sinks.iter().next().map(|(k, _)| (k.clone(), ())) {
                 key_sinks.remove(&old_key);
                 let mut pressed = self.key_pressed.lock().unwrap();
                 pressed.insert(old_key, false);
@@ -580,16 +588,53 @@ impl AudioContext {
         &self,
         mouse_sinks: &mut std::sync::MutexGuard<HashMap<String, Sink>>
     ) {
+        // First, clean up finished sinks (those that have stopped playing)
+        let finished_buttons: Vec<String> = mouse_sinks
+            .iter()
+            .filter(|(_, sink)| sink.empty())
+            .map(|(button, _)| button.clone())
+            .collect();
+
+        for button in finished_buttons {
+            mouse_sinks.remove(&button);
+        }
+
+        // Only remove active sinks if we still exceed max_voices after cleanup
         if mouse_sinks.len() >= self.max_voices {
-            if
-                let Some((old_button, _)) = mouse_sinks
-                    .iter()
-                    .next()
-                    .map(|(k, _)| (k.clone(), ()))
-            {
+            // Find the oldest sink (first in iteration order) and remove it
+            if let Some((old_button, _)) = mouse_sinks.iter().next().map(|(k, _)| (k.clone(), ())) {
                 mouse_sinks.remove(&old_button);
                 let mut pressed = self.mouse_pressed.lock().unwrap();
                 pressed.insert(old_button, false);
+            }
+        }
+    }
+
+    /// Clean up finished sinks to prevent memory leaks and improve performance
+    pub fn cleanup_finished_sinks(&self) {
+        // Clean up finished keyboard sinks
+        if let Ok(mut key_sinks) = self.key_sinks.lock() {
+            let finished_keys: Vec<String> = key_sinks
+                .iter()
+                .filter(|(_, sink)| sink.empty())
+                .map(|(key, _)| key.clone())
+                .collect();
+
+            for key in finished_keys {
+                key_sinks.remove(&key);
+            }
+        }
+
+        // Clean up finished mouse sinks
+        if let Ok(mut mouse_sinks) = self.mouse_sinks.lock() {
+            let finished_buttons: Vec<String> = mouse_sinks
+                .iter()
+                .filter(|(_, sink)| sink.empty())
+                .map(|(button, _)| button.clone())
+                .collect();
+
+            for button in finished_buttons {
+                mouse_sinks.remove(&button);
             }
         }
     }
