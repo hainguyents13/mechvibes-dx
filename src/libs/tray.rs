@@ -15,6 +15,21 @@ pub enum TrayMessage {
     OpenWebsite,
 }
 
+fn load_icon_from_ico(path: &str) -> Result<Icon, Box<dyn std::error::Error>> {
+    // Load the ICO file
+    let ico_data = std::fs::read(path)?;
+    
+    // Parse ICO file and extract RGBA data
+    // ICO files can contain multiple images, we'll use the first one that's 32x32
+    let img = image::load_from_memory(&ico_data)?;
+    let img = img.resize_exact(32, 32, image::imageops::FilterType::Lanczos3);
+    let rgba = img.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    
+    Icon::from_rgba(rgba.into_raw(), width, height)
+        .map_err(|e| format!("Failed to create icon from RGBA: {:?}", e).into())
+}
+
 pub struct TrayManager {
     tray_icon: TrayIcon,
 }
@@ -71,8 +86,9 @@ impl TrayManager {
             ]
         )?;
 
-        // Load the icon from the specified path
-        let icon = Icon::from_path("assets/icon.ico", Some((32, 32))).expect("Failed to load icon");
+        // Load the icon - convert ICO to RGBA
+        let icon = load_icon_from_ico("assets/icon.ico")
+            .expect("Failed to load icon");
 
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
