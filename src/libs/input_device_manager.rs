@@ -1,6 +1,10 @@
 use std::collections::HashMap;
+
+#[cfg(windows)]
 use std::ptr::null_mut;
+#[cfg(windows)]
 use std::ffi::OsString;
+#[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
 
 #[cfg(windows)]

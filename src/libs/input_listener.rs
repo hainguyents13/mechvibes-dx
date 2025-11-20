@@ -1,4 +1,4 @@
-use rdev::{ listen, Button, Event, EventType, Key };
+use rdev::{ listen, Button, Event, EventType, Key, set_is_main_thread };
 use std::collections::HashSet;
 use std::sync::{ mpsc::Sender, Arc, Mutex };
 use std::thread;
@@ -37,7 +37,8 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::End => "End",
         Key::PageUp => "PageUp",
         Key::PageDown => "PageDown",
-        Key::Insert => "Insert", // Function keys F1-F12 (rdev 0.5.3 only supports F1-F12)
+        Key::Insert => "Insert",
+        
         Key::F1 => "F1",
         Key::F2 => "F2",
         Key::F3 => "F3",
@@ -50,6 +51,18 @@ fn map_key_to_code(key: Key) -> &'static str {
         Key::F10 => "F10",
         Key::F11 => "F11",
         Key::F12 => "F12",
+        Key::F13 => "F13",
+        Key::F14 => "F14",
+        Key::F15 => "F15",
+        Key::F16 => "F16",
+        Key::F17 => "F17",
+        Key::F18 => "F18",
+        Key::F19 => "F19",
+        Key::F20 => "F20",
+        Key::F21 => "F21",
+        Key::F22 => "F22",
+        Key::F23 => "F23",
+        Key::F24 => "F24",
 
         // Alpha keys A-Z
         Key::KeyA => "KeyA",
@@ -176,6 +189,10 @@ pub fn start_unified_input_listener(
         // Track pressed modifier keys for hotkey detection
         let mut ctrl_pressed = false;
         let mut alt_pressed = false;
+
+        #[cfg(target_os = "macos")]
+        set_is_main_thread(false);
+
         let result = listen(move |event: Event| {
             match event.event_type {
                 // ===== KEYBOARD EVENTS =====
