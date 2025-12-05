@@ -1,8 +1,9 @@
-#[cfg(target_os = "linux")]
-use crossbeam_channel::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+#[cfg(target_os = "linux")]
+use std::sync::mpsc::Sender;
 
 #[cfg(target_os = "linux")]
 pub fn start_evdev_keyboard_listener(
@@ -57,9 +58,7 @@ pub fn start_evdev_keyboard_listener(
                                     if let Ok(key) = Key::new(event.code()) {
                                         let key_code = map_evdev_keycode(key);
                                         if !key_code.is_empty() {
-                                            let focused = *is_focused.lock().unwrap();
-                                            let source = if focused { "evdev/focused" } else { "evdev/unfocused" };
-                                            println!("⌨️ Key Pressed: {} [source: {}]", key_code, source);
+                                            // Send key event without logging sensitive keystrokes
                                             let _ = keyboard_tx.send(key_code.to_string());
                                         }
                                     }
@@ -113,10 +112,14 @@ fn map_evdev_keycode(key: evdev::Key) -> &'static str {
         KEY_TAB => "Tab",
         KEY_ESC => "Escape",
         KEY_CAPSLOCK => "CapsLock",
-        KEY_LEFTSHIFT | KEY_RIGHTSHIFT => "Shift",
-        KEY_LEFTCTRL | KEY_RIGHTCTRL => "Control",
-        KEY_LEFTALT | KEY_RIGHTALT => "Alt",
-        KEY_LEFTMETA | KEY_RIGHTMETA => "Meta",
+        KEY_LEFTSHIFT => "ShiftLeft",
+        KEY_RIGHTSHIFT => "ShiftRight",
+        KEY_LEFTCTRL => "ControlLeft",
+        KEY_RIGHTCTRL => "ControlRight",
+        KEY_LEFTALT => "AltLeft",
+        KEY_RIGHTALT => "AltRight",
+        KEY_LEFTMETA => "MetaLeft",
+        KEY_RIGHTMETA => "MetaRight",
         
         // Arrow keys
         KEY_UP => "ArrowUp",

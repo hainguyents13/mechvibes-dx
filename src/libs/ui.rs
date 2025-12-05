@@ -66,16 +66,14 @@ pub fn app() -> Element {
     // Track window focus state to switch between rdev (unfocused) and device_query (focused)
     // This is a hybrid approach to work around the rdev + Wry/Winit incompatibility on Windows
     {
+        use dioxus::desktop::tao::event::WindowEvent;
+
         use_wry_event_handler(move |event, _target| {
             if let TaoEvent::WindowEvent { event: window_event, .. } = event {
-                // Check for focus events
-                if let Some(focused) = match window_event {
-                    _ if format!("{:?}", window_event).starts_with("Focused(true)") => Some(true),
-                    _ if format!("{:?}", window_event).starts_with("Focused(false)") => Some(false),
-                    _ => None,
-                } {
+                // Check for focus events using proper pattern matching
+                if let WindowEvent::Focused(focused) = window_event {
                     // Update global focus state
-                    set_window_focus(focused);
+                    set_window_focus(*focused);
                 }
             }
         });

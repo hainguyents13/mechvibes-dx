@@ -184,9 +184,6 @@ pub fn start_unified_input_listener(
                 EventType::KeyPress(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Pressed: {} [source: rdev/unfocused]", key_code);
-                        // println!("🔍 DEBUG: Key event detected: {}", key_code);
-
                         // Track modifier keys for hotkey detection
                         match key_code {
                             "ControlLeft" | "ControlRight" => {

@@ -152,19 +152,12 @@ pub fn start_focused_keyboard_listener(
                 let keys = device_state.get_keys();
                 let current_keys: HashSet<Keycode> = keys.into_iter().collect();
 
-                // Debug: log if any keys are detected
-                if !current_keys.is_empty() && current_keys != prev_keys {
-                    println!("🔍 [device_query] Detected {} keys: {:?}", current_keys.len(), current_keys);
-                }
-
                 // Detect newly pressed keys
                 for key in current_keys.difference(&prev_keys) {
                     let key_code = map_device_query_keycode(*key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Pressed: {} [source: device_query/focused]", key_code);
+                        // Send key event without logging sensitive keystrokes
                         let _ = keyboard_tx.send(key_code.to_string());
-                    } else {
-                        println!("⚠️ [device_query] Unmapped key: {:?}", key);
                     }
                 }
 
@@ -172,7 +165,6 @@ pub fn start_focused_keyboard_listener(
                 for key in prev_keys.difference(&current_keys) {
                     let key_code = map_device_query_keycode(*key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Released: {} [source: device_query/focused]", key_code);
                         let _ = keyboard_tx.send(format!("UP:{}", key_code));
                     }
                 }
