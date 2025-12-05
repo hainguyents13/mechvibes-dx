@@ -1,6 +1,4 @@
 use dioxus::prelude::*;
-use crate::libs::AudioContext;
-use std::sync::Arc;
 
 use crate::{ libs::theme::use_theme, utils::config::use_config };
 
@@ -27,6 +25,7 @@ pub fn Layout() -> Element {
 
     // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
+    println!("🎨 Layout rendering with theme: {:?} -> DaisyUI: {}", theme(), daisy_theme);
 
     // Get background customization settings (reactive to config changes)
     let background_style = use_memo(move || {
@@ -49,54 +48,11 @@ pub fn Layout() -> Element {
         }
     });
 
-    // ========== HYBRID APPROACH: Window Focus Detection ==========
-    // Track window focus state - when focused, use Dioxus event handlers (no global hooks)
-    // When unfocused, rely on rdev global hooks (necessary for background operation)
-    let mut is_focused = use_signal(|| false);
-
-    // Get audio context to play sounds when window is focused
-    let audio_context: Arc<AudioContext> = use_context();
-
-    // Keyboard event handler for when window is focused
-    let ctx_keydown = audio_context.clone();
-    let onkeydown = move |evt: KeyboardEvent| {
-        if *is_focused.read() {
-            let key_code = evt.code().to_string();
-            println!("🪟 Window focused - Dioxus handler: Key pressed: {}", key_code);
-            ctx_keydown.play_key_event_sound(&key_code, true);
-        }
-    };
-
-    let ctx_keyup = audio_context.clone();
-    let onkeyup = move |evt: KeyboardEvent| {
-        if *is_focused.read() {
-            let key_code = evt.code().to_string();
-            println!("🪟 Window focused - Dioxus handler: Key released: {}", key_code);
-            ctx_keyup.play_key_event_sound(&key_code, false);
-        }
-    };
-
-    // Focus/blur handlers to track window focus state
-    let onfocus = move |_| {
-        is_focused.set(true);
-        println!("🪟 Window FOCUSED - using Dioxus event handlers (no global hooks)");
-    };
-
-    let onblur = move |_| {
-        is_focused.set(false);
-        println!("🪟 Window UNFOCUSED - using rdev global hooks");
-    };
-
     rsx! {
       div {
         class: "h-screen flex flex-col",
         "data-theme": "{daisy_theme}",
         style: "{background_style()}",
-        tabindex: 0,  // Make div focusable to receive keyboard events
-        onkeydown: onkeydown,
-        onkeyup: onkeyup,
-        onfocus: onfocus,
-        onblur: onblur,
         // Custom title bar for window controls
         crate::components::titlebar::TitleBar {}
 

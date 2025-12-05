@@ -1,4 +1,4 @@
-use rdev::{ grab, Button, Event, EventType, Key };
+use rdev::{ listen, Button, Event, EventType, Key };
 use std::collections::HashSet;
 use std::sync::{ mpsc::Sender, Arc, Mutex };
 use std::thread;
@@ -167,63 +167,42 @@ pub fn start_unified_input_listener(
     thread::spawn(move || {
         println!("🎮 Unified input listener thread started");
 
-        // Set thread priority to high to ensure events are captured
-        #[cfg(target_os = "windows")]
-        {
-            unsafe extern "system" {
-                fn SetThreadPriority(hThread: *mut std::ffi::c_void, nPriority: i32) -> i32;
-                fn GetCurrentThread() -> *mut std::ffi::c_void;
-            }
-            const THREAD_PRIORITY_HIGHEST: i32 = 2;
-            unsafe {
-                let handle = GetCurrentThread();
-                if SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST) != 0 {
-                    println!("✅ Input listener thread priority set to HIGHEST");
-                } else {
-                    println!("⚠️ Failed to set thread priority");
-                }
-            }
-        }
-
         // Separate state tracking for keyboard and mouse
         let keyboard_last_press = Arc::new(Mutex::new(Instant::now()));
         let mouse_last_press = Arc::new(Mutex::new(Instant::now()));
         let pressed_keys = Arc::new(Mutex::new(HashSet::<String>::new()));
         let pressed_buttons = Arc::new(Mutex::new(HashSet::<String>::new()));
 
-        // Track pressed modifier keys for hotkey detection (must use Arc<Mutex> for grab's Fn closure)
-        let ctrl_pressed = Arc::new(Mutex::new(false));
-        let alt_pressed = Arc::new(Mutex::new(false));
+        // Track pressed modifier keys for hotkey detection
+        let mut ctrl_pressed = false;
+        let mut alt_pressed = false;
 
-        println!("🎮 Starting rdev::grab() - this intercepts ALL keyboard/mouse events globally (even when window focused)");
-        let result = grab(move |event: Event| -> Option<Event> {
-            // Process the event and return Some(event) to pass it through, or None to consume it
+        println!("🎮 Starting rdev::listen() - listening to keyboard/mouse events");
+        let result = listen(move |event: Event| {
             match event.event_type {
                 // ===== KEYBOARD EVENTS =====
                 EventType::KeyPress(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        println!("⌨️ Key Pressed: {} (rdev global hook)", key_code);
+                        println!("⌨️ Key Pressed: {}", key_code);
                         // println!("🔍 DEBUG: Key event detected: {}", key_code);
 
                         // Track modifier keys for hotkey detection
                         match key_code {
                             "ControlLeft" | "ControlRight" => {
-                                *ctrl_pressed.lock().unwrap() = true;
+                                ctrl_pressed = true;
                             }
                             "AltLeft" | "AltRight" => {
-                                *alt_pressed.lock().unwrap() = true;
+                                alt_pressed = true;
                             }
                             "KeyM" => {
                                 // Check for Ctrl+Alt+M hotkey combination
-                                let ctrl = *ctrl_pressed.lock().unwrap();
-                                let alt = *alt_pressed.lock().unwrap();
-                                if ctrl && alt {
+                                if ctrl_pressed && alt_pressed {
                                     println!(
                                         "🔥 Hotkey detected: Ctrl+Alt+M - Toggling global sound"
                                     );
                                     let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
-                                    return Some(event); // Pass through the event
+                                    return; // Don't process this as a regular key event
                                 }
                             }
                             _ => {}
@@ -232,7 +211,7 @@ pub fn start_unified_input_listener(
                         // Check if key is already pressed
                         let mut pressed = pressed_keys.lock().unwrap();
                         if pressed.contains(&key_code.to_string()) {
-                            return Some(event); // Key already pressed, pass through
+                            return; // Key already pressed, ignore
                         }
                         pressed.insert(key_code.to_string());
                         drop(pressed); // Apply debounce and detect rapid key events
@@ -242,7 +221,7 @@ pub fn start_unified_input_listener(
 
                         // Special handling for Backspace key - skip if too rapid (< 10ms)
                         if key_code == "Backspace" && time_since_last < Duration::from_millis(10) {
-                            return Some(event); // Pass through but don't send to channel
+                            return; // Skip this Backspace event entirely
                         }
 
                         if time_since_last > Duration::from_millis(1) {
@@ -259,10 +238,10 @@ pub fn start_unified_input_listener(
                         // Track modifier key releases for hotkey detection
                         match key_code {
                             "ControlLeft" | "ControlRight" => {
-                                *ctrl_pressed.lock().unwrap() = false;
+                                ctrl_pressed = false;
                             }
                             "AltLeft" | "AltRight" => {
-                                *alt_pressed.lock().unwrap() = false;
+                                alt_pressed = false;
                             }
                             _ => {}
                         }
@@ -286,7 +265,7 @@ pub fn start_unified_input_listener(
                         // Check if button is already pressed
                         let mut pressed = pressed_buttons.lock().unwrap();
                         if pressed.contains(&button_code.to_string()) {
-                            return Some(event); // Button already pressed, pass through
+                            return; // Button already pressed, ignore
                         }
                         pressed.insert(button_code.to_string());
                         drop(pressed); // Apply debounce and detect rapid mouse events
@@ -350,9 +329,6 @@ pub fn start_unified_input_listener(
                     // println!("🖱️ Mouse Move: ({}, {})", x, y);
                 }
             }
-
-            // Always pass through the event to the system
-            Some(event)
         });
 
         if let Err(error) = result {
