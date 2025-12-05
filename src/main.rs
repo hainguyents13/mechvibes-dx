@@ -12,8 +12,15 @@ use utils::constants::{ APP_NAME };
 use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
-use libs::input_manager::init_input_channels;
+use libs::focused_input_listener::start_focused_keyboard_listener;
+use libs::input_manager::{ init_input_channels, init_window_focus_state, get_window_focus_state };
 use std::sync::mpsc;
+
+#[cfg(target_os = "linux")]
+use libs::evdev_input_listener::start_evdev_keyboard_listener;
+
+#[cfg(target_os = "linux")]
+use std::sync::{Arc, Mutex};
 
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
@@ -94,12 +101,64 @@ fn main() {
     let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<String>();
 
-    // Initialize global input channels for UI to access
-    init_input_channels(keyboard_rx, mouse_rx, hotkey_rx);
+    // Clone senders for global access (for window-level keyboard events)
+    let keyboard_tx_clone = keyboard_tx.clone();
+    let mouse_tx_clone = mouse_tx.clone();
+    let hotkey_tx_clone = hotkey_tx.clone();
 
-    // Start the unified input listener early in main
-    debug_print!("🎮 Starting unified input listener from main...");
-    start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx);
+    // Initialize global input channels for UI to access (including senders for window events)
+    init_input_channels(keyboard_rx, mouse_rx, hotkey_rx, keyboard_tx_clone, mouse_tx_clone, hotkey_tx_clone);
+
+    // Initialize window focus state
+    init_window_focus_state();
+
+    // Detect display server on Linux
+    #[cfg(target_os = "linux")]
+    let display_server = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "x11".to_string());
+
+    #[cfg(target_os = "linux")]
+    debug_print!("🔍 Detected display server: {}", display_server);
+
+    // Start input listeners based on platform and display server
+    #[cfg(target_os = "linux")]
+    {
+        if display_server == "wayland" {
+            // On Wayland, use evdev for keyboard input (works both focused and unfocused)
+            // evdev also handles hotkey detection (Ctrl+Alt+M)
+            debug_print!("🎮 Starting evdev keyboard listener (Wayland mode)...");
+            let focus_state = get_window_focus_state();
+            start_evdev_keyboard_listener(keyboard_tx.clone(), hotkey_tx.clone(), focus_state);
+
+            // Use rdev for mouse events only (no keyboard/hotkeys on Wayland)
+            // Pass "always focused" state to prevent rdev from sending keyboard events
+            debug_print!("🎮 Starting unified input listener for mouse events (Wayland mode)...");
+            let always_focused = Arc::new(Mutex::new(true));
+            start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx, Some(always_focused));
+        } else {
+            // On X11, use the hybrid approach (rdev + device_query)
+            // rdev handles keyboard when unfocused, device_query when focused
+            let focus_state = get_window_focus_state();
+
+            debug_print!("🎮 Starting unified input listener (X11 mode - unfocused)...");
+            start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
+
+            debug_print!("🎮 Starting focused keyboard listener (X11 mode - focused)...");
+            start_focused_keyboard_listener(keyboard_tx, focus_state);
+        }
+    }
+
+    // On Windows and macOS, use the hybrid approach (rdev + device_query)
+    // rdev handles keyboard when unfocused, device_query when focused
+    #[cfg(not(target_os = "linux"))]
+    {
+        let focus_state = get_window_focus_state();
+
+        debug_print!("🎮 Starting unified input listener (unfocused)...");
+        start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
+
+        debug_print!("🎮 Starting focused keyboard listener (focused)...");
+        start_focused_keyboard_listener(keyboard_tx, focus_state);
+    }
 
     // Create window action channel
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
@@ -110,7 +169,7 @@ fn main() {
         .with_title(APP_NAME)
         .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_inner_size(LogicalSize::new(470, 750))
+        .with_inner_size(LogicalSize::new(470, 800))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
         .with_resizable(false) // Enable window resizing for landscape mode

@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{ navigator, use_route };
 use lucide_dioxus::{ House, Music, Palette, Settings, CloudSunRain };
 
 #[allow(non_snake_case)]

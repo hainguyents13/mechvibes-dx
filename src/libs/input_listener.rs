@@ -157,10 +157,14 @@ fn map_button_to_code(button: Button) -> &'static str {
 
 /// Start a unified input listener that handles both keyboard and mouse events
 /// This solves the issue where rdev can only have one global listener at a time
+///
+/// When is_focused is provided, keyboard events are only sent when the window is UNFOCUSED
+/// to avoid duplicate events with the focused_input_listener
 pub fn start_unified_input_listener(
     keyboard_tx: Sender<String>,
     mouse_tx: Sender<String>,
-    hotkey_tx: Sender<String>
+    hotkey_tx: Sender<String>,
+    is_focused: Option<Arc<Mutex<bool>>>,
 ) {
     println!("🎮 Starting unified input listener (keyboard + mouse + hotkeys)...");
 
@@ -176,15 +180,14 @@ pub fn start_unified_input_listener(
         // Track pressed modifier keys for hotkey detection
         let mut ctrl_pressed = false;
         let mut alt_pressed = false;
+
+        println!("🎮 Starting rdev::listen() - listening to keyboard/mouse events");
         let result = listen(move |event: Event| {
             match event.event_type {
                 // ===== KEYBOARD EVENTS =====
                 EventType::KeyPress(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        // println!("⌨️ Key Pressed: {}", key_code);
-                        // println!("🔍 DEBUG: Key event detected: {}", key_code);
-
                         // Track modifier keys for hotkey detection
                         match key_code {
                             "ControlLeft" | "ControlRight" => {
@@ -204,6 +207,14 @@ pub fn start_unified_input_listener(
                                 }
                             }
                             _ => {}
+                        }
+
+                        // If focus state is provided, only send keyboard events when UNFOCUSED
+                        // This prevents duplicate events with the focused_input_listener
+                        if let Some(ref focus_state) = is_focused {
+                            if *focus_state.lock().unwrap() {
+                                return; // Window is focused, skip keyboard event (focused_input_listener handles it)
+                            }
                         }
 
                         // Check if key is already pressed
@@ -231,8 +242,6 @@ pub fn start_unified_input_listener(
                 EventType::KeyRelease(key) => {
                     let key_code = map_key_to_code(key);
                     if !key_code.is_empty() {
-                        // println!("⌨️ Key Released: {}", key_code);
-
                         // Track modifier key releases for hotkey detection
                         match key_code {
                             "ControlLeft" | "ControlRight" => {
@@ -242,6 +251,13 @@ pub fn start_unified_input_listener(
                                 alt_pressed = false;
                             }
                             _ => {}
+                        }
+
+                        // If focus state is provided, only send keyboard events when UNFOCUSED
+                        if let Some(ref focus_state) = is_focused {
+                            if *focus_state.lock().unwrap() {
+                                return; // Window is focused, skip keyboard event
+                            }
                         }
 
                         // Remove key from pressed set

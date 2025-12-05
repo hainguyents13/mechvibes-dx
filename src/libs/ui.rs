@@ -2,7 +2,7 @@ use crate::components::window_controller::WindowController;
 use crate::components::header::Header;
 use crate::libs::routes::Route;
 use crate::libs::tray_service::request_tray_update;
-use crate::libs::input_manager::get_input_channels;
+use crate::libs::input_manager::{ get_input_channels, set_window_focus };
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::utils::delay;
@@ -10,8 +10,8 @@ use crate::utils::path;
 use crate::{ debug_print, always_eprint };
 
 use dioxus::prelude::*;
-use dioxus_router::prelude::Router;
-use dioxus::desktop::{ use_asset_handler, wry::http::Response };
+use dioxus::desktop::{ use_asset_handler, use_wry_event_handler, wry::http::Response };
+use dioxus::desktop::tao::event::{ Event as TaoEvent };
 use std::sync::Arc;
 
 pub fn app() -> Element {
@@ -60,7 +60,26 @@ pub fn app() -> Element {
     // Extract receivers from input channels
     let keyboard_rx = input_channels.keyboard_rx.clone();
     let mouse_rx = input_channels.mouse_rx.clone();
-    let hotkey_rx = input_channels.hotkey_rx.clone(); // Process keyboard events and update both audio and UI state
+    let hotkey_rx = input_channels.hotkey_rx.clone();
+
+    // ===== WINDOW FOCUS TRACKING =====
+    // Track window focus state to switch between rdev (unfocused) and device_query (focused)
+    // This is a hybrid approach to work around the rdev + Wry/Winit incompatibility on Windows
+    {
+        use dioxus::desktop::tao::event::WindowEvent;
+
+        use_wry_event_handler(move |event, _target| {
+            if let TaoEvent::WindowEvent { event: window_event, .. } = event {
+                // Check for focus events using proper pattern matching
+                if let WindowEvent::Focused(focused) = window_event {
+                    // Update global focus state
+                    set_window_focus(*focused);
+                }
+            }
+        });
+    }
+
+    // Process keyboard events and update both audio and UI state
     {
         let ctx = audio_context.clone();
         let keyboard_rx = keyboard_rx.clone();
