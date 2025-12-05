@@ -19,6 +19,9 @@ use std::sync::mpsc;
 #[cfg(target_os = "linux")]
 use libs::evdev_input_listener::start_evdev_keyboard_listener;
 
+#[cfg(target_os = "linux")]
+use std::sync::{Arc, Mutex};
+
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
@@ -126,8 +129,10 @@ fn main() {
             start_evdev_keyboard_listener(keyboard_tx.clone(), focus_state);
 
             // Use rdev for mouse events and hotkeys only (no keyboard events on Wayland)
+            // Pass "always focused" state to prevent rdev from sending keyboard events
             debug_print!("🎮 Starting unified input listener for mouse/hotkeys (Wayland mode)...");
-            start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx, None);
+            let always_focused = Arc::new(Mutex::new(true));
+            start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx, Some(always_focused));
         } else {
             // On X11, use the hybrid approach (rdev + device_query)
             // rdev handles keyboard when unfocused, device_query when focused

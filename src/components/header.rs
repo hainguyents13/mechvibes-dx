@@ -106,7 +106,7 @@ pub fn Header() -> Element {
 
         eval(&script);
     });
-    println!("🎨 Header: Rendering with stylesheet: {}", GLOBAL_STYLES);
+
     rsx! {
       // prettier-ignore
       document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
