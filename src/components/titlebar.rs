@@ -37,12 +37,12 @@ pub fn TitleBar() -> Element {
     let minimize = move |_| {
         window_minimize.set_minimized(true);
     };
-    rsx! {      
-      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300 to-transparent transition-all ",        
+    rsx! {
+      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300 to-transparent transition-all ",
       // Left side - app title and draggable area
         div {
           class: "flex items-center grow cursor-move px-3 py-2",
-          onmousedown: start_drag, 
+          onmousedown: start_drag,
           // App title
           span { class: "text-sm font-semibold text-base-content", "{APP_NAME}" }
           // Optional version badge
@@ -50,8 +50,8 @@ pub fn TitleBar() -> Element {
             "v{current_version}"
           }
         }
-        
-        
+
+
         // Right side - window controls
         div { class: "flex items-center space-x-2 px-3 py-2 pl-0",
           // Update notification (separate from draggable area)

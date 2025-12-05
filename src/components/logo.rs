@@ -18,7 +18,7 @@ pub fn Logo() -> Element {
 
     // Apply dynamic styling based on whether a key is pressed
     let base =
-        "logo select-none border-4 font-black block py-6 px-8 pt-7 text-5xl rounded-box transition-all duration-150 ease-in-out flex justify-center items-center ";
+        "logo select-none border-4 font-black py-6 px-8 pt-7 text-5xl rounded-box transition-all duration-150 ease-in-out flex justify-center items-center ";
 
     // Create dynamic styles - only apply custom colors if logo customization is enabled
     let dynamic_style = if enable_logo_customization() {
