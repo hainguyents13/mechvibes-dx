@@ -124,13 +124,14 @@ fn main() {
     {
         if display_server == "wayland" {
             // On Wayland, use evdev for keyboard input (works both focused and unfocused)
+            // evdev also handles hotkey detection (Ctrl+Alt+M)
             debug_print!("🎮 Starting evdev keyboard listener (Wayland mode)...");
             let focus_state = get_window_focus_state();
-            start_evdev_keyboard_listener(keyboard_tx.clone(), focus_state);
+            start_evdev_keyboard_listener(keyboard_tx.clone(), hotkey_tx.clone(), focus_state);
 
-            // Use rdev for mouse events and hotkeys only (no keyboard events on Wayland)
+            // Use rdev for mouse events only (no keyboard/hotkeys on Wayland)
             // Pass "always focused" state to prevent rdev from sending keyboard events
-            debug_print!("🎮 Starting unified input listener for mouse/hotkeys (Wayland mode)...");
+            debug_print!("🎮 Starting unified input listener for mouse events (Wayland mode)...");
             let always_focused = Arc::new(Mutex::new(true));
             start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx, Some(always_focused));
         } else {

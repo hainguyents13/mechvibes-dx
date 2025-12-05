@@ -8,13 +8,18 @@ use std::sync::mpsc::Sender;
 #[cfg(target_os = "linux")]
 pub fn start_evdev_keyboard_listener(
     keyboard_tx: Sender<String>,
+    hotkey_tx: Sender<String>,
     _is_focused: Arc<Mutex<bool>>,
 ) {
     thread::spawn(move || {
         use evdev::{Device, EventType, Key};
-        
+
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
-        
+
+        // Track modifier keys for hotkey detection
+        let mut ctrl_pressed = false;
+        let mut alt_pressed = false;
+
         // Find all keyboard devices
         let mut keyboards = Vec::new();
         
@@ -58,15 +63,51 @@ pub fn start_evdev_keyboard_listener(
                         for event in events {
                             if event.event_type() == EventType::KEY {
                                 let key_value = event.value();
-                                
-                                // Only process key press (value == 1), ignore release (0) and repeat (2)
-                                if key_value == 1 {
-                                    if let Ok(key) = Key::new(event.code()) {
-                                        let key_code = map_evdev_keycode(key);
-                                        if !key_code.is_empty() {
-                                            // Send key event without logging sensitive keystrokes
+
+                                if let Ok(key) = Key::new(event.code()) {
+                                    let key_code = map_evdev_keycode(key);
+                                    if !key_code.is_empty() {
+                                        // Handle key press (value == 1)
+                                        if key_value == 1 {
+                                            // Track modifier keys for hotkey detection
+                                            match key_code {
+                                                "ControlLeft" | "ControlRight" => {
+                                                    ctrl_pressed = true;
+                                                }
+                                                "AltLeft" | "AltRight" => {
+                                                    alt_pressed = true;
+                                                }
+                                                "KeyM" => {
+                                                    // Check for Ctrl+Alt+M hotkey combination
+                                                    if ctrl_pressed && alt_pressed {
+                                                        println!("🔥 [evdev] Hotkey detected: Ctrl+Alt+M - Toggling global sound");
+                                                        let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
+                                                        continue; // Don't process this as a regular key event
+                                                    }
+                                                }
+                                                _ => {}
+                                            }
+
+                                            // Send key press event
                                             let _ = keyboard_tx.send(key_code.to_string());
                                         }
+                                        // Handle key release (value == 0)
+                                        else if key_value == 0 {
+                                            // Track modifier key releases for hotkey detection
+                                            match key_code {
+                                                "ControlLeft" | "ControlRight" => {
+                                                    ctrl_pressed = false;
+                                                }
+                                                "AltLeft" | "AltRight" => {
+                                                    alt_pressed = false;
+                                                }
+                                                _ => {}
+                                            }
+
+                                            // Send key release event
+                                            let _ = keyboard_tx.send(format!("UP:{}", key_code));
+                                        }
+                                        // Ignore key repeat (value == 2)
                                     }
                                 }
                             }
