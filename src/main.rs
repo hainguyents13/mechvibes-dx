@@ -125,28 +125,32 @@ fn main() {
             let focus_state = get_window_focus_state();
             start_evdev_keyboard_listener(keyboard_tx.clone(), focus_state);
 
-            // Use rdev for mouse events and hotkeys
+            // Use rdev for mouse events and hotkeys only (no keyboard events on Wayland)
             debug_print!("🎮 Starting unified input listener for mouse/hotkeys (Wayland mode)...");
-            start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx);
+            start_unified_input_listener(keyboard_tx, mouse_tx, hotkey_tx, None);
         } else {
             // On X11, use the hybrid approach (rdev + device_query)
+            // rdev handles keyboard when unfocused, device_query when focused
+            let focus_state = get_window_focus_state();
+
             debug_print!("🎮 Starting unified input listener (X11 mode - unfocused)...");
-            start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx);
+            start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
 
             debug_print!("🎮 Starting focused keyboard listener (X11 mode - focused)...");
-            let focus_state = get_window_focus_state();
             start_focused_keyboard_listener(keyboard_tx, focus_state);
         }
     }
 
     // On Windows and macOS, use the hybrid approach (rdev + device_query)
+    // rdev handles keyboard when unfocused, device_query when focused
     #[cfg(not(target_os = "linux"))]
     {
+        let focus_state = get_window_focus_state();
+
         debug_print!("🎮 Starting unified input listener (unfocused)...");
-        start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx);
+        start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
 
         debug_print!("🎮 Starting focused keyboard listener (focused)...");
-        let focus_state = get_window_focus_state();
         start_focused_keyboard_listener(keyboard_tx, focus_state);
     }
 

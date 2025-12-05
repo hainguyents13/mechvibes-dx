@@ -93,16 +93,13 @@ pub fn app() -> Element {
                 loop {
                     if let Ok(receiver) = keyboard_rx.try_lock() {
                         if let Ok(keycode) = receiver.try_recv() {
-                            println!("🎵 UI received keyboard event: {}", keycode);
                             if keycode.starts_with("UP:") {
                                 let key = &keycode[3..];
-                                println!("🎵 Playing key release sound for: {}", key);
                                 ctx.play_key_event_sound(key, false);
 
                                 // Update keyboard state - key released
                                 keyboard_state.write().key_pressed = false;
                             } else if !keycode.is_empty() {
-                                println!("🎵 Playing key press sound for: {}", keycode);
                                 ctx.play_key_event_sound(&keycode, true);
                                 // Update keyboard state - key pressed
                                 let mut state = keyboard_state.write();
