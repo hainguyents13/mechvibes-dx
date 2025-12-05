@@ -63,9 +63,9 @@ pub fn Logo() -> Element {
     } else {
         // Default style - let CSS handle the default colors
         if !key_pressed && enable_sound() {
-            "box-shadow: 0 5px 0 var(--color-base-content); background: var(--color-base-200)".to_string()
+            "box-shadow: 0 5px 0 var(--color-primary); background: oklch(from var(--color-primary) l c h / 0.05)".to_string()
         } else {
-            "background: var(--color-base-200)".to_string()
+            "background: oklch(from var(--color-primary) l c h / 0.05)".to_string()
         }
     };
 
@@ -78,7 +78,7 @@ pub fn Logo() -> Element {
     let mut final_class = if enable_logo_customization() {
         class
     } else {
-        format!("{} border-base-content text-base-content bg-transparent", class)
+        format!("{} border-primary text-primary bg-transparent", class)
     };
 
     // Logo muted - add opacity when not using custom logo and sound is disabled

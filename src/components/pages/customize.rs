@@ -33,7 +33,7 @@ pub fn CustomizePage() -> Element {
           }),
         }
         // Settings sections
-        div { class: "space-y-4 mt-8", // Theme Section
+        div { class: "{crate::utils::spacing::SECTION_SPACING} mt-8", // Theme Section
           Collapse {
             title: "Themes".to_string(),
             group_name: "customize-accordion".to_string(),
@@ -46,24 +46,8 @@ pub fn CustomizePage() -> Element {
               ThemeToggler {}
             },
           }
-          Collapse {
-            title: "Logo".to_string(),
-            group_name: "customize-accordion".to_string(),
-            variant: "border border-base-300 bg-base-200 text-base-content",
-            content_class: "collapse-content overflow-visible text-base-content/70",
-            children: rsx! {
-              LogoCustomizationSection {}
-            },
-          }
-          Collapse {
-            title: "Background".to_string(),
-            group_name: "customize-accordion".to_string(),
-            variant: "border border-base-300 bg-base-200 text-base-content",
-            content_class: "collapse-content overflow-visible text-base-content/70",
-            children: rsx! {
-              BackgroundCustomizationSection {}
-            },
-          }
+          LogoCollapseSection {}
+          BackgroundCollapseSection {}
                 // Custom CSS Section
         // div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
         //   input { r#type: "radio", name: "customize-accordion" }
@@ -94,6 +78,44 @@ pub fn CustomizePage() -> Element {
         // }
         }
       }
+    }
+}
+
+#[component]
+fn LogoCollapseSection() -> Element {
+    let (config, _) = use_config();
+    let enable_logo_customization = use_memo(move || config().enable_logo_customization);
+
+    rsx! {
+        Collapse {
+            title: "Logo".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            show_indicator: enable_logo_customization(),
+            children: rsx! {
+                LogoCustomizationSection {}
+            },
+        }
+    }
+}
+
+#[component]
+fn BackgroundCollapseSection() -> Element {
+    let (config, _) = use_config();
+    let enable_background_customization = use_memo(move || config().enable_background_customization);
+
+    rsx! {
+        Collapse {
+            title: "Background".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            show_indicator: enable_background_customization(),
+            children: rsx! {
+                BackgroundCustomizationSection {}
+            },
+        }
     }
 }
 
@@ -153,20 +175,14 @@ fn LogoCustomizationPanel() -> Element {
     let mut saving = use_signal(|| false);
     // Theme-based color options using CSS variables
     let color_options = vec![
-        ("Base Content", "var(--color-base-content)"),
-        ("Base 100", "var(--color-base-100)"),
-        ("Base 200", "var(--color-base-200)"),
-        ("Base 300", "var(--color-base-300)"),
         ("Primary", "var(--color-primary)"),
         ("Primary Content", "var(--color-primary-content)"),
         ("Secondary", "var(--color-secondary)"),
         ("Secondary Content", "var(--color-secondary-content)"),
-        ("Accent", "var(--color-accent)"),
-        ("Accent Content", "var(--color-accent-content)"),
-        ("Neutral", "var(--color-neutral)"),
-        ("Neutral Content", "var(--color-neutral-content)"),
-        ("Info", "var(--color-info)"),
-        ("Info Content", "var(--color-info-content)"),
+        ("Base Content", "var(--color-base-content)"),
+        ("Base 100", "var(--color-base-100)"),
+        ("Base 200", "var(--color-base-200)"),
+        ("Base 300", "var(--color-base-300)"),
         ("Success", "var(--color-success)"),
         ("Success Content", "var(--color-success-content)"),
         ("Warning", "var(--color-warning)"),
@@ -515,20 +531,14 @@ fn BackgroundCustomizationPanel() -> Element {
 
     // Theme-based color options using CSS variables (same as logo)
     let color_options = vec![
-        ("Base Content", "var(--color-base-content)"),
-        ("Base 100", "var(--color-base-100)"),
-        ("Base 200", "var(--color-base-200)"),
-        ("Base 300", "var(--color-base-300)"),
         ("Primary", "var(--color-primary)"),
         ("Primary Content", "var(--color-primary-content)"),
         ("Secondary", "var(--color-secondary)"),
         ("Secondary Content", "var(--color-secondary-content)"),
-        ("Accent", "var(--color-accent)"),
-        ("Accent Content", "var(--color-accent-content)"),
-        ("Neutral", "var(--color-neutral)"),
-        ("Neutral Content", "var(--color-neutral-content)"),
-        ("Info", "var(--color-info)"),
-        ("Info Content", "var(--color-info-content)"),
+        ("Base Content", "var(--color-base-content)"),
+        ("Base 100", "var(--color-base-100)"),
+        ("Base 200", "var(--color-base-200)"),
+        ("Base 300", "var(--color-base-300)"),
         ("Success", "var(--color-success)"),
         ("Success Content", "var(--color-success-content)"),
         ("Warning", "var(--color-warning)"),

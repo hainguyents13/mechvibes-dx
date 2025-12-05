@@ -24,7 +24,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
     rsx! {
       div { class: "space-y-2",
         div { class: "flex items-center gap-2 text-sm font-bold text-base-content/80",
-          {props.icon}
+          span { class: "text-primary", {props.icon} }
           "{props.label}"
         }
         SoundpackDropdown { soundpack_type: props.soundpack_type }
@@ -203,7 +203,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
               // Search input
               div { class: "p-3 border-b border-base-200",
                 div { class: "relative",
-                  Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" }
+                  Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" }
                   input {
                     class: "input input-sm w-full px-4 py-2 text-base-content placeholder:text-base-content/40",
                     placeholder: "{search_placeholder}",
@@ -308,10 +308,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                 src: "{icon}",
                               }
                             } else {
-                              Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
+                              Music { class: "w-4 h-4 text-primary/50 bg-base-100" }
                             }
                           } else {
-                            Music { class: "w-4 h-4 text-base-content/50 bg-base-100" }
+                            Music { class: "w-4 h-4 text-primary/50 bg-base-100" }
                           }
                           if pack.folder_path == current() {
                             // Use folder_path for comparison

@@ -312,13 +312,13 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                             div { class: "space-y-2",
                                 // Unified device list (system default + hardware devices)
                                 for (device_id, device_name, badge_text, is_default) in all_audio_devices().iter() {
-                                    label { 
+                                    label {
                                         key: "{device_id}",
                                         class: "flex items-center gap-3 rounded-lg hover:bg-base-100 cursor-pointer transition-colors",
                                         input {
                                             r#type: "radio",
                                             name: "audio-device",
-                                            class: "radio radio-xs",
+                                            class: "radio radio-xs radio-primary",
                                             checked: if device_id == "default" {
                                                 current_selection().0.is_none()
                                             } else {

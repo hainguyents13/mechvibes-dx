@@ -164,15 +164,23 @@ fn main() {
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx);
 
-    // Create a WindowBuilder with custom appearance and responsive sizing
+    // Window dimensions - allow vertical resizing
+    let window_width = 470;
+    let min_height = 600;   // Minimum height for compact mode
+    let default_height = 820; // Default height
+    let max_height = 820;  // Maximum height
+
+    // Create a WindowBuilder with custom appearance and vertical resizing
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_inner_size(LogicalSize::new(470, 800))
+        .with_inner_size(LogicalSize::new(window_width, default_height))
+        .with_min_inner_size(LogicalSize::new(window_width, min_height))
+        .with_max_inner_size(LogicalSize::new(window_width, max_height))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
-        .with_resizable(false) // Enable window resizing for landscape mode
+        .with_resizable(true) // Enable vertical resizing
         .with_visible(!should_start_minimized) // Hide window if starting minimized
         .with_window_icon(load_icon()); // Set window icon for taskbar
 

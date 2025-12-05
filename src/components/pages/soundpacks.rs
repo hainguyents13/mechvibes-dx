@@ -120,7 +120,7 @@ pub fn Soundpacks() -> Element {
             Settings2 { class: "w-5 h-5 mr-2" }
             "Manage"
           }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 p-4",
+          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 {crate::utils::spacing::CARD_PADDING}",
             SoundpackManager {
               on_import_click: EventHandler::new(move |_| {
                   eval("soundpack_import_modal.showModal()");

@@ -106,8 +106,8 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
           Logo {}
         }
         // Main content for home page
-        div { class: "flex flex-col gap-2",
-          div { class: "space-y-3",
+        div { class: "flex flex-col {crate::utils::spacing::GAP_SPACING}",
+          div { class: "{crate::utils::spacing::SECTION_SPACING}",
             KeyboardSoundpackSelector {}
             KeyboardVolumeSlider {
               volume,
@@ -117,7 +117,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
             }
           }
           div { class: "divider m-0" }
-          div { class: "space-y-3",
+          div { class: "{crate::utils::spacing::SECTION_SPACING}",
             // Mouse soundpack selector and volume control
             MouseSoundpackSelector {}
             MouseVolumeSlider {
@@ -136,7 +136,7 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
             // Footer with credits
             div { class: "text-xs text-base-content/50",
               span { "Made with " }
-              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-error/70 fill-error/30" }
+              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-primary/70 fill-primary/30" }
               span { " by " }
               a {
                 href: "https://github.com/hainguyents13/mechvibes-dx",

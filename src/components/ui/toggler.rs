@@ -26,7 +26,7 @@ pub fn Toggler(props: TogglerProps) -> Element {
     let toggle_class = format!("toggle toggle-sm {}", if !props.variant.is_empty() {
         format!("toggle-{}", props.variant)
     } else {
-        String::new()
+        "toggle-primary".to_string()
     });
 
     rsx! {
