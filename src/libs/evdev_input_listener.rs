@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 #[cfg(target_os = "linux")]
 pub fn start_evdev_keyboard_listener(
     keyboard_tx: Sender<String>,
-    is_focused: Arc<Mutex<bool>>,
+    _is_focused: Arc<Mutex<bool>>,
 ) {
     thread::spawn(move || {
         use evdev::{Device, EventType, Key};
@@ -20,10 +20,16 @@ pub fn start_evdev_keyboard_listener(
         
         match evdev::enumerate().map(|t| t.collect::<Vec<_>>()) {
             Ok(devices) => {
-                for (path, device) in devices {
+                for (path, mut device) in devices {
                     // Check if device has keyboard capabilities
                     if device.supported_keys().is_some() {
                         println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+
+                        // Set device to non-blocking mode to prevent blocking on idle devices
+                        if let Err(e) = device.set_nonblocking(true) {
+                            eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
+                        }
+
                         keyboards.push(device);
                     }
                 }
