@@ -23,17 +23,18 @@ pub fn get_config_file_absolute() -> String {
     paths::data::config_json().to_string_lossy().to_string()
 }
 
-/// Get absolute path for soundpacks directory
+/// Get absolute path for soundpacks directory (built-in soundpacks)
 pub fn get_soundpacks_dir_absolute() -> String {
-    get_soundpacks_dir_path().to_string_lossy().to_string()
+    paths::soundpacks::get_builtin_soundpacks_dir()
+        .to_string_lossy()
+        .to_string()
 }
 
-/// Get soundpacks directory path
-fn get_soundpacks_dir_path() -> std::path::PathBuf {
-    std::env
-        ::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("soundpacks")
+/// Get absolute path for custom soundpacks directory (system app data)
+pub fn get_custom_soundpacks_dir_absolute() -> String {
+    paths::soundpacks::get_custom_soundpacks_dir()
+        .to_string_lossy()
+        .to_string()
 }
 
 // ===== FILE SYSTEM UTILITIES =====

@@ -4,14 +4,33 @@ use crate::state::{ app::use_state_trigger };
 use crate::utils::path::{ open_path, directory_exists };
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{ FolderOpen, Music, Plus, Trash };
+use lucide_dioxus::{ FolderOpen, Music, Plus, RefreshCw, Trash };
+use std::sync::Arc;
 
 use super::ConfirmDeleteModal;
 
 /// Open a soundpack folder in the system file manager
+/// Opens the specific soundpack folder
 fn open_soundpack_folder(soundpack_id: &str) -> Result<(), String> {
+    use std::path::PathBuf;
+
     let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
-    open_path(&soundpack_path).map_err(|e| format!("Failed to open soundpack folder: {}", e))
+
+    // Normalize path separators for Windows
+    let normalized_path = PathBuf::from(&soundpack_path);
+    let normalized_str = normalized_path.to_string_lossy().to_string();
+
+    println!("🔍 Opening soundpack folder:");
+    println!("   Soundpack ID: {}", soundpack_id);
+    println!("   Resolved path: {}", soundpack_path);
+    println!("   Normalized path: {}", normalized_str);
+
+    // Check if path exists
+    if !normalized_path.exists() {
+        return Err(format!("Soundpack folder does not exist: {}", normalized_str));
+    }
+
+    open_path(&normalized_str).map_err(|e| format!("Failed to open soundpack folder: {}", e))
 }
 
 /// Delete a soundpack directory and all its contents
@@ -41,6 +60,11 @@ pub fn SoundpackTable(
     // Search state
     let mut search_query = use_signal(String::new);
 
+    // Refresh state
+    let refreshing_soundpacks = use_signal(|| false);
+    let state_trigger = use_state_trigger();
+    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+
     // Filter soundpacks based on search query - computed every render to be reactive to props changes
     let query = search_query().to_lowercase();
     let filtered_soundpacks: Vec<SoundpackMetadata> = if query.is_empty() {
@@ -60,15 +84,58 @@ pub fn SoundpackTable(
             .collect()
     };
 
+    // Refresh handler
+    let refresh_soundpacks_cache = {
+        let audio_ctx_refresh = audio_ctx.clone();
+        let refreshing_soundpacks = refreshing_soundpacks.clone();
+        let state_trigger_clone = state_trigger.clone();
+        Callback::new(move |_| {
+            // Prevent multiple concurrent refreshes
+            if refreshing_soundpacks() {
+                println!("🔄 Refresh already in progress, skipping...");
+                return;
+            }
+
+            let audio_ctx = audio_ctx_refresh.clone();
+            let mut refreshing_soundpacks = refreshing_soundpacks.clone();
+            let state_trigger = state_trigger_clone.clone();
+
+            spawn(async move {
+                refreshing_soundpacks.set(true);
+                println!("🔄 Refreshing soundpack cache...");
+
+                // Reload soundpacks in audio context
+                crate::state::app::reload_current_soundpacks(&audio_ctx);
+
+                // Trigger state update to refresh UI
+                state_trigger.call(());
+
+                println!("✅ Soundpack cache refreshed");
+                refreshing_soundpacks.set(false);
+            });
+        })
+    };
+
     rsx! {
       div { class: "space-y-4",
         // Search field
         div { class: "flex items-center px-3 gap-2",
           input {
             class: "input input-sm w-full",
-            placeholder: "Search {soundpack_type.to_lowercase()} soundpacks...",
+            placeholder: "Search {soundpack_type.to_lowercase()} sound packs...",
             value: "{search_query}",
             oninput: move |evt| search_query.set(evt.value()),
+          }
+          button {
+            class: "btn btn-sm btn-ghost",
+            disabled: refreshing_soundpacks(),
+            onclick: refresh_soundpacks_cache,
+            title: "Refresh sound pack list",
+            if refreshing_soundpacks() {
+              span { class: "loading loading-spinner loading-xs" }
+            } else {
+              RefreshCw { class: "w-4 h-4" }
+            }
           }
           if let Some(add_handler) = on_add_click {
             button {
@@ -111,15 +178,31 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
 
     // Handlers for button clicks
     let on_open_folder = {
+        let folder_path = soundpack.folder_path.clone();
         let soundpack_id = soundpack.id.clone();
+        let soundpack_name = soundpack.name.clone();
         move |_| {
+            let folder_path = folder_path.clone();
             let soundpack_id = soundpack_id.clone();
+            let soundpack_name = soundpack_name.clone();
             spawn(async move {
-                match open_soundpack_folder(&soundpack_id) {
+                println!("🔍 Soundpack info:");
+                println!("   Name: {}", soundpack_name);
+                println!("   ID: {}", soundpack_id);
+                println!("   Folder path: {}", folder_path);
+
+                // Use folder_path if not empty, otherwise fall back to id
+                let path_to_use = if !folder_path.is_empty() {
+                    folder_path
+                } else {
+                    soundpack_id.clone()
+                };
+
+                match open_soundpack_folder(&path_to_use) {
                     Ok(_) =>
-                        println!("✅ Successfully opened folder for soundpack: {}", soundpack_id),
+                        println!("✅ Successfully opened folder for soundpack: {}", soundpack_name),
                     Err(e) =>
-                        eprintln!("❌ Failed to open folder for soundpack {}: {}", soundpack_id, e),
+                        eprintln!("❌ Failed to open folder for soundpack {}: {}", soundpack_name, e),
                 }
             });
         }

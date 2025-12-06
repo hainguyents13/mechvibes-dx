@@ -113,7 +113,7 @@ pub fn SoundpackImportModal(
                 let file_dialog = rfd::AsyncFileDialog
                     ::new()
                     .add_filter("ZIP Files", &["zip"])
-                    .set_title("Select Soundpack ZIP File")
+                    .set_title("Select Sound Pack ZIP File")
                     .pick_file().await;
 
                 let file_handle = match file_dialog {
@@ -181,7 +181,7 @@ pub fn SoundpackImportModal(
                 if check_soundpack_id_conflict(&soundpack_id, &soundpacks) {
                     error_step.set(ImportStep::CheckingConflicts);
                     error_message.set(
-                        format!("A soundpack with ID '{}' already exists.\nPlease remove the existing soundpack and try again.", soundpack_id)
+                        format!("A sound pack with ID '{}' already exists.\nPlease remove the existing sound pack and try again.", soundpack_id)
                     );
                     is_loading.set(false);
                     return; // Stop import process on conflict
@@ -216,6 +216,12 @@ pub fn SoundpackImportModal(
                 // Reload soundpacks in audio context
                 crate::state::app::reload_current_soundpacks(&audio_ctx);
 
+                // =============================================
+                // Step 6: Refreshing soundpack list
+                // =============================================
+                current_step.set(ImportStep::Refreshing);
+                delay::Delay::ms(500).await;
+
                 // Refresh the soundpack cache to show the new soundpack in the UI
                 println!("🔄 Triggering soundpack cache refresh after import...");
                 state_trigger.call(());
@@ -224,7 +230,7 @@ pub fn SoundpackImportModal(
                 on_import_success.call(());
 
                 // ============================================
-                // Step 6: Completed
+                // Step 7: Completed
                 // ============================================
                 current_step.set(ImportStep::Completed);
                 success_step.set(ImportStep::Completed);
@@ -248,12 +254,12 @@ pub fn SoundpackImportModal(
               "✕"
             }
           }
-          h3 { class: "font-bold text-lg mb-2", "Import soundpack" }
-          
+          h3 { class: "font-bold text-lg mb-2", "Import sound pack" }
+
           if *current_step.read() == ImportStep::Idle {
             div { class: "card border border-base-300 bg-base-200 text-sm p-4 space-y-4",
               div {
-                "To import a soundpack, select a ZIP file containing the soundpack structure as shown below:"
+                "To import a sound pack, select a ZIP file containing the sound pack structure as shown below:"
               }
               div { class: "bg-base-100 p-2 px-3 rounded-box font-mono text-base-content/70 text-xs space-x-1",
                 div { "soundpack-name.zip" }
@@ -268,7 +274,7 @@ pub fn SoundpackImportModal(
                 ul { class: "list list-disc text-xs ml-4 text-base-content/70 space-y-1",
                   li {
                     span { class: "kbd kbd-xs bg-base-100", "single" }
-                    " Use a single sound file to play for the entire soundpack."
+                    " Use a single sound file to play for the entire sound pack."
                   }
                   li {
                     span { class: "kbd kbd-xs bg-base-100", "multi" }
@@ -306,7 +312,7 @@ pub fn SoundpackImportModal(
                 }
                 ProgressStep {
                   step_number: 4,
-                  title: "Installing soundpacks".to_string(),
+                  title: "Installing sound pack".to_string(),
                   current_step: *current_step.read(),
                   error_message: if *error_step.read() == ImportStep::Installing { error_message.read().clone() } else { String::new() },
                   success_message: installation_success_message.read().clone(),
@@ -317,6 +323,13 @@ pub fn SoundpackImportModal(
                   current_step: *current_step.read(),
                   error_message: if *error_step.read() == ImportStep::Finalizing { error_message.read().clone() } else { String::new() },
                   success_message: finalization_success_message.read().clone(),
+                }
+                ProgressStep {
+                  step_number: 6,
+                  title: "Refreshing sound pack list".to_string(),
+                  current_step: *current_step.read(),
+                  error_message: if *error_step.read() == ImportStep::Refreshing { error_message.read().clone() } else { String::new() },
+                  success_message: String::new(),
                 }
               }
 
@@ -333,14 +346,14 @@ pub fn SoundpackImportModal(
           div { class: "modal-action mt-6",
             form { method: "dialog",
               button {
-                class: "btn btn-ghost",
+                class: "btn btn-sm btn-ghost",
                 disabled: *is_loading.read(),
                 onclick: handle_close,
                 "Close"
               }
             }
             button {
-              class: "btn btn-neutral",
+              class: "btn btn-sm btn-neutral",
               disabled: *is_loading.read(),
               onclick: handle_import_click,
               if *is_loading.read() == false {

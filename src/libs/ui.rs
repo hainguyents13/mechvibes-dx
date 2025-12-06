@@ -5,8 +5,8 @@ use crate::libs::tray_service::request_tray_update;
 use crate::libs::input_manager::{ get_input_channels, set_window_focus };
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
+use crate::state::paths;
 use crate::utils::delay;
-use crate::utils::path;
 use crate::{ debug_print, always_eprint };
 
 use dioxus::prelude::*;
@@ -234,23 +234,9 @@ pub fn app() -> Element {
             // Join device_type/soundpack_name to form the full soundpack_id
             let soundpack_id = format!("{}/{}", device_type, soundpack_name);
 
-            // Get the soundpack directory path using the correct function
-            let soundpacks_path = std::path::PathBuf::from(path::get_soundpacks_dir_absolute());
-            let image_path = soundpacks_path.join(&soundpack_id).join(filename);
-
-            // Security: Ensure the resolved path is still within soundpacks directory
-            if let Ok(canonical_path) = image_path.canonicalize() {
-                if let Ok(canonical_base) = soundpacks_path.canonicalize() {
-                    if !canonical_path.starts_with(&canonical_base) {
-                        let error_response = Response::builder()
-                            .status(403)
-                            .body(Vec::new())
-                            .unwrap();
-                        response.respond(error_response);
-                        return;
-                    }
-                }
-            }
+            // Get the soundpack directory path - supports both built-in and custom locations
+            let soundpack_dir = paths::soundpacks::soundpack_dir(&soundpack_id);
+            let image_path = std::path::PathBuf::from(&soundpack_dir).join(filename);
 
             if image_path.exists() {
                 // Read the file and determine content type
