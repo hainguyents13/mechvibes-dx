@@ -277,8 +277,8 @@ pub fn app() -> Element {
                     }
                 }
             }
-            // Add keyframes for spinner
-            style { "@keyframes spin {{ to {{ transform: rotate(360deg); }} }}" }
+            // Add keyframes for spinner animation
+            style { r#"@keyframes spin { to { transform: rotate(360deg); } }"# }
         }
 
         // Main app content

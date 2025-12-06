@@ -197,7 +197,7 @@ fn main() {
     // Create a WindowBuilder with custom appearance and vertical resizing
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
-        .with_transparent(true) // Disable transparency for better performance
+        .with_transparent(true) // Enable transparency for custom window styling
         .with_always_on_top(false) // Allow normal window behavior for taskbar
         .with_inner_size(LogicalSize::new(window_width, default_height))
         .with_min_inner_size(LogicalSize::new(window_width, min_height))
