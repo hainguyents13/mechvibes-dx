@@ -688,7 +688,7 @@ fn BackgroundCustomizationPanel() -> Element {
               input {
                 r#type: "text",
                 placeholder: "Enter image URL or path...",
-                class: "input w-full",
+                class: "input w-full input-sm",
                 value: background_image().unwrap_or_default(),
                 oninput: move |evt| {
                     let value = if evt.value().is_empty() { None } else { Some(evt.value()) };

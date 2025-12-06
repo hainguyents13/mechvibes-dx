@@ -1,8 +1,9 @@
 /// Centralized path definitions
 ///
 /// ## Path Structure
-/// - `data/` - Application data and configuration files
-/// - `soundpacks/` - Soundpack directories containing audio files and metadata
+/// - `data/` - Application data and configuration files (relative to app root)
+/// - `soundpacks/` - Soundpack directories containing audio files and metadata (relative to app root)
+/// - Custom images - Stored in system app data directory (e.g., %APPDATA%/MechvibesDX/custom_images)
 ///
 /// All paths are relative to the application executable directory unless specified otherwise.
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ fn get_app_root() -> &'static PathBuf {
 
 /// Application data directory paths
 pub mod data {
-    use super::get_app_root;
+    use super::{get_app_root, get_system_app_data_dir};
     use std::path::PathBuf;
 
     /// Application configuration file
@@ -40,8 +41,25 @@ pub mod data {
     }
 
     /// Custom images directory for user-uploaded images
+    /// Uses system app data directory (e.g., %APPDATA%/MechvibesDX/custom_images on Windows)
     pub fn custom_images_dir() -> PathBuf {
-        get_app_root().join("data").join("custom_images")
+        get_system_app_data_dir().join("custom_images")
+    }
+}
+
+/// Get the system app data directory for MechvibesDX
+/// Returns platform-specific app data directory:
+/// - Windows: %APPDATA%/MechvibesDX
+/// - macOS: ~/Library/Application Support/MechvibesDX
+/// - Linux: ~/.local/share/mechvibes-dx
+fn get_system_app_data_dir() -> PathBuf {
+    use directories::ProjectDirs;
+
+    if let Some(proj_dirs) = ProjectDirs::from("com", "hainguyents13", "MechvibesDX") {
+        proj_dirs.data_dir().to_path_buf()
+    } else {
+        // Fallback to app root if system directories not available
+        get_app_root().join("data")
     }
 }
 
