@@ -5,9 +5,9 @@ use tray_icon::{
     TrayIconBuilder,
 };
 use crate::utils::constants::APP_NAME;
-use image;
-use std::fs;
-use std::path::Path;
+
+// Embed the icon at compile time for cross-platform reliability
+const EMBEDDED_ICON: &[u8] = include_bytes!("../../assets/icon.ico");
 
 pub enum TrayMessage {
     Show,
@@ -74,8 +74,30 @@ impl TrayManager {
             ]
         )?;
 
-        // Load the icon from the specified path
-        let icon = load_icon_from_path("assets/icon.ico")?;
+        // Load the icon from embedded bytes for cross-platform reliability
+        let icon = match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                match Icon::from_rgba(rgba.into_raw(), width, height) {
+                    Ok(icon) => {
+                        println!("✅ Loaded embedded tray icon ({}x{})", width, height);
+                        icon
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to create tray icon from embedded data: {}", e);
+                        return Err(Box::new(e));
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to load embedded tray icon data: {}", e);
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Failed to load embedded icon: {}", e)
+                )));
+            }
+        };
 
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
@@ -183,20 +205,4 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
     }
 
     None
-}
-
-fn load_icon_from_path(path: &str) -> Result<Icon, Box<dyn std::error::Error>> {
-    if !Path::new(path).exists() {
-        return Err(format!("Icon file not found: {}", path).into());
-    }
-
-    // Read and decode the image
-    let img = image::open(path)?;
-    let img = img.to_rgba8();
-    let (width, height) = img.dimensions();
-    let rgba = img.into_raw();
-
-    // Create Icon from RGBA data
-    let icon = Icon::from_rgba(rgba, width, height)?;
-    Ok(icon)
 }

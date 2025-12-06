@@ -2,8 +2,68 @@ use crate::components::theme_toggler::ThemeToggler;
 use crate::components::ui::{ Collapse, ColorPicker, PageHeader, Toggler };
 use crate::utils::config::use_config;
 use crate::utils::delay;
+use crate::utils::path;
 use dioxus::prelude::*;
-use lucide_dioxus::{ Check, Palette, RotateCcw };
+use lucide_dioxus::{ Check, Palette, RotateCcw, Upload };
+
+/// Reusable image picker component with file dialog and URL input
+#[component]
+fn ImagePicker(
+    label: String,
+    value: Option<String>,
+    on_change: EventHandler<Option<String>>,
+    dialog_title: String,
+) -> Element {
+    rsx! {
+        div { class: "space-y-2",
+            div {
+                div { class: "text-sm font-medium text-base-content", "{label}" }
+                div { class: "text-xs text-base-content/50", "Select an image file or enter a URL" }
+            }
+            div { class: "flex gap-2",
+                input {
+                    r#type: "text",
+                    placeholder: "Enter image URL or path...",
+                    class: "input w-full input-sm",
+                    value: value.unwrap_or_default(),
+                    oninput: move |evt| {
+                        let new_value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                        on_change.call(new_value);
+                    },
+                }
+                button {
+                    class: "btn btn-neutral btn-sm",
+                    onclick: move |_| {
+                        let on_change = on_change.clone();
+                        let title = dialog_title.clone();
+                        spawn(async move {
+                            let file_dialog = rfd::AsyncFileDialog::new()
+                                .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                                .set_title(&title)
+                                .pick_file()
+                                .await;
+
+                            if let Some(file_handle) = file_dialog {
+                                let source_path = file_handle.path().to_string_lossy().to_string();
+
+                                // Copy image to custom images directory and get asset URL
+                                match path::copy_to_custom_images(&source_path) {
+                                    Ok(asset_url) => {
+                                        on_change.call(Some(asset_url));
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to copy image: {}", e);
+                                    }
+                                }
+                            }
+                        });
+                    },
+                    Upload { class: "w-4 h-4" }
+                }
+            }
+        }
+    }
+}
 
 #[component]
 pub fn CustomizePage() -> Element {
@@ -33,7 +93,7 @@ pub fn CustomizePage() -> Element {
           }),
         }
         // Settings sections
-        div { class: "space-y-4 mt-8", // Theme Section
+        div { class: "{crate::utils::spacing::SECTION_SPACING} mt-8", // Theme Section
           Collapse {
             title: "Themes".to_string(),
             group_name: "customize-accordion".to_string(),
@@ -46,24 +106,8 @@ pub fn CustomizePage() -> Element {
               ThemeToggler {}
             },
           }
-          Collapse {
-            title: "Logo".to_string(),
-            group_name: "customize-accordion".to_string(),
-            variant: "border border-base-300 bg-base-200 text-base-content",
-            content_class: "collapse-content overflow-visible text-base-content/70",
-            children: rsx! {
-              LogoCustomizationSection {}
-            },
-          }
-          Collapse {
-            title: "Background".to_string(),
-            group_name: "customize-accordion".to_string(),
-            variant: "border border-base-300 bg-base-200 text-base-content",
-            content_class: "collapse-content overflow-visible text-base-content/70",
-            children: rsx! {
-              BackgroundCustomizationSection {}
-            },
-          }
+          LogoCollapseSection {}
+          BackgroundCollapseSection {}
                 // Custom CSS Section
         // div { class: "collapse collapse-arrow border border-base-300 bg-base-200 text-base-content",
         //   input { r#type: "radio", name: "customize-accordion" }
@@ -94,6 +138,44 @@ pub fn CustomizePage() -> Element {
         // }
         }
       }
+    }
+}
+
+#[component]
+fn LogoCollapseSection() -> Element {
+    let (config, _) = use_config();
+    let enable_logo_customization = use_memo(move || config().enable_logo_customization);
+
+    rsx! {
+        Collapse {
+            title: "Logo".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            show_indicator: enable_logo_customization(),
+            children: rsx! {
+                LogoCustomizationSection {}
+            },
+        }
+    }
+}
+
+#[component]
+fn BackgroundCollapseSection() -> Element {
+    let (config, _) = use_config();
+    let enable_background_customization = use_memo(move || config().enable_background_customization);
+
+    rsx! {
+        Collapse {
+            title: "Background".to_string(),
+            group_name: "customize-accordion".to_string(),
+            variant: "border border-base-300 bg-base-200 text-base-content",
+            content_class: "collapse-content overflow-visible text-base-content/70",
+            show_indicator: enable_background_customization(),
+            children: rsx! {
+                BackgroundCustomizationSection {}
+            },
+        }
     }
 }
 
@@ -153,20 +235,14 @@ fn LogoCustomizationPanel() -> Element {
     let mut saving = use_signal(|| false);
     // Theme-based color options using CSS variables
     let color_options = vec![
-        ("Base Content", "var(--color-base-content)"),
-        ("Base 100", "var(--color-base-100)"),
-        ("Base 200", "var(--color-base-200)"),
-        ("Base 300", "var(--color-base-300)"),
         ("Primary", "var(--color-primary)"),
         ("Primary Content", "var(--color-primary-content)"),
         ("Secondary", "var(--color-secondary)"),
         ("Secondary Content", "var(--color-secondary-content)"),
-        ("Accent", "var(--color-accent)"),
-        ("Accent Content", "var(--color-accent-content)"),
-        ("Neutral", "var(--color-neutral)"),
-        ("Neutral Content", "var(--color-neutral-content)"),
-        ("Info", "var(--color-info)"),
-        ("Info Content", "var(--color-info-content)"),
+        ("Base Content", "var(--color-base-content)"),
+        ("Base 100", "var(--color-base-100)"),
+        ("Base 200", "var(--color-base-200)"),
+        ("Base 300", "var(--color-base-300)"),
         ("Success", "var(--color-success)"),
         ("Success Content", "var(--color-success-content)"),
         ("Warning", "var(--color-warning)"),
@@ -359,25 +435,11 @@ fn LogoCustomizationPanel() -> Element {
           }
           // Background Image Selector (shown when using image)
           if use_background_image() {
-            div { class: "space-y-2",
-              div {
-                div { class: "text-sm font-medium text-base-content",
-                  "Background Image"
-                }
-                div { class: "text-xs text-base-content/50",
-                  "Image upload feature coming soon!"
-                }
-              }
-              input {
-                r#type: "text",
-                placeholder: "Enter image URL or path...",
-                class: "input w-full input-sm",
-                value: background_image().unwrap_or_default(),
-                oninput: move |evt| {
-                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                    background_image.set(value);
-                },
-              }
+            ImagePicker {
+              label: "Background Image".to_string(),
+              value: background_image(),
+              on_change: move |value| background_image.set(value),
+              dialog_title: "Select Background Image".to_string(),
             }
           }
         }
@@ -408,25 +470,11 @@ fn LogoCustomizationPanel() -> Element {
           }
           // Muted Background Image Selector (shown when using image)
           if use_muted_background_image() {
-            div { class: "space-y-2",
-              div {
-                div { class: "text-sm font-medium text-base-content",
-                  "Image"
-                }
-                div { class: "text-xs text-base-content/50",
-                  "Image upload feature coming soon!"
-                }
-              }
-              input {
-                r#type: "text",
-                placeholder: "Enter image URL or path...",
-                class: "input w-full input-sm",
-                value: muted_background_image().unwrap_or_default(),
-                oninput: move |evt| {
-                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                    muted_background_image.set(value);
-                },
-              }
+            ImagePicker {
+              label: "Image".to_string(),
+              value: muted_background_image(),
+              on_change: move |value| muted_background_image.set(value),
+              dialog_title: "Select Muted Background Image".to_string(),
             }
           }
         }
@@ -515,20 +563,14 @@ fn BackgroundCustomizationPanel() -> Element {
 
     // Theme-based color options using CSS variables (same as logo)
     let color_options = vec![
-        ("Base Content", "var(--color-base-content)"),
-        ("Base 100", "var(--color-base-100)"),
-        ("Base 200", "var(--color-base-200)"),
-        ("Base 300", "var(--color-base-300)"),
         ("Primary", "var(--color-primary)"),
         ("Primary Content", "var(--color-primary-content)"),
         ("Secondary", "var(--color-secondary)"),
         ("Secondary Content", "var(--color-secondary-content)"),
-        ("Accent", "var(--color-accent)"),
-        ("Accent Content", "var(--color-accent-content)"),
-        ("Neutral", "var(--color-neutral)"),
-        ("Neutral Content", "var(--color-neutral-content)"),
-        ("Info", "var(--color-info)"),
-        ("Info Content", "var(--color-info-content)"),
+        ("Base Content", "var(--color-base-content)"),
+        ("Base 100", "var(--color-base-100)"),
+        ("Base 200", "var(--color-base-200)"),
+        ("Base 300", "var(--color-base-300)"),
         ("Success", "var(--color-success)"),
         ("Success Content", "var(--color-success-content)"),
         ("Warning", "var(--color-warning)"),
@@ -606,23 +648,11 @@ fn BackgroundCustomizationPanel() -> Element {
         }
         // Background Image Selector (shown when using image)
         if use_image() {
-          div { class: "space-y-2",
-            div {
-              div { class: "text-sm font-medium text-base-content", "Background Image" }
-              div { class: "text-xs text-base-content/50",
-                "Image upload feature coming soon!"
-              }
-            }
-            input {
-              r#type: "text",
-              placeholder: "Enter image URL or path...",
-              class: "input w-full",
-              value: background_image().unwrap_or_default(),
-              oninput: move |evt| {
-                  let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                  background_image.set(value);
-              },
-            }
+          ImagePicker {
+            label: "Background Image".to_string(),
+            value: background_image(),
+            on_change: move |value| background_image.set(value),
+            dialog_title: "Select Background Image".to_string(),
           }
         }
 

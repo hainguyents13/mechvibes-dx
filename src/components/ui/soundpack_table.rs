@@ -81,11 +81,11 @@ pub fn SoundpackTable(
         }
         if soundpacks.is_empty() {
           div { class: "p-4 text-center text-sm text-base-content/70",
-            "No {soundpack_type} soundpack found. You can add new soundpacks by clicking the 'Add' button above."
+            "No {soundpack_type} sound pack found. You can add new sound packs by clicking the 'Add' button above."
           }
         } else {
           // Table
-          div { class: "overflow-x-auto max-h-[calc(100vh-470px)]",
+          div { class: "overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)] -mb-1",
             if filtered_soundpacks.is_empty() {
               div { class: "p-4 text-center text-sm text-base-content/70",
                 "No result match your search!"

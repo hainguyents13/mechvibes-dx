@@ -35,3 +35,9 @@ node_modules
 !/soundpacks/mouse/ping/
 !/soundpacks/mouse/vibrate/
 !/soundpacks/mouse/wooden/
+
+.serena
+.opencode
+.claude
+plans
+.augment

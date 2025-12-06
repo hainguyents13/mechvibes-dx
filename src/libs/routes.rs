@@ -25,6 +25,7 @@ pub fn Layout() -> Element {
 
     // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
+    println!("🎨 Layout rendering with theme: {:?} -> DaisyUI: {}", theme(), daisy_theme);
 
     // Get background customization settings (reactive to config changes)
     let background_style = use_memo(move || {
@@ -56,7 +57,7 @@ pub fn Layout() -> Element {
         crate::components::titlebar::TitleBar {}
 
         // Main content area with padding to account for title bar
-        div { class: "flex-1 overflow-auto pb-28 px-8 pt-20 py-12",
+        div { class: "flex-1 overflow-auto {crate::utils::spacing::CONTENT_PADDING}",
           // Outlet for nested routes
           Outlet::<Route> {}
         }

@@ -52,7 +52,7 @@ fn MusicPlayerPanel(
     let is_next_track_loading = use_signal(|| false);
 
     rsx! {
-      div { class: "bg-base-200 border border-base-300 rounded-box p-6 space-y-4 relative overflow-hidden",
+      div { class: "bg-base-200 border border-base-300 rounded-box p-4 space-y-4 relative overflow-hidden",
         if is_loading() {
           div { class: "text-center py-4",
             span { class: "loading loading-spinner loading-md" }
@@ -246,11 +246,13 @@ fn SoundSelectionPanel(
           }
         }
         // Sound Selection List
-        div { class: "space-y-3",
+        div { class: "{crate::utils::spacing::SECTION_SPACING}",
           for sound in ambiance_player().sounds.iter() {
             div {
               class: format!(
-                  " rounded-box border p-4 space-y-3 {}",
+                  " rounded-box border {} {} {}",
+                  crate::utils::spacing::CARD_PADDING,
+                  crate::utils::spacing::SECTION_SPACING,
                   if ambiance_player().is_sound_active(&sound.id) {
                       "bg-base-100 border-base-100"
                   } else {
@@ -310,7 +312,7 @@ fn SoundSelectionPanel(
                 div { class: "flex-shrink-0",
                   input {
                     r#type: "checkbox",
-                    class: "toggle toggle-xs",
+                    class: "toggle toggle-xs toggle-primary",
                     checked: ambiance_player().is_sound_active(&sound.id),
                     onchange: {
                         let sound_id = sound.id.clone();
@@ -436,7 +438,7 @@ pub fn MoodPage() -> Element {
     });
 
     rsx! {
-      div { class: "space-y-6",
+      div { class: "{crate::utils::spacing::SECTION_SPACING_LG}",
         PageHeader {
           title: "Mood".to_string(),
           subtitle: "Music and ambient sounds to set the perfect atmosphere".to_string(),

@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{ navigator, use_route };
 use lucide_dioxus::{ House, Music, Palette, Settings, CloudSunRain };
 
 #[allow(non_snake_case)]
@@ -25,7 +24,7 @@ pub fn Dock() -> Element {
               nav.push("/soundpacks");
           },
           Music { class: "w-5 h-5" }
-          span { class: "dock-label mt-1", "Soundpacks" }
+          span { class: "dock-label mt-1", "Sound packs" }
         }
         // Button Customize
         button {

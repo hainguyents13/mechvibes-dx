@@ -59,7 +59,7 @@ pub fn SettingsPage() -> Element {
             default_open: true,
             content_class: "collapse-content text-sm",
             children: rsx! {
-              div { class: "space-y-6",
+              div { class: "{crate::utils::spacing::SECTION_SPACING_LG}",
                 // Volume Control
                 Toggler {
                   title: "Enable all sounds".to_string(),

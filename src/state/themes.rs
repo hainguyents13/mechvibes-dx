@@ -38,7 +38,7 @@ impl ThemesConfig {
 
         // Ensure data directory exists
         if let Some(parent) = themes_path.parent() {
-            if let Err(e) = path::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path::ensure_directory_exists(parent) {
                 eprintln!("Warning: Could not create themes data directory: {}", e);
             }
         }
@@ -68,7 +68,7 @@ impl ThemesConfig {
 
         // Ensure the data directory exists
         if let Some(parent) = themes_path.parent() {
-            path::ensure_directory_exists(&parent.to_string_lossy())
+            path::ensure_directory_exists(parent)
                 .map_err(|e| format!("Failed to create data directory: {}", e))?;
         }
 
