@@ -3,7 +3,7 @@ use crate::components::ui::{ Collapse, ColorPicker, PageHeader, Toggler };
 use crate::utils::config::use_config;
 use crate::utils::delay;
 use dioxus::prelude::*;
-use lucide_dioxus::{ Check, Palette, RotateCcw };
+use lucide_dioxus::{ Check, Palette, RotateCcw, Upload };
 
 #[component]
 pub fn CustomizePage() -> Element {
@@ -381,18 +381,39 @@ fn LogoCustomizationPanel() -> Element {
                   "Background Image"
                 }
                 div { class: "text-xs text-base-content/50",
-                  "Image upload feature coming soon!"
+                  "Select an image file or enter a URL"
                 }
               }
-              input {
-                r#type: "text",
-                placeholder: "Enter image URL or path...",
-                class: "input w-full input-sm",
-                value: background_image().unwrap_or_default(),
-                oninput: move |evt| {
-                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                    background_image.set(value);
-                },
+              div { class: "flex gap-2",
+                input {
+                  r#type: "text",
+                  placeholder: "Enter image URL or path...",
+                  class: "input w-full input-sm",
+                  value: background_image().unwrap_or_default(),
+                  oninput: move |evt| {
+                      let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                      background_image.set(value);
+                  },
+                }
+                button {
+                  class: "btn btn-neutral btn-sm",
+                  onclick: move |_| {
+                      let mut bg_image = background_image.clone();
+                      spawn(async move {
+                          let file_dialog = rfd::AsyncFileDialog::new()
+                              .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                              .set_title("Select Background Image")
+                              .pick_file()
+                              .await;
+
+                          if let Some(file_handle) = file_dialog {
+                              let file_path = file_handle.path().to_string_lossy().to_string();
+                              bg_image.set(Some(file_path));
+                          }
+                      });
+                  },
+                  Upload { class: "w-4 h-4" }
+                }
               }
             }
           }
@@ -430,18 +451,39 @@ fn LogoCustomizationPanel() -> Element {
                   "Image"
                 }
                 div { class: "text-xs text-base-content/50",
-                  "Image upload feature coming soon!"
+                  "Select an image file or enter a URL"
                 }
               }
-              input {
-                r#type: "text",
-                placeholder: "Enter image URL or path...",
-                class: "input w-full input-sm",
-                value: muted_background_image().unwrap_or_default(),
-                oninput: move |evt| {
-                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                    muted_background_image.set(value);
-                },
+              div { class: "flex gap-2",
+                input {
+                  r#type: "text",
+                  placeholder: "Enter image URL or path...",
+                  class: "input w-full input-sm",
+                  value: muted_background_image().unwrap_or_default(),
+                  oninput: move |evt| {
+                      let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                      muted_background_image.set(value);
+                  },
+                }
+                button {
+                  class: "btn btn-neutral btn-sm",
+                  onclick: move |_| {
+                      let mut muted_bg_image = muted_background_image.clone();
+                      spawn(async move {
+                          let file_dialog = rfd::AsyncFileDialog::new()
+                              .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                              .set_title("Select Muted Background Image")
+                              .pick_file()
+                              .await;
+
+                          if let Some(file_handle) = file_dialog {
+                              let file_path = file_handle.path().to_string_lossy().to_string();
+                              muted_bg_image.set(Some(file_path));
+                          }
+                      });
+                  },
+                  Upload { class: "w-4 h-4" }
+                }
               }
             }
           }
@@ -620,18 +662,39 @@ fn BackgroundCustomizationPanel() -> Element {
             div {
               div { class: "text-sm font-medium text-base-content", "Background Image" }
               div { class: "text-xs text-base-content/50",
-                "Image upload feature coming soon!"
+                "Select an image file or enter a URL"
               }
             }
-            input {
-              r#type: "text",
-              placeholder: "Enter image URL or path...",
-              class: "input w-full",
-              value: background_image().unwrap_or_default(),
-              oninput: move |evt| {
-                  let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                  background_image.set(value);
-              },
+            div { class: "flex gap-2",
+              input {
+                r#type: "text",
+                placeholder: "Enter image URL or path...",
+                class: "input w-full",
+                value: background_image().unwrap_or_default(),
+                oninput: move |evt| {
+                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                    background_image.set(value);
+                },
+              }
+              button {
+                class: "btn btn-neutral btn-sm",
+                onclick: move |_| {
+                    let mut bg_image = background_image.clone();
+                    spawn(async move {
+                        let file_dialog = rfd::AsyncFileDialog::new()
+                            .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                            .set_title("Select Background Image")
+                            .pick_file()
+                            .await;
+
+                        if let Some(file_handle) = file_dialog {
+                            let file_path = file_handle.path().to_string_lossy().to_string();
+                            bg_image.set(Some(file_path));
+                        }
+                    });
+                },
+                Upload { class: "w-4 h-4" }
+              }
             }
           }
         }
