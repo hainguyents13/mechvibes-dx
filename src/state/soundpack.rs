@@ -178,7 +178,7 @@ impl SoundpackCache {
 
         // Ensure parent directory exists
         if let Some(parent) = Path::new(&cache_file).parent() {
-            if let Err(e) = path::ensure_directory_exists(&parent.to_string_lossy()) {
+            if let Err(e) = path::ensure_directory_exists(parent) {
                 eprintln!("⚠️  Failed to create cache directory: {}", e);
                 return;
             }

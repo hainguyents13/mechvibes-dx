@@ -4,6 +4,7 @@
 /// - `data/` - Application data and configuration files (relative to app root)
 /// - `soundpacks/` - Built-in soundpack directories (relative to app root)
 /// - Custom soundpacks - Stored in system app data directory (e.g., %APPDATA%/Mechvibes/soundpacks)
+/// - Custom images - Stored in system app data directory (e.g., %APPDATA%/Mechvibes/custom_images)
 ///
 /// All paths are relative to the application executable directory unless specified otherwise.
 use std::path::PathBuf;
@@ -33,7 +34,7 @@ fn get_system_app_data_dir() -> PathBuf {
 
 /// Application data directory paths
 pub mod data {
-    use super::get_app_root;
+    use super::{get_app_root, get_system_app_data_dir};
     use std::path::PathBuf;
 
     /// Application configuration file
@@ -54,6 +55,12 @@ pub mod data {
     /// Soundpack cache file
     pub fn soundpack_cache_json() -> PathBuf {
         get_app_root().join("data").join("soundpack_cache.json")
+    }
+
+    /// Custom images directory for user-uploaded images
+    /// Uses system app data directory (e.g., %APPDATA%/Mechvibes/custom_images on Windows)
+    pub fn custom_images_dir() -> PathBuf {
+        get_system_app_data_dir().join("custom_images")
     }
 }
 

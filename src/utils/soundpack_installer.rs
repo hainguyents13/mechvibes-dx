@@ -128,7 +128,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
 
     // Create installation directory
     path
-        ::ensure_directory_exists(&install_dir.to_string_lossy())
+        ::ensure_directory_exists(&install_dir)
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
     // Extract all files
@@ -163,7 +163,7 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
         // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
             path
-                ::ensure_directory_exists(&parent.to_string_lossy())
+                ::ensure_directory_exists(parent)
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
@@ -280,7 +280,7 @@ pub fn extract_and_install_soundpack_with_type(
 
     // Create installation directory
     path
-        ::ensure_directory_exists(&install_dir.to_string_lossy())
+        ::ensure_directory_exists(&install_dir)
         .map_err(|e| format!("Failed to create soundpack directory: {}", e))?;
 
     // Extract all files
@@ -311,7 +311,7 @@ pub fn extract_and_install_soundpack_with_type(
         // Create parent directory if needed
         if let Some(parent) = output_path.parent() {
             path
-                ::ensure_directory_exists(&parent.to_string_lossy())
+                ::ensure_directory_exists(parent)
                 .map_err(|e| format!("Failed to create parent directory: {}", e))?;
         }
 
