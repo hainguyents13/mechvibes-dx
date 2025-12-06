@@ -122,8 +122,9 @@ pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, S
     let soundpack_type = if is_mouse_soundpack { "mouse" } else { "keyboard" };
 
     // Determine installation directory using soundpack type and ID
-    let soundpacks_dir = path::get_soundpacks_dir_absolute();
-    let install_dir = Path::new(&soundpacks_dir).join(soundpack_type).join(&soundpack_id);
+    // Custom soundpacks go to system app data directory
+    let soundpacks_dir = crate::state::paths::soundpacks::get_custom_soundpacks_dir();
+    let install_dir = soundpacks_dir.join(soundpack_type).join(&soundpack_id);
 
     // Create installation directory
     path
@@ -273,8 +274,9 @@ pub fn extract_and_install_soundpack_with_type(
     };
 
     // Determine installation directory using soundpack type and ID
-    let soundpacks_dir = path::get_soundpacks_dir_absolute();
-    let install_dir = Path::new(&soundpacks_dir).join(soundpack_type).join(&soundpack_id);
+    // Custom soundpacks go to system app data directory
+    let soundpacks_dir = crate::state::paths::soundpacks::get_custom_soundpacks_dir();
+    let install_dir = soundpacks_dir.join(soundpack_type).join(&soundpack_id);
 
     // Create installation directory
     path

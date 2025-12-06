@@ -199,16 +199,25 @@ impl SoundpackCache {
         self.soundpacks.insert(metadata.id.clone(), metadata);
     } // Refresh cache by scanning soundpacks directory
     pub fn refresh_from_directory(&mut self) {
-        println!("📂 Scanning soundpacks directory...");
+        println!("📂 Scanning soundpacks directories...");
 
-        let soundpacks_dir = path::get_soundpacks_dir_absolute();
         self.soundpacks.clear(); // Clear all existing entries
 
-        // Scan keyboard soundpacks
-        self.scan_soundpack_type(&soundpacks_dir, "keyboard", false);
+        // Scan built-in soundpacks (app root)
+        let builtin_soundpacks_dir = paths::soundpacks::get_builtin_soundpacks_dir()
+            .to_string_lossy()
+            .to_string();
+        println!("📂 Scanning built-in soundpacks in: {}", builtin_soundpacks_dir);
+        self.scan_soundpack_type(&builtin_soundpacks_dir, "keyboard", false);
+        self.scan_soundpack_type(&builtin_soundpacks_dir, "mouse", true);
 
-        // Scan mouse soundpacks
-        self.scan_soundpack_type(&soundpacks_dir, "mouse", true);
+        // Scan custom soundpacks (system app data)
+        let custom_soundpacks_dir = paths::soundpacks::get_custom_soundpacks_dir()
+            .to_string_lossy()
+            .to_string();
+        println!("📂 Scanning custom soundpacks in: {}", custom_soundpacks_dir);
+        self.scan_soundpack_type(&custom_soundpacks_dir, "keyboard", false);
+        self.scan_soundpack_type(&custom_soundpacks_dir, "mouse", true);
 
         // Update count based on loaded soundpacks
         self.update_count();
