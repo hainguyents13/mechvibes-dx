@@ -15,6 +15,18 @@ use dioxus::desktop::tao::event::{ Event as TaoEvent };
 use std::sync::Arc;
 
 pub fn app() -> Element {
+    // Loading state to prevent FOUC
+    let mut is_loading = use_signal(|| true);
+
+    // Hide content until CSS loads
+    use_effect(move || {
+        spawn(async move {
+            // Wait for CSS to load
+            futures_timer::Delay::new(std::time::Duration::from_millis(100)).await;
+            is_loading.set(false);
+        });
+    });
+
     // Get input channels from global state (initialized in main)
     let input_channels = get_input_channels();
 
@@ -250,6 +262,26 @@ pub fn app() -> Element {
     });
 
     rsx! {
+        // Loading overlay (shown while CSS loads)
+        if is_loading() {
+            div {
+                style: "position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background: #1a1a1a;",
+                div {
+                    style: "display: flex; flex-direction: column; align-items: center; gap: 1rem;",
+                    div {
+                        style: "width: 3rem; height: 3rem; border: 4px solid rgba(255, 255, 255, 0.2); border-top-color: rgba(255, 255, 255, 0.9); border-radius: 50%; animation: spin 1s linear infinite;",
+                    }
+                    div {
+                        style: "font-size: 0.875rem; font-weight: 500; color: rgba(255, 255, 255, 0.7);",
+                        "Loading..."
+                    }
+                }
+            }
+            // Add keyframes for spinner animation
+            style { "@keyframes spin {{ to {{ transform: rotate(360deg); }} }}" }
+        }
+
+        // Main app content
         // prettier-ignore
         WindowController {}
         // prettier-ignore

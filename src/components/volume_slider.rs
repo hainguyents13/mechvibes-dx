@@ -52,23 +52,21 @@ fn VolumeSliderBase(
           span {
             class: format!(
                 "font-bold ml-1 {}",
-                if enable_sound() { 
-                    if enable_volume_boost() && volume() > 1.0 {
-                        "text-warning"
-                    } else {
-                        "text-base-content"
-                    }
-                } else { 
-                    "text-base-content/50" 
+                if enable_volume_boost() && volume() > 1.0 {
+                    "text-warning"
+                } else if enable_sound() {
+                    "text-base-content"
+                } else {
+                    "text-base-content/50"
                 },
             ),
             "{volume_percentage}%"
           }
         }
-        div { 
-          class: format!("{} flex items-center gap-2", if !enable_volume_boost() { "col-span-8" } else { "col-span-10" }),         
+        div {
+          class: format!("{} flex items-center gap-2", if !enable_volume_boost() { "col-span-8" } else { "col-span-10" }),
           input {
-            class: format!("range range-xs grow {}", if volume() > 1.0 { "range-warning" } else { "" }),
+            class: format!("range range-xs grow {}", if volume() > 1.0 { "range-warning" } else { "range-primary" }),
             r#type: "range",
             min: 0.0,
             max: max_volume,

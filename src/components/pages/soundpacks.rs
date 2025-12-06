@@ -49,8 +49,8 @@ pub fn Soundpacks() -> Element {
       div { class: "",
         // Page header
         PageHeader {
-          title: "Soundpacks".to_string(),
-          subtitle: "Manage your soundpacks".to_string(),
+          title: "Sound Packs".to_string(),
+          subtitle: "Manage your sound packs".to_string(),
           icon: Some(rsx! {
             Music { class: "w-8 h-8 mx-auto" }
           }),
@@ -120,7 +120,7 @@ pub fn Soundpacks() -> Element {
             Settings2 { class: "w-5 h-5 mr-2" }
             "Manage"
           }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 p-4",
+          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 {crate::utils::spacing::CARD_PADDING}",
             SoundpackManager {
               on_import_click: EventHandler::new(move |_| {
                   eval("soundpack_import_modal.showModal()");

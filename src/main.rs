@@ -13,7 +13,7 @@ use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
 use libs::focused_input_listener::start_focused_keyboard_listener;
-use libs::input_manager::{ init_input_channels, init_window_focus_state, get_window_focus_state };
+use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value, get_window_focus_state };
 use std::sync::mpsc;
 
 #[cfg(target_os = "linux")]
@@ -27,23 +27,38 @@ const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     // Try to create icon from embedded ICO data
+    // Windows taskbar works best with 32x32 icons
     match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
         Ok(img) => {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            match dioxus::desktop::tao::window::Icon::from_rgba(rgba.into_raw(), width, height) {
+            debug_print!("📐 Loaded icon from ICO: {}x{}", width, height);
+
+            // Always resize to 32x32 for maximum Windows taskbar compatibility
+            // This is the standard size Windows expects for taskbar icons
+            let target_size = 32u32;
+
+            let final_rgba = if width != target_size || height != target_size {
+                debug_print!("🔄 Resizing icon from {}x{} to {}x{} for Windows taskbar", width, height, target_size, target_size);
+                image::imageops::resize(&rgba, target_size, target_size, image::imageops::FilterType::Lanczos3)
+            } else {
+                debug_print!("✅ Icon already at optimal size ({}x{})", width, height);
+                rgba
+            };
+
+            match dioxus::desktop::tao::window::Icon::from_rgba(final_rgba.into_raw(), target_size, target_size) {
                 Ok(icon) => {
-                    debug_print!("✅ Loaded embedded ICO icon ({}x{})", width, height);
+                    debug_print!("✅ Successfully created window icon ({}x{})", target_size, target_size);
                     Some(icon)
                 }
                 Err(e) => {
-                    always_eprint!("❌ Failed to create icon from embedded ICO data: {}", e);
+                    always_eprint!("❌ Failed to create window icon from RGBA data: {}", e);
                     None
                 }
             }
         }
         Err(e) => {
-            debug_eprint!("❌ Failed to load embedded ICO data: {}", e);
+            always_eprint!("❌ Failed to load embedded ICO data: {}", e);
             None
         }
     }
@@ -110,7 +125,10 @@ fn main() {
     init_input_channels(keyboard_rx, mouse_rx, hotkey_rx, keyboard_tx_clone, mouse_tx_clone, hotkey_tx_clone);
 
     // Initialize window focus state
-    init_window_focus_state();
+    // If window starts visible (not minimized), it will be focused
+    let initial_focus_state = !should_start_minimized;
+    init_window_focus_state_with_value(initial_focus_state);
+    debug_print!("🔍 Initial window focus state: {}", if initial_focus_state { "FOCUSED" } else { "UNFOCUSED" });
 
     // Detect display server on Linux
     #[cfg(target_os = "linux")]
@@ -164,17 +182,31 @@ fn main() {
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx);
 
-    // Create a WindowBuilder with custom appearance and responsive sizing
+    // Window dimensions - allow vertical resizing
+    let window_width = 470;
+    let min_height = 600;   // Minimum height for compact mode
+    let default_height = 820; // Default height
+    let max_height = 820;  // Maximum height
+
+    // Load icon before creating window
+    let window_icon = load_icon();
+    if window_icon.is_none() {
+        always_eprint!("⚠️ Warning: Failed to load window icon - taskbar icon may not appear");
+    }
+
+    // Create a WindowBuilder with custom appearance and vertical resizing
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
-        .with_transparent(true) // Disable transparency for better performance
+        .with_transparent(true) // Enable transparency for custom window styling
         .with_always_on_top(false) // Allow normal window behavior for taskbar
-        .with_inner_size(LogicalSize::new(470, 800))
+        .with_inner_size(LogicalSize::new(window_width, default_height))
+        .with_min_inner_size(LogicalSize::new(window_width, min_height))
+        .with_max_inner_size(LogicalSize::new(window_width, max_height))
         .with_fullscreen(None)
         .with_decorations(false) // Use custom title bar
-        .with_resizable(false) // Enable window resizing for landscape mode
+        .with_resizable(true) // Enable vertical resizing
         .with_visible(!should_start_minimized) // Hide window if starting minimized
-        .with_window_icon(load_icon()); // Set window icon for taskbar
+        .with_window_icon(window_icon); // Set window icon for taskbar
 
     // Create config with our window settings and custom protocol handlers
     let config = Config::new().with_window(window_builder).with_menu(None);

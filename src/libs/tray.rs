@@ -6,6 +6,9 @@ use tray_icon::{
 };
 use crate::utils::constants::APP_NAME;
 
+// Embed the icon at compile time for cross-platform reliability
+const EMBEDDED_ICON: &[u8] = include_bytes!("../../assets/icon.ico");
+
 pub enum TrayMessage {
     Show,
     Exit,
@@ -71,8 +74,30 @@ impl TrayManager {
             ]
         )?;
 
-        // Load the icon from the specified path
-        let icon = Icon::from_path("assets/icon.ico", Some((32, 32))).expect("Failed to load icon");
+        // Load the icon from embedded bytes for cross-platform reliability
+        let icon = match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                match Icon::from_rgba(rgba.into_raw(), width, height) {
+                    Ok(icon) => {
+                        println!("✅ Loaded embedded tray icon ({}x{})", width, height);
+                        icon
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to create tray icon from embedded data: {}", e);
+                        return Err(Box::new(e));
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to load embedded tray icon data: {}", e);
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Failed to load embedded icon: {}", e)
+                )));
+            }
+        };
 
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()

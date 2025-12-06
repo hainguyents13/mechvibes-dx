@@ -62,10 +62,10 @@ pub fn ThemeToggler() -> Element {
                             if is_active { "opacity-30" } else { "" },
                         ),
                         "data-theme": builtin_theme_clone.to_daisy_theme(),
-                        div { class: "bg-base-content size-2 rounded-full" }
                         div { class: "bg-primary size-2 rounded-full" }
                         div { class: "bg-secondary size-2 rounded-full" }
-                        div { class: "bg-accent size-2 rounded-full" }
+                        div { class: "bg-warning size-2 rounded-full" }
+                        div { class: "bg-success size-2 rounded-full" }
                       }
                       div { class: "line-clamp-1 w-60",
                         {format!("{:?}", builtin_theme_clone)}
@@ -172,10 +172,10 @@ fn CustomThemeButton(props: CustomThemeButtonProps) -> Element {
             ),
             "data-theme": props.theme_id.clone(),
             style: props.theme_css.clone(),
-            div { class: "bg-base-content size-2 rounded-full" }
             div { class: "bg-primary size-2 rounded-full" }
             div { class: "bg-secondary size-2 rounded-full" }
-            div { class: "bg-accent size-2 rounded-full" }
+            div { class: "bg-warning size-2 rounded-full" }
+            div { class: "bg-success size-2 rounded-full" }
           }
           div { class: "line-clamp-1 w-60", {props.name.clone()} }
         }
@@ -279,8 +279,6 @@ const THEME_DEFAULT_CSS: &str =
 --color-accent-content: oklch(98% 0.01 160);
 --color-neutral: oklch(50% 0.05 240);
 --color-neutral-content: oklch(98% 0.01 240);
---color-info: oklch(70% 0.2 220);
---color-info-content: oklch(98% 0.01 220);
 --color-success: oklch(65% 0.25 140);
 --color-success-content: oklch(98% 0.01 140);
 --color-warning: oklch(80% 0.25 80);

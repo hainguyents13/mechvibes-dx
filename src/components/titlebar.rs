@@ -38,7 +38,7 @@ pub fn TitleBar() -> Element {
         window_minimize.set_minimized(true);
     };
     rsx! {
-      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300 to-transparent transition-all ",
+      div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300/70 to-transparent backdrop-blur-sm transition-all ",
       // Left side - app title and draggable area
         div {
           class: "flex items-center grow cursor-move px-3 py-2",

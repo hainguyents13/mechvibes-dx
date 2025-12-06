@@ -23,6 +23,9 @@ pub struct CollapseProps {
     /// Custom CSS classes for the container
     #[props(default = "")]
     pub class: &'static str,
+    /// Show indicator dot when enabled
+    #[props(default = false)]
+    pub show_indicator: bool,
 }
 
 #[component]
@@ -41,7 +44,12 @@ pub fn Collapse(props: CollapseProps) -> Element {
                 checked: props.default_open,
             }
             div { class: "{props.title_class}",
-                "{props.title}"
+                span { class: "flex items-center gap-2",
+                    "{props.title}"
+                    if props.show_indicator {
+                        span { class: "w-2 h-2 rounded-full bg-primary" }
+                    }
+                }
             }
             div { class: "{props.content_class}",
                 {props.children}
