@@ -51,7 +51,7 @@ pub mod data {
 /// Returns platform-specific app data directory:
 /// - Windows: %APPDATA%/Mechvibes
 /// - macOS: ~/Library/Application Support/Mechvibes
-/// - Linux: ~/.local/share/mechvibes
+/// - Linux: ~/.local/share/com/hainguyents13/Mechvibes
 fn get_system_app_data_dir() -> PathBuf {
     use directories::ProjectDirs;
 

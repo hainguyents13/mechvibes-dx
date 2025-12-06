@@ -61,8 +61,15 @@ pub fn directory_exists(path: &str) -> bool {
 }
 
 /// Create directory recursively if it doesn't exist
-pub fn ensure_directory_exists(path: &str) -> Result<(), String> {
-    fs::create_dir_all(path).map_err(|e| format!("Failed to create directory '{}': {}", path, e))
+pub fn ensure_directory_exists(path: impl AsRef<std::path::Path>) -> Result<(), String> {
+    let path_ref = path.as_ref();
+    fs::create_dir_all(path_ref).map_err(|e| {
+        format!(
+            "Failed to create directory '{}': {}",
+            path_ref.display(),
+            e
+        )
+    })
 }
 
 /// Read file contents as string
@@ -108,7 +115,7 @@ pub fn copy_to_custom_images(source_path: &str) -> Result<String, String> {
 
     // Ensure custom images directory exists
     let custom_images_dir = paths::data::custom_images_dir();
-    ensure_directory_exists(&custom_images_dir.to_string_lossy())?;
+    ensure_directory_exists(&custom_images_dir)?;
 
     // Copy file to custom images directory
     let dest_path = custom_images_dir.join(&new_filename);
