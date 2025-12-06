@@ -38,6 +38,11 @@ pub mod data {
     pub fn soundpack_cache_json() -> PathBuf {
         get_app_root().join("data").join("soundpack_cache.json")
     }
+
+    /// Custom images directory for user-uploaded images
+    pub fn custom_images_dir() -> PathBuf {
+        get_app_root().join("data").join("custom_images")
+    }
 }
 
 /// Soundpack directory paths

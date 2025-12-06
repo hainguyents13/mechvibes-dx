@@ -261,6 +261,70 @@ pub fn app() -> Element {
         }
     });
 
+    // Set up asset handler for serving custom user images
+    use_asset_handler("custom-images", |request, response| {
+        let request_path = request.uri().path();
+
+        // Parse the path: /custom-images/{filename}
+        let path_parts: Vec<&str> = request_path.trim_start_matches('/').split('/').collect();
+
+        if path_parts.len() >= 2 && path_parts[0] == "custom-images" {
+            let filename = path_parts[1];
+
+            // Get the custom images directory path
+            let custom_images_dir = crate::state::paths::data::custom_images_dir();
+            let image_path = custom_images_dir.join(filename);
+
+            if image_path.exists() {
+                // Read the file and determine content type
+                match std::fs::read(&image_path) {
+                    Ok(data) => {
+                        let mut response_builder = Response::builder();
+
+                        let content_type = match
+                            image_path.extension().and_then(|ext| ext.to_str())
+                        {
+                            Some("png") => "image/png",
+                            Some("jpg") | Some("jpeg") => "image/jpeg",
+                            Some("gif") => "image/gif",
+                            Some("svg") => "image/svg+xml",
+                            Some("webp") => "image/webp",
+                            Some("bmp") => "image/bmp",
+                            Some("ico") => "image/x-icon",
+                            _ => "application/octet-stream",
+                        };
+
+                        response_builder = response_builder
+                            .header("Content-Type", content_type)
+                            .header("Cache-Control", "public, max-age=3600");
+
+                        if let Ok(http_response) = response_builder.body(data) {
+                            response.respond(http_response);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        debug_print!(
+                            "❌ Failed to read custom image file {:?}: {}",
+                            image_path,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        // Return 404 for invalid paths or missing files
+        if
+            let Ok(not_found_response) = Response::builder()
+                .status(404)
+                .header("Content-Type", "text/plain")
+                .body(b"Not Found".to_vec())
+        {
+            response.respond(not_found_response);
+        }
+    });
+
     rsx! {
         // Loading overlay (shown while CSS loads)
         if is_loading() {

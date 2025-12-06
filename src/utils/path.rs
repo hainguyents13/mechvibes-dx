@@ -74,3 +74,47 @@ pub fn read_file_contents(path: &str) -> Result<String, String> {
 pub fn write_file_contents(path: &str, contents: &str) -> Result<(), String> {
     fs::write(path, contents).map_err(|e| format!("Failed to write file '{}': {}", path, e))
 }
+
+/// Copy a file to the custom images directory and return the asset URL
+/// Returns a URL in the format: /custom-images/{filename}
+pub fn copy_to_custom_images(source_path: &str) -> Result<String, String> {
+    use std::path::Path;
+
+    let source = Path::new(source_path);
+
+    // Validate source file exists
+    if !source.exists() {
+        return Err(format!("Source file does not exist: {}", source_path));
+    }
+
+    // Get file extension
+    let extension = source
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .ok_or_else(|| "File has no extension".to_string())?;
+
+    // Generate unique filename using timestamp and original filename
+    let original_filename = source
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "Invalid filename".to_string())?;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let new_filename = format!("{}_{}.{}", original_filename, timestamp, extension);
+
+    // Ensure custom images directory exists
+    let custom_images_dir = paths::data::custom_images_dir();
+    ensure_directory_exists(&custom_images_dir.to_string_lossy())?;
+
+    // Copy file to custom images directory
+    let dest_path = custom_images_dir.join(&new_filename);
+    fs::copy(source, &dest_path)
+        .map_err(|e| format!("Failed to copy file: {}", e))?;
+
+    // Return asset URL
+    Ok(format!("/custom-images/{}", new_filename))
+}

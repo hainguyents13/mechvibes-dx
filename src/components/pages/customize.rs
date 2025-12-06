@@ -2,6 +2,7 @@ use crate::components::theme_toggler::ThemeToggler;
 use crate::components::ui::{ Collapse, ColorPicker, PageHeader, Toggler };
 use crate::utils::config::use_config;
 use crate::utils::delay;
+use crate::utils::path;
 use dioxus::prelude::*;
 use lucide_dioxus::{ Check, Palette, RotateCcw, Upload };
 
@@ -407,8 +408,17 @@ fn LogoCustomizationPanel() -> Element {
                               .await;
 
                           if let Some(file_handle) = file_dialog {
-                              let file_path = file_handle.path().to_string_lossy().to_string();
-                              bg_image.set(Some(file_path));
+                              let source_path = file_handle.path().to_string_lossy().to_string();
+
+                              // Copy image to custom images directory and get asset URL
+                              match path::copy_to_custom_images(&source_path) {
+                                  Ok(asset_url) => {
+                                      bg_image.set(Some(asset_url));
+                                  }
+                                  Err(e) => {
+                                      eprintln!("Failed to copy image: {}", e);
+                                  }
+                              }
                           }
                       });
                   },
@@ -477,8 +487,17 @@ fn LogoCustomizationPanel() -> Element {
                               .await;
 
                           if let Some(file_handle) = file_dialog {
-                              let file_path = file_handle.path().to_string_lossy().to_string();
-                              muted_bg_image.set(Some(file_path));
+                              let source_path = file_handle.path().to_string_lossy().to_string();
+
+                              // Copy image to custom images directory and get asset URL
+                              match path::copy_to_custom_images(&source_path) {
+                                  Ok(asset_url) => {
+                                      muted_bg_image.set(Some(asset_url));
+                                  }
+                                  Err(e) => {
+                                      eprintln!("Failed to copy image: {}", e);
+                                  }
+                              }
                           }
                       });
                   },
@@ -688,8 +707,17 @@ fn BackgroundCustomizationPanel() -> Element {
                             .await;
 
                         if let Some(file_handle) = file_dialog {
-                            let file_path = file_handle.path().to_string_lossy().to_string();
-                            bg_image.set(Some(file_path));
+                            let source_path = file_handle.path().to_string_lossy().to_string();
+
+                            // Copy image to custom images directory and get asset URL
+                            match path::copy_to_custom_images(&source_path) {
+                                Ok(asset_url) => {
+                                    bg_image.set(Some(asset_url));
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to copy image: {}", e);
+                                }
+                            }
                         }
                     });
                 },
