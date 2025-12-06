@@ -22,10 +22,29 @@ fn get_app_root() -> &'static PathBuf {
 /// - macOS: ~/Library/Application Support/Mechvibes
 /// - Linux: ~/.local/share/mechvibes
 fn get_system_app_data_dir() -> PathBuf {
-    use directories::ProjectDirs;
+    use directories::BaseDirs;
 
-    if let Some(proj_dirs) = ProjectDirs::from("com", "hainguyents13", "Mechvibes") {
-        proj_dirs.data_dir().to_path_buf()
+    if let Some(base_dirs) = BaseDirs::new() {
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: %APPDATA%/Mechvibes
+            base_dirs.data_dir().join("Mechvibes")
+        }
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: ~/Library/Application Support/Mechvibes
+            base_dirs.data_dir().join("Mechvibes")
+        }
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ~/.local/share/mechvibes
+            base_dirs.data_dir().join("mechvibes")
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        {
+            // Other Unix-like systems
+            base_dirs.data_dir().join("mechvibes")
+        }
     } else {
         // Fallback to app root if system directories not available
         get_app_root().join("data")
@@ -108,23 +127,32 @@ pub mod soundpacks {
     /// Checks built-in location first, then custom location
     /// soundpack_id format: "keyboard/Soundpack Name" or "mouse/Soundpack Name"
     pub fn soundpack_dir(soundpack_id: &str) -> String {
+        // Normalize the soundpack_id by splitting on both / and \ and rejoining with PathBuf
+        let parts: Vec<&str> = soundpack_id.split(&['/', '\\'][..]).collect();
+
         // Check if it's a built-in soundpack
         if is_builtin_soundpack(soundpack_id) {
-            get_builtin_soundpacks_dir()
-                .join(soundpack_id)
-                .to_string_lossy()
-                .to_string()
+            let mut path = get_builtin_soundpacks_dir();
+            for part in parts {
+                path = path.join(part);
+            }
+            path.to_string_lossy().to_string()
         } else {
             // Check custom location first
-            let custom_path = get_custom_soundpacks_dir().join(soundpack_id);
+            let mut custom_path = get_custom_soundpacks_dir();
+            for part in &parts {
+                custom_path = custom_path.join(part);
+            }
+
             if custom_path.exists() {
                 custom_path.to_string_lossy().to_string()
             } else {
                 // Fallback to built-in location (for backwards compatibility)
-                get_builtin_soundpacks_dir()
-                    .join(soundpack_id)
-                    .to_string_lossy()
-                    .to_string()
+                let mut builtin_path = get_builtin_soundpacks_dir();
+                for part in parts {
+                    builtin_path = builtin_path.join(part);
+                }
+                builtin_path.to_string_lossy().to_string()
             }
         }
     }

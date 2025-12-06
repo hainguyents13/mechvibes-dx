@@ -56,9 +56,6 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         })
     };
 
-    // Get soundpacks directory path
-    let soundpacks_dir_absolute = crate::utils::path::get_soundpacks_dir_absolute();
-
     // Get current counts from cache
     let soundpack_count_keyboard = app_state.optimized_cache.count.keyboard;
     let soundpack_count_mouse = app_state.optimized_cache.count.mouse;
@@ -112,22 +109,33 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         }
         div { class: "divider" }
         div { class: "space-y-2",
-          div { class: "text-base-content font-medium text-sm", "Sound pack folder path" }
+          div { class: "text-base-content font-medium text-sm", "Custom sound packs folder" }
           div { class: "text-sm text-base-content/70",
-            "This is the absolute path to the sound pack directory where Mechvibes looks for sound packs."
+            "This is where your custom sound packs are stored. Built-in sound packs are bundled with the app."
           }
-          input {
-            value: "{soundpacks_dir_absolute}",
-            class: "input input-sm w-full",
-            readonly: true,
-          }
-          button {
-            class: "btn btn-soft btn-sm",
-            onclick: move |_| {
-                let _ = crate::utils::path::open_path(&soundpacks_dir_absolute.clone());
-            },
-            FolderOpen { class: "w-4 h-4 mr-1" }
-            "Open"
+          div { class: "flex gap-2",
+            button {
+              class: "btn btn-soft btn-sm",
+              onclick: move |_| {
+                  let custom_keyboard_dir = crate::state::paths::soundpacks::get_custom_soundpacks_dir().join("keyboard");
+                  // Create the directory if it doesn't exist
+                  let _ = std::fs::create_dir_all(&custom_keyboard_dir);
+                  let _ = crate::utils::path::open_path(&custom_keyboard_dir.to_string_lossy());
+              },
+              FolderOpen { class: "w-4 h-4 mr-1" }
+              "Keyboard"
+            }
+            button {
+              class: "btn btn-soft btn-sm",
+              onclick: move |_| {
+                  let custom_mouse_dir = crate::state::paths::soundpacks::get_custom_soundpacks_dir().join("mouse");
+                  // Create the directory if it doesn't exist
+                  let _ = std::fs::create_dir_all(&custom_mouse_dir);
+                  let _ = crate::utils::path::open_path(&custom_mouse_dir.to_string_lossy());
+              },
+              FolderOpen { class: "w-4 h-4 mr-1" }
+              "Mouse"
+            }
           }
         }
         div { class: "divider" }
