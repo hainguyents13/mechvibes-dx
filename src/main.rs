@@ -13,7 +13,7 @@ use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
 use libs::focused_input_listener::start_focused_keyboard_listener;
-use libs::input_manager::{ init_input_channels, init_window_focus_state, get_window_focus_state };
+use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value, get_window_focus_state };
 use std::sync::mpsc;
 
 #[cfg(target_os = "linux")]
@@ -31,13 +31,31 @@ fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
         Ok(img) => {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            match dioxus::desktop::tao::window::Icon::from_rgba(rgba.into_raw(), width, height) {
+
+            // Windows taskbar prefers 32x32 or 48x48 icons
+            // If the loaded icon is not one of these sizes, resize it
+            let (target_width, target_height) = if width >= 48 && height >= 48 {
+                (48, 48)
+            } else if width >= 32 && height >= 32 {
+                (32, 32)
+            } else {
+                (width, height) // Use original size if smaller
+            };
+
+            let final_rgba = if width != target_width || height != target_height {
+                debug_print!("🔄 Resizing icon from {}x{} to {}x{}", width, height, target_width, target_height);
+                image::imageops::resize(&rgba, target_width, target_height, image::imageops::FilterType::Lanczos3)
+            } else {
+                rgba
+            };
+
+            match dioxus::desktop::tao::window::Icon::from_rgba(final_rgba.into_raw(), target_width, target_height) {
                 Ok(icon) => {
-                    debug_print!("✅ Loaded embedded ICO icon ({}x{})", width, height);
+                    debug_print!("✅ Loaded embedded window icon ({}x{})", target_width, target_height);
                     Some(icon)
                 }
                 Err(e) => {
-                    always_eprint!("❌ Failed to create icon from embedded ICO data: {}", e);
+                    always_eprint!("❌ Failed to create window icon from embedded ICO data: {}", e);
                     None
                 }
             }
@@ -110,7 +128,10 @@ fn main() {
     init_input_channels(keyboard_rx, mouse_rx, hotkey_rx, keyboard_tx_clone, mouse_tx_clone, hotkey_tx_clone);
 
     // Initialize window focus state
-    init_window_focus_state();
+    // If window starts visible (not minimized), it will be focused
+    let initial_focus_state = !should_start_minimized;
+    init_window_focus_state_with_value(initial_focus_state);
+    debug_print!("🔍 Initial window focus state: {}", if initial_focus_state { "FOCUSED" } else { "UNFOCUSED" });
 
     // Detect display server on Linux
     #[cfg(target_os = "linux")]
@@ -170,6 +191,12 @@ fn main() {
     let default_height = 820; // Default height
     let max_height = 820;  // Maximum height
 
+    // Load icon before creating window
+    let window_icon = load_icon();
+    if window_icon.is_none() {
+        always_eprint!("⚠️ Warning: Failed to load window icon - taskbar icon may not appear");
+    }
+
     // Create a WindowBuilder with custom appearance and vertical resizing
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
@@ -182,7 +209,7 @@ fn main() {
         .with_decorations(false) // Use custom title bar
         .with_resizable(true) // Enable vertical resizing
         .with_visible(!should_start_minimized) // Hide window if starting minimized
-        .with_window_icon(load_icon()); // Set window icon for taskbar
+        .with_window_icon(window_icon); // Set window icon for taskbar
 
     // Create config with our window settings and custom protocol handlers
     let config = Config::new().with_window(window_builder).with_menu(None);

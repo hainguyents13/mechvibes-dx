@@ -102,17 +102,17 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     {
         SelectorType::Keyboard =>
             (
-                "Select a keyboard soundpack...",
-                "Search keyboard soundpacks...",
-                "No keyboard soundpacks found",
-                "No soundpacks available",
+                "Select a keyboard sound pack...",
+                "Search keyboard sound packs...",
+                "No keyboard sound packs found",
+                "No sound packs available",
             ),
         SelectorType::Mouse =>
             (
-                "Select a mouse soundpack...",
-                "Search mouse soundpacks...",
-                "No mouse soundpacks found",
-                "No soundpacks available",
+                "Select a mouse sound pack...",
+                "Search mouse sound packs...",
+                "No mouse sound packs found",
+                "No sound packs available",
             ),
     };
 

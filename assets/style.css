@@ -2518,6 +2518,9 @@
   .z-999 {
     z-index: 999;
   }
+  .z-\[9999\] {
+    z-index: 9999;
+  }
   .tab-content {
     order: var(--tabcontent-order);
     display: none;
@@ -3162,6 +3165,9 @@
   .h-11 {
     height: calc(var(--spacing) * 11);
   }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
   .h-17 {
     height: calc(var(--spacing) * 17);
   }
@@ -3243,6 +3249,9 @@
   }
   .w-11 {
     width: calc(var(--spacing) * 11);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
   }
   .w-26 {
     width: calc(var(--spacing) * 26);
@@ -3565,6 +3574,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       border-color: color-mix(in oklab, var(--color-success) 20%, transparent);
     }
+  }
+  .border-t-transparent {
+    border-top-color: transparent;
   }
   .bg-accent {
     background-color: var(--color-accent);

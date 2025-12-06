@@ -48,6 +48,11 @@ pub fn init_window_focus_state() {
     let _ = WINDOW_FOCUS_STATE.set(Arc::new(Mutex::new(false)));
 }
 
+/// Initialize window focus state with a specific value (called from main)
+pub fn init_window_focus_state_with_value(focused: bool) {
+    let _ = WINDOW_FOCUS_STATE.set(Arc::new(Mutex::new(focused)));
+}
+
 /// Get window focus state (called from UI)
 pub fn get_window_focus_state() -> Arc<Mutex<bool>> {
     WINDOW_FOCUS_STATE.get().expect("Window focus state not initialized").clone()

@@ -49,8 +49,8 @@ pub fn Soundpacks() -> Element {
       div { class: "",
         // Page header
         PageHeader {
-          title: "Soundpacks".to_string(),
-          subtitle: "Manage your soundpacks".to_string(),
+          title: "Sound Packs".to_string(),
+          subtitle: "Manage your sound packs".to_string(),
           icon: Some(rsx! {
             Music { class: "w-8 h-8 mx-auto" }
           }),
