@@ -106,9 +106,17 @@ pub fn copy_to_custom_images(source_path: &str) -> Result<String, String> {
         .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid filename".to_string())?;
 
+    // Generate timestamp, with fallback for systems with misconfigured clocks
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_else(|_| {
+            // Fallback: use a random number if system time is before epoch
+            use std::collections::hash_map::RandomState;
+            use std::hash::{BuildHasher, Hash, Hasher};
+            let mut hasher = RandomState::new().build_hasher();
+            std::time::SystemTime::now().hash(&mut hasher);
+            std::time::Duration::from_secs(hasher.finish())
+        })
         .as_secs();
 
     let new_filename = format!("{}_{}.{}", original_filename, timestamp, extension);

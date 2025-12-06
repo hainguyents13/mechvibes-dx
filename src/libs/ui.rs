@@ -271,9 +271,34 @@ pub fn app() -> Element {
         if path_parts.len() >= 2 && path_parts[0] == "custom-images" {
             let filename = path_parts[1];
 
+            // Security: Validate filename to prevent directory traversal
+            // Only allow safe filenames (alphanumeric, dash, underscore, dot)
+            if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+                let error_response = Response::builder()
+                    .status(400)
+                    .body(Vec::new())
+                    .unwrap();
+                response.respond(error_response);
+                return;
+            }
+
             // Get the custom images directory path
             let custom_images_dir = crate::state::paths::data::custom_images_dir();
             let image_path = custom_images_dir.join(filename);
+
+            // Security: Ensure the resolved path is still within custom_images_dir
+            if let Ok(canonical_path) = image_path.canonicalize() {
+                if let Ok(canonical_base) = custom_images_dir.canonicalize() {
+                    if !canonical_path.starts_with(&canonical_base) {
+                        let error_response = Response::builder()
+                            .status(403)
+                            .body(Vec::new())
+                            .unwrap();
+                        response.respond(error_response);
+                        return;
+                    }
+                }
+            }
 
             if image_path.exists() {
                 // Read the file and determine content type

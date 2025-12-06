@@ -6,6 +6,65 @@ use crate::utils::path;
 use dioxus::prelude::*;
 use lucide_dioxus::{ Check, Palette, RotateCcw, Upload };
 
+/// Reusable image picker component with file dialog and URL input
+#[component]
+fn ImagePicker(
+    label: String,
+    value: Option<String>,
+    on_change: EventHandler<Option<String>>,
+    dialog_title: String,
+) -> Element {
+    rsx! {
+        div { class: "space-y-2",
+            div {
+                div { class: "text-sm font-medium text-base-content", "{label}" }
+                div { class: "text-xs text-base-content/50", "Select an image file or enter a URL" }
+            }
+            div { class: "flex gap-2",
+                input {
+                    r#type: "text",
+                    placeholder: "Enter image URL or path...",
+                    class: "input w-full input-sm",
+                    value: value.unwrap_or_default(),
+                    oninput: move |evt| {
+                        let new_value = if evt.value().is_empty() { None } else { Some(evt.value()) };
+                        on_change.call(new_value);
+                    },
+                }
+                button {
+                    class: "btn btn-neutral btn-sm",
+                    onclick: move |_| {
+                        let on_change = on_change.clone();
+                        let title = dialog_title.clone();
+                        spawn(async move {
+                            let file_dialog = rfd::AsyncFileDialog::new()
+                                .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                                .set_title(&title)
+                                .pick_file()
+                                .await;
+
+                            if let Some(file_handle) = file_dialog {
+                                let source_path = file_handle.path().to_string_lossy().to_string();
+
+                                // Copy image to custom images directory and get asset URL
+                                match path::copy_to_custom_images(&source_path) {
+                                    Ok(asset_url) => {
+                                        on_change.call(Some(asset_url));
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to copy image: {}", e);
+                                    }
+                                }
+                            }
+                        });
+                    },
+                    Upload { class: "w-4 h-4" }
+                }
+            }
+        }
+    }
+}
+
 #[component]
 pub fn CustomizePage() -> Element {
     // let (config, update_config) = use_config();
@@ -376,55 +435,11 @@ fn LogoCustomizationPanel() -> Element {
           }
           // Background Image Selector (shown when using image)
           if use_background_image() {
-            div { class: "space-y-2",
-              div {
-                div { class: "text-sm font-medium text-base-content",
-                  "Background Image"
-                }
-                div { class: "text-xs text-base-content/50",
-                  "Select an image file or enter a URL"
-                }
-              }
-              div { class: "flex gap-2",
-                input {
-                  r#type: "text",
-                  placeholder: "Enter image URL or path...",
-                  class: "input w-full input-sm",
-                  value: background_image().unwrap_or_default(),
-                  oninput: move |evt| {
-                      let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                      background_image.set(value);
-                  },
-                }
-                button {
-                  class: "btn btn-neutral btn-sm",
-                  onclick: move |_| {
-                      let mut bg_image = background_image.clone();
-                      spawn(async move {
-                          let file_dialog = rfd::AsyncFileDialog::new()
-                              .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
-                              .set_title("Select Background Image")
-                              .pick_file()
-                              .await;
-
-                          if let Some(file_handle) = file_dialog {
-                              let source_path = file_handle.path().to_string_lossy().to_string();
-
-                              // Copy image to custom images directory and get asset URL
-                              match path::copy_to_custom_images(&source_path) {
-                                  Ok(asset_url) => {
-                                      bg_image.set(Some(asset_url));
-                                  }
-                                  Err(e) => {
-                                      eprintln!("Failed to copy image: {}", e);
-                                  }
-                              }
-                          }
-                      });
-                  },
-                  Upload { class: "w-4 h-4" }
-                }
-              }
+            ImagePicker {
+              label: "Background Image".to_string(),
+              value: background_image(),
+              on_change: move |value| background_image.set(value),
+              dialog_title: "Select Background Image".to_string(),
             }
           }
         }
@@ -455,55 +470,11 @@ fn LogoCustomizationPanel() -> Element {
           }
           // Muted Background Image Selector (shown when using image)
           if use_muted_background_image() {
-            div { class: "space-y-2",
-              div {
-                div { class: "text-sm font-medium text-base-content",
-                  "Image"
-                }
-                div { class: "text-xs text-base-content/50",
-                  "Select an image file or enter a URL"
-                }
-              }
-              div { class: "flex gap-2",
-                input {
-                  r#type: "text",
-                  placeholder: "Enter image URL or path...",
-                  class: "input w-full input-sm",
-                  value: muted_background_image().unwrap_or_default(),
-                  oninput: move |evt| {
-                      let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                      muted_background_image.set(value);
-                  },
-                }
-                button {
-                  class: "btn btn-neutral btn-sm",
-                  onclick: move |_| {
-                      let mut muted_bg_image = muted_background_image.clone();
-                      spawn(async move {
-                          let file_dialog = rfd::AsyncFileDialog::new()
-                              .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
-                              .set_title("Select Muted Background Image")
-                              .pick_file()
-                              .await;
-
-                          if let Some(file_handle) = file_dialog {
-                              let source_path = file_handle.path().to_string_lossy().to_string();
-
-                              // Copy image to custom images directory and get asset URL
-                              match path::copy_to_custom_images(&source_path) {
-                                  Ok(asset_url) => {
-                                      muted_bg_image.set(Some(asset_url));
-                                  }
-                                  Err(e) => {
-                                      eprintln!("Failed to copy image: {}", e);
-                                  }
-                              }
-                          }
-                      });
-                  },
-                  Upload { class: "w-4 h-4" }
-                }
-              }
+            ImagePicker {
+              label: "Image".to_string(),
+              value: muted_background_image(),
+              on_change: move |value| muted_background_image.set(value),
+              dialog_title: "Select Muted Background Image".to_string(),
             }
           }
         }
@@ -677,53 +648,11 @@ fn BackgroundCustomizationPanel() -> Element {
         }
         // Background Image Selector (shown when using image)
         if use_image() {
-          div { class: "space-y-2",
-            div {
-              div { class: "text-sm font-medium text-base-content", "Background Image" }
-              div { class: "text-xs text-base-content/50",
-                "Select an image file or enter a URL"
-              }
-            }
-            div { class: "flex gap-2",
-              input {
-                r#type: "text",
-                placeholder: "Enter image URL or path...",
-                class: "input w-full input-sm",
-                value: background_image().unwrap_or_default(),
-                oninput: move |evt| {
-                    let value = if evt.value().is_empty() { None } else { Some(evt.value()) };
-                    background_image.set(value);
-                },
-              }
-              button {
-                class: "btn btn-neutral btn-sm",
-                onclick: move |_| {
-                    let mut bg_image = background_image.clone();
-                    spawn(async move {
-                        let file_dialog = rfd::AsyncFileDialog::new()
-                            .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
-                            .set_title("Select Background Image")
-                            .pick_file()
-                            .await;
-
-                        if let Some(file_handle) = file_dialog {
-                            let source_path = file_handle.path().to_string_lossy().to_string();
-
-                            // Copy image to custom images directory and get asset URL
-                            match path::copy_to_custom_images(&source_path) {
-                                Ok(asset_url) => {
-                                    bg_image.set(Some(asset_url));
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to copy image: {}", e);
-                                }
-                            }
-                        }
-                    });
-                },
-                Upload { class: "w-4 h-4" }
-              }
-            }
+          ImagePicker {
+            label: "Background Image".to_string(),
+            value: background_image(),
+            on_change: move |value| background_image.set(value),
+            dialog_title: "Select Background Image".to_string(),
           }
         }
 
