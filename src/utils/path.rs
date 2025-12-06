@@ -106,6 +106,19 @@ pub fn copy_to_custom_images(source_path: &str) -> Result<String, String> {
         .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid filename".to_string())?;
 
+    // Normalize filename to safe characters (alphanumeric, dash, underscore)
+    // This prevents issues with spaces/special characters in CSS URLs
+    let safe_filename: String = original_filename
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
     // Generate timestamp, with fallback for systems with misconfigured clocks
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -119,7 +132,7 @@ pub fn copy_to_custom_images(source_path: &str) -> Result<String, String> {
         })
         .as_secs();
 
-    let new_filename = format!("{}_{}.{}", original_filename, timestamp, extension);
+    let new_filename = format!("{}_{}.{}", safe_filename, timestamp, extension);
 
     // Ensure custom images directory exists
     let custom_images_dir = paths::data::custom_images_dir();

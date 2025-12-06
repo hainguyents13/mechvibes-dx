@@ -272,7 +272,7 @@ pub fn app() -> Element {
             let filename = path_parts[1];
 
             // Security: Validate filename to prevent directory traversal
-            // Only allow safe filenames (alphanumeric, dash, underscore, dot)
+            // Reject path separators and parent directory references
             if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
                 let error_response = Response::builder()
                     .status(400)
