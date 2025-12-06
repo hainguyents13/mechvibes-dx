@@ -12,7 +12,7 @@ pub struct PageHeaderProps {
 #[component]
 pub fn PageHeader(props: PageHeaderProps) -> Element {
     rsx! {
-      div { class: "mb-8 flex items-start gap-4",
+      div { class: "mb-8 flex items-center gap-4",
         if let Some(icon) = props.icon {
           div { class: "p-3 bg-base-300 rounded-full flex-shrink-0",
             {icon}
