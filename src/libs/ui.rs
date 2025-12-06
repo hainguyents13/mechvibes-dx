@@ -218,9 +218,13 @@ pub fn app() -> Element {
                     Ok(data) => {
                         let mut response_builder = Response::builder();
 
-                        let content_type = match
-                            image_path.extension().and_then(|ext| ext.to_str())
-                        {
+                        // Get extension and convert to lowercase for case-insensitive matching
+                        let extension = image_path
+                            .extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| ext.to_lowercase());
+
+                        let content_type = match extension.as_deref() {
                             Some("png") => "image/png",
                             Some("jpg") | Some("jpeg") => "image/jpeg",
                             Some("gif") => "image/gif",
@@ -306,9 +310,13 @@ pub fn app() -> Element {
                     Ok(data) => {
                         let mut response_builder = Response::builder();
 
-                        let content_type = match
-                            image_path.extension().and_then(|ext| ext.to_str())
-                        {
+                        // Get extension and convert to lowercase for case-insensitive matching
+                        let extension = image_path
+                            .extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| ext.to_lowercase());
+
+                        let content_type = match extension.as_deref() {
                             Some("png") => "image/png",
                             Some("jpg") | Some("jpeg") => "image/jpeg",
                             Some("gif") => "image/gif",
