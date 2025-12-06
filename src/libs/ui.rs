@@ -204,13 +204,53 @@ pub fn app() -> Element {
         let path_parts: Vec<&str> = request_path.trim_start_matches('/').split('/').collect();
 
         if path_parts.len() >= 4 && path_parts[0] == "soundpack-images" {
-            // Join device_type/soundpack_name to form the full soundpack_id
-            let soundpack_id = format!("{}/{}", path_parts[1], path_parts[2]);
+            let device_type = path_parts[1];
+            let soundpack_name = path_parts[2];
             let filename = path_parts[3];
+
+            // Security: Validate path segments to prevent directory traversal
+            // Reject empty segments, path separators, and parent directory references
+            if device_type.is_empty() || soundpack_name.is_empty() || filename.is_empty() {
+                let error_response = Response::builder()
+                    .status(400)
+                    .body(Vec::new())
+                    .unwrap();
+                response.respond(error_response);
+                return;
+            }
+
+            if device_type.contains("..") || device_type.contains('/') || device_type.contains('\\')
+                || soundpack_name.contains("..") || soundpack_name.contains('/') || soundpack_name.contains('\\')
+                || filename.contains("..") || filename.contains('/') || filename.contains('\\')
+            {
+                let error_response = Response::builder()
+                    .status(400)
+                    .body(Vec::new())
+                    .unwrap();
+                response.respond(error_response);
+                return;
+            }
+
+            // Join device_type/soundpack_name to form the full soundpack_id
+            let soundpack_id = format!("{}/{}", device_type, soundpack_name);
 
             // Get the soundpack directory path using the correct function
             let soundpacks_path = std::path::PathBuf::from(path::get_soundpacks_dir_absolute());
             let image_path = soundpacks_path.join(&soundpack_id).join(filename);
+
+            // Security: Ensure the resolved path is still within soundpacks directory
+            if let Ok(canonical_path) = image_path.canonicalize() {
+                if let Ok(canonical_base) = soundpacks_path.canonicalize() {
+                    if !canonical_path.starts_with(&canonical_base) {
+                        let error_response = Response::builder()
+                            .status(403)
+                            .body(Vec::new())
+                            .unwrap();
+                        response.respond(error_response);
+                        return;
+                    }
+                }
+            }
 
             if image_path.exists() {
                 // Read the file and determine content type
@@ -274,6 +314,16 @@ pub fn app() -> Element {
 
         if path_parts.len() >= 2 && path_parts[0] == "custom-images" {
             let filename = path_parts[1];
+
+            // Security: Reject empty filenames (e.g., trailing slash /custom-images/)
+            if filename.is_empty() {
+                let error_response = Response::builder()
+                    .status(400)
+                    .body(Vec::new())
+                    .unwrap();
+                response.respond(error_response);
+                return;
+            }
 
             // Security: Validate filename to prevent directory traversal
             // Reject path separators and parent directory references
