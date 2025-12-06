@@ -14,7 +14,7 @@ pub fn PageHeader(props: PageHeaderProps) -> Element {
     rsx! {
       div { class: "mb-8 flex items-start gap-4",
         if let Some(icon) = props.icon {
-          div { class: "p-3 bg-primary/10 text-primary rounded-full flex-shrink-0",
+          div { class: "p-3 bg-base-300 rounded-full flex-shrink-0",
             {icon}
           }
         }
