@@ -6,7 +6,7 @@ mod libs;
 mod state;
 mod utils;
 
-use dioxus::desktop::{ Config, LogicalSize, WindowBuilder };
+use dioxus::desktop::{ Config, LogicalSize, LogicalPosition, WindowBuilder };
 use dioxus::prelude::*;
 use utils::constants::{ APP_NAME };
 use libs::ui;
@@ -194,8 +194,35 @@ fn main() {
         always_eprint!("⚠️ Warning: Failed to load window icon - taskbar icon may not appear");
     }
 
+    // Calculate center position for the window
+    // Get primary monitor size and center the window
+    let center_position = {
+        use dioxus::desktop::tao::window::Window;
+        use dioxus::desktop::tao::event_loop::EventLoop;
+
+        // Create a temporary event loop to get monitor info
+        let event_loop = EventLoop::new();
+        if let Some(monitor) = event_loop.primary_monitor() {
+            let screen_size = monitor.size();
+            let screen_width = screen_size.width as f64;
+            let screen_height = screen_size.height as f64;
+
+            // Calculate center position
+            let x = (screen_width - window_width as f64) / 2.0;
+            let y = (screen_height - default_height as f64) / 2.0;
+
+            debug_print!("📐 Screen size: {}x{}, centering window at ({}, {})",
+                screen_width, screen_height, x, y);
+
+            Some(LogicalPosition::new(x, y))
+        } else {
+            debug_print!("⚠️ Could not get primary monitor, window will use default position");
+            None
+        }
+    };
+
     // Create a WindowBuilder with custom appearance and vertical resizing
-    let window_builder = WindowBuilder::default()
+    let mut window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(true) // Disable transparency for better performance
         .with_always_on_top(false) // Allow normal window behavior for taskbar
@@ -207,6 +234,11 @@ fn main() {
         .with_resizable(true) // Enable vertical resizing
         .with_visible(!should_start_minimized) // Hide window if starting minimized
         .with_window_icon(window_icon); // Set window icon for taskbar
+
+    // Set center position if available
+    if let Some(position) = center_position {
+        window_builder = window_builder.with_position(position);
+    }
 
     // Create config with our window settings and custom protocol handlers
     let config = Config::new().with_window(window_builder).with_menu(None);
