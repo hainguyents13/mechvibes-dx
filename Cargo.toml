@@ -1,6 +1,6 @@
 [package]
 name = "mechvibes-dx"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Hải Nguyễn <hainguyen.ts13@gmail.com>"]
 edition = "2024"
 

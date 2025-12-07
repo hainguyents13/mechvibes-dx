@@ -419,6 +419,7 @@ pub fn app() -> Element {
         WindowController {}
         // prettier-ignore
         Header {}
+
         Router::<Route> {}
     }
 }

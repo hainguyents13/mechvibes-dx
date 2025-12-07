@@ -10,10 +10,33 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-/// Get the application root directory (current working directory where data and soundpacks are located)
+/// Get the application root directory (where the executable is located)
+/// This ensures resources are found regardless of working directory
 fn get_app_root() -> &'static PathBuf {
     static APP_ROOT: OnceLock<PathBuf> = OnceLock::new();
-    APP_ROOT.get_or_init(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+    APP_ROOT.get_or_init(|| {
+        // Try to get the directory where the executable is located
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                // Check if running in dev mode (dx serve creates target/dx/... path)
+                let exe_path_str = exe_path.to_string_lossy();
+                if exe_path_str.contains("target\\dx\\") || exe_path_str.contains("target/dx/") {
+                    // In dev mode, use current working directory (project root)
+                    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                    println!("📂 App root (dev mode - from cwd): {}", cwd.display());
+                    return cwd;
+                }
+
+                println!("📂 App root (from exe): {}", exe_dir.display());
+                return exe_dir.to_path_buf();
+            }
+        }
+
+        // Fallback to current working directory (for development)
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        println!("📂 App root (fallback - from cwd): {}", cwd.display());
+        cwd
+    })
 }
 
 /// Get the system app data directory for Mechvibes

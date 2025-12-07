@@ -5,7 +5,7 @@ use dioxus::document::eval;
 use dioxus::prelude::*;
 
 const FAVICON: Asset = asset!("/assets/icon.ico");
-const GLOBAL_STYLES: Asset = asset!("/assets/style.css");
+const GLOBAL_STYLES_CSS: &str = include_str!("../../assets/style.css");
 
 // Font assets
 const LATO_REGULAR: Asset = asset!("/assets/fonts/Lato-Regular.ttf");
@@ -110,6 +110,8 @@ pub fn Header() -> Element {
     rsx! {
       // prettier-ignore
       document::Link { rel: "icon", r#type: "image/x-icon", href: FAVICON }
-      document::Link { rel: "stylesheet", href: GLOBAL_STYLES }
+
+      // Inline global styles since asset!() for CSS doesn't work in desktop apps
+      style { dangerous_inner_html: GLOBAL_STYLES_CSS }
     }
 }
