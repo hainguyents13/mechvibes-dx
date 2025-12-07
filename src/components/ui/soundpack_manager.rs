@@ -109,9 +109,36 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         }
         div { class: "divider" }
         div { class: "space-y-2",
+          div { class: "text-base-content font-medium text-sm", "Built-in sound packs folder" }
+          div { class: "text-sm text-base-content/70",
+            "Default sound packs that ship with the app."
+          }
+          div { class: "flex gap-2",
+            button {
+              class: "btn btn-soft btn-sm",
+              onclick: move |_| {
+                  let builtin_keyboard_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("keyboard");
+                  let _ = crate::utils::path::open_path(&builtin_keyboard_dir.to_string_lossy());
+              },
+              FolderOpen { class: "w-4 h-4 mr-1" }
+              "Keyboard"
+            }
+            button {
+              class: "btn btn-soft btn-sm",
+              onclick: move |_| {
+                  let builtin_mouse_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("mouse");
+                  let _ = crate::utils::path::open_path(&builtin_mouse_dir.to_string_lossy());
+              },
+              FolderOpen { class: "w-4 h-4 mr-1" }
+              "Mouse"
+            }
+          }
+        }
+        div { class: "divider" }
+        div { class: "space-y-2",
           div { class: "text-base-content font-medium text-sm", "Custom sound packs folder" }
           div { class: "text-sm text-base-content/70",
-            "This is where your custom sound packs are stored. Built-in sound packs are bundled with the app."
+            "Add your own custom sound packs here."
           }
           div { class: "flex gap-2",
             button {

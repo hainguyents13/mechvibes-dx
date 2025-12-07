@@ -9,26 +9,22 @@ bundle_assets = true
 [bundle]
 identifier = "com.hainguyents13.mechvibesdx"
 name = "MechvibesDX"
-version = "0.2.0"
+version = "0.4.0"
 publisher = "Hai Nguyen"
 icon = ["./assets/icon.ico"]
 category = "Productivity"
 short_description = "MechvibesDX"
-long_description = "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards."
+long_description = "MechvibesDX is a modern, cross-platform interactive sound simulator for keyboard, mouse, and other input devices."
 resources = [
   "./soundpacks/keyboard",
   "./soundpacks/mouse",
   "./soundpacks/keyboard/cherrymx-black-abs",
-  "./soundpacks/keyboard/cherrymx-black-abs/black.jpg",
-  "./soundpacks/keyboard/cherrymx-black-abs/config.json",
-  "./soundpacks/keyboard/cherrymx-black-abs/sound.ogg",
   "./soundpacks/keyboard/cherrymx-black-pbt",
   "./soundpacks/keyboard/cherrymx-blue-abs",
   "./soundpacks/keyboard/cherrymx-blue-pbt",
   "./soundpacks/keyboard/cherrymx-brown-abs",
   "./soundpacks/keyboard/cherrymx-brown-pbt",
   "./soundpacks/keyboard/cherrymx-red-abs",
-  "./soundpacks/keyboard/cherrymx-red-pbt",
   "./soundpacks/keyboard/eg-crystal-purple",
   "./soundpacks/keyboard/eg-oreo",
   "./soundpacks/keyboard/topre-purple-hybrid-pbt",
@@ -40,13 +36,7 @@ resources = [
 ]
 
 [bundle.windows]
-installer = "nsis"
 icon_path = "./assets/icon.ico"
 webview_install_mode = "Skip"
 tsp = false
 allow_downgrades = true
-
-[bundle.windows.nsis]
-installer_icon = "./assets/icon.ico"
-install_mode = "CurrentUser"
-display_language_selector = false

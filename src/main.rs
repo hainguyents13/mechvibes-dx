@@ -209,7 +209,9 @@ fn main() {
         .with_window_icon(window_icon); // Set window icon for taskbar
 
     // Create config with our window settings and custom protocol handlers
-    let config = Config::new().with_window(window_builder).with_menu(None);
+    let config = Config::new()
+        .with_window(window_builder)
+        .with_menu(None);
 
     // Launch the app with our config
     dioxus::LaunchBuilder::desktop().with_cfg(config).launch(app_with_stylesheets)
