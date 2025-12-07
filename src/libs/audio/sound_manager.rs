@@ -450,33 +450,4 @@ impl AudioContext {
         }
     }
 
-    /// Clean up finished sinks to prevent memory leaks and improve performance
-    #[allow(dead_code)]
-    pub fn cleanup_finished_sinks(&self) {
-        // Clean up finished keyboard sinks
-        if let Ok(mut key_sinks) = self.key_sinks.lock() {
-            let finished_keys: Vec<String> = key_sinks
-                .iter()
-                .filter(|(_, sink)| sink.empty())
-                .map(|(key, _)| key.clone())
-                .collect();
-
-            for key in finished_keys {
-                key_sinks.remove(&key);
-            }
-        }
-
-        // Clean up finished mouse sinks
-        if let Ok(mut mouse_sinks) = self.mouse_sinks.lock() {
-            let finished_buttons: Vec<String> = mouse_sinks
-                .iter()
-                .filter(|(_, sink)| sink.empty())
-                .map(|(button, _)| button.clone())
-                .collect();
-
-            for button in finished_buttons {
-                mouse_sinks.remove(&button);
-            }
-        }
-    }
 }

@@ -18,18 +18,6 @@ pub const APP_IDENTIFIER: &str = "com.hainguyents13.mechvibesdx";
 /// The protocol scheme for deep linking
 pub const APP_PROTOCOL: &str = "mechvibes";
 
-/// The protocol URL prefix
-pub const APP_PROTOCOL_URL: &str = "mechvibes://";
-
-/// Short description of the application
-#[allow(dead_code)]
-pub const APP_DESCRIPTION_SHORT: &str = "MechvibesDX";
-
-/// Long description of the application
-#[allow(dead_code)]
-pub const APP_DESCRIPTION_LONG: &str =
-    "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable.";
-
 /// Version of the application (should match Cargo.toml)
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
