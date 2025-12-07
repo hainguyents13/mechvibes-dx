@@ -8,17 +8,7 @@ use std::os::windows::ffi::OsStringExt;
 #[cfg(windows)]
 use winapi::shared::ntdef::HANDLE;
 #[cfg(windows)]
-use winapi::shared::minwindef::*;
-#[cfg(windows)]
 use winapi::um::winuser::*;
-#[cfg(windows)]
-use winapi::um::setupapi::*;
-#[cfg(windows)]
-use winapi::um::winreg::*;
-#[cfg(windows)]
-use winapi::shared::devguid::*;
-#[cfg(windows)]
-use winapi::um::cfgmgr32::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputDeviceInfo {
@@ -37,12 +27,14 @@ pub enum InputDeviceType {
     Unknown,
 }
 
+#[allow(dead_code)]
 pub struct InputDeviceManager {
     devices: HashMap<String, InputDeviceInfo>,
     enabled_keyboards: Vec<String>,
     enabled_mice: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl InputDeviceManager {
     pub fn new() -> Self {
         Self {
@@ -128,7 +120,9 @@ impl InputDeviceManager {
         let mut name_size = 0u32;
 
         // Get device name size
-        GetRawInputDeviceInfoW(device_handle, RIDI_DEVICENAME as u32, null_mut(), &mut name_size);
+        unsafe {
+            GetRawInputDeviceInfoW(device_handle, RIDI_DEVICENAME as u32, null_mut(), &mut name_size);
+        }
 
         if name_size == 0 {
             return Err("Failed to get device name size".to_string());
@@ -136,13 +130,14 @@ impl InputDeviceManager {
 
         // Get device name
         let mut name_buffer = vec![0u16; name_size as usize];
-        if
+        if unsafe {
             GetRawInputDeviceInfoW(
                 device_handle,
                 RIDI_DEVICENAME as u32,
                 name_buffer.as_mut_ptr() as *mut _,
                 &mut name_size
-            ) == u32::MAX
+            )
+        } == u32::MAX
         {
             return Err("Failed to get device name".to_string());
         }
@@ -155,16 +150,17 @@ impl InputDeviceManager {
         let mut device_info = RID_DEVICE_INFO {
             cbSize: info_size,
             dwType: 0,
-            u: std::mem::zeroed(),
+            u: unsafe { std::mem::zeroed() },
         };
 
-        if
+        if unsafe {
             GetRawInputDeviceInfoW(
                 device_handle,
                 RIDI_DEVICEINFO as u32,
                 &mut device_info as *mut _ as *mut _,
                 &mut info_size
-            ) == u32::MAX
+            )
+        } == u32::MAX
         {
             return Err("Failed to get device info".to_string());
         }
@@ -269,11 +265,10 @@ impl InputDeviceManager {
     #[cfg(windows)]
     fn get_friendly_device_name(&self, device_path: &str) -> Result<String, String> {
         use winapi::um::cfgmgr32::*;
-        use std::ffi::CString;
 
         unsafe {
             // Extract instance ID from device path
-            let instance_id = if let Some(start) = device_path.find("\\\\?\\") {
+            let instance_id = if let Some(_start) = device_path.find("\\\\?\\") {
                 let path_without_prefix = &device_path[4..]; // Remove "\\?\"
                 if let Some(end) = path_without_prefix.find("#{") {
                     path_without_prefix[..end].replace("\\", "\\")

@@ -451,6 +451,7 @@ impl AudioContext {
     }
 
     /// Clean up finished sinks to prevent memory leaks and improve performance
+    #[allow(dead_code)]
     pub fn cleanup_finished_sinks(&self) {
         // Clean up finished keyboard sinks
         if let Ok(mut key_sinks) = self.key_sinks.lock() {

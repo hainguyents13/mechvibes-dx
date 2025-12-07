@@ -420,6 +420,7 @@ pub fn AudioOutputSelector() -> Element {
     }
 }
 
+#[allow(dead_code)]
 #[component]
 pub fn KeyboardSelector() -> Element {
     rsx! {
@@ -431,6 +432,7 @@ pub fn KeyboardSelector() -> Element {
     }
 }
 
+#[allow(dead_code)]
 #[component]
 pub fn MouseSelector() -> Element {
     rsx! {

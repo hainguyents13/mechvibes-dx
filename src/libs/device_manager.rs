@@ -20,6 +20,7 @@ impl Clone for DeviceManager {
     }
 }
 
+#[allow(dead_code)]
 impl DeviceManager {
     pub fn new() -> Self {
         Self {

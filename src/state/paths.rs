@@ -191,11 +191,13 @@ pub mod soundpacks {
 
     /// Get the base soundpacks directory (containing keyboard/ and mouse/ folders)
     /// Returns built-in soundpacks directory
+    #[allow(dead_code)]
     pub fn get_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir().to_string_lossy().to_string()
     }
 
     /// Get keyboard soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn keyboard_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("keyboard")
@@ -204,6 +206,7 @@ pub mod soundpacks {
     }
 
     /// Get mouse soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn mouse_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("mouse")
@@ -212,6 +215,7 @@ pub mod soundpacks {
     }
 
     /// Get custom keyboard soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_keyboard_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("keyboard")
@@ -220,6 +224,7 @@ pub mod soundpacks {
     }
 
     /// Get custom mouse soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_mouse_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("mouse")

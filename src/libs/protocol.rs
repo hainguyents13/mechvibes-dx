@@ -1,6 +1,9 @@
 use std::env;
 use std::process::Command;
-use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME, APP_NAME_LOWERCASE };
+use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME };
+
+#[cfg(target_os = "linux")]
+use crate::utils::constants::APP_NAME_LOWERCASE;
 
 #[allow(dead_code)]
 /// Register the mechvibes:// protocol for the application
@@ -103,6 +106,7 @@ Categories=AudioVideo;Utility;
 }
 
 /// Handle incoming protocol URLs
+#[allow(dead_code)]
 pub fn handle_protocol_url(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     if !url.starts_with(APP_PROTOCOL_URL) {
         return Err("Invalid protocol URL".into());
@@ -138,17 +142,20 @@ pub fn handle_protocol_url(url: &str) -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /// Focus the application window (platform-specific)
+#[allow(dead_code)]
 #[cfg(target_os = "windows")]
 fn focus_window() {
     // On Windows, the window should automatically focus when the protocol is triggered
     println!("🪟 Focusing window on Windows");
 }
 
+#[allow(dead_code)]
 #[cfg(not(target_os = "windows"))]
 fn focus_window() {
     println!("🖥️ Window focus handling for this platform not implemented");
 }
 
+#[allow(dead_code)]
 fn install_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::state::config::AppConfig;
     use std::fs;
@@ -215,6 +222,7 @@ fn install_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn s
 }
 
 /// Import a theme from protocol URL (base64 encoded theme data)
+#[allow(dead_code)]
 fn import_theme_from_protocol(theme_data: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::libs::theme::Theme;
     use crate::state::config::AppConfig;

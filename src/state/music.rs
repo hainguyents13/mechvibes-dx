@@ -14,6 +14,7 @@ static MUSIC_PLAYER_CHANNEL: std::sync::OnceLock<Arc<Mutex<Option<mpsc::Sender<M
 static GLOBAL_MUSIC_PLAYER_STATE: std::sync::OnceLock<Arc<Mutex<Option<MusicPlayerState>>>> = std::sync::OnceLock::new();
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum MusicPlayerCommand {
     Play(String), // URL
     Pause,
@@ -56,6 +57,7 @@ pub async fn initialize_global_music_player_state() -> Result<(), String> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn update_global_music_player_state<F>(f: F) where F: FnOnce(&mut MusicPlayerState) {
     let global_state_ref = get_global_music_player_state();
     if let Ok(mut global_state_lock) = global_state_ref.try_lock() {
@@ -126,6 +128,7 @@ pub struct MusicTrack {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct MusicApiResponse {
     pub success: bool,
     pub data: Vec<MusicTrack>,
@@ -1086,6 +1089,7 @@ fn get_music_cache_path() -> String {
 // ===== MUSIC PLAYER STATE =====
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MusicPlayerState {
     pub cache: MusicCache,
     pub is_playing: bool,
@@ -1110,6 +1114,7 @@ impl Default for MusicPlayerState {
     }
 }
 
+#[allow(dead_code)]
 impl MusicPlayerState {
     pub fn new() -> Self {
         Self::default()

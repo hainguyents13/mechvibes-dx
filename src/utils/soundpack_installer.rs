@@ -2,12 +2,12 @@ use crate::utils::path;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 use uuid::Uuid;
 use zip::ZipArchive;
 
 // Structure to hold soundpack information after extraction
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SoundpackInfo {
     pub name: String,
     pub id: String,
@@ -62,6 +62,7 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
 }
 
 /// Extract and install soundpack from ZIP file
+#[allow(dead_code)]
 pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, String> {
     // Open ZIP file
     let file = File::open(file_path).map_err(|e| format!("Failed to open ZIP file: {}", e))?;
@@ -340,6 +341,7 @@ pub fn extract_and_install_soundpack_with_type(
 }
 
 /// Handle V1 to V2 config conversion if needed
+#[allow(dead_code)]
 fn handle_config_conversion(
     config_content: &str,
     soundpack_id: &str,

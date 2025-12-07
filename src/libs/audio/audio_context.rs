@@ -9,6 +9,7 @@ static AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new(
 static MOUSE_AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct AudioContext {
     _stream: Arc<OutputStream>,
     pub(crate) stream_handle: OutputStreamHandle,
@@ -162,6 +163,7 @@ impl AudioContext {
             .map(|v| *v)
             .unwrap_or(1.0)
     }
+    #[allow(dead_code)]
     pub fn create_with_device(device_id: Option<String>) -> Result<Self, String> {
         // Initialize device manager
         let device_manager = DeviceManager::new();
@@ -225,11 +227,13 @@ impl AudioContext {
         Ok(context)
     }
 
+    #[allow(dead_code)]
     pub fn get_current_device_info(&self) -> Option<String> {
         let config = AppConfig::load();
         config.selected_audio_device
     }
 
+    #[allow(dead_code)]
     pub fn test_current_device(&self) -> bool {
         let config = AppConfig::load();
         match &config.selected_audio_device {

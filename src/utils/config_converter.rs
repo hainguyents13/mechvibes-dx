@@ -39,7 +39,7 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
 
     let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
-    let mut format = probed.format;
+    let format = probed.format;
 
     // Get the default track
     let track = format
@@ -550,6 +550,7 @@ pub fn convert_v2_multi_to_single(
 }
 
 /// Concatenate multiple audio files into one file
+#[allow(dead_code)]
 fn concatenate_audio_files(
     audio_files: &[(String, f64)], // (filename, duration)
     soundpack_dir: &str,
@@ -687,11 +688,6 @@ fn concatenate_audio_files_with_timing(
                     sample_rate = file_sample_rate;
                     channels = file_channels;
                     println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
-                    // Recalculate offset for first file with correct sample rate
-                    let corrected_offset =
-                        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
-                        1000.0;
-                    // Update if needed
                 }
 
                 // Convert to target format if needed
