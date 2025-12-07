@@ -50,6 +50,7 @@ sudo apt-get install -y \
     libayatana-appindicator3-dev \
     librsvg2-dev \
     libevdev-dev \
+    libxdo-dev \
     autoconf \
     automake \
     libtool
@@ -65,6 +66,7 @@ sudo dnf install -y \
     libappindicator-gtk3-devel \
     librsvg2-devel \
     libevdev-devel \
+    xdotool-devel \
     autoconf \
     automake \
     libtool
