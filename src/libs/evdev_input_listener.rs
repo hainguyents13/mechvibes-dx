@@ -12,7 +12,7 @@ pub fn start_evdev_keyboard_listener(
     _is_focused: Arc<Mutex<bool>>,
 ) {
     thread::spawn(move || {
-        use evdev::{Device, EventType, Key};
+        use evdev::{Device, EventType, KeyCode};
 
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
@@ -62,8 +62,8 @@ pub fn start_evdev_keyboard_listener(
                             if event.event_type() == EventType::KEY {
                                 let key_value = event.value();
 
-                                // Convert event code to Key enum
-                                let key = Key(event.code());
+                                // Convert event code to KeyCode
+                                let key = KeyCode(event.code());
                                 {
                                     let key_code = map_evdev_keycode(key);
                                     if !key_code.is_empty() {
@@ -129,71 +129,71 @@ pub fn start_evdev_keyboard_listener(
 }
 
 #[cfg(target_os = "linux")]
-fn map_evdev_keycode(key: evdev::Key) -> &'static str {
-    use evdev::Key;
+fn map_evdev_keycode(key: evdev::KeyCode) -> &'static str {
+    use evdev::KeyCode;
 
     match key {
         // Letters
-        Key::KEY_A => "KeyA", Key::KEY_B => "KeyB", Key::KEY_C => "KeyC", Key::KEY_D => "KeyD",
-        Key::KEY_E => "KeyE", Key::KEY_F => "KeyF", Key::KEY_G => "KeyG", Key::KEY_H => "KeyH",
-        Key::KEY_I => "KeyI", Key::KEY_J => "KeyJ", Key::KEY_K => "KeyK", Key::KEY_L => "KeyL",
-        Key::KEY_M => "KeyM", Key::KEY_N => "KeyN", Key::KEY_O => "KeyO", Key::KEY_P => "KeyP",
-        Key::KEY_Q => "KeyQ", Key::KEY_R => "KeyR", Key::KEY_S => "KeyS", Key::KEY_T => "KeyT",
-        Key::KEY_U => "KeyU", Key::KEY_V => "KeyV", Key::KEY_W => "KeyW", Key::KEY_X => "KeyX",
-        Key::KEY_Y => "KeyY", Key::KEY_Z => "KeyZ",
+        KeyCode::KEY_A => "KeyA", KeyCode::KEY_B => "KeyB", KeyCode::KEY_C => "KeyC", KeyCode::KEY_D => "KeyD",
+        KeyCode::KEY_E => "KeyE", KeyCode::KEY_F => "KeyF", KeyCode::KEY_G => "KeyG", KeyCode::KEY_H => "KeyH",
+        KeyCode::KEY_I => "KeyI", KeyCode::KEY_J => "KeyJ", KeyCode::KEY_K => "KeyK", KeyCode::KEY_L => "KeyL",
+        KeyCode::KEY_M => "KeyM", KeyCode::KEY_N => "KeyN", KeyCode::KEY_O => "KeyO", KeyCode::KEY_P => "KeyP",
+        KeyCode::KEY_Q => "KeyQ", KeyCode::KEY_R => "KeyR", KeyCode::KEY_S => "KeyS", KeyCode::KEY_T => "KeyT",
+        KeyCode::KEY_U => "KeyU", KeyCode::KEY_V => "KeyV", KeyCode::KEY_W => "KeyW", KeyCode::KEY_X => "KeyX",
+        KeyCode::KEY_Y => "KeyY", KeyCode::KEY_Z => "KeyZ",
 
         // Numbers
-        Key::KEY_1 => "Digit1", Key::KEY_2 => "Digit2", Key::KEY_3 => "Digit3", Key::KEY_4 => "Digit4",
-        Key::KEY_5 => "Digit5", Key::KEY_6 => "Digit6", Key::KEY_7 => "Digit7", Key::KEY_8 => "Digit8",
-        Key::KEY_9 => "Digit9", Key::KEY_0 => "Digit0",
+        KeyCode::KEY_1 => "Digit1", KeyCode::KEY_2 => "Digit2", KeyCode::KEY_3 => "Digit3", KeyCode::KEY_4 => "Digit4",
+        KeyCode::KEY_5 => "Digit5", KeyCode::KEY_6 => "Digit6", KeyCode::KEY_7 => "Digit7", KeyCode::KEY_8 => "Digit8",
+        KeyCode::KEY_9 => "Digit9", KeyCode::KEY_0 => "Digit0",
 
         // Function keys
-        Key::KEY_F1 => "F1", Key::KEY_F2 => "F2", Key::KEY_F3 => "F3", Key::KEY_F4 => "F4",
-        Key::KEY_F5 => "F5", Key::KEY_F6 => "F6", Key::KEY_F7 => "F7", Key::KEY_F8 => "F8",
-        Key::KEY_F9 => "F9", Key::KEY_F10 => "F10", Key::KEY_F11 => "F11", Key::KEY_F12 => "F12",
+        KeyCode::KEY_F1 => "F1", KeyCode::KEY_F2 => "F2", KeyCode::KEY_F3 => "F3", KeyCode::KEY_F4 => "F4",
+        KeyCode::KEY_F5 => "F5", KeyCode::KEY_F6 => "F6", KeyCode::KEY_F7 => "F7", KeyCode::KEY_F8 => "F8",
+        KeyCode::KEY_F9 => "F9", KeyCode::KEY_F10 => "F10", KeyCode::KEY_F11 => "F11", KeyCode::KEY_F12 => "F12",
 
         // Special keys
-        Key::KEY_SPACE => "Space",
-        Key::KEY_ENTER => "Enter",
-        Key::KEY_BACKSPACE => "Backspace",
-        Key::KEY_TAB => "Tab",
-        Key::KEY_ESC => "Escape",
-        Key::KEY_CAPSLOCK => "CapsLock",
-        Key::KEY_LEFTSHIFT => "ShiftLeft",
-        Key::KEY_RIGHTSHIFT => "ShiftRight",
-        Key::KEY_LEFTCTRL => "ControlLeft",
-        Key::KEY_RIGHTCTRL => "ControlRight",
-        Key::KEY_LEFTALT => "AltLeft",
-        Key::KEY_RIGHTALT => "AltRight",
-        Key::KEY_LEFTMETA => "MetaLeft",
-        Key::KEY_RIGHTMETA => "MetaRight",
+        KeyCode::KEY_SPACE => "Space",
+        KeyCode::KEY_ENTER => "Enter",
+        KeyCode::KEY_BACKSPACE => "Backspace",
+        KeyCode::KEY_TAB => "Tab",
+        KeyCode::KEY_ESC => "Escape",
+        KeyCode::KEY_CAPSLOCK => "CapsLock",
+        KeyCode::KEY_LEFTSHIFT => "ShiftLeft",
+        KeyCode::KEY_RIGHTSHIFT => "ShiftRight",
+        KeyCode::KEY_LEFTCTRL => "ControlLeft",
+        KeyCode::KEY_RIGHTCTRL => "ControlRight",
+        KeyCode::KEY_LEFTALT => "AltLeft",
+        KeyCode::KEY_RIGHTALT => "AltRight",
+        KeyCode::KEY_LEFTMETA => "MetaLeft",
+        KeyCode::KEY_RIGHTMETA => "MetaRight",
 
         // Arrow keys
-        Key::KEY_UP => "ArrowUp",
-        Key::KEY_DOWN => "ArrowDown",
-        Key::KEY_LEFT => "ArrowLeft",
-        Key::KEY_RIGHT => "ArrowRight",
+        KeyCode::KEY_UP => "ArrowUp",
+        KeyCode::KEY_DOWN => "ArrowDown",
+        KeyCode::KEY_LEFT => "ArrowLeft",
+        KeyCode::KEY_RIGHT => "ArrowRight",
 
         // Editing keys
-        Key::KEY_INSERT => "Insert",
-        Key::KEY_DELETE => "Delete",
-        Key::KEY_HOME => "Home",
-        Key::KEY_END => "End",
-        Key::KEY_PAGEUP => "PageUp",
-        Key::KEY_PAGEDOWN => "PageDown",
+        KeyCode::KEY_INSERT => "Insert",
+        KeyCode::KEY_DELETE => "Delete",
+        KeyCode::KEY_HOME => "Home",
+        KeyCode::KEY_END => "End",
+        KeyCode::KEY_PAGEUP => "PageUp",
+        KeyCode::KEY_PAGEDOWN => "PageDown",
 
         // Punctuation
-        Key::KEY_MINUS => "Minus",
-        Key::KEY_EQUAL => "Equal",
-        Key::KEY_LEFTBRACE => "BracketLeft",
-        Key::KEY_RIGHTBRACE => "BracketRight",
-        Key::KEY_BACKSLASH => "Backslash",
-        Key::KEY_SEMICOLON => "Semicolon",
-        Key::KEY_APOSTROPHE => "Quote",
-        Key::KEY_GRAVE => "Backquote",
-        Key::KEY_COMMA => "Comma",
-        Key::KEY_DOT => "Period",
-        Key::KEY_SLASH => "Slash",
+        KeyCode::KEY_MINUS => "Minus",
+        KeyCode::KEY_EQUAL => "Equal",
+        KeyCode::KEY_LEFTBRACE => "BracketLeft",
+        KeyCode::KEY_RIGHTBRACE => "BracketRight",
+        KeyCode::KEY_BACKSLASH => "Backslash",
+        KeyCode::KEY_SEMICOLON => "Semicolon",
+        KeyCode::KEY_APOSTROPHE => "Quote",
+        KeyCode::KEY_GRAVE => "Backquote",
+        KeyCode::KEY_COMMA => "Comma",
+        KeyCode::KEY_DOT => "Period",
+        KeyCode::KEY_SLASH => "Slash",
         
         _ => "",
     }
