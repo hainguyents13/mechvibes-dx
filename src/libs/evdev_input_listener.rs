@@ -11,9 +11,12 @@ pub fn start_evdev_keyboard_listener(
     hotkey_tx: Sender<String>,
     _is_focused: Arc<Mutex<bool>>,
 ) {
+    println!("🔍 [evdev] start_evdev_keyboard_listener() called - spawning thread");
     thread::spawn(move || {
         use evdev::{Device, EventType, KeyCode};
 
+        println!("🔍 [evdev] Thread started - initializing keyboard listener");
+        println!("🔍 [evdev] Current user: {:?}", std::env::var("USER"));
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
         // Track modifier keys for hotkey detection
@@ -23,35 +26,48 @@ pub fn start_evdev_keyboard_listener(
         // Find all keyboard devices
         let mut keyboards = Vec::new();
 
+        println!("🔍 [evdev] Enumerating input devices...");
         let devices: Vec<_> = evdev::enumerate().collect();
-        if !devices.is_empty() {
-            for (path, mut device) in devices {
-                    // Check if device has keyboard capabilities
-                    if device.supported_keys().is_some() {
-                        println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+        println!("🔍 [evdev] Found {} total input devices", devices.len());
 
-                        // Set device to non-blocking mode to prevent blocking on idle devices
-                        if let Err(e) = device.set_nonblocking(true) {
-                            eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
-                        }
-
-                        keyboards.push(device);
-                    }
-                }
-            } else {
-                eprintln!("❌ [evdev] No devices found");
-                eprintln!("💡 [evdev] Make sure you're in the 'input' group: sudo usermod -a -G input $USER");
-                return;
-            }
-        
-        if keyboards.is_empty() {
-            eprintln!("❌ [evdev] No keyboard devices found!");
-            eprintln!("💡 [evdev] Make sure you have permission to access /dev/input/event*");
+        if devices.is_empty() {
+            eprintln!("❌ [evdev] No devices found - cannot access /dev/input/event* devices");
+            eprintln!("💡 [evdev] Troubleshooting steps:");
+            eprintln!("   1. Check if you're in the 'input' group: groups $USER");
+            eprintln!("   2. Add yourself to input group: sudo usermod -a -G input $USER");
+            eprintln!("   3. Log out and log back in for group changes to take effect");
+            eprintln!("   4. Check /dev/input permissions: ls -la /dev/input/event*");
             return;
         }
-        
-        println!("🔍 [evdev] Monitoring {} keyboard device(s)", keyboards.len());
-        
+
+        for (path, mut device) in devices {
+            // Check if device has keyboard capabilities
+            if device.supported_keys().is_some() {
+                println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+
+                // Set device to non-blocking mode to prevent blocking on idle devices
+                if let Err(e) = device.set_nonblocking(true) {
+                    eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
+                }
+
+                keyboards.push(device);
+            } else {
+                println!("🔍 [evdev] Skipping non-keyboard device: {:?}", path.display());
+            }
+        }
+
+        if keyboards.is_empty() {
+            eprintln!("❌ [evdev] No keyboard devices found among the {} input devices!", devices.len());
+            eprintln!("💡 [evdev] This might indicate a permission issue or unusual hardware setup");
+            return;
+        }
+
+        println!("✅ [evdev] Successfully initialized {} keyboard device(s)", keyboards.len());
+        println!("🔍 [evdev] Starting event monitoring loop...");
+
+        let mut event_count = 0;
+        let mut first_event_logged = false;
+
         // Monitor all keyboards in a loop
         loop {
             for device in &mut keyboards {
@@ -60,6 +76,12 @@ pub fn start_evdev_keyboard_listener(
                     Ok(events) => {
                         for event in events {
                             if event.event_type() == EventType::KEY {
+                                event_count += 1;
+                                if !first_event_logged {
+                                    println!("✅ [evdev] First keyboard event detected!");
+                                    first_event_logged = true;
+                                }
+
                                 let key_value = event.value();
 
                                 // Convert event code to KeyCode
@@ -89,6 +111,9 @@ pub fn start_evdev_keyboard_listener(
                                             }
 
                                             // Send key press event
+                                            if event_count <= 5 {
+                                                println!("🔍 [evdev] Sending key press: {}", key_code);
+                                            }
                                             let _ = keyboard_tx.send(key_code.to_string());
                                         }
                                         // Handle key release (value == 0)
