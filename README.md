@@ -18,10 +18,109 @@ MechvibesDX lets you play any sound when you type or click. Use it for education
 
 ## Installation
 
+### End Users
+
 1. Download from [Releases](https://github.com/hainguyents13/mechvibes-dx/releases)
 2. Run installer
 3. Select soundpacks
 4. Enjoy the sounds or playing with Customizations
+
+### Building from Source
+
+#### Prerequisites
+
+All platforms:
+- [Rust](https://rustup.rs/) (1.70 or later)
+- [Dioxus CLI](https://dioxuslabs.com/learn/0.6/getting_started): `cargo install dioxus-cli`
+
+#### Platform-Specific Dependencies
+
+**Windows**
+- Visual Studio Build Tools (C++ build tools)
+- [Inno Setup](https://jrsoftware.org/isinfo.php) (for creating installer)
+
+**Linux (Ubuntu/Debian)**
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    libasound2-dev \
+    pkg-config \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libevdev-dev \
+    autoconf \
+    automake \
+    libtool
+```
+
+**Linux (Fedora/RHEL)**
+```bash
+sudo dnf install -y \
+    alsa-lib-devel \
+    pkg-config \
+    webkit2gtk4.1-devel \
+    gtk3-devel \
+    libappindicator-gtk3-devel \
+    librsvg2-devel \
+    libevdev-devel \
+    autoconf \
+    automake \
+    libtool
+```
+
+**macOS**
+```bash
+xcode-select --install
+```
+
+#### Build Instructions
+
+**Development (all platforms)**
+```bash
+# Clone repository
+git clone https://github.com/hainguyents13/mechvibes-dx.git
+cd mechvibes-dx
+
+# Run in development mode
+dx serve
+
+# Or use cargo directly
+cargo run
+```
+
+**Release Build**
+
+Windows:
+```bash
+# Build release binary
+cargo build --release
+
+# Create installer (requires Inno Setup)
+.\scripts\build-windows-installer.ps1
+
+# Output: dist/MechvibesDX-0.4.0-Setup.exe
+```
+
+Linux:
+```bash
+# Build release binary
+cargo build --release
+
+# Binary location: target/release/mechvibes-dx
+```
+
+macOS:
+```bash
+# Build release binary
+cargo build --release
+
+# Bundle app (requires Dioxus CLI)
+dx bundle --release
+
+# Output: target/dx/mechvibes-dx/release/macos/MechvibesDX.app
+```
 
 ## Use cases
 
