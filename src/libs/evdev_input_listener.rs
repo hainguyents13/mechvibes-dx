@@ -12,7 +12,7 @@ pub fn start_evdev_keyboard_listener(
     _is_focused: Arc<Mutex<bool>>,
 ) {
     thread::spawn(move || {
-        use evdev::{Device, EventType};
+        use evdev::{Device, EventType, Key};
 
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
@@ -63,7 +63,7 @@ pub fn start_evdev_keyboard_listener(
                                 let key_value = event.value();
 
                                 // Convert event code to Key enum
-                                let key = evdev::Key(event.code());
+                                let key = Key(event.code());
                                 {
                                     let key_code = map_evdev_keycode(key);
                                     if !key_code.is_empty() {
@@ -131,7 +131,7 @@ pub fn start_evdev_keyboard_listener(
 #[cfg(target_os = "linux")]
 fn map_evdev_keycode(key: evdev::Key) -> &'static str {
     use evdev::Key;
-    
+
     match key {
         // Letters
         Key::KEY_A => "KeyA", Key::KEY_B => "KeyB", Key::KEY_C => "KeyC", Key::KEY_D => "KeyD",
