@@ -173,7 +173,6 @@ impl TrayManager {
 pub fn handle_tray_events() -> Option<TrayMessage> {
     // Handle tray icon click events
     if let Ok(event) = TrayIconEvent::receiver().try_recv() {
-        println!("🖱️ Tray icon event: {:?}", event);
         match event {
             TrayIconEvent::Click {
                 id: _,
@@ -182,13 +181,15 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
                 button,
                 button_state,
             } => {
-                // Check for double-click (two rapid clicks) or just show on any click
+                // Only respond to left button release (avoids duplicate events)
                 if button == tray_icon::MouseButton::Left && button_state == tray_icon::MouseButtonState::Up {
-                    println!("🖱️ Tray icon: Left click - showing window");
+                    println!("🔼 Tray icon clicked - showing window");
                     return Some(TrayMessage::Show);
                 }
             }
-            _ => {}
+            _ => {
+                // Silently ignore other events (Move, Enter, Leave, etc.)
+            }
         }
     }
 
