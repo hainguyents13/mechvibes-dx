@@ -53,7 +53,9 @@ sudo apt-get install -y \
     libxdo-dev \
     autoconf \
     automake \
-    libtool
+    libtool \
+    libfuse2
+# Note: libfuse2 is required for building AppImage
 ```
 
 **Linux (Fedora/RHEL)**
@@ -69,7 +71,9 @@ sudo dnf install -y \
     xdotool-devel \
     autoconf \
     automake \
-    libtool
+    libtool \
+    fuse-libs
+# Note: fuse-libs is required for building AppImage
 ```
 
 **macOS**

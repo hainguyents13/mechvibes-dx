@@ -49,6 +49,17 @@ echo ""
 # Step 3: Build AppImage
 echo -e "${BLUE}📦 Step 3/3: Building AppImage...${NC}"
 
+# Check for FUSE
+if ! command -v fusermount &> /dev/null && [ ! -f /usr/lib/x86_64-linux-gnu/libfuse.so.2 ]; then
+    echo -e "${YELLOW}⚠️  FUSE not found. Installing libfuse2...${NC}"
+    sudo apt-get update && sudo apt-get install -y libfuse2 || {
+        echo -e "${YELLOW}⚠️  Could not install FUSE. Skipping AppImage build.${NC}"
+        echo -e "${YELLOW}   Install manually: sudo apt-get install libfuse2${NC}"
+        echo -e "${GREEN}✓ DEB package is ready: ${DEB_FILE}${NC}"
+        exit 0
+    }
+fi
+
 # Create AppDir structure
 echo "  → Creating AppDir structure..."
 rm -rf AppDir
