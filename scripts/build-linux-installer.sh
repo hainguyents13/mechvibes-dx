@@ -33,11 +33,17 @@ fi
 
 cargo deb
 
-# Copy DEB to dist directory
+# Copy DEB to dist directory (cargo-deb adds -1 revision by default)
 mkdir -p dist
-cp "target/debian/mechvibes-dx_${VERSION}_amd64.deb" "dist/mechvibes-dx_${VERSION}_amd64.deb"
-DEB_FILE="dist/mechvibes-dx_${VERSION}_amd64.deb"
-echo -e "${GREEN}✓ DEB package created: ${DEB_FILE}${NC}"
+DEB_SOURCE=$(ls target/debian/mechvibes-dx_${VERSION}*.deb | head -1)
+if [ -f "$DEB_SOURCE" ]; then
+    cp "$DEB_SOURCE" "dist/mechvibes-dx_${VERSION}_amd64.deb"
+    DEB_FILE="dist/mechvibes-dx_${VERSION}_amd64.deb"
+    echo -e "${GREEN}✓ DEB package created: ${DEB_FILE}${NC}"
+else
+    echo -e "${RED}❌ DEB package not found in target/debian/${NC}"
+    exit 1
+fi
 echo ""
 
 # Step 3: Build AppImage
