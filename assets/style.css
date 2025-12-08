@@ -4447,9 +4447,9 @@ html, body {
   .backdrop-blur-sm,
   .backdrop-blur-md,
   .backdrop-blur-lg {
-    /* Solid semi-opaque background when blur is not supported */
+    /* Solid background when blur is not supported */
     background-color: var(--color-base-200);
-    opacity: 0.95;
+    opacity: 0.9 !important; /* 90% opacity for better visibility */
   }
 }
 
