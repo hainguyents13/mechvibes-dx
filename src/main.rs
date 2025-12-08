@@ -28,18 +28,27 @@ const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     // Try to create icon from embedded ICO data
     // Windows taskbar works best with 32x32 icons
+    // Linux/X11 needs larger icons (64x64 or 48x48)
     match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
         Ok(img) => {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
             debug_print!("📐 Loaded icon from ICO: {}x{}", width, height);
 
-            // Always resize to 32x32 for maximum Windows taskbar compatibility
-            // This is the standard size Windows expects for taskbar icons
+            // Platform-specific icon sizes
+            // Windows: 32x32 for taskbar
+            // Linux: 64x64 for better X11/Wayland support
+            #[cfg(target_os = "windows")]
             let target_size = 32u32;
 
+            #[cfg(target_os = "linux")]
+            let target_size = 64u32;
+
+            #[cfg(target_os = "macos")]
+            let target_size = 64u32;
+
             let final_rgba = if width != target_size || height != target_size {
-                debug_print!("🔄 Resizing icon from {}x{} to {}x{} for Windows taskbar", width, height, target_size, target_size);
+                debug_print!("🔄 Resizing icon from {}x{} to {}x{}", width, height, target_size, target_size);
                 image::imageops::resize(&rgba, target_size, target_size, image::imageops::FilterType::Lanczos3)
             } else {
                 debug_print!("✅ Icon already at optimal size ({}x{})", width, height);
