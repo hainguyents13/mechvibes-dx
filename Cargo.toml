@@ -97,18 +97,7 @@ priority = "optional"
 assets = [
   ["target/release/mechvibes-dx", "usr/bin/", "755"],
   ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png", "644"],
+  ["mechvibes-dx.desktop", "usr/share/applications/", "644"],
   ["README.md", "usr/share/doc/mechvibes-dx/", "644"],
 ]
 maintainer-scripts = "debian/"
-
-# Desktop entry for application menu
-[package.metadata.deb.desktop]
-Name = "Mechvibes DX"
-GenericName = "Keyboard Sound Simulator"
-Comment = "Mechanical keyboard sound simulator"
-Categories = "Audio;AudioVideo;Utility;"
-Icon = "mechvibes-dx"
-Terminal = false
-Type = "Application"
-Keywords = "keyboard;sound;mechanical;simulator;"
-StartupNotify = true
