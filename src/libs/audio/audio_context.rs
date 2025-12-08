@@ -13,8 +13,8 @@ static MOUSE_AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock
 pub struct AudioContext {
     _stream: Arc<OutputStream>,
     pub(crate) stream_handle: OutputStreamHandle,
-    pub(crate) keyboard_samples: Arc<Mutex<Option<(Vec<f32>, u16, u32)>>>,
-    pub(crate) mouse_samples: Arc<Mutex<Option<(Vec<f32>, u16, u32)>>>,
+    pub(crate) keyboard_samples: Arc<Mutex<Option<(Arc<Vec<f32>>, u16, u32)>>>,
+    pub(crate) mouse_samples: Arc<Mutex<Option<(Arc<Vec<f32>>, u16, u32)>>>,
     pub(crate) key_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
     pub(crate) mouse_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
     pub(crate) max_voices: usize,

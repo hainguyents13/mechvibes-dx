@@ -2,6 +2,7 @@ use crate::state::config::AppConfig;
 use crate::state::paths;
 use crate::state::soundpack::SoundPack;
 use crate::state::soundpack::{ SoundpackCache, SoundpackMetadata };
+use std::sync::Arc;
 
 use super::audio_context::AudioContext;
 
@@ -580,9 +581,9 @@ fn update_keyboard_context(
     let key_mapping_count = key_mappings.len();
     let soundpack_name = soundpack.name.clone();
 
-    // Update keyboard samples
+    // Update keyboard samples (wrap in Arc to avoid cloning on every keypress)
     if let Ok(mut cached) = context.keyboard_samples.lock() {
-        *cached = Some((audio_samples, channels, sample_rate));
+        *cached = Some((Arc::new(audio_samples), channels, sample_rate));
         println!("🎹 Updated keyboard samples: {} samples", sample_count);
     } else {
         return Err("Failed to acquire lock on keyboard_samples".to_string());
@@ -642,9 +643,9 @@ fn update_mouse_context(
     let mouse_mapping_count = mouse_mappings.len();
     let soundpack_name = soundpack.name.clone();
 
-    // Update mouse samples
+    // Update mouse samples (wrap in Arc to avoid cloning on every click)
     if let Ok(mut cached) = context.mouse_samples.lock() {
-        *cached = Some((audio_samples, channels, sample_rate));
+        *cached = Some((Arc::new(audio_samples), channels, sample_rate));
         println!("🖱️ Updated mouse samples: {} samples", sample_count);
     } else {
         return Err("Failed to acquire lock on mouse_samples".to_string());

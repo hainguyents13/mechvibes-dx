@@ -104,8 +104,10 @@ impl AudioContext {
         self.play_sound_segment(key, start, end, is_keydown);
     }
     fn play_sound_segment(&self, key: &str, start: f32, end: f32, is_keydown: bool) {
+        // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
-        if let Some((samples, channels, sample_rate)) = pcm_opt {
+        if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
+            let samples = &**samples_arc; // Deref Arc to access Vec
             // Calculate total audio duration in milliseconds
             let total_duration =
                 ((samples.len() as f32) / (sample_rate as f32) / (channels as f32)) * 1000.0;
@@ -324,8 +326,10 @@ impl AudioContext {
         duration: f32,
         is_buttondown: bool
     ) {
+        // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.mouse_samples.lock().unwrap().clone();
-        if let Some((samples, channels, sample_rate)) = pcm_opt {
+        if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
+            let samples = &**samples_arc; // Deref Arc to access Vec
             // Calculate total audio duration in milliseconds
             let total_duration =
                 ((samples.len() as f32) / (sample_rate as f32) / (channels as f32)) * 1000.0;
