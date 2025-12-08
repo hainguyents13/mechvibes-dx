@@ -22,22 +22,31 @@ use libs::evdev_input_listener::start_evdev_keyboard_listener;
 #[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex};
 
-// Use .ico format for better Windows compatibility
+// Platform-specific icon files for optimal quality
+#[cfg(target_os = "windows")]
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
+#[cfg(not(target_os = "windows"))]
+const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.png");
+
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
-    // Try to create icon from embedded ICO data
-    // Windows taskbar works best with 32x32 icons
-    // Linux/X11 needs larger icons (64x64 or 48x48)
-    match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
+    // Platform-specific icon format and size
+    // Windows: ICO format (multi-size), 32x32 for taskbar
+    // Linux/macOS: PNG format, 64x64 for better X11/Wayland support
+
+    #[cfg(target_os = "windows")]
+    let format = image::ImageFormat::Ico;
+
+    #[cfg(not(target_os = "windows"))]
+    let format = image::ImageFormat::Png;
+
+    match image::load_from_memory_with_format(EMBEDDED_ICON, format) {
         Ok(img) => {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            debug_print!("📐 Loaded icon from ICO: {}x{}", width, height);
+            debug_print!("📐 Loaded icon: {}x{}", width, height);
 
-            // Platform-specific icon sizes
-            // Windows: 32x32 for taskbar
-            // Linux: 64x64 for better X11/Wayland support
+            // Platform-specific target sizes
             #[cfg(target_os = "windows")]
             let target_size = 32u32;
 
