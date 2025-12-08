@@ -83,8 +83,41 @@ pub fn Header() -> Element {
             String::new()
         };
 
+        // Platform-specific CSS for Linux (solid backgrounds when blur not supported)
+        #[cfg(target_os = "linux")]
+        let platform_css = r#"
+/* Linux-specific: Solid backgrounds for backdrop-blur fallback */
+.backdrop-blur-sm,
+.backdrop-blur-md,
+.backdrop-blur-lg {
+  background-color: var(--color-base-200) !important;
+}
+
+body {
+  background-color: var(--color-base-100);
+}
+
+:where(:root),[data-theme=light] body {
+  background-color: oklch(98% 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root body {
+    background-color: oklch(23.26% 0.014 253.1);
+  }
+}
+
+:root:has(input.theme-controller[value=forest]:checked) body,
+[data-theme=forest] body {
+  background-color: oklch(21.15% 0.012 254.09);
+}
+"#.to_string();
+
+        #[cfg(not(target_os = "linux"))]
+        let platform_css = String::new();
+
         // Combine all dynamic CSS parts
-        let dynamic_css = format!("{}\n{}\n{}", font_css, custom_theme_css, custom_css); // Inject only dynamic CSS using eval
+        let dynamic_css = format!("{}\n{}\n{}\n{}", font_css, custom_theme_css, custom_css, platform_css); // Inject only dynamic CSS using eval
         let script = format!(
             r#"
               // Remove existing custom style if any

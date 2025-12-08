@@ -4441,35 +4441,8 @@ html, body {
   overflow: hidden;
 }
 
-/* Backdrop-blur fallback: provide solid backgrounds */
-/* Apply to all systems, blur will layer on top where supported (Windows) */
-.backdrop-blur-sm,
-.backdrop-blur-md,
-.backdrop-blur-lg {
-  /* Fully opaque solid background */
-  background-color: var(--color-base-200) !important;
-}
-
-/* Solid body background for all systems */
-body {
-  background-color: var(--color-base-100);
-}
-
-/* Theme-specific body backgrounds */
-:where(:root),[data-theme=light] body {
-  background-color: oklch(98% 0 0); /* base-200 light */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root body {
-    background-color: oklch(23.26% 0.014 253.1); /* base-200 dark */
-  }
-}
-
-:root:has(input.theme-controller[value=forest]:checked) body,
-[data-theme=forest] body {
-  background-color: oklch(21.15% 0.012 254.09); /* base-300 forest */
-}
+/* Platform-specific backdrop-blur fallback is injected via Rust */
+/* See src/components/header.rs for Linux-specific solid backgrounds */
 
 .logo-pressed {
   margin-top: 5px;
