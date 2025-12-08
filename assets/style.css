@@ -4441,33 +4441,40 @@ html, body {
   overflow: hidden;
 }
 
-/* Always provide background for body (fixes Linux transparent background issue) */
-body {
-  background-color: var(--color-base-100);
-}
-
-/* Theme-specific body backgrounds */
-:where(:root),[data-theme=light] body {
-  background-color: oklch(98% 0 0); /* base-200 light */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root body {
-    background-color: oklch(23.26% 0.014 253.1); /* base-200 dark */
+/* Backdrop-blur fallback: Only apply solid backgrounds when blur is NOT supported */
+/* This way Windows keeps its blur effect, Linux gets solid backgrounds */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    /* Solid semi-opaque background when blur is not supported */
+    background-color: var(--color-base-200);
+    opacity: 0.95;
   }
 }
 
-:root:has(input.theme-controller[value=forest]:checked) body,
-[data-theme=forest] body {
-  background-color: oklch(21.15% 0.012 254.09); /* base-300 forest */
-}
+/* Fallback for systems without backdrop-blur support */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  /* Provide solid background for body when blur is definitely not supported */
+  body {
+    background-color: var(--color-base-100);
+  }
 
-/* Ensure backdrop-blur elements have solid background fallback */
-.backdrop-blur-sm,
-.backdrop-blur-md,
-.backdrop-blur-lg {
-  background-color: var(--color-base-200);
-  opacity: 0.95;
+  /* Theme-specific body backgrounds */
+  :where(:root),[data-theme=light] body {
+    background-color: oklch(98% 0 0); /* base-200 light */
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root body {
+      background-color: oklch(23.26% 0.014 253.1); /* base-200 dark */
+    }
+  }
+
+  :root:has(input.theme-controller[value=forest]:checked) body,
+  [data-theme=forest] body {
+    background-color: oklch(21.15% 0.012 254.09); /* base-300 forest */
+  }
 }
 
 .logo-pressed {
