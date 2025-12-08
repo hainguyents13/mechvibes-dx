@@ -6,6 +6,11 @@ use tray_icon::{
     TrayIconEvent,
 };
 use crate::utils::constants::APP_NAME;
+use std::sync::Mutex;
+use std::time::Instant;
+
+// Track last click time for double-click detection
+static LAST_CLICK_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 
 // Embed the icon at compile time for cross-platform reliability
 const EMBEDDED_ICON: &[u8] = include_bytes!("../../assets/icon.ico");
@@ -183,8 +188,23 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
             } => {
                 // Only respond to left button release (avoids duplicate events)
                 if button == tray_icon::MouseButton::Left && button_state == tray_icon::MouseButtonState::Up {
-                    println!("🔼 Tray icon clicked - showing window");
-                    return Some(TrayMessage::Show);
+                    // Double-click detection: 500ms window
+                    let now = Instant::now();
+                    let mut last_click = LAST_CLICK_TIME.lock().unwrap();
+
+                    let is_double_click = if let Some(last_time) = *last_click {
+                        now.duration_since(last_time).as_millis() < 500
+                    } else {
+                        false
+                    };
+
+                    *last_click = Some(now);
+                    drop(last_click);
+
+                    if is_double_click {
+                        println!("🔼 Tray icon double-clicked - showing window");
+                        return Some(TrayMessage::Show);
+                    }
                 }
             }
             _ => {
