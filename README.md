@@ -110,12 +110,12 @@ Linux:
 # Option 1: Build both DEB and AppImage (recommended)
 ./scripts/build-linux-installer.sh
 
-# Outputs:
-# - target/debian/mechvibes-dx_0.4.0_amd64.deb (Ubuntu/Debian)
+# Outputs (unified in dist/ directory):
+# - dist/mechvibes-dx_0.4.0_amd64.deb (Ubuntu/Debian)
 # - dist/mechvibes-dx-0.4.0-x86_64.AppImage (Universal)
 
 # Install DEB (auto-adds user to input group)
-sudo dpkg -i target/debian/mechvibes-dx_0.4.0_amd64.deb
+sudo dpkg -i dist/mechvibes-dx_0.4.0_amd64.deb
 
 # Or run AppImage (portable, no install needed)
 chmod +x dist/mechvibes-dx-0.4.0-x86_64.AppImage
@@ -126,6 +126,7 @@ chmod +x dist/mechvibes-dx-0.4.0-x86_64.AppImage
 # Option 2: Build DEB only
 cargo install cargo-deb
 cargo deb
+# Output: target/debian/mechvibes-dx_0.4.0_amd64.deb
 
 # Option 3: Build binary only
 # Add user to input group manually (required for keyboard input)

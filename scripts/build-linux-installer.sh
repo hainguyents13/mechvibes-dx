@@ -32,7 +32,11 @@ if ! command -v cargo-deb &> /dev/null; then
 fi
 
 cargo deb
-DEB_FILE="target/debian/mechvibes-dx_${VERSION}_amd64.deb"
+
+# Copy DEB to dist directory
+mkdir -p dist
+cp "target/debian/mechvibes-dx_${VERSION}_amd64.deb" "dist/mechvibes-dx_${VERSION}_amd64.deb"
+DEB_FILE="dist/mechvibes-dx_${VERSION}_amd64.deb"
 echo -e "${GREEN}✓ DEB package created: ${DEB_FILE}${NC}"
 echo ""
 
@@ -71,12 +75,9 @@ fi
 
 # Build AppImage
 echo "  → Building AppImage..."
-ARCH=x86_64 ./$APPIMAGETOOL AppDir "mechvibes-dx-${VERSION}-x86_64.AppImage"
-APPIMAGE_FILE="mechvibes-dx-${VERSION}-x86_64.AppImage"
-
-# Move to dist directory
 mkdir -p dist
-mv "$APPIMAGE_FILE" "dist/$APPIMAGE_FILE"
+ARCH=x86_64 ./$APPIMAGETOOL AppDir "dist/mechvibes-dx-${VERSION}-x86_64.AppImage"
+APPIMAGE_FILE="mechvibes-dx-${VERSION}-x86_64.AppImage"
 
 echo -e "${GREEN}✓ AppImage created: dist/${APPIMAGE_FILE}${NC}"
 echo ""
@@ -87,12 +88,12 @@ echo -e "${GREEN}✓ Build completed successfully!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${BLUE}📦 Packages created:${NC}"
-echo -e "  • DEB:      ${DEB_FILE}"
-echo -e "  • AppImage: dist/${APPIMAGE_FILE}"
+echo -e "  • DEB:      dist/mechvibes-dx_${VERSION}_amd64.deb"
+echo -e "  • AppImage: dist/mechvibes-dx-${VERSION}-x86_64.AppImage"
 echo ""
 echo -e "${BLUE}📝 Installation:${NC}"
-echo -e "  • DEB:      sudo dpkg -i ${DEB_FILE}"
-echo -e "  • AppImage: chmod +x dist/${APPIMAGE_FILE} && ./dist/${APPIMAGE_FILE}"
+echo -e "  • DEB:      sudo dpkg -i dist/mechvibes-dx_${VERSION}_amd64.deb"
+echo -e "  • AppImage: chmod +x dist/mechvibes-dx-${VERSION}-x86_64.AppImage && ./dist/mechvibes-dx-${VERSION}-x86_64.AppImage"
 echo ""
 echo -e "${YELLOW}⚠️  Note: DEB installation requires logout/login for input group access${NC}"
 echo ""
