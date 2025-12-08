@@ -107,7 +107,22 @@ cargo build --release
 
 Linux:
 ```bash
-# Add user to input group (required for keyboard input on Linux)
+# Option 1: Build DEB package (recommended for Ubuntu/Debian)
+# Install cargo-deb
+cargo install cargo-deb
+
+# Build DEB package
+cargo deb
+
+# Install the package (automatically adds user to input group)
+sudo dpkg -i target/debian/mechvibes-dx_0.4.0_amd64.deb
+
+# Log out and log back in for group changes to take effect
+
+# Output: target/debian/mechvibes-dx_0.4.0_amd64.deb
+
+# Option 2: Build binary only
+# Add user to input group manually (required for keyboard input)
 sudo usermod -a -G input $USER
 # Log out and log back in for group changes to take effect
 

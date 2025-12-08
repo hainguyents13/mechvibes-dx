@@ -82,3 +82,33 @@ inherits = "dev"
 
 [profile.android-dev]
 inherits = "dev"
+
+# DEB package configuration for Ubuntu/Debian
+[package.metadata.deb]
+maintainer = "Hải Nguyễn <hainguyen.ts13@gmail.com>"
+copyright = "2025, Hải Nguyễn <hainguyen.ts13@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = """\
+A modern mechanical keyboard sound simulator for Linux.
+Plays realistic keyboard sounds as you type with customizable soundpacks."""
+depends = "$auto, libasound2, libevdev2, libxdo3"
+section = "sound"
+priority = "optional"
+assets = [
+  ["target/release/mechvibes-dx", "usr/bin/", "755"],
+  ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png", "644"],
+  ["README.md", "usr/share/doc/mechvibes-dx/", "644"],
+]
+maintainer-scripts = "debian/"
+
+# Desktop entry for application menu
+[package.metadata.deb.desktop]
+Name = "Mechvibes DX"
+GenericName = "Keyboard Sound Simulator"
+Comment = "Mechanical keyboard sound simulator"
+Categories = "Audio;AudioVideo;Utility;"
+Icon = "mechvibes-dx"
+Terminal = false
+Type = "Application"
+Keywords = "keyboard;sound;mechanical;simulator;"
+StartupNotify = true

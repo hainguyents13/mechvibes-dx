@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+# Clean up icon cache on removal
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0
