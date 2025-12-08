@@ -107,6 +107,10 @@ cargo build --release
 
 Linux:
 ```bash
+# Add user to input group (required for keyboard input on Linux)
+sudo usermod -a -G input $USER
+# Log out and log back in for group changes to take effect
+
 # Build release binary
 cargo build --release
 
@@ -154,6 +158,12 @@ Piano pack/
 **Hotkey not working?** Run as administrator, check for conflicts
 
 **Soundpack won't load?** Verify config.json syntax, supported audio formats
+
+**Linux: No keyboard input detected?**
+- Add user to `input` group: `sudo usermod -a -G input $USER`
+- Log out and log back in for changes to take effect
+- Verify with: `groups $USER` (should include `input`)
+- Check device permissions: `ls -la /dev/input/event*` (should show `crw-rw---- root input`)
 
 ## License
 
