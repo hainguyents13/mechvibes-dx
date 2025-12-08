@@ -28,9 +28,10 @@ pub fn start_evdev_keyboard_listener(
 
         println!("🔍 [evdev] Enumerating input devices...");
         let devices: Vec<_> = evdev::enumerate().collect();
-        println!("🔍 [evdev] Found {} total input devices", devices.len());
+        let device_count = devices.len();
+        println!("🔍 [evdev] Found {} total input devices", device_count);
 
-        if devices.is_empty() {
+        if device_count == 0 {
             eprintln!("❌ [evdev] No devices found - cannot access /dev/input/event* devices");
             eprintln!("💡 [evdev] Troubleshooting steps:");
             eprintln!("   1. Check if you're in the 'input' group: groups $USER");
@@ -57,7 +58,7 @@ pub fn start_evdev_keyboard_listener(
         }
 
         if keyboards.is_empty() {
-            eprintln!("❌ [evdev] No keyboard devices found among the {} input devices!", devices.len());
+            eprintln!("❌ [evdev] No keyboard devices found among the {} input devices!", device_count);
             eprintln!("💡 [evdev] This might indicate a permission issue or unusual hardware setup");
             return;
         }
