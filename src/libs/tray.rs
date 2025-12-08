@@ -3,6 +3,7 @@ use tray_icon::{
     menu::{ Menu, MenuEvent, MenuItem, PredefinedMenuItem, MenuId },
     TrayIcon,
     TrayIconBuilder,
+    TrayIconEvent,
 };
 use crate::utils::constants::APP_NAME;
 
@@ -170,6 +171,27 @@ impl TrayManager {
 }
 
 pub fn handle_tray_events() -> Option<TrayMessage> {
+    // Handle tray icon click events
+    if let Ok(event) = TrayIconEvent::receiver().try_recv() {
+        println!("🖱️ Tray icon event: {:?}", event);
+        match event {
+            TrayIconEvent::Click {
+                id: _,
+                position: _,
+                rect: _,
+                button,
+                button_state,
+            } => {
+                // Check for double-click (two rapid clicks) or just show on any click
+                if button == tray_icon::MouseButton::Left && button_state == tray_icon::MouseButtonState::Up {
+                    println!("🖱️ Tray icon: Left click - showing window");
+                    return Some(TrayMessage::Show);
+                }
+            }
+            _ => {}
+        }
+    }
+
     // Handle menu events
     if let Ok(event) = MenuEvent::receiver().try_recv() {
         println!("🖱️ Tray menu event received: {:?}", event);
