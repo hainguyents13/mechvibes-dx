@@ -107,21 +107,27 @@ cargo build --release
 
 Linux:
 ```bash
-# Option 1: Build DEB package (recommended for Ubuntu/Debian)
-# Install cargo-deb
-cargo install cargo-deb
+# Option 1: Build both DEB and AppImage (recommended)
+./scripts/build-linux-installer.sh
 
-# Build DEB package
-cargo deb
+# Outputs:
+# - target/debian/mechvibes-dx_0.4.0_amd64.deb (Ubuntu/Debian)
+# - dist/mechvibes-dx-0.4.0-x86_64.AppImage (Universal)
 
-# Install the package (automatically adds user to input group)
+# Install DEB (auto-adds user to input group)
 sudo dpkg -i target/debian/mechvibes-dx_0.4.0_amd64.deb
+
+# Or run AppImage (portable, no install needed)
+chmod +x dist/mechvibes-dx-0.4.0-x86_64.AppImage
+./dist/mechvibes-dx-0.4.0-x86_64.AppImage
 
 # Log out and log back in for group changes to take effect
 
-# Output: target/debian/mechvibes-dx_0.4.0_amd64.deb
+# Option 2: Build DEB only
+cargo install cargo-deb
+cargo deb
 
-# Option 2: Build binary only
+# Option 3: Build binary only
 # Add user to input group manually (required for keyboard input)
 sudo usermod -a -G input $USER
 # Log out and log back in for group changes to take effect

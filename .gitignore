@@ -13,6 +13,12 @@ node_modules
 /tests*
 /dist
 
+# AppImage build artifacts
+/AppDir
+appimagetool-*.AppImage
+*.AppImage
+*.zsync
+
 # Test files and directories
 
 # Soundpacks - ignore new ones but keep existing tracked ones
