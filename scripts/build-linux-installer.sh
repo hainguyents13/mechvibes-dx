@@ -72,6 +72,10 @@ cp target/release/mechvibes-dx AppDir/usr/bin/
 cp assets/icon.png AppDir/usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png
 cp mechvibes-dx.desktop AppDir/usr/share/applications/
 
+# AppImage requires desktop file and icon at root level
+cp mechvibes-dx.desktop AppDir/
+cp assets/icon.png AppDir/mechvibes-dx.png
+
 # Create AppRun script
 cat > AppDir/AppRun << 'APPRUN_EOF'
 #!/bin/bash
