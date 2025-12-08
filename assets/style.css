@@ -4440,6 +4440,35 @@
 html, body {
   overflow: hidden;
 }
+
+/* Fallback background for Linux/systems without backdrop-blur support */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  /* Light theme fallback */
+  :where(:root),[data-theme=light] {
+    background-color: oklch(98% 0 0) !important; /* base-200 */
+  }
+
+  /* Dark theme fallback */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      background-color: oklch(23.26% 0.014 253.1) !important; /* base-200 dark */
+    }
+  }
+
+  /* Forest theme fallback */
+  :root:has(input.theme-controller[value=forest]:checked),[data-theme=forest] {
+    background-color: oklch(21.15% 0.012 254.09) !important; /* base-300 forest */
+  }
+
+  /* Apply semi-opaque background to elements using backdrop-blur */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    background-color: var(--color-base-200) !important;
+    opacity: 0.95;
+  }
+}
+
 .logo-pressed {
   margin-top: 5px;
   margin-bottom: -5px;
