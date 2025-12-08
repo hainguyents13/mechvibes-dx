@@ -7,6 +7,6 @@ Comment=Mechanical keyboard sound simulator
 Icon=mechvibes-dx
 Exec=mechvibes-dx
 Terminal=false
-Categories=Audio;AudioVideo;Utility;
+Categories=AudioVideo;
 Keywords=keyboard;sound;mechanical;simulator;
 StartupNotify=true
