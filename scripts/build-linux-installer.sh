@@ -66,11 +66,13 @@ rm -rf AppDir
 mkdir -p AppDir/usr/bin
 mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
 mkdir -p AppDir/usr/share/applications
+mkdir -p AppDir/usr/share/mechvibes-dx/soundpacks
 
 # Copy files to AppDir
 cp target/release/mechvibes-dx AppDir/usr/bin/
 cp assets/icon.png AppDir/usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png
 cp mechvibes-dx.desktop AppDir/usr/share/applications/
+cp -r soundpacks/* AppDir/usr/share/mechvibes-dx/soundpacks/
 
 # AppImage requires desktop file and icon at root level
 cp mechvibes-dx.desktop AppDir/

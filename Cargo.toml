@@ -100,5 +100,6 @@ assets = [
   ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png", "644"],
   ["mechvibes-dx.desktop", "usr/share/applications/", "644"],
   ["README.md", "usr/share/doc/mechvibes-dx/", "644"],
+  ["soundpacks/**/*", "usr/share/mechvibes-dx/soundpacks/", "644"],
 ]
 maintainer-scripts = "debian/"

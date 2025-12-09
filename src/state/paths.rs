@@ -136,9 +136,25 @@ pub mod soundpacks {
         BUILTIN_SOUNDPACKS.contains(&soundpack_id)
     }
 
-    /// Get the base soundpacks directory for built-in soundpacks (app root)
+    /// Get the base soundpacks directory for built-in soundpacks
+    /// Checks multiple locations in order:
+    /// 1. /usr/share/mechvibes-dx/soundpacks (installed via DEB/system package)
+    /// 2. {app_root}/soundpacks (portable/dev mode)
     pub fn get_builtin_soundpacks_dir() -> PathBuf {
-        get_app_root().join("soundpacks")
+        // Check standard Linux data directory first (for installed packages)
+        #[cfg(target_os = "linux")]
+        {
+            let system_soundpacks = PathBuf::from("/usr/share/mechvibes-dx/soundpacks");
+            if system_soundpacks.exists() {
+                println!("📂 Using system soundpacks directory: {}", system_soundpacks.display());
+                return system_soundpacks;
+            }
+        }
+
+        // Fallback to app root (for portable/dev mode)
+        let app_root_soundpacks = get_app_root().join("soundpacks");
+        println!("📂 Using app root soundpacks directory: {}", app_root_soundpacks.display());
+        app_root_soundpacks
     }
 
     /// Get the base soundpacks directory for custom soundpacks (system app data)
