@@ -45,8 +45,10 @@ pub fn load_keyboard_soundpack_with_cache_control(
     match load_keyboard_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
         Ok(()) => Ok(()),
         Err(e) => {
-            // Capture the error in cache
-            capture_soundpack_loading_error(soundpack_id, &e);
+            // Capture the error in cache only if requested
+            if update_cache_on_error {
+                capture_soundpack_loading_error(soundpack_id, &e);
+            }
             Err(e)
         }
     }
