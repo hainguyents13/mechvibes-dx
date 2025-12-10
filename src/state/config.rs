@@ -151,9 +151,11 @@ impl AppConfig {
         // Ensure data directory exists
         if let Some(parent) = config_path.parent() {
             if let Err(_) = path::ensure_directory_exists(parent) {
-                eprintln!("Warning: Could not create data directory");
+                eprintln!("⚠️  Could not create data directory");
             }
         }
+
+        println!("📖 Loading config from: {}", config_path.display());
 
         // Load config from file, falling back to defaults if it doesn't exist or is invalid
         match data::load_json_from_file::<AppConfig>(&config_path) {
@@ -193,7 +195,9 @@ impl AppConfig {
                 config
             }
             Err(e) => {
-                eprintln!("Warning: Failed to load config file: {}. Using defaults.", e);
+                eprintln!("❌ Failed to load config file: {}. Using defaults.", e);
+                eprintln!("   Config path: {}", config_path.display());
+                eprintln!("   This will reset all settings to defaults!");
                 let default_config = Self::default();
                 let _ = default_config.save();
                 default_config
@@ -203,6 +207,9 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
+        println!("💾 Saving config to: {}", config_path.display());
+        println!("   keyboard_soundpack: {}", self.keyboard_soundpack);
+        println!("   mouse_soundpack: {}", self.mouse_soundpack);
         data::save_json_to_file(self, &config_path)
     }
 }

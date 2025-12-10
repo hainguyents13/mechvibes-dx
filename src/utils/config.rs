@@ -4,25 +4,15 @@ use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Hook that always loads fresh config from file
-/// This ensures components get updated config even when changed externally (like hotkeys)
+/// Hook that loads config from file once on component mount
+/// Config updates happen via the update_config function, not automatic polling
+/// This prevents flickering and unnecessary re-renders
 pub fn use_fresh_config() -> Signal<AppConfig> {
-    let mut config = use_signal(|| AppConfig::load());
+    let config = use_signal(|| AppConfig::load());
 
-    // Refresh config from file periodically to catch external changes
-    // Using 1000ms interval to reduce CPU usage and prevent excessive re-renders
-    use_effect(move || {
-        spawn(async move {
-            loop {
-                delay::Delay::ms(1000).await;
-                let fresh_config = AppConfig::load();
-                if fresh_config.last_updated != config().last_updated {
-                    println!("[config_utils] Config file changed, reloading...");
-                    config.set(fresh_config);
-                }
-            }
-        });
-    });
+    // Note: Automatic polling disabled to prevent flickering
+    // Config updates are handled by update_config function
+    // which directly updates the signal after saving
 
     config
 }
