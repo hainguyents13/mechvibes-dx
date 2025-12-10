@@ -4,17 +4,12 @@ use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Hook that loads config from file once on component mount
-/// Config updates happen via the update_config function, not automatic polling
-/// This prevents flickering and unnecessary re-renders
+/// Hook that gets the global config from context
+/// Config is loaded once at app startup and shared across all pages
+/// This prevents config reset on page navigation
 pub fn use_fresh_config() -> Signal<AppConfig> {
-    let config = use_signal(|| AppConfig::load());
-
-    // Note: Automatic polling disabled to prevent flickering
-    // Config updates are handled by update_config function
-    // which directly updates the signal after saving
-
-    config
+    // Get global config from context (provided in ui.rs app())
+    use_context::<Signal<AppConfig>>()
 }
 
 /// Creates a config updater function that loads fresh config, applies changes, and saves

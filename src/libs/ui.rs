@@ -34,6 +34,13 @@ pub fn app() -> Element {
     let update_signal = use_signal(|| 0u32);
     use_context_provider(|| update_signal);
 
+    // Create global config state - load once and share across all pages
+    let global_config = use_signal(|| {
+        println!("🌍 Initializing global config context");
+        crate::state::config::AppConfig::load()
+    });
+    use_context_provider(|| global_config);
+
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new());
 
