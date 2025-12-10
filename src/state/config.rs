@@ -128,6 +128,20 @@ impl AppConfig {
         // Load config from file, falling back to defaults if it doesn't exist or is invalid
         match data::load_json_from_file::<AppConfig>(&config_path) {
             Ok(mut config) => {
+                let mut config_updated = false;
+
+                // Migrate old soundpack IDs to new format
+                if config.keyboard_soundpack == "oreo" {
+                    println!("🔄 Migrating keyboard soundpack: oreo -> keyboard/eg-oreo");
+                    config.keyboard_soundpack = "keyboard/eg-oreo".to_string();
+                    config_updated = true;
+                }
+                if config.mouse_soundpack == "test-mouse" {
+                    println!("🔄 Migrating mouse soundpack: test-mouse -> mouse/ping");
+                    config.mouse_soundpack = "mouse/ping".to_string();
+                    config_updated = true;
+                }
+
                 // Sync auto_start with actual registry state
                 let actual_auto_start = crate::utils::auto_startup::get_auto_startup_state();
                 if config.auto_start != actual_auto_start {
@@ -137,8 +151,14 @@ impl AppConfig {
                         actual_auto_start
                     );
                     config.auto_start = actual_auto_start;
-                    let _ = config.save(); // Save the synced state
+                    config_updated = true;
                 }
+
+                // Save if any migrations were applied
+                if config_updated {
+                    let _ = config.save();
+                }
+
                 config
             }
             Err(e) => {
@@ -162,8 +182,8 @@ impl Default for AppConfig {
             version: crate::utils::constants::APP_VERSION.to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-            keyboard_soundpack: "oreo".to_string(),
-            mouse_soundpack: "test-mouse".to_string(),
+            keyboard_soundpack: "keyboard/eg-oreo".to_string(),
+            mouse_soundpack: "mouse/ping".to_string(),
             volume: 1.0,
             mouse_volume: 1.0, // Default mouse volume to 100%
             enable_volume_boost: false, // Default volume boost disabled
