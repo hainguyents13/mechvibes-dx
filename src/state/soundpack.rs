@@ -259,8 +259,11 @@ impl SoundpackCache {
             soundpack_type,
             type_dir.display()
         );
+        println!("   Directory exists: {}", type_dir.exists());
 
         if type_dir.exists() {
+            println!("✅ Directory found, reading entries...");
+
             if let Ok(entries) = std::fs::read_dir(&type_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_name) = entry.file_name().to_str() {
@@ -290,10 +293,15 @@ impl SoundpackCache {
                     }
                 }
             } else {
-                println!("⚠️ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
+                println!("❌ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
             }
         } else {
             println!("⚠️ [CACHE DEBUG] Directory does not exist: {}", type_dir.display());
+            println!("   Expected at: {}", type_dir.display());
+            if let Some(parent) = type_dir.parent() {
+                println!("   Parent directory: {}", parent.display());
+                println!("   Parent exists: {}", parent.exists());
+            }
         }
     }
 
