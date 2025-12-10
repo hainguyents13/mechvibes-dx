@@ -10,12 +10,14 @@ pub fn use_fresh_config() -> Signal<AppConfig> {
     let mut config = use_signal(|| AppConfig::load());
 
     // Refresh config from file periodically to catch external changes
+    // Using 1000ms interval to reduce CPU usage and prevent excessive re-renders
     use_effect(move || {
         spawn(async move {
             loop {
-                delay::Delay::ms(100).await;
+                delay::Delay::ms(1000).await;
                 let fresh_config = AppConfig::load();
                 if fresh_config.last_updated != config().last_updated {
+                    println!("[config_utils] Config file changed, reloading...");
                     config.set(fresh_config);
                 }
             }
@@ -31,14 +33,22 @@ pub fn create_config_updater(
 ) -> Rc<dyn Fn(Box<dyn FnOnce(&mut AppConfig)>)> {
     let signal_ref = Rc::new(RefCell::new(config_signal));
     Rc::new(move |updater: Box<dyn FnOnce(&mut AppConfig)>| {
-        let mut new_config = AppConfig::load(); // Always load fresh from file
-        updater(&mut new_config);
-        new_config.last_updated = chrono::Utc::now();
-        let _ = new_config.save();
+        let old_config = AppConfig::load(); // Load current config
+        let mut new_config = old_config.clone(); // Clone for modification
 
-        // Update the signal through RefCell
-        signal_ref.borrow_mut().set(new_config);
-        println!("[config_utils] Config updated");
+        updater(&mut new_config);
+
+        // Only update timestamp and save if config data actually changed (excluding metadata)
+        if !new_config.data_equals(&old_config) {
+            new_config.last_updated = chrono::Utc::now();
+            let _ = new_config.save();
+
+            // Update the signal through RefCell
+            signal_ref.borrow_mut().set(new_config);
+            println!("[config_utils] Config updated and saved");
+        } else {
+            println!("[config_utils] Config unchanged, skipping save");
+        }
     })
 }
 

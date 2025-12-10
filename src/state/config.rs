@@ -75,7 +75,7 @@ impl Default for BackgroundCustomization {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AppConfig {
     // Metadata
     pub version: String,
@@ -115,6 +115,36 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    /// Check if config data has changed (excluding metadata fields)
+    pub fn data_equals(&self, other: &Self) -> bool {
+        // Compare all fields except metadata (version, last_updated, commit)
+        self.keyboard_soundpack == other.keyboard_soundpack
+            && self.mouse_soundpack == other.mouse_soundpack
+            && self.volume == other.volume
+            && self.mouse_volume == other.mouse_volume
+            && self.enable_volume_boost == other.enable_volume_boost
+            && self.enable_sound == other.enable_sound
+            && self.enable_keyboard_sound == other.enable_keyboard_sound
+            && self.enable_mouse_sound == other.enable_mouse_sound
+            && self.selected_audio_device == other.selected_audio_device
+            && self.enabled_keyboards == other.enabled_keyboards
+            && self.enabled_mice == other.enabled_mice
+            && self.theme == other.theme
+            && self.custom_css == other.custom_css
+            && self.logo_customization == other.logo_customization
+            && self.enable_logo_customization == other.enable_logo_customization
+            && self.background_customization == other.background_customization
+            && self.enable_background_customization == other.enable_background_customization
+            && self.music_player == other.music_player
+            && self.ambiance_active_sounds == other.ambiance_active_sounds
+            && self.ambiance_global_volume == other.ambiance_global_volume
+            && self.ambiance_is_muted == other.ambiance_is_muted
+            && self.auto_start == other.auto_start
+            && self.start_minimized == other.start_minimized
+            && self.landscape_mode == other.landscape_mode
+            && self.auto_update == other.auto_update
+    }
+
     pub fn load() -> Self {
         let config_path = paths::data::config_json();
 
@@ -156,6 +186,7 @@ impl AppConfig {
 
                 // Save if any migrations were applied
                 if config_updated {
+                    config.last_updated = chrono::Utc::now();
                     let _ = config.save();
                 }
 
