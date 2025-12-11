@@ -111,10 +111,85 @@ body {
 [data-theme=forest] body {
   background-color: oklch(21.15% 0.012 254.09);
 }
+
+/* Linux-specific: Force border-radius and box-shadow rendering with hardware acceleration */
+* {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Explicitly force rounded corners with vendor prefixes */
+.rounded-box {
+  -webkit-border-radius: var(--radius-box, 0.5rem) !important;
+  -moz-border-radius: var(--radius-box, 0.5rem) !important;
+  border-radius: var(--radius-box, 0.5rem) !important;
+}
+
+.rounded-btn {
+  -webkit-border-radius: var(--radius-btn, 0.5rem) !important;
+  -moz-border-radius: var(--radius-btn, 0.5rem) !important;
+  border-radius: var(--radius-btn, 0.5rem) !important;
+}
+
+.rounded-lg {
+  -webkit-border-radius: 0.5rem !important;
+  -moz-border-radius: 0.5rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.rounded-md {
+  -webkit-border-radius: 0.375rem !important;
+  -moz-border-radius: 0.375rem !important;
+  border-radius: 0.375rem !important;
+}
+
+.rounded {
+  -webkit-border-radius: 0.25rem !important;
+  -moz-border-radius: 0.25rem !important;
+  border-radius: 0.25rem !important;
+}
+
+/* Explicitly force box-shadow with vendor prefixes */
+.shadow-lg {
+  -webkit-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  -moz-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.shadow-md {
+  -webkit-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+  -moz-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.shadow {
+  -webkit-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+  -moz-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensure proper rendering with compositor */
+.card,
+.btn,
+.input,
+.select,
+.modal-box,
+.dropdown-content,
+.menu,
+.rounded-box {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+}
 "#.to_string();
 
         #[cfg(not(target_os = "linux"))]
         let platform_css = String::new();
+
+        #[cfg(target_os = "linux")]
+        println!("🐧 Injecting Linux-specific CSS for border-radius and box-shadow rendering");
 
         // Combine all dynamic CSS parts
         let dynamic_css = format!("{}\n{}\n{}\n{}", font_css, custom_theme_css, custom_css, platform_css); // Inject only dynamic CSS using eval
