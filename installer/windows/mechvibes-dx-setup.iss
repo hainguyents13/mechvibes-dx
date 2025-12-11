@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6.0 or later: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "MechvibesDX"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.5.1"
 #define MyAppPublisher "Hai Nguyen"
 #define MyAppURL "https://github.com/hainguyents13/mechvibes-dx"
 #define MyAppExeName "mechvibes-dx.exe"
