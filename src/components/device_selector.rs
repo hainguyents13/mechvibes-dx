@@ -123,10 +123,9 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         })
     };
 
-    // Load cached devices automatically on mount (no enumeration = no audio interference)
-    use_effect(move || {
-        load_cached_devices.call(());
-    });
+    // Don't auto-load devices on mount to avoid audio interruption
+    // User must click refresh button to load devices
+    // This prevents ALSA enumeration from interfering with audio playback
 
     // Test device status (only for audio devices)
     let test_device_status = {
@@ -455,10 +454,14 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
             }
 
             // Linux-specific information
-            if cfg!(target_os = "linux") && props.device_type == DeviceType::AudioOutput && has_loaded() {
+            if cfg!(target_os = "linux") && props.device_type == DeviceType::AudioOutput {
                 div { class: "alert alert-info mt-2",
                     div { class: "text-xs",
-                        "ℹ️ Linux: App startup and refresh button may briefly interrupt audio due to ALSA device enumeration. Restart app for device changes to take effect."
+                        if !has_loaded() {
+                            "ℹ️ Linux: Click refresh to load available devices. This may briefly interrupt audio playback due to ALSA device enumeration."
+                        } else {
+                            "ℹ️ Linux: Device changes require app restart. Refresh button will interrupt audio playback (ALSA limitation)."
+                        }
                     }
                 }
             }
