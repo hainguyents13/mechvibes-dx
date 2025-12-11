@@ -3,7 +3,6 @@ use rodio::Sink;
 use std::collections::HashMap;
 
 use super::audio_context::AudioContext;
-use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
@@ -13,9 +12,8 @@ impl AudioContext {
         //     if is_keydown { "down" } else { "up" }
         // );
 
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_keyboard_sound {
+        // Check enable_sound from cached config (no file I/O in hot path)
+        if !self.is_sound_enabled() || !self.is_keyboard_sound_enabled() {
             return;
         }
 
@@ -259,9 +257,8 @@ impl AudioContext {
     }
 
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_mouse_sound {
+        // Check enable_sound from cached config (no file I/O in hot path)
+        if !self.is_sound_enabled() || !self.is_mouse_sound_enabled() {
             return;
         }
 

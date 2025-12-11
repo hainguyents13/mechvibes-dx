@@ -1,5 +1,4 @@
 use crate::state::config::AppConfig;
-use crate::utils::delay;
 use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;

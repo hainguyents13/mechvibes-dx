@@ -8,6 +8,11 @@ use std::time::Instant;
 static AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 static MOUSE_AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 
+// Cached config flags to avoid loading config on every keypress
+static ENABLE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+static ENABLE_KEYBOARD_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+static ENABLE_MOUSE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+
 #[derive(Clone)]
 #[allow(dead_code)]
 pub struct AudioContext {
@@ -99,10 +104,13 @@ impl AudioContext {
             last_keyboard_sound_time: Arc::new(Mutex::new(None)),
             last_mouse_sound_time: Arc::new(Mutex::new(None)),
         };
-        // Initialize volume from config
+        // Initialize volume and sound flags from config
         let config = AppConfig::load();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
+        ENABLE_SOUND.get_or_init(|| Mutex::new(config.enable_sound));
+        ENABLE_KEYBOARD_SOUND.get_or_init(|| Mutex::new(config.enable_keyboard_sound));
+        ENABLE_MOUSE_SOUND.get_or_init(|| Mutex::new(config.enable_mouse_sound));
 
         // Load soundpack from config
         match super::soundpack_loader::load_soundpack(&context) {
@@ -162,5 +170,64 @@ impl AudioContext {
             .and_then(|v| v.lock().ok())
             .map(|v| *v)
             .unwrap_or(1.0)
+    }
+
+    // Cached config flag getters (no file I/O, safe to call in hot path)
+    pub fn is_sound_enabled(&self) -> bool {
+        ENABLE_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
+    }
+
+    pub fn is_keyboard_sound_enabled(&self) -> bool {
+        ENABLE_KEYBOARD_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
+    }
+
+    pub fn is_mouse_sound_enabled(&self) -> bool {
+        ENABLE_MOUSE_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
+    }
+
+    // Cached config flag setters (update cache + save to file)
+    pub fn set_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
+        }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_sound = enabled;
+        let _ = config.save();
+    }
+
+    pub fn set_keyboard_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_KEYBOARD_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
+        }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_keyboard_sound = enabled;
+        let _ = config.save();
+    }
+
+    pub fn set_mouse_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_MOUSE_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
+        }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_mouse_sound = enabled;
+        let _ = config.save();
     }
 }
