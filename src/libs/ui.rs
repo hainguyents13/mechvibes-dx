@@ -61,13 +61,9 @@ pub fn app() -> Element {
         });
     }
 
-    // Initialize device cache on startup (enumerate once, use cached list later)
-    use_effect(move || {
-        spawn(async move {
-            debug_print!("🔍 Initializing device cache on startup...");
-            crate::libs::device_manager::DeviceManager::initialize_cache();
-        });
-    });
+    // Don't initialize device cache on startup to avoid interrupting system audio
+    // Cache will be populated lazily when user opens Settings page
+    // This prevents ALSA enumeration from interfering with other audio playback
 
     // Check for updates on startup (from completely closed state)
     use_effect(move || {

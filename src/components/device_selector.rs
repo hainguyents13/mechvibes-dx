@@ -455,10 +455,10 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
             }
 
             // Linux-specific warning about device enumeration interference
-            if props.device_type == DeviceType::AudioOutput && has_loaded() {
+            if cfg!(target_os = "linux") && props.device_type == DeviceType::AudioOutput && has_loaded() {
                 div { class: "alert alert-info mt-2",
                     div { class: "text-xs",
-                        "ℹ️ On Linux: Loading devices may temporarily interrupt audio playback. Sound will resume on next keystroke."
+                        "ℹ️ Linux: First load and refresh button may briefly interrupt audio playback due to ALSA device enumeration. Devices are cached after first load."
                     }
                 }
             }
