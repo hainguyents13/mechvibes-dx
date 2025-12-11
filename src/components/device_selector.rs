@@ -24,6 +24,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
     let audio_devices = use_signal(|| Vec::<DeviceInfo>::new());
     let input_devices = use_signal(|| Vec::<InputDeviceInfo>::new());
     let is_loading = use_signal(|| false);
+    let has_loaded = use_signal(|| false); // Track if devices have been loaded at least once
     let error_message = use_signal(String::new);
     let device_status = use_signal(|| std::collections::HashMap::<String, bool>::new());
 
@@ -42,6 +43,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         let mut audio_devices = audio_devices.clone();
         let mut input_devices = input_devices.clone();
         let mut is_loading = is_loading.clone();
+        let mut has_loaded = has_loaded.clone();
         let mut error_message = error_message.clone();
         let device_type = props.device_type;
 
@@ -56,9 +58,11 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         match device_manager.get_output_devices() {
                             Ok(device_list) => {
                                 audio_devices.set(device_list);
+                                has_loaded.set(true);
                             }
                             Err(e) => {
                                 error_message.set(format!("Failed to load audio devices: {}", e));
+                                has_loaded.set(true);
                             }
                         }
                     }
@@ -72,9 +76,11 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                                     _ => Vec::new(),
                                 };
                                 input_devices.set(device_list);
+                                has_loaded.set(true);
                             }
                             Err(e) => {
                                 error_message.set(format!("Failed to load input devices: {}", e));
+                                has_loaded.set(true);
                             }
                         }
                     }
@@ -85,10 +91,9 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         })
     };
 
-    // Load devices on mount
-    use_effect(move || {
-        load_devices.call(());
-    });
+    // Don't load devices automatically on mount to prevent interference with active audio stream
+    // User must click refresh button to load devices manually
+    // This is especially important on Linux/ALSA where enumeration can interfere with playback
 
     // Test device status (only for audio devices)
     let test_device_status = {
@@ -307,8 +312,13 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         if audio_devices().is_empty() && !is_loading() {
                             div { class: "text-center text-base-content/50 py-8",
                                 {device_icon()}
-                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
-                            }                        } else {
+                                if !has_loaded() {
+                                    div { class: "mt-2 text-sm", "Click the refresh button to load available devices" }
+                                } else {
+                                    div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                }
+                            }
+                        } else {
                             div { class: "space-y-2",
                                 // Unified device list (system default + hardware devices)
                                 for (device_id, device_name, badge_text, is_default) in all_audio_devices().iter() {
@@ -357,7 +367,11 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         if input_devices().is_empty() && !is_loading() {
                             div { class: "text-center text-base-content/50 py-8",
                                 {device_icon()}
-                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                if !has_loaded() {
+                                    div { class: "mt-2 text-sm", "Click the refresh button to load available devices" }
+                                } else {
+                                    div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                }
                             }
                         } else {
                             div { class: "space-y-2",
