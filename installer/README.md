@@ -6,27 +6,18 @@ This directory contains installer configurations for different platforms.
 
 ### Prerequisites
 
-Choose one of the following installer builders:
-
-1. **Inno Setup** (Recommended)
-   - Download from: https://jrsoftware.org/isinfo.php
-   - Version 6.0 or later required
-   - Free and open source
-
-2. **NSIS** (via Dioxus bundler)
-   - Requires Dioxus CLI: `cargo install dioxus-cli`
-   - Configuration in `Dioxus.toml`
+**Inno Setup**
+- Download from: https://jrsoftware.org/isinfo.php
+- Version 6.0 or later required
+- Free and open source
 
 ### Building the Installer
 
 #### Option 1: Using PowerShell Script (Recommended)
 
 ```powershell
-# Build with Inno Setup (default)
+# Build installer
 .\scripts\build-windows-installer.ps1
-
-# Build with NSIS
-.\scripts\build-windows-installer.ps1 -UseNSIS
 
 # Skip rebuild (use existing binary)
 .\scripts\build-windows-installer.ps1 -SkipBuild
@@ -38,8 +29,6 @@ Choose one of the following installer builders:
 .\scripts\build-windows-installer.bat
 ```
 
-Then choose installer type when prompted.
-
 #### Option 3: Manual Build
 
 1. Build release binary:
@@ -47,14 +36,9 @@ Then choose installer type when prompted.
    cargo build --release
    ```
 
-2. For Inno Setup:
+2. Build installer:
    ```cmd
    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\windows\mechvibes-dx-setup.iss
-   ```
-
-3. For NSIS:
-   ```cmd
-   dx bundle --release
    ```
 
 ### Installer Features
@@ -72,32 +56,19 @@ The Windows installer includes:
 
 ### Output
 
-Installers are created in the `dist` folder:
-
-- **Inno Setup**: `dist/MechvibesDX-{version}-Setup.exe`
-- **NSIS**: `bundle/nsis/MechvibesDX_{version}_x64-setup.exe`
+Installer is created in the `dist` folder: `dist/MechvibesDX-{version}-Setup.exe`
 
 ### Installer Configuration
-
-#### Inno Setup
 
 Configuration file: `installer/windows/mechvibes-dx-setup.iss`
 
 Key settings:
 - App ID: Unique identifier for the application
+- App Version: Should match `Cargo.toml` version
 - Install location: `%ProgramFiles%\MechvibesDX`
 - User data: `%APPDATA%\Mechvibes`
 - Compression: LZMA2 (maximum)
 - Privileges: User-level (no admin required)
-
-#### NSIS
-
-Configuration file: `Dioxus.toml` (bundle.windows.nsis section)
-
-Key settings:
-- Install mode: CurrentUser
-- Webview: Skip (not needed)
-- Downgrades: Allowed
 
 ## Testing the Installer
 

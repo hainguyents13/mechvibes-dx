@@ -39,22 +39,8 @@ echo Output directory ready
 echo.
 
 REM Build installer
-echo [3/3] Building installer...
+echo [3/3] Building Inno Setup installer...
 echo.
-echo Choose installer type:
-echo 1. Inno Setup (recommended)
-echo 2. NSIS (via Dioxus bundler)
-echo.
-set /p choice="Enter choice (1 or 2): "
-
-if "%choice%"=="1" goto innosetup
-if "%choice%"=="2" goto nsis
-echo Invalid choice
-exit /b 1
-
-:innosetup
-echo.
-echo Building Inno Setup installer...
 
 REM Try to find Inno Setup
 set ISCC=
@@ -77,37 +63,11 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-echo Installer created successfully!
-goto end
-
-:nsis
-echo.
-echo Building NSIS installer using Dioxus bundler...
-
-REM Check if dx CLI is installed
-where dx >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: Dioxus CLI (dx) is not installed
-    echo Install with: cargo install dioxus-cli
-    exit /b 1
-)
-
-dx bundle --release
-
-if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: NSIS bundling failed
-    exit /b 1
-)
-
-echo Installer created successfully!
-goto end
-
-:end
 echo.
 echo ========================================
 echo Build completed successfully!
 echo ========================================
 echo.
-echo Check the 'dist' or 'bundle' folder for the installer
+echo Installer created in 'dist' folder
 pause
 

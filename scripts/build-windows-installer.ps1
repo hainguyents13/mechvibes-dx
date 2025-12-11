@@ -2,9 +2,7 @@
 # This script builds the release binary and creates a Windows installer using Inno Setup
 
 param(
-    [switch]$SkipBuild = $false,
-    [switch]$UseNSIS = $false,
-    [switch]$UseInnoSetup = $true
+    [switch]$SkipBuild = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -74,74 +72,49 @@ if (-not (Test-Path $DistDir)) {
 Write-Host "✓ Output directory ready: $DistDir" -ForegroundColor Green
 Write-Host ""
 
-# Step 3: Build installer based on selected method
-if ($UseInnoSetup) {
-    Write-Host "[3/4] Building Inno Setup installer..." -ForegroundColor Yellow
-    
-    # Check if Inno Setup is installed
-    $InnoSetupPaths = @(
-        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-        "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
-        "${env:ProgramFiles(x86)}\Inno Setup 5\ISCC.exe",
-        "${env:ProgramFiles}\Inno Setup 5\ISCC.exe"
-    )
-    
-    $ISCC = $null
-    foreach ($path in $InnoSetupPaths) {
-        if (Test-Path $path) {
-            $ISCC = $path
-            break
-        }
+# Step 3: Build installer with Inno Setup
+Write-Host "[3/4] Building Inno Setup installer..." -ForegroundColor Yellow
+
+# Check if Inno Setup is installed
+$InnoSetupPaths = @(
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 5\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 5\ISCC.exe"
+)
+
+$ISCC = $null
+foreach ($path in $InnoSetupPaths) {
+    if (Test-Path $path) {
+        $ISCC = $path
+        break
     }
-    
-    if (-not $ISCC) {
-        Write-Host "ERROR: Inno Setup not found" -ForegroundColor Red
-        Write-Host "Please install Inno Setup from: https://jrsoftware.org/isinfo.php" -ForegroundColor Yellow
-        Write-Host "Or use -UseNSIS flag to build with NSIS instead" -ForegroundColor Yellow
-        exit 1
-    }
-    
-    Write-Host "Found Inno Setup: $ISCC" -ForegroundColor Gray
-    
-    $InnoScript = Join-Path $ProjectRoot "installer\windows\mechvibes-dx-setup.iss"
-    if (-not (Test-Path $InnoScript)) {
-        Write-Host "ERROR: Inno Setup script not found at $InnoScript" -ForegroundColor Red
-        exit 1
-    }
-    
-    Write-Host "Running Inno Setup compiler..." -ForegroundColor Gray
-    & $ISCC $InnoScript
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: Inno Setup compilation failed" -ForegroundColor Red
-        exit 1
-    }
-    
-    Write-Host "✓ Inno Setup installer created successfully" -ForegroundColor Green
-    Write-Host ""
 }
 
-if ($UseNSIS) {
-    Write-Host "[3/4] Building NSIS installer using Dioxus bundler..." -ForegroundColor Yellow
-    
-    # Check if dx CLI is installed
-    if (-not (Get-Command dx -ErrorAction SilentlyContinue)) {
-        Write-Host "ERROR: Dioxus CLI (dx) is not installed" -ForegroundColor Red
-        Write-Host "Install with: cargo install dioxus-cli" -ForegroundColor Yellow
-        exit 1
-    }
-    
-    Write-Host "Running: dx bundle --release" -ForegroundColor Gray
-    dx bundle --release
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: NSIS bundling failed" -ForegroundColor Red
-        exit 1
-    }
-    
-    Write-Host "✓ NSIS installer created successfully" -ForegroundColor Green
-    Write-Host ""
+if (-not $ISCC) {
+    Write-Host "ERROR: Inno Setup not found" -ForegroundColor Red
+    Write-Host "Please install Inno Setup from: https://jrsoftware.org/isinfo.php" -ForegroundColor Yellow
+    exit 1
 }
+
+Write-Host "Found Inno Setup: $ISCC" -ForegroundColor Gray
+
+$InnoScript = Join-Path $ProjectRoot "installer\windows\mechvibes-dx-setup.iss"
+if (-not (Test-Path $InnoScript)) {
+    Write-Host "ERROR: Inno Setup script not found at $InnoScript" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Running Inno Setup compiler..." -ForegroundColor Gray
+& $ISCC $InnoScript
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Inno Setup compilation failed" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✓ Inno Setup installer created successfully" -ForegroundColor Green
+Write-Host ""
 
 # Step 4: Summary
 Write-Host "[4/4] Build Summary" -ForegroundColor Yellow
@@ -149,13 +122,11 @@ Write-Host "==================" -ForegroundColor Yellow
 Write-Host "Executable: $ExePath" -ForegroundColor Gray
 Write-Host "Output directory: $DistDir" -ForegroundColor Gray
 
-if ($UseInnoSetup) {
-    $InstallerPath = Get-ChildItem -Path $DistDir -Filter "MechvibesDX-*-Setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($InstallerPath) {
-        Write-Host "Installer: $($InstallerPath.FullName)" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "✓ Installer ready!" -ForegroundColor Green
-    }
+$InstallerPath = Get-ChildItem -Path $DistDir -Filter "MechvibesDX-*-Setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($InstallerPath) {
+    Write-Host "Installer: $($InstallerPath.FullName)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "✓ Installer ready!" -ForegroundColor Green
 }
 
 Write-Host ""
