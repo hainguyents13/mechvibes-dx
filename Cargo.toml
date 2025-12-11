@@ -76,6 +76,11 @@ default = ["dioxus/desktop", "auto-update"]
 desktop = ["dioxus/desktop"]
 auto-update = []
 
+[profile.dev]
+# Optimize audio performance in dev builds while keeping debug symbols
+opt-level = 2
+debug = true
+
 [profile.wasm-dev]
 inherits = "dev"
 opt-level = 1
