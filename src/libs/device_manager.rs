@@ -8,6 +8,47 @@ pub struct DeviceInfo {
     pub is_default: bool,
 }
 
+// ALSA error suppressor for Linux to silence expected enumeration errors
+#[cfg(target_os = "linux")]
+struct AlsaErrorSuppressor {
+    _stderr_fd: std::os::fd::OwnedFd,
+}
+
+#[cfg(target_os = "linux")]
+impl AlsaErrorSuppressor {
+    fn new() -> Self {
+        use std::os::fd::AsRawFd;
+
+        // Redirect stderr to /dev/null temporarily to suppress ALSA error messages
+        // ALSA generates expected errors when probing invalid/misconfigured devices
+        unsafe {
+            let null_fd = libc::open(
+                b"/dev/null\0".as_ptr() as *const libc::c_char,
+                libc::O_WRONLY
+            );
+            let stderr_fd = libc::dup(libc::STDERR_FILENO);
+            libc::dup2(null_fd, libc::STDERR_FILENO);
+            libc::close(null_fd);
+
+            Self {
+                _stderr_fd: std::os::fd::OwnedFd::from_raw_fd(stderr_fd),
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for AlsaErrorSuppressor {
+    fn drop(&mut self) {
+        use std::os::fd::AsRawFd;
+
+        // Restore original stderr when suppressor is dropped
+        unsafe {
+            libc::dup2(self._stderr_fd.as_raw_fd(), libc::STDERR_FILENO);
+        }
+    }
+}
+
 pub struct DeviceManager {
     host: Host,
 }
@@ -36,6 +77,11 @@ impl DeviceManager {
             .as_ref()
             .and_then(|d| d.name().ok())
             .unwrap_or_else(|| "Unknown".to_string());
+
+        // Suppress ALSA error messages on Linux during device enumeration
+        // ALSA probes all possible devices and generates expected errors for invalid/misconfigured ones
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
 
         match self.host.output_devices() {
             Ok(device_iter) => {
@@ -82,6 +128,10 @@ impl DeviceManager {
             .and_then(|d| d.name().ok())
             .unwrap_or_else(|| "Unknown".to_string());
 
+        // Suppress ALSA error messages on Linux during device enumeration
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
+
         match self.host.input_devices() {
             Ok(device_iter) => {
                 for (index, device) in device_iter.enumerate() {
@@ -124,6 +174,10 @@ impl DeviceManager {
             return Ok(self.host.default_output_device());
         }
 
+        // Suppress ALSA error messages on Linux
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
+
         // Parse index from device_id (format: "output_{index}")
         if let Some(index_str) = device_id.strip_prefix("output_") {
             if let Ok(target_index) = index_str.parse::<usize>() {
@@ -151,6 +205,10 @@ impl DeviceManager {
             return Ok(self.host.default_input_device());
         }
 
+        // Suppress ALSA error messages on Linux
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
+
         // Parse index from device_id (format: "input_{index}")
         if let Some(index_str) = device_id.strip_prefix("input_") {
             if let Ok(target_index) = index_str.parse::<usize>() {
@@ -174,6 +232,10 @@ impl DeviceManager {
 
     /// Test if a device is available and working
     pub fn test_output_device(&self, device_id: &str) -> Result<bool, String> {
+        // Suppress ALSA error messages on Linux
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
+
         match self.get_output_device_by_id(device_id)? {
             Some(device) => {
                 // Try to get supported configurations to test device availability
@@ -188,6 +250,10 @@ impl DeviceManager {
 
     /// Test if an input device is available and working
     pub fn test_input_device(&self, device_id: &str) -> Result<bool, String> {
+        // Suppress ALSA error messages on Linux
+        #[cfg(target_os = "linux")]
+        let _alsa_suppressor = AlsaErrorSuppressor::new();
+
         match self.get_input_device_by_id(device_id)? {
             Some(device) => {
                 // Try to get supported configurations to test device availability
