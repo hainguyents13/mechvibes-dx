@@ -49,18 +49,23 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
 
         use_callback(move |_| {
             spawn(async move {
+                println!("🔄 [DeviceSelector] User clicked refresh - starting device enumeration...");
                 is_loading.set(true);
                 error_message.set(String::new());
 
                 match device_type {
                     DeviceType::AudioOutput => {
+                        println!("🔄 [DeviceSelector] Loading audio output devices...");
                         let device_manager = DeviceManager::new();
                         match device_manager.get_output_devices() {
                             Ok(device_list) => {
+                                println!("✅ [DeviceSelector] Successfully loaded {} audio devices", device_list.len());
                                 audio_devices.set(device_list);
                                 has_loaded.set(true);
+                                println!("⚠️ [DeviceSelector] Note: Device enumeration may have interfered with active audio stream on Linux");
                             }
                             Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to load devices: {}", e);
                                 error_message.set(format!("Failed to load audio devices: {}", e));
                                 has_loaded.set(true);
                             }
@@ -419,7 +424,17 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         "⚠️ Selected device may not be available. Audio may not work properly."
                     }
                 }
-            }        }
+            }
+
+            // Linux-specific warning about device enumeration interference
+            if props.device_type == DeviceType::AudioOutput && has_loaded() {
+                div { class: "alert alert-info mt-2",
+                    div { class: "text-xs",
+                        "ℹ️ On Linux: Loading devices may temporarily interrupt audio playback. Sound will resume on next keystroke."
+                    }
+                }
+            }
+        }
     }
 }
 

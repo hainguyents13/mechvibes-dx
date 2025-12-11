@@ -71,6 +71,7 @@ impl DeviceManager {
 
     /// Get all available audio output devices
     pub fn get_output_devices(&self) -> Result<Vec<DeviceInfo>, String> {
+        println!("🔍 [DeviceManager] Starting audio output device enumeration...");
         let mut devices = Vec::new();
         let default_device = self.host.default_output_device();
         let default_name = default_device
@@ -78,11 +79,14 @@ impl DeviceManager {
             .and_then(|d| d.name().ok())
             .unwrap_or_else(|| "Unknown".to_string());
 
+        println!("🔍 [DeviceManager] Default device: {}", default_name);
+
         // Suppress ALSA error messages on Linux during device enumeration
         // ALSA probes all possible devices and generates expected errors for invalid/misconfigured ones
         #[cfg(target_os = "linux")]
         let _alsa_suppressor = AlsaErrorSuppressor::new();
 
+        println!("🔍 [DeviceManager] Enumerating output devices via ALSA/cpal...");
         match self.host.output_devices() {
             Ok(device_iter) => {
                 for (index, device) in device_iter.enumerate() {
@@ -94,6 +98,12 @@ impl DeviceManager {
                                 .and_then(|d| d.name().ok())
                                 .as_ref();
 
+                        println!("🔍 [DeviceManager] Found device #{}: {} {}",
+                            index,
+                            name,
+                            if is_default { "(default)" } else { "" }
+                        );
+
                         devices.push(DeviceInfo {
                             id: format!("output_{}", index),
                             name: name.clone(),
@@ -101,14 +111,17 @@ impl DeviceManager {
                         });
                     }
                 }
+                println!("✅ [DeviceManager] Enumeration complete. Found {} devices", devices.len());
             }
             Err(e) => {
+                println!("❌ [DeviceManager] Failed to enumerate: {}", e);
                 return Err(format!("Failed to enumerate output devices: {}", e));
             }
         }
 
         // Ensure we have at least the default device
         if devices.is_empty() {
+            println!("⚠️ [DeviceManager] No devices found, adding default fallback");
             devices.push(DeviceInfo {
                 id: "output_default".to_string(),
                 name: default_name,
@@ -116,6 +129,7 @@ impl DeviceManager {
             });
         }
 
+        println!("🔍 [DeviceManager] Returning {} total devices", devices.len());
         Ok(devices)
     }
 
