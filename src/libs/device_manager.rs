@@ -1,5 +1,6 @@
 use cpal::traits::{ DeviceTrait, HostTrait };
 use cpal::{ Device, Host };
+use std::sync::{ Mutex, OnceLock };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeviceInfo {
@@ -7,6 +8,10 @@ pub struct DeviceInfo {
     pub name: String,
     pub is_default: bool,
 }
+
+// Global device cache to avoid repeated enumeration
+static CACHED_OUTPUT_DEVICES: OnceLock<Mutex<Vec<DeviceInfo>>> = OnceLock::new();
+static CACHED_INPUT_DEVICES: OnceLock<Mutex<Vec<DeviceInfo>>> = OnceLock::new();
 
 // ALSA error suppressor for Linux to silence expected enumeration errors
 #[cfg(target_os = "linux")]
@@ -284,5 +289,122 @@ impl DeviceManager {
 impl Default for DeviceManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// Global device cache management functions
+impl DeviceManager {
+    /// Initialize device cache on app startup (enumerate once and cache)
+    pub fn initialize_cache() {
+        println!("🔍 [DeviceCache] Initializing device cache on app startup...");
+        let manager = DeviceManager::new();
+
+        // Load output devices
+        match manager.get_output_devices() {
+            Ok(devices) => {
+                println!("✅ [DeviceCache] Cached {} output devices", devices.len());
+                CACHED_OUTPUT_DEVICES.get_or_init(|| Mutex::new(devices));
+            }
+            Err(e) => {
+                println!("❌ [DeviceCache] Failed to cache output devices: {}", e);
+                CACHED_OUTPUT_DEVICES.get_or_init(|| Mutex::new(Vec::new()));
+            }
+        }
+
+        // Load input devices
+        match manager.get_input_devices() {
+            Ok(devices) => {
+                println!("✅ [DeviceCache] Cached {} input devices", devices.len());
+                CACHED_INPUT_DEVICES.get_or_init(|| Mutex::new(devices));
+            }
+            Err(e) => {
+                println!("❌ [DeviceCache] Failed to cache input devices: {}", e);
+                CACHED_INPUT_DEVICES.get_or_init(|| Mutex::new(Vec::new()));
+            }
+        }
+    }
+
+    /// Get cached output devices (no enumeration - instant)
+    pub fn get_cached_output_devices() -> Result<Vec<DeviceInfo>, String> {
+        println!("📋 [DeviceCache] Returning cached output devices...");
+        if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
+            if let Ok(devices) = cache.lock() {
+                println!("✅ [DeviceCache] Found {} cached output devices", devices.len());
+                return Ok(devices.clone());
+            }
+        }
+
+        println!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
+        Self::initialize_cache();
+
+        if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
+            if let Ok(devices) = cache.lock() {
+                return Ok(devices.clone());
+            }
+        }
+
+        Err("Failed to access device cache".to_string())
+    }
+
+    /// Get cached input devices (no enumeration - instant)
+    pub fn get_cached_input_devices() -> Result<Vec<DeviceInfo>, String> {
+        println!("📋 [DeviceCache] Returning cached input devices...");
+        if let Some(cache) = CACHED_INPUT_DEVICES.get() {
+            if let Ok(devices) = cache.lock() {
+                println!("✅ [DeviceCache] Found {} cached input devices", devices.len());
+                return Ok(devices.clone());
+            }
+        }
+
+        println!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
+        Self::initialize_cache();
+
+        if let Some(cache) = CACHED_INPUT_DEVICES.get() {
+            if let Ok(devices) = cache.lock() {
+                return Ok(devices.clone());
+            }
+        }
+
+        Err("Failed to access device cache".to_string())
+    }
+
+    /// Force refresh cache (re-enumerate and update)
+    pub fn refresh_cache() -> Result<(), String> {
+        println!("🔄 [DeviceCache] Force refreshing device cache...");
+        let manager = DeviceManager::new();
+
+        // Refresh output devices
+        match manager.get_output_devices() {
+            Ok(devices) => {
+                if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
+                    if let Ok(mut cached) = cache.lock() {
+                        *cached = devices;
+                        println!("✅ [DeviceCache] Refreshed output devices cache");
+                    }
+                }
+            }
+            Err(e) => {
+                println!("❌ [DeviceCache] Failed to refresh output devices: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Refresh input devices
+        match manager.get_input_devices() {
+            Ok(devices) => {
+                if let Some(cache) = CACHED_INPUT_DEVICES.get() {
+                    if let Ok(mut cached) = cache.lock() {
+                        *cached = devices;
+                        println!("✅ [DeviceCache] Refreshed input devices cache");
+                    }
+                }
+            }
+            Err(e) => {
+                println!("❌ [DeviceCache] Failed to refresh input devices: {}", e);
+                return Err(e);
+            }
+        }
+
+        Ok(())
     }
 }

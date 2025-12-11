@@ -453,6 +453,18 @@ impl InputDeviceManager {
             .collect()
     }
 
+    /// Static method to get all input devices (keyboards + mice)
+    pub fn get_devices() -> Result<Vec<InputDeviceInfo>, String> {
+        let mut manager = InputDeviceManager::new();
+        manager.enumerate_devices()?;
+
+        let mut all_devices = Vec::new();
+        all_devices.extend(manager.get_keyboards());
+        all_devices.extend(manager.get_mice());
+
+        Ok(all_devices)
+    }
+
     /// Enable/disable a specific device
     pub fn set_device_enabled(&mut self, device_id: &str, enabled: bool) {
         if let Some(device) = self.devices.get_mut(device_id) {

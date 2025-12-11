@@ -38,8 +38,8 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         }
     });
 
-    // Load devices on component mount and when refresh is triggered
-    let load_devices = {
+    // Load devices from cache (audio) or fresh (input devices)
+    let load_cached_devices = {
         let mut audio_devices = audio_devices.clone();
         let mut input_devices = input_devices.clone();
         let mut is_loading = is_loading.clone();
@@ -49,41 +49,36 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
 
         use_callback(move |_| {
             spawn(async move {
-                println!("🔄 [DeviceSelector] User clicked refresh - starting device enumeration...");
+                println!("📋 [DeviceSelector] Loading devices...");
                 is_loading.set(true);
                 error_message.set(String::new());
 
                 match device_type {
                     DeviceType::AudioOutput => {
-                        println!("🔄 [DeviceSelector] Loading audio output devices...");
-                        let device_manager = DeviceManager::new();
-                        match device_manager.get_output_devices() {
+                        // Use cached audio devices to avoid enumeration interference
+                        match DeviceManager::get_cached_output_devices() {
                             Ok(device_list) => {
-                                println!("✅ [DeviceSelector] Successfully loaded {} audio devices", device_list.len());
+                                println!("✅ [DeviceSelector] Loaded {} cached audio devices", device_list.len());
                                 audio_devices.set(device_list);
                                 has_loaded.set(true);
-                                println!("⚠️ [DeviceSelector] Note: Device enumeration may have interfered with active audio stream on Linux");
                             }
                             Err(e) => {
-                                println!("❌ [DeviceSelector] Failed to load devices: {}", e);
+                                println!("❌ [DeviceSelector] Failed to load cached devices: {}", e);
                                 error_message.set(format!("Failed to load audio devices: {}", e));
                                 has_loaded.set(true);
                             }
                         }
                     }
                     DeviceType::Keyboard | DeviceType::Mouse => {
-                        let mut input_manager = InputDeviceManager::new();
-                        match input_manager.enumerate_devices() {
-                            Ok(_) => {
-                                let device_list = match device_type {
-                                    DeviceType::Keyboard => input_manager.get_keyboards(),
-                                    DeviceType::Mouse => input_manager.get_mice(),
-                                    _ => Vec::new(),
-                                };
+                        // Input devices don't interfere with audio, load fresh
+                        match InputDeviceManager::get_devices() {
+                            Ok(device_list) => {
+                                println!("✅ [DeviceSelector] Loaded {} input devices", device_list.len());
                                 input_devices.set(device_list);
                                 has_loaded.set(true);
                             }
                             Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to load input devices: {}", e);
                                 error_message.set(format!("Failed to load input devices: {}", e));
                                 has_loaded.set(true);
                             }
@@ -96,9 +91,42 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         })
     };
 
-    // Don't load devices automatically on mount to prevent interference with active audio stream
-    // User must click refresh button to load devices manually
-    // This is especially important on Linux/ALSA where enumeration can interfere with playback
+    // Refresh device cache (re-enumerate)
+    let refresh_device_cache = {
+        let load_cached = load_cached_devices.clone();
+        let device_type = props.device_type;
+
+        use_callback(move |_| {
+            spawn(async move {
+                println!("🔄 [DeviceSelector] User clicked refresh - re-enumerating devices...");
+                match device_type {
+                    DeviceType::AudioOutput => {
+                        // Refresh audio device cache
+                        match DeviceManager::refresh_cache() {
+                            Ok(_) => {
+                                println!("✅ [DeviceSelector] Audio cache refreshed successfully");
+                                // Reload from refreshed cache
+                                load_cached.call(());
+                            }
+                            Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to refresh audio cache: {}", e);
+                            }
+                        }
+                    }
+                    DeviceType::Keyboard | DeviceType::Mouse => {
+                        // Input devices - just reload fresh
+                        println!("🔄 [DeviceSelector] Reloading input devices...");
+                        load_cached.call(());
+                    }
+                }
+            });
+        })
+    };
+
+    // Load cached devices automatically on mount (no enumeration = no audio interference)
+    use_effect(move || {
+        load_cached_devices.call(());
+    });
 
     // Test device status (only for audio devices)
     let test_device_status = {
@@ -296,7 +324,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                 span { "{props.label}" }
                 button {
                     class: "btn btn-ghost btn-xs",
-                    onclick: move |_| load_devices.call(()),
+                    onclick: move |_| refresh_device_cache.call(()),
                     disabled: is_loading(),
                     title: "Refresh device list",
                     if is_loading() {

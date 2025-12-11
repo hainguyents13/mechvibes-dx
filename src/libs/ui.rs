@@ -61,6 +61,14 @@ pub fn app() -> Element {
         });
     }
 
+    // Initialize device cache on startup (enumerate once, use cached list later)
+    use_effect(move || {
+        spawn(async move {
+            debug_print!("🔍 Initializing device cache on startup...");
+            crate::libs::device_manager::DeviceManager::initialize_cache();
+        });
+    });
+
     // Check for updates on startup (from completely closed state)
     use_effect(move || {
         spawn(async move {
