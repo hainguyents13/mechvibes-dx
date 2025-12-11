@@ -458,7 +458,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
             if cfg!(target_os = "linux") && props.device_type == DeviceType::AudioOutput && has_loaded() {
                 div { class: "alert alert-info mt-2",
                     div { class: "text-xs",
-                        "ℹ️ Linux: Restart app for device changes to take effect. Refresh button may briefly interrupt audio (ALSA limitation)."
+                        "ℹ️ Linux: App startup and refresh button may briefly interrupt audio due to ALSA device enumeration. Restart app for device changes to take effect."
                     }
                 }
             }

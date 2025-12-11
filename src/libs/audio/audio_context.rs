@@ -45,14 +45,54 @@ impl AudioContext {
     pub fn new() -> Self {
         // Initialize device manager
         let device_manager = DeviceManager::new();
+        let config = AppConfig::load();
 
-        // Always start with default device to avoid ALSA enumeration on startup
-        // This prevents interrupting system audio playback on Linux
-        // Device will be switched to user's selection when Settings page loads
-        println!("🔊 [AudioContext] Starting with default audio device (no enumeration)");
-        let (stream, stream_handle) = rodio::OutputStream
-            ::try_default()
-            .expect("Failed to create default audio output stream");
+        // Use selected device from config or fall back to default
+        // Note: On Linux, this will enumerate devices and may briefly interrupt audio playback
+        let (stream, stream_handle) = match &config.selected_audio_device {
+            Some(device_id) => {
+                println!("🔊 [AudioContext] Attempting to use selected device: {}", device_id);
+                match device_manager.get_output_device_by_id(device_id) {
+                    Ok(Some(device)) => {
+                        match rodio::OutputStream::try_from_device(&device) {
+                            Ok((stream, handle)) => {
+                                println!("✅ [AudioContext] Using selected device: {}", device_id);
+                                (stream, handle)
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "❌ Failed to create stream from selected device {}: {}",
+                                    device_id,
+                                    e
+                                );
+                                eprintln!("🔄 Falling back to default device...");
+                                rodio::OutputStream
+                                    ::try_default()
+                                    .expect("Failed to create default audio output stream")
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        eprintln!("❌ Selected audio device {} not found, using default", device_id);
+                        rodio::OutputStream
+                            ::try_default()
+                            .expect("Failed to create default audio output stream")
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Error accessing selected device {}: {}", device_id, e);
+                        rodio::OutputStream
+                            ::try_default()
+                            .expect("Failed to create default audio output stream")
+                    }
+                }
+            }
+            None => {
+                println!("🔊 [AudioContext] Using system default audio device");
+                rodio::OutputStream
+                    ::try_default()
+                    .expect("Failed to create default audio output stream")
+            }
+        };
 
         let context = Self {
             _stream: Arc::new(stream),
