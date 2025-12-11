@@ -17,7 +17,7 @@ struct AlsaErrorSuppressor {
 #[cfg(target_os = "linux")]
 impl AlsaErrorSuppressor {
     fn new() -> Self {
-        use std::os::fd::AsRawFd;
+        use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
         // Redirect stderr to /dev/null temporarily to suppress ALSA error messages
         // ALSA generates expected errors when probing invalid/misconfigured devices
@@ -31,7 +31,7 @@ impl AlsaErrorSuppressor {
             libc::close(null_fd);
 
             Self {
-                _stderr_fd: std::os::fd::OwnedFd::from_raw_fd(stderr_fd),
+                _stderr_fd: OwnedFd::from_raw_fd(stderr_fd),
             }
         }
     }
