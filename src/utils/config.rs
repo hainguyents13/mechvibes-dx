@@ -25,11 +25,19 @@ pub fn create_config_updater(
         // Only update timestamp and save if config data actually changed (excluding metadata)
         if !new_config.data_equals(&old_config) {
             new_config.last_updated = chrono::Utc::now();
-            let _ = new_config.save();
+            match new_config.save() {
+                Ok(_) => {
+                    println!("✅ [config_utils] Config saved successfully");
+                    println!("   keyboard_soundpack: {}", new_config.keyboard_soundpack);
+                    println!("   mouse_soundpack: {}", new_config.mouse_soundpack);
+                }
+                Err(e) => {
+                    eprintln!("❌ [config_utils] Failed to save config: {}", e);
+                }
+            }
 
             // Update the signal through RefCell
             signal_ref.borrow_mut().set(new_config);
-            println!("[config_utils] Config updated and saved");
         } else {
             println!("[config_utils] Config unchanged, skipping save");
         }
