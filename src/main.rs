@@ -213,6 +213,23 @@ fn main() {
     }
 
     // Create a WindowBuilder with custom appearance and vertical resizing
+    // On Linux, disable transparency to ensure proper border-radius and shadow rendering
+    #[cfg(target_os = "linux")]
+    let window_builder = WindowBuilder::default()
+        .with_title(APP_NAME)
+        .with_transparent(false) // Disable transparency on Linux for better CSS rendering
+        .with_always_on_top(false)
+        .with_inner_size(LogicalSize::new(window_width, default_height))
+        .with_min_inner_size(LogicalSize::new(window_width, min_height))
+        .with_max_inner_size(LogicalSize::new(window_width, max_height))
+        .with_fullscreen(None)
+        .with_decorations(false)
+        .with_resizable(true)
+        .with_visible(!should_start_minimized)
+        .with_window_icon(window_icon);
+
+    // On Windows, enable transparency for custom window styling
+    #[cfg(not(target_os = "linux"))]
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(true) // Enable transparency for custom window styling
