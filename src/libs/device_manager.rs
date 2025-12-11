@@ -96,6 +96,24 @@ impl DeviceManager {
             Ok(device_iter) => {
                 for (index, device) in device_iter.enumerate() {
                     if let Ok(name) = device.name() {
+                        // Filter out low-level ALSA device aliases
+                        // Only show user-friendly device names (default, pipewire, pulse, etc.)
+                        #[cfg(target_os = "linux")]
+                        {
+                            // Skip low-level ALSA aliases (hw:, plughw:, dmix:, dsnoop:, etc.)
+                            if name.starts_with("hw:")
+                                || name.starts_with("plughw:")
+                                || name.starts_with("dmix:")
+                                || name.starts_with("dsnoop:")
+                                || name.starts_with("front:")
+                                || name.starts_with("surround")
+                                || name.starts_with("iec958:")
+                            {
+                                println!("🔍 [DeviceManager] Skipping low-level ALSA alias: {}", name);
+                                continue;
+                            }
+                        }
+
                         let is_default =
                             Some(&name) ==
                             default_device
@@ -155,6 +173,21 @@ impl DeviceManager {
             Ok(device_iter) => {
                 for (index, device) in device_iter.enumerate() {
                     if let Ok(name) = device.name() {
+                        // Filter out low-level ALSA device aliases
+                        #[cfg(target_os = "linux")]
+                        {
+                            if name.starts_with("hw:")
+                                || name.starts_with("plughw:")
+                                || name.starts_with("dmix:")
+                                || name.starts_with("dsnoop:")
+                                || name.starts_with("front:")
+                                || name.starts_with("surround")
+                                || name.starts_with("iec958:")
+                            {
+                                continue;
+                            }
+                        }
+
                         let is_default =
                             Some(&name) ==
                             default_device
