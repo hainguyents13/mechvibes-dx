@@ -6,7 +6,7 @@ use std::sync::Arc;
 #[component]
 pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
     let app_state = use_app_state();
-    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+    let audio_ctx: Signal<Arc<crate::libs::audio::AudioContext>> = use_context();
     let state_trigger = crate::state::app::use_state_trigger(); // UI state for notification and loading
     let refreshing_soundpacks = use_signal(|| false);
     let refresh_soundpacks_cache = {
@@ -45,7 +45,8 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
 
                 // Reload current soundpacks to apply any changes
                 println!("🔄 Reloading current soundpacks...");
-                crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
+                let audio_ctx_value = audio_ctx_clone.read().clone();
+                crate::state::app::reload_current_soundpacks(&audio_ctx_value);
 
                 // Add another small delay before changing the loading state back
                 Delay::new(Duration::from_millis(100)).await;

@@ -4,6 +4,7 @@ use crate::libs::routes::Route;
 use crate::libs::tray_service::request_tray_update;
 use crate::libs::input_manager::{ get_input_channels, set_window_focus };
 use crate::libs::AudioContext;
+use crate::libs::audio::device_change_watcher::{ DefaultDeviceEvent, start_default_device_watcher };
 use crate::state::keyboard::KeyboardState;
 use crate::state::paths;
 use crate::utils::delay;
@@ -41,7 +42,7 @@ pub fn app() -> Element {
     use_context_provider(|| keyboard_state);
 
     // Initialize the audio system for mechvibes sounds - moved here to be accessible by both keyboard processing and UI
-    let audio_context = use_hook(|| Arc::new(AudioContext::new()));
+    let audio_context = use_signal(|| Arc::new(AudioContext::new()));
 
     // Provide audio context to all child components (this will be used by Layout and other components)
     use_context_provider(|| audio_context.clone());
@@ -50,7 +51,51 @@ pub fn app() -> Element {
         let ctx = audio_context.clone();
         use_effect(move || {
             debug_print!("🎵 Loading current soundpacks on startup...");
+            let ctx = ctx.read().clone();
             crate::state::app::reload_current_soundpacks(&ctx);
+        });
+    }
+
+    // Watch for default output device changes (only applies when using system default)
+    let device_event_rx = use_hook(|| start_default_device_watcher());
+    {
+        let device_event_rx = device_event_rx.clone();
+        let mut audio_context = audio_context.clone();
+        use_future(move || {
+            let device_event_rx = device_event_rx.clone();
+            async move {
+            use std::time::{ Duration, Instant };
+            let mut last_refresh = Instant::now() - Duration::from_secs(10);
+
+            loop {
+                if let Ok(DefaultDeviceEvent::OutputChanged) = device_event_rx.try_recv() {
+                    let config = crate::state::config::AppConfig::load();
+                    if config.selected_audio_device.is_none() {
+                        let now = Instant::now();
+                        if now.duration_since(last_refresh) > Duration::from_secs(2) {
+                            last_refresh = now;
+                            match AudioContext::create_with_device(None) {
+                                Ok(new_ctx) => {
+                                    let new_ctx = Arc::new(new_ctx);
+                                    crate::state::app::reload_current_soundpacks(&new_ctx);
+                                    audio_context.set(new_ctx);
+                                    crate::state::ambiance::restart_ambiance_on_device_change();
+                                    let _ = crate::state::music::rebuild_music_player();
+                                    debug_print!("🔊 Rebuilt audio pipeline after default device change");
+                                }
+                                Err(e) => {
+                                    always_eprint!(
+                                        "❌ Failed to rebuild audio pipeline after device change: {}",
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                delay::Delay::ms(200).await;
+            }
+            }
         });
     }
 
@@ -107,12 +152,12 @@ pub fn app() -> Element {
                         if let Ok(keycode) = receiver.try_recv() {
                             if keycode.starts_with("UP:") {
                                 let key = &keycode[3..];
-                                ctx.play_key_event_sound(key, false);
+                                ctx.read().clone().play_key_event_sound(key, false);
 
                                 // Update keyboard state - key released
                                 keyboard_state.write().key_pressed = false;
                             } else if !keycode.is_empty() {
-                                ctx.play_key_event_sound(&keycode, true);
+                                ctx.read().clone().play_key_event_sound(&keycode, true);
                                 // Update keyboard state - key pressed
                                 let mut state = keyboard_state.write();
                                 state.key_pressed = true;
@@ -141,9 +186,9 @@ pub fn app() -> Element {
                         if let Ok(button_code) = receiver.try_recv() {
                             if button_code.starts_with("UP:") {
                                 let button = &button_code[3..];
-                                ctx.play_mouse_event_sound(button, false);
+                                ctx.read().clone().play_mouse_event_sound(button, false);
                             } else if !button_code.is_empty() {
-                                ctx.play_mouse_event_sound(&button_code, true);
+                                ctx.read().clone().play_mouse_event_sound(&button_code, true);
                             }
                         }
                     }

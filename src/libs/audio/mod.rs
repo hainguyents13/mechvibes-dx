@@ -1,4 +1,5 @@
 mod audio_context;
+pub mod device_change_watcher;
 mod sound_manager;
 pub mod soundpack_loader;
 pub mod music_player;
