@@ -1,0 +1,88 @@
+error[E0432]: unresolved import `crate::utils::theme::get_themes_config`
+   --> src/libs/protocol.rs:222:9
+    |
+222 |     use crate::utils::theme::get_themes_config;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `get_themes_config` in `utils::theme`
+
+warning: unused import: `std::ptr::null_mut`
+ --> src/libs/input_device_manager.rs:2:5
+  |
+2 | use std::ptr::null_mut;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::ffi::OsString`
+ --> src/libs/input_device_manager.rs:3:5
+  |
+3 | use std::ffi::OsString;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::env`
+ --> src/libs/protocol.rs:1:5
+  |
+1 | use std::env;
+  |     ^^^^^^^^
+
+warning: unused import: `std::process::Command`
+ --> src/libs/protocol.rs:2:5
+  |
+2 | use std::process::Command;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `APP_NAME_LOWERCASE`
+ --> src/libs/protocol.rs:3:74
+  |
+3 | use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME, APP_NAME_LOWERCASE };
+  |                                                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::utils::constants::APP_NAME`
+ --> src/utils/auto_startup.rs:2:5
+  |
+2 | use crate::utils::constants::APP_NAME;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+ --> src/utils/soundpack_installer.rs:5:5
+  |
+5 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+
+error[E0599]: no variant or associated item named `InvalidVersion` found for enum `SoundpackValidationStatus` in the current scope
+   --> src/utils/soundpack.rs:201:40
+    |
+201 |             SoundpackValidationStatus::InvalidVersion => "invalid_version".to_string(),
+    |                                        ^^^^^^^^^^^^^^ variant or associated item not found in `SoundpackValidationStatus`
+    |
+   ::: src/utils/soundpack_validator.rs:8:1
+    |
+  8 | pub enum SoundpackValidationStatus {
+    | ---------------------------------- variant or associated item `InvalidVersion` not found for this enum
+
+warning: unused variable: `enable`
+  --> src/utils/auto_startup.rs:85:25
+   |
+85 | pub fn set_auto_startup(enable: bool) -> Result<(), String> {
+   |                         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_enable`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> src/utils/config_converter.rs:42:9
+   |
+42 |     let mut format = probed.format;
+   |         ----^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `corrected_offset`
+   --> src/utils/config_converter.rs:691:25
+    |
+691 |                     let corrected_offset =
+    |                         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_corrected_offset`
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `mechvibes-dx` (bin "mechvibes-dx") due to 2 previous errors; 10 warnings emitted

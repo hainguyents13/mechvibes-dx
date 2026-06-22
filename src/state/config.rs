@@ -162,8 +162,8 @@ impl Default for AppConfig {
             version: crate::utils::constants::APP_VERSION.to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-            keyboard_soundpack: "oreo".to_string(),
-            mouse_soundpack: "test-mouse".to_string(),
+            keyboard_soundpack: "keyboard/eg-oreo".to_string(),
+            mouse_soundpack: "mouse/wooden".to_string(),
             volume: 1.0,
             mouse_volume: 1.0, // Default mouse volume to 100%
             enable_volume_boost: false, // Default volume boost disabled
