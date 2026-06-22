@@ -20,7 +20,10 @@ fn get_app_root() -> &'static PathBuf {
             if let Some(exe_dir) = exe_path.parent() {
                 // Check if running in dev mode (dx serve creates target/dx/... path)
                 let exe_path_str = exe_path.to_string_lossy();
-                if exe_path_str.contains("target\\dx\\") || exe_path_str.contains("target/dx/") {
+                if exe_path_str.contains("target\\dx\\") || 
+                   exe_path_str.contains("target/dx/") ||
+                   exe_path_str.contains("target/debug/") ||
+                   exe_path_str.contains("target/release/") {
                     // In dev mode, use current working directory (project root)
                     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
                     println!("📂 App root (dev mode - from cwd): {}", cwd.display());

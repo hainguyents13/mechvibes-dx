@@ -45,3 +45,5 @@ pub fn use_themes() -> (Signal<ThemesConfig>, Rc<dyn Fn(Box<dyn FnOnce(&mut Them
 pub fn get_themes_config() -> ThemesConfig {
     THEMES_CONFIG.lock().unwrap().clone()
 }
+
+
