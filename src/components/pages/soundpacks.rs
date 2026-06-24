@@ -43,7 +43,8 @@ pub fn Soundpacks() -> Element {
     );
 
     // Get access to audio context for reloading soundpacks
-    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+    let audio_ctx: Signal<Arc<crate::libs::audio::AudioContext>> = use_context();
+    let audio_ctx = audio_ctx.read().clone();
 
     rsx! {
       div { class: "",

@@ -113,6 +113,66 @@ pub fn initialize_music_player() -> Result<(), String> {
     Ok(())
 }
 
+pub fn rebuild_music_player() -> Result<(), String> {
+    let (sender, receiver) = mpsc::channel::<MusicPlayerCommand>();
+
+    let channel_ref = get_music_player_channel();
+    let mut channel_lock = channel_ref.lock().unwrap();
+    *channel_lock = Some(sender);
+    drop(channel_lock);
+
+    let state_snapshot = get_global_music_player_state_copy();
+    let (volume, is_muted, should_play, current_url) = match state_snapshot {
+        Some(state) => (
+            state.volume,
+            state.is_muted,
+            state.is_playing,
+            state.get_current_track_audio(),
+        ),
+        None => (50.0, false, false, None),
+    };
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            if let Ok(player) = RodioMusicPlayer::new() {
+                while let Ok(command) = receiver.recv() {
+                    match command {
+                        MusicPlayerCommand::Play(url) => {
+                            if let Err(e) = player.play(&url).await {
+                                eprintln!("Failed to play track: {}", e);
+                            }
+                        }
+                        MusicPlayerCommand::Pause => {
+                            let _ = player.pause();
+                        }
+                        MusicPlayerCommand::SetVolume(volume) => {
+                            let _ = player.set_volume(volume);
+                        }
+                        MusicPlayerCommand::SetMuted(muted) => {
+                            let _ = player.set_muted(muted);
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    if let Ok(channel_lock) = channel_ref.try_lock() {
+        if let Some(ref sender) = *channel_lock {
+            let _ = sender.send(MusicPlayerCommand::SetVolume(volume / 100.0));
+            let _ = sender.send(MusicPlayerCommand::SetMuted(is_muted));
+            if should_play {
+                if let Some(url) = current_url {
+                    let _ = sender.send(MusicPlayerCommand::Play(url));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ===== MUSIC TYPES =====
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1185,6 +1245,12 @@ impl MusicPlayerState {
                 "0:00".to_string(),
             )
         }
+    }
+
+    pub fn get_current_track_audio(&self) -> Option<String> {
+        self.cache
+            .get_current_track(self.current_index, &self.shuffle_order)
+            .map(|track| track.audio.clone())
     }
     pub fn get_current_track_image(&self) -> String {
         if let Some(track) = self.cache.get_current_track(self.current_index, &self.shuffle_order) {

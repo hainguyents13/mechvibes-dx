@@ -63,7 +63,7 @@ pub fn SoundpackTable(
     // Refresh state
     let refreshing_soundpacks = use_signal(|| false);
     let state_trigger = use_state_trigger();
-    let audio_ctx: Arc<crate::libs::audio::AudioContext> = use_context();
+    let audio_ctx: Signal<Arc<crate::libs::audio::AudioContext>> = use_context();
 
     // Filter soundpacks based on search query - computed every render to be reactive to props changes
     let query = search_query().to_lowercase();
@@ -105,7 +105,8 @@ pub fn SoundpackTable(
                 println!("🔄 Refreshing soundpack cache...");
 
                 // Reload soundpacks in audio context
-                crate::state::app::reload_current_soundpacks(&audio_ctx);
+                let audio_ctx_value = audio_ctx.read().clone();
+                crate::state::app::reload_current_soundpacks(&audio_ctx_value);
 
                 // Trigger state update to refresh UI
                 state_trigger.call(());

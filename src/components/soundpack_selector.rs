@@ -35,7 +35,7 @@ pub fn SoundpackSelector(props: SoundpackSelectorProps) -> Element {
 #[component]
 fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     // Use audio context from the layout provider
-    let audio_ctx: Arc<AudioContext> = use_context();
+    let audio_ctx: Signal<Arc<AudioContext>> = use_context();
 
     // Use the new event-driven app state
     use crate::state::app::use_app_state;
@@ -267,16 +267,17 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                   spawn(async move {
                                       is_loading_async.set(true);
                                       Delay::new(Duration::from_millis(1)).await;
+                                      let audio_ctx_value = audio_ctx_async.read().clone();
                                       let result = match soundpack_type_async {
                                           SelectorType::Keyboard => {
                                               crate::libs::audio::load_keyboard_soundpack(
-                                                  &audio_ctx_async,
+                                                  &audio_ctx_value,
                                                   &pack_id_async,
                                               )
                                           }
                                           SelectorType::Mouse => {
                                               crate::libs::audio::load_mouse_soundpack(
-                                                  &audio_ctx_async,
+                                                  &audio_ctx_value,
                                                   &pack_id_async,
                                               )
                                           }

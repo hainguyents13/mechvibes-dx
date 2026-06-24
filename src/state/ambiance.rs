@@ -206,6 +206,21 @@ pub fn set_global_ambiance_mute(muted: bool) -> Result<(), String> {
     Ok(())
 }
 
+pub fn restart_ambiance_on_device_change() {
+    if let Some(sinks_ref) = GLOBAL_AMBIANCE_SINKS.get() {
+        let mut sinks_lock = sinks_ref.lock().unwrap();
+        for (_, sink) in sinks_lock.drain() {
+            sink.stop();
+        }
+    }
+
+    if let Some(state_ref) = GLOBAL_AMBIANCE_PLAYER_STATE.get() {
+        if let Ok(state_lock) = state_ref.lock() {
+            state_lock.start_all_active_sounds();
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AmbianceSound {
     pub id: String,
@@ -430,7 +445,7 @@ impl AmbiancePlayerState {
     }
 
     /// Start all active sounds when play is pressed
-    fn start_all_active_sounds(&self) {
+    pub fn start_all_active_sounds(&self) {
         if !self.is_playing || self.is_muted {
             return;
         }
