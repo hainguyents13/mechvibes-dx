@@ -121,65 +121,130 @@ fn map_device_query_keycode(key: Keycode) -> &'static str {
     }
 }
 
-/// Start the focused keyboard listener (uses device_query polling)
-/// This listener is ONLY active when the window is focused
+fn is_ctrl(key: &str) -> bool {
+    key == "ControlLeft" || key == "ControlRight"
+}
+
+fn is_alt(key: &str) -> bool {
+    key == "AltLeft" || key == "AltRight"
+}
+
+/// Start a keyboard poller using device_query.
+///
+/// - When `active_when` is `Some(state)`, polling runs only while `*state == true`
+///   (used on Windows/Linux X11 so rdev can own the unfocused path without duplicates).
+/// - When `active_when` is `None`, polling always runs (used on macOS where rdev often
+///   misses keyboard events while the app is unfocused/minimized).
+///
+/// If `hotkey_tx` is provided, Ctrl+Alt+M is detected here (needed when rdev keyboard
+/// is suppressed).
 pub fn start_focused_keyboard_listener(
     keyboard_tx: Sender<String>,
-    is_focused: Arc<Mutex<bool>>,
+    active_when: Option<Arc<Mutex<bool>>>,
+    hotkey_tx: Option<Sender<String>>,
 ) {
     thread::spawn(move || {
-        println!("🎮 Starting focused keyboard listener (device_query polling)...");
-        
-        let device_state = DeviceState::new();
-        let mut prev_keys: HashSet<Keycode> = HashSet::new();
+        let mode = if active_when.is_some() {
+            "gated by focus"
+        } else {
+            "always on"
+        };
+        println!("🎮 Starting keyboard poller (device_query, {mode})...");
 
-        let mut last_focus_log = std::time::Instant::now();
+        let device_state_result = std::panic::catch_unwind(|| DeviceState::new());
+
+        let device_state = match device_state_result {
+            Ok(ds) => ds,
+            Err(_) => {
+                eprintln!(
+                    "⚠️ WARNING: Failed to initialize device_query DeviceState. \
+                     This is likely because the app lacks macOS Accessibility Permissions."
+                );
+                crate::libs::input_manager::set_accessibility_permissions(false);
+                return;
+            }
+        };
+
+        let mut prev_keys: HashSet<Keycode> = HashSet::new();
+        let mut last_status_log = std::time::Instant::now();
+        let mut ctrl_pressed = false;
+        let mut alt_pressed = false;
 
         loop {
-            // Check if window is focused
-            let focused = *is_focused.lock().unwrap();
+            let active = match &active_when {
+                Some(state) => *state.lock().unwrap(),
+                None => true,
+            };
 
-            // Log focus state every 5 seconds for debugging
-            if last_focus_log.elapsed().as_secs() >= 5 {
-                println!("🔍 [device_query] Focus state: {}, polling active: {}",
-                    if focused { "FOCUSED" } else { "UNFOCUSED" },
-                    focused);
-                last_focus_log = std::time::Instant::now();
+            if last_status_log.elapsed().as_secs() >= 5 {
+                println!(
+                    "🔍 [device_query] polling active: {} ({})",
+                    active,
+                    mode
+                );
+                last_status_log = std::time::Instant::now();
             }
 
-            if focused {
-                // Poll keyboard state
-                let keys = device_state.get_keys();
-                let current_keys: HashSet<Keycode> = keys.into_iter().collect();
-
-                // Detect newly pressed keys
-                for key in current_keys.difference(&prev_keys) {
-                    let key_code = map_device_query_keycode(*key);
-                    if !key_code.is_empty() {
-                        // Send key event without logging sensitive keystrokes
-                        let _ = keyboard_tx.send(key_code.to_string());
-                    }
-                }
-
-                // Detect released keys
-                for key in prev_keys.difference(&current_keys) {
-                    let key_code = map_device_query_keycode(*key);
-                    if !key_code.is_empty() {
-                        let _ = keyboard_tx.send(format!("UP:{}", key_code));
-                    }
-                }
-
-                prev_keys = current_keys;
-            } else {
-                // Window not focused - clear state and sleep longer
+            if !active {
+                // Clear edge-detect state so re-focus doesn't replay held keys as presses
                 prev_keys.clear();
+                ctrl_pressed = false;
+                alt_pressed = false;
                 thread::sleep(Duration::from_millis(100));
                 continue;
             }
 
-            // Poll at ~100Hz when focused (10ms interval)
+            let keys = device_state.get_keys();
+            let current_keys: HashSet<Keycode> = keys.into_iter().collect();
+
+            // Newly pressed keys
+            for key in current_keys.difference(&prev_keys) {
+                let key_code = map_device_query_keycode(*key);
+                if key_code.is_empty() {
+                    continue;
+                }
+
+                if is_ctrl(key_code) {
+                    ctrl_pressed = true;
+                } else if is_alt(key_code) {
+                    alt_pressed = true;
+                } else if key_code == "KeyM" {
+                    if let Some(ref hotkey_tx) = hotkey_tx {
+                        if ctrl_pressed && alt_pressed {
+                            println!("🔥 Hotkey detected (device_query): Ctrl+Alt+M - Toggling global sound");
+                            let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
+                            crate::libs::input_manager::add_last_event(
+                                "🔥 Hotkey: Ctrl+Alt+M".to_string(),
+                            );
+                            // Don't play a normal key sound for the toggle combo
+                            continue;
+                        }
+                    }
+                }
+
+                crate::libs::input_manager::add_last_event(format!("⌨️ KeyDown: {}", key_code));
+                let _ = keyboard_tx.send(key_code.to_string());
+            }
+
+            // Released keys
+            for key in prev_keys.difference(&current_keys) {
+                let key_code = map_device_query_keycode(*key);
+                if key_code.is_empty() {
+                    continue;
+                }
+
+                if is_ctrl(key_code) {
+                    ctrl_pressed = false;
+                } else if is_alt(key_code) {
+                    alt_pressed = false;
+                }
+
+                crate::libs::input_manager::add_last_event(format!("⌨️ KeyUp: {}", key_code));
+                let _ = keyboard_tx.send(format!("UP:{}", key_code));
+            }
+
+            prev_keys = current_keys;
             thread::sleep(Duration::from_millis(10));
         }
     });
 }
-

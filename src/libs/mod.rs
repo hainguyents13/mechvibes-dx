@@ -15,5 +15,8 @@ pub mod window_manager;
 #[cfg(target_os = "linux")]
 pub mod evdev_input_listener;
 
+#[cfg(target_os = "macos")]
+pub mod device_query_mouse_listener;
+
 // Re-export main audio types
 pub use audio::AudioContext;

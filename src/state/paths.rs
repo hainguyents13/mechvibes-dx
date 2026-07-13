@@ -18,9 +18,16 @@ fn get_app_root() -> &'static PathBuf {
         // Try to get the directory where the executable is located
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                // Check if running in dev mode (dx serve creates target/dx/... path)
+                // Check if running in dev mode (dx serve creates target/dx/... path,
+                // cargo run creates target/debug/ or target/release/ paths)
                 let exe_path_str = exe_path.to_string_lossy();
-                if exe_path_str.contains("target\\dx\\") || exe_path_str.contains("target/dx/") {
+                if exe_path_str.contains("target/dx/")
+                    || exe_path_str.contains("target\\dx\\")
+                    || exe_path_str.contains("target/debug/")
+                    || exe_path_str.contains("target\\debug\\")
+                    || exe_path_str.contains("target/release/")
+                    || exe_path_str.contains("target\\release\\")
+                {
                     // In dev mode, use current working directory (project root)
                     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
                     println!("📂 App root (dev mode - from cwd): {}", cwd.display());
@@ -81,22 +88,22 @@ pub mod data {
 
     /// Application configuration file
     pub fn config_json() -> PathBuf {
-        get_app_root().join("data").join("config.json")
+        get_system_app_data_dir().join("data").join("config.json")
     }
 
     /// Application manifest file
     pub fn manifest_json() -> PathBuf {
-        get_app_root().join("data").join("manifest.json")
+        get_system_app_data_dir().join("data").join("manifest.json")
     }
 
     /// Custom themes configuration file
     pub fn themes_json() -> PathBuf {
-        get_app_root().join("data").join("themes.json")
+        get_system_app_data_dir().join("data").join("themes.json")
     }
 
     /// Soundpack cache file
     pub fn soundpack_cache_json() -> PathBuf {
-        get_app_root().join("data").join("soundpack_cache.json")
+        get_system_app_data_dir().join("data").join("soundpack_cache.json")
     }
 
     /// Custom images directory for user-uploaded images

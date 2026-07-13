@@ -56,6 +56,21 @@ pub fn Layout() -> Element {
         // Custom title bar for window controls
         crate::components::titlebar::TitleBar {}
 
+        // macOS Accessibility Permission warning banner (checked dynamically)
+        if !crate::libs::input_manager::check_accessibility_permissions() {
+          div {
+            class: "bg-error text-error-content text-center py-1.5 text-xs font-semibold px-4 flex items-center justify-center gap-4 border-b border-error/20 z-50",
+            span { "⚠️ macOS Accessibility Permissions are required for keyboard sounds." }
+            button {
+              class: "btn btn-xs btn-neutral btn-ghost border border-base-content/20 text-xs px-2 py-0.5 min-h-0 h-auto",
+              onclick: move |_| {
+                let _ = crate::utils::path::open_path("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+              },
+              "Open Settings"
+            }
+          }
+        }
+
         // Main content area with padding to account for title bar
         div { class: "flex-1 overflow-auto {crate::utils::spacing::CONTENT_PADDING}",
           // Outlet for nested routes

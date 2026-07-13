@@ -1,11 +1,24 @@
 /// Global input manager to handle input channels between main and UI
 use std::sync::{ mpsc, Arc, Mutex, OnceLock };
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 /// Static global holder for input channels
 static INPUT_CHANNELS: OnceLock<InputChannels> = OnceLock::new();
 
 /// Static global holder for window focus state
 static WINDOW_FOCUS_STATE: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
+
+/// Static global holder for macOS accessibility permissions status
+static HAS_ACCESSIBILITY_PERMISSIONS: AtomicBool = AtomicBool::new(true);
+
+pub fn set_accessibility_permissions(has_permission: bool) {
+    HAS_ACCESSIBILITY_PERMISSIONS.store(has_permission, Ordering::Relaxed);
+}
+
+pub fn get_accessibility_permissions() -> bool {
+    HAS_ACCESSIBILITY_PERMISSIONS.load(Ordering::Relaxed)
+}
 
 /// Struct to hold input event channels
 pub struct InputChannels {
@@ -63,5 +76,35 @@ pub fn set_window_focus(focused: bool) {
     if let Some(state) = WINDOW_FOCUS_STATE.get() {
         *state.lock().unwrap() = focused;
         println!("🔍 Window focus state changed: {}", if focused { "FOCUSED" } else { "UNFOCUSED" });
+    }
+}
+
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    fn AXIsProcessTrusted() -> bool;
+}
+
+pub fn check_accessibility_permissions() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { AXIsProcessTrusted() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        get_accessibility_permissions()
+    }
+}
+
+static LAST_EVENTS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+
+pub fn get_last_events() -> Vec<String> {
+    LAST_EVENTS.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap().clone()
+}
+
+pub fn add_last_event(event_str: String) {
+    let mut events = LAST_EVENTS.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap();
+    events.insert(0, event_str);
+    if events.len() > 8 {
+        events.truncate(8);
     }
 }

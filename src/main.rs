@@ -11,7 +11,6 @@ use dioxus::prelude::*;
 use utils::constants::{ APP_NAME };
 use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
-use libs::input_listener::start_unified_input_listener;
 use libs::focused_input_listener::start_focused_keyboard_listener;
 use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value, get_window_focus_state };
 use std::sync::mpsc;
@@ -20,7 +19,7 @@ use std::sync::mpsc;
 use libs::evdev_input_listener::start_evdev_keyboard_listener;
 
 #[cfg(target_os = "linux")]
-use std::sync::{Arc, Mutex};
+use libs::evdev_input_listener::start_evdev_keyboard_listener;
 
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
@@ -130,6 +129,15 @@ fn main() {
     init_window_focus_state_with_value(initial_focus_state);
     debug_print!("🔍 Initial window focus state: {}", if initial_focus_state { "FOCUSED" } else { "UNFOCUSED" });
 
+    // Check accessibility permissions early (required for global input on macOS)
+    libs::input_manager::set_accessibility_permissions(
+        libs::input_manager::check_accessibility_permissions()
+    );
+    debug_print!(
+        "🔒 Initial Accessibility Permissions: {}",
+        libs::input_manager::get_accessibility_permissions()
+    );
+
     // Detect display server on Linux
     #[cfg(target_os = "linux")]
     let display_server = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "x11".to_string());
@@ -161,21 +169,33 @@ fn main() {
             start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
 
             debug_print!("🎮 Starting focused keyboard listener (X11 mode - focused)...");
-            start_focused_keyboard_listener(keyboard_tx, focus_state);
+            start_focused_keyboard_listener(keyboard_tx, Some(focus_state), None);
         }
     }
 
-    // On Windows and macOS, use the hybrid approach (rdev + device_query)
-    // rdev handles keyboard when unfocused, device_query when focused
-    #[cfg(not(target_os = "linux"))]
+    // macOS: device_query-only (no rdev CGEventTap). Avoids rdev's HID-level tap
+    // which blocks letters/numbers from device_query's CGEventSourceKeyState polling.
+    #[cfg(target_os = "macos")]
+    {
+        crate::libs::device_query_mouse_listener::start_device_query_mouse_listener(mouse_tx);
+        start_focused_keyboard_listener(keyboard_tx, None, Some(hotkey_tx));
+    }
+
+    // Windows: hybrid approach — rdev when unfocused, device_query when focused.
+    #[cfg(target_os = "windows")]
     {
         let focus_state = get_window_focus_state();
 
-        debug_print!("🎮 Starting unified input listener (unfocused)...");
-        start_unified_input_listener(keyboard_tx.clone(), mouse_tx, hotkey_tx, Some(focus_state.clone()));
+        debug_print!("🎮 Starting unified input listener (Windows - unfocused keyboard + mouse)...");
+        start_unified_input_listener(
+            keyboard_tx.clone(),
+            mouse_tx,
+            hotkey_tx,
+            Some(focus_state.clone()),
+        );
 
-        debug_print!("🎮 Starting focused keyboard listener (focused)...");
-        start_focused_keyboard_listener(keyboard_tx, focus_state);
+        debug_print!("🎮 Starting focused keyboard listener (Windows - focused)...");
+        start_focused_keyboard_listener(keyboard_tx, Some(focus_state), None);
     }
 
     // Create window action channel
