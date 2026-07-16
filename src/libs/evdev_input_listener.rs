@@ -12,7 +12,8 @@ pub fn start_evdev_keyboard_listener(
     _is_focused: Arc<Mutex<bool>>,
 ) {
     thread::spawn(move || {
-        use evdev::{Device, EventType, Key};
+        use evdev::{Device, EventType, KeyCode};
+        type Key = KeyCode;
 
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
@@ -23,26 +24,17 @@ pub fn start_evdev_keyboard_listener(
         // Find all keyboard devices
         let mut keyboards = Vec::new();
         
-        match evdev::enumerate().map(|t| t.collect::<Vec<_>>()) {
-            Ok(devices) => {
-                for (path, mut device) in devices {
-                    // Check if device has keyboard capabilities
-                    if device.supported_keys().is_some() {
-                        println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+        for (path, mut device) in evdev::enumerate() {
+            // Check if device has keyboard capabilities
+            if device.supported_keys().is_some() {
+                println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
 
-                        // Set device to non-blocking mode to prevent blocking on idle devices
-                        if let Err(e) = device.set_nonblocking(true) {
-                            eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
-                        }
-
-                        keyboards.push(device);
-                    }
+                // Set device to non-blocking mode to prevent blocking on idle devices
+                if let Err(e) = device.set_nonblocking(true) {
+                    eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
                 }
-            }
-            Err(e) => {
-                eprintln!("❌ [evdev] Failed to enumerate devices: {}", e);
-                eprintln!("💡 [evdev] Make sure you're in the 'input' group: sudo usermod -a -G input $USER");
-                return;
+
+                keyboards.push(device);
             }
         }
         
@@ -64,8 +56,8 @@ pub fn start_evdev_keyboard_listener(
                             if event.event_type() == EventType::KEY {
                                 let key_value = event.value();
 
-                                if let Ok(key) = Key::new(event.code()) {
-                                    let key_code = map_evdev_keycode(key);
+                                let key = Key::new(event.code());
+                                let key_code = map_evdev_keycode(key);
                                     if !key_code.is_empty() {
                                         // Handle key press (value == 1)
                                         if key_value == 1 {
@@ -109,7 +101,6 @@ pub fn start_evdev_keyboard_listener(
                                         }
                                         // Ignore key repeat (value == 2)
                                     }
-                                }
                             }
                         }
                     }
@@ -129,8 +120,8 @@ pub fn start_evdev_keyboard_listener(
 }
 
 #[cfg(target_os = "linux")]
-fn map_evdev_keycode(key: evdev::Key) -> &'static str {
-    use evdev::Key::*;
+fn map_evdev_keycode(key: evdev::KeyCode) -> &'static str {
+    type Key = evdev::KeyCode;
     
     match key {
         // Letters

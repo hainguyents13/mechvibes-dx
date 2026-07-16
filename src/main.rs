@@ -84,11 +84,34 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     debug_print!("🔍 Command line args: {:?}", args);
 
+    // Check for --soundpack flag
+    let cli_soundpack = args.windows(2).find(|w| w[0] == "--soundpack").map(|w| {
+        let name = w[1].clone();
+        // Auto-prepend keyboard/ if no prefix given
+        if !name.starts_with("keyboard/") && !name.starts_with("mouse/") {
+            format!("keyboard/{}", name)
+        } else {
+            name
+        }
+    });
+    if let Some(ref sp) = cli_soundpack {
+        debug_print!("🎯 CLI soundpack override: {}", sp);
+    }
+
     // Check if we should start minimized (from auto-startup)
     let should_start_minimized =
         args.contains(&"--minimized".to_string()) ||
         (state::config::AppConfig::load().auto_start &&
             state::config::AppConfig::load().start_minimized);
+
+    // Apply CLI soundpack override and run in headless mode
+    if let Some(ref soundpack_name) = cli_soundpack {
+        let mut config = state::config::AppConfig::load();
+        config.keyboard_soundpack = soundpack_name.clone();
+        let _ = config.save();
+        libs::cli::run_cli_mode(soundpack_name);
+        return;
+    }
 
     // Register protocol on first run
     // if let Err(e) = protocol::register_protocol() {
