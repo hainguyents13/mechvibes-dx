@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod cli;
 pub mod device_manager;
 pub mod focused_input_listener;
 pub mod input_device_manager;
