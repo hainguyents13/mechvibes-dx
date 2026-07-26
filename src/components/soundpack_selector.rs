@@ -46,7 +46,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
     let error = use_signal(String::new);
     let mut is_open = use_signal(|| false);
     let mut search_query = use_signal(String::new);
-    let is_loading = use_signal(|| false);
+    let loading_pack_id = use_signal(|| None::<String>);
 
     // Use global app state for soundpacks
     let soundpacks = use_memo(move || app_state.get_soundpacks());
@@ -141,7 +141,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                 if is_open() { "btn-active" } else { "" },
             ),
             style: format!("anchor-name: --soundpack-anchor-{:?};", soundpack_type),
-            disabled: is_loading() || !has_soundpacks(),
+            disabled: loading_pack_id().is_some() || !has_soundpacks(),
             onclick: move |_| {
                 if has_soundpacks() {
                     is_open.set(!is_open());
@@ -152,7 +152,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                 div { class: "text-base-content/50 text-sm", "{no_soundpack_text}" }
               } else if let Some(pack) = current_soundpack() {
                 div { class: "flex-shrink-0 overflow-hidden  w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
-                  if is_loading() {
+                  if loading_pack_id().is_some() {
                     span { class: "loading loading-spinner loading-sm" }
                   } else {
                     if let Some(icon) = &pack.icon {
@@ -228,7 +228,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-300 last:border-b-0 h-auto {}",
                           if pack.folder_path == current() { "btn-disabled" } else { "btn-ghost" },
                       ),
-                      disabled: pack.folder_path == current(),
+                      disabled: pack.folder_path == current() || loading_pack_id().is_some(),
                       // Use folder_path for comparison
                       onclick: {
                           let pack_id = pack.folder_path.clone();
@@ -236,7 +236,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                           let soundpacks = soundpacks.clone();
                           let mut is_open = is_open.clone();
                           let mut search_query = search_query.clone();
-                          let is_loading = is_loading.clone();
+                          let loading_pack_id = loading_pack_id.clone();
                           let audio_ctx = audio_ctx.clone();
                           let update_config = update_config.clone();
                           let soundpack_type_click = soundpack_type.clone();
@@ -262,10 +262,10 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                   let pack_id_async = pack_id.clone();
                                   let audio_ctx_async = audio_ctx.clone();
                                   let mut error_async = error.clone();
-                                  let mut is_loading_async = is_loading.clone();
+                                  let mut loading_pack_id_async = loading_pack_id.clone();
                                   let soundpack_type_async = soundpack_type_click.clone();
                                   spawn(async move {
-                                      is_loading_async.set(true);
+                                      loading_pack_id_async.set(Some(pack_id_async.clone()));
                                       Delay::new(Duration::from_millis(1)).await;
                                       let result = match soundpack_type_async {
                                           SelectorType::Keyboard => {
@@ -294,32 +294,33 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                                                   );
                                           }
                                       }
-                                      is_loading_async.set(false);
+                                      loading_pack_id_async.set(None);
                                   });
                               }
                           }
                       },
-                      div { class: "flex items-center justify-between gap-3 ",
-                        div { class: "flex-shrink-0 w-8 h-8 rounded-box flex items-center justify-center bg-base-100 overflow-hidden relative",
-                          if let Some(icon) = &pack.icon {
-                            if !icon.is_empty() {
-                              img {
-                                class: "w-full h-full object-cover bg-blend-multiply",
-                                src: "{icon}",
+                        div { class: "flex items-center justify-between gap-3 ",
+                          div { class: "flex-shrink-0 w-8 h-8 rounded-box flex items-center justify-center bg-base-100 overflow-hidden relative",
+                            if loading_pack_id().as_ref() == Some(&pack.folder_path) {
+                              span { class: "loading loading-spinner loading-xs" }
+                            } else if let Some(icon) = &pack.icon {
+                              if !icon.is_empty() {
+                                img {
+                                  class: "w-full h-full object-cover bg-blend-multiply",
+                                  src: "{icon}",
+                                }
+                              } else {
+                                Music { class: "w-4 h-4 text-primary/50 bg-base-100" }
                               }
                             } else {
                               Music { class: "w-4 h-4 text-primary/50 bg-base-100" }
                             }
-                          } else {
-                            Music { class: "w-4 h-4 text-primary/50 bg-base-100" }
-                          }
-                          if pack.folder_path == current() {
-                            // Use folder_path for comparison
-                            div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
-                              Check { class: "text-white w-6 h-6" }
+                            if pack.folder_path == current() {
+                              div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center ",
+                                Check { class: "text-white w-6 h-6" }
+                              }
                             }
                           }
-                        }
                         div { class: "flex-1 min-w-0",
                           div { class: "text-xs font-medium line-clamp-1 text-base-content",
                             "{pack.name}"

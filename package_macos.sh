@@ -75,9 +75,11 @@ cat <<EOF > MechvibesDX.app/Contents/Info.plist
     <key>CFBundleVersion</key>
     <string>0.4.0</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.10</string>
+    <string>10.15</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MechvibesDX needs permission to detect key presses for sound playback.</string>
 </dict>
 </plist>
 EOF
@@ -92,11 +94,15 @@ mkdir -p dmg_stage
 cp -R MechvibesDX.app dmg_stage/
 ln -s /Applications dmg_stage/Applications
 
-hdiutil create -fs HFS+ -volname "MechvibesDX" -srcfolder dmg_stage MechvibesDX.dmg
+hdiutil create -fs HFS+ -volname "MechvibesDX" -srcfolder dmg_stage MechvibesDX.dmg -ov
 rm -rf dmg_stage
 
-# 9. Reset macOS TCC cache for the app bundle identifier to clear cached permission mismatches
-echo "🧹 Resetting macOS Accessibility permission cache for MechvibesDX..."
-tccutil reset Accessibility com.hainguyents13.mechvibesdx || true
-
 echo "🎉 DMG packaging completed! MechvibesDX.dmg is ready."
+echo ""
+echo "⚠️  IMPORTANT — after installing the .app, grant BOTH permissions:"
+echo "   System Settings → Privacy & Security → Accessibility → enable MechvibesDX"
+echo "   System Settings → Privacy & Security → Input Monitoring → enable MechvibesDX"
+echo "   Then fully quit and reopen the app."
+echo ""
+echo "   cargo run permissions do NOT carry over to the packaged app (different binary path)."
+echo "   Do NOT run 'tccutil reset' unless troubleshooting — it wipes grants."

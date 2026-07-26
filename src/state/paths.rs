@@ -83,7 +83,7 @@ fn get_system_app_data_dir() -> PathBuf {
 
 /// Application data directory paths
 pub mod data {
-    use super::{get_app_root, get_system_app_data_dir};
+    use super::get_system_app_data_dir;
     use std::path::PathBuf;
 
     /// Application configuration file
@@ -198,11 +198,13 @@ pub mod soundpacks {
 
     /// Get the base soundpacks directory (containing keyboard/ and mouse/ folders)
     /// Returns built-in soundpacks directory
+    #[allow(dead_code)]
     pub fn get_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir().to_string_lossy().to_string()
     }
 
     /// Get keyboard soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn keyboard_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("keyboard")
@@ -211,6 +213,7 @@ pub mod soundpacks {
     }
 
     /// Get mouse soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn mouse_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("mouse")
@@ -219,6 +222,7 @@ pub mod soundpacks {
     }
 
     /// Get custom keyboard soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_keyboard_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("keyboard")
@@ -227,6 +231,7 @@ pub mod soundpacks {
     }
 
     /// Get custom mouse soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_mouse_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("mouse")
@@ -298,5 +303,28 @@ pub mod soundpacks {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_app_root() {
+        let root = get_app_root();
+        assert!(root.to_str().unwrap().len() > 0);
+    }
+
+    #[test]
+    fn test_data_config_json_path() {
+        let config_path = data::config_json();
+        assert!(config_path.to_str().unwrap().ends_with("config.json"));
+    }
+
+    #[test]
+    fn test_soundpack_dirs() {
+        let builtin_dir = soundpacks::get_builtin_soundpacks_dir();
+        assert!(builtin_dir.to_str().unwrap().ends_with("soundpacks"));
     }
 }

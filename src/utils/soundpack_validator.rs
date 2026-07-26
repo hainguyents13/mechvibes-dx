@@ -7,6 +7,7 @@ use zip::ZipArchive;
 #[derive(Debug, Clone, PartialEq)]
 pub enum SoundpackValidationStatus {
     Valid,
+    #[allow(dead_code)]
     InvalidVersion,
     InvalidStructure(String),
     MissingRequiredFields(Vec<String>),
@@ -17,9 +18,11 @@ pub enum SoundpackValidationStatus {
 pub struct SoundpackValidationResult {
     pub status: SoundpackValidationStatus,
     pub config_version: Option<u32>,
+    #[allow(dead_code)]
     pub detected_version: Option<String>,
     pub is_valid_v2: bool,
     pub can_be_converted: bool,
+    #[allow(dead_code)]
     pub message: String,
 }
 
@@ -321,5 +324,80 @@ pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, St
         SoundpackValidationStatus::InvalidVersion => {
             Err("Invalid or unsupported soundpack version".to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+
+    #[test]
+    fn test_validate_v2_soundpack_config() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("test_v2_config.json");
+        let v2_json = r#"{
+            "name": "Test Soundpack V2",
+            "author": "Tester",
+            "config_version": 2,
+            "defs": {
+                "30": [[0, 100]]
+            }
+        }"#;
+
+        let mut file = File::create(&file_path).expect("Failed to create temp file");
+        file.write_all(v2_json.as_bytes()).unwrap();
+
+        let result = validate_soundpack_config(file_path.to_str().unwrap());
+        assert_eq!(result.status, SoundpackValidationStatus::Valid);
+        assert!(result.is_valid_v2);
+        assert!(!result.can_be_converted);
+
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_validate_v1_soundpack_config() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("test_v1_config.json");
+        let v1_json = r#"{
+            "name": "Test Soundpack V1",
+            "sound": "click.ogg",
+            "defines": {
+                "30": [0, 100]
+            }
+        }"#;
+
+        let mut file = File::create(&file_path).expect("Failed to create temp file");
+        file.write_all(v1_json.as_bytes()).unwrap();
+
+        let result = validate_soundpack_config(file_path.to_str().unwrap());
+        assert_eq!(result.status, SoundpackValidationStatus::VersionOneNeedsConversion);
+        assert!(!result.is_valid_v2);
+        assert!(result.can_be_converted);
+
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_validate_missing_fields() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("test_missing_config.json");
+        let missing_json = r#"{
+            "version": "1.0.0"
+        }"#;
+
+        let mut file = File::create(&file_path).expect("Failed to create temp file");
+        file.write_all(missing_json.as_bytes()).unwrap();
+
+        let result = validate_soundpack_config(file_path.to_str().unwrap());
+        if let SoundpackValidationStatus::MissingRequiredFields(fields) = result.status {
+            assert!(fields.contains(&"name".to_string()));
+        } else {
+            panic!("Expected MissingRequiredFields status");
+        }
+
+        let _ = std::fs::remove_file(file_path);
     }
 }

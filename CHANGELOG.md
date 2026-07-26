@@ -1,6 +1,42 @@
 # Changelog
 
-## v0.4.1 - 2026-07-13
+## v0.4.3 - 2026-07-26
+
+### Code Cleanup & Refactoring
+- **Compiler Warnings Cleanup**: Resolved 100% of compiler warnings (from 101 to 0 warnings) by removing orphan code and applying `#[allow(dead_code)]` annotations to reserved public API surfaces.
+- **Orphan File Removal**: Removed unreferenced placeholder and debug files (`src/state/rodio_music.rs`, `src/libs/file_server.rs`, `src/bin/test_dq.rs`).
+- **Unused UI Variables**: Fixed unused variable declarations in `soundpack_table.rs` and `device_selector.rs`.
+
+### Testing & Quality Assurance
+- **Unit Test Suite**: Created a unit test suite covering soundpack manifest validation (`soundpack_validator.rs`), legacy config keycode conversion (`config_converter.rs`), and system path resolution (`paths.rs`).
+
+### Documentation
+- **Comprehensive Docs**: Created all core documentation guides under `./docs/` (`project-overview-pdr.md`, `code-standards.md`, `codebase-summary.md`, `design-guidelines.md`, `deployment-guide.md`, `system-architecture.md`, `project-roadmap.md`).
+
+## v0.4.2 - 2026-07-14
+
+### Performance Improvements
+
+#### Zero Disk I/O on Keypress
+- **Root cause:** The `AppConfig::load()` function was reading from disk and system registry on every single keypress and mouse click to check if sounds were enabled.
+- **Fix:** Introduced global `AtomicBool` flags (`SOUND_ENABLED`, `KEYBOARD_SOUND_ENABLED`, `MOUSE_SOUND_ENABLED`) in `audio_context.rs`. These flags are synced on app startup and whenever settings change, completely eliminating disk reads from the audio hot path.
+
+#### Faster Soundpack Downloads
+- **Root cause:** An artificial `tokio::time::sleep` of 15ms per chunk was slowing down soundpack downloads significantly.
+- **Fix:** Removed the sleep delay, allowing downloads to process at full network speed.
+
+### Bug Fixes
+
+#### Tray Menu Download Improvements
+- **Tray Index Mismatch:** Fixed an issue where downloading a soundpack from the tray menu could download the wrong pack because the menu relied on a sorted index instead of the pack ID.
+- **Loading Label:** Fixed the "Loading..." label in the tray menu which was not displaying during downloads due to an ID comparison mismatch.
+- **Auto-Activation:** Downloaded soundpacks from the tray are now correctly prefixed with `keyboard/` or `mouse/` so they instantly show up as active in the UI.
+
+#### General Fixes
+- **Ghost Keys:** Fixed a bug where keys could get "stuck" (ghost keys) when switching focus away from the app. The `pressed_keys` tracker is now properly cleared on focus transitions.
+- **Safe Soundpack Deletion:** Deleting a currently active soundpack now safely unsets it from the active config, preventing corrupted config states and dangling references.
+- **Platform-Specific Restarts:** Fixed the "Restart App" functionality on Windows by falling back to `cmd.exe /C ping` instead of relying on `sh` (which is unavailable natively on Windows). Paths are now safely sanitized.
+- **Adaptive Settings Labels:** The "Start with Windows" setting now dynamically shows "Start at Login" on macOS and "Launch at Startup" on Linux.## v0.4.1 - 2026-07-13
 
 ### Bug Fixes
 

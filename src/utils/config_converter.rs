@@ -39,7 +39,7 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
 
     let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
-    let mut format = probed.format;
+    let format = probed.format;
 
     // Get the default track
     let track = format
@@ -550,6 +550,7 @@ pub fn convert_v2_multi_to_single(
 }
 
 /// Concatenate multiple audio files into one file
+#[allow(dead_code)]
 fn concatenate_audio_files(
     audio_files: &[(String, f64)], // (filename, duration)
     soundpack_dir: &str,
@@ -688,7 +689,7 @@ fn concatenate_audio_files_with_timing(
                     channels = file_channels;
                     println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
                     // Recalculate offset for first file with correct sample rate
-                    let corrected_offset =
+                    let _corrected_offset =
                         ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
                         1000.0;
                     // Update if needed
@@ -1154,4 +1155,18 @@ fn create_iohook_to_web_key_mapping() -> HashMap<u32, String> {
     mapping.insert(65406, "Find".to_string()); // VC_SUN_FIND = 0xFF7E
 
     mapping
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iohook_keycode_mapping() {
+        let mapping = create_iohook_to_web_key_mapping();
+        assert_eq!(mapping.get(&57).unwrap(), "Space");
+        assert_eq!(mapping.get(&28).unwrap(), "Enter");
+        assert_eq!(mapping.get(&14).unwrap(), "Backspace");
+        assert_eq!(mapping.get(&1).unwrap(), "Escape");
+    }
 }

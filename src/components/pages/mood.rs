@@ -52,7 +52,7 @@ fn MusicPlayerPanel(
     let is_next_track_loading = use_signal(|| false);
 
     rsx! {
-      div { class: "bg-base-200 border border-base-300 rounded-box p-4 space-y-4 relative overflow-hidden",
+      div { class: "mac-panel p-4 space-y-4 relative overflow-hidden",
         if is_loading() {
           div { class: "text-center py-4",
             span { class: "loading loading-spinner loading-md" }
@@ -162,7 +162,7 @@ fn SoundSelectionPanel(
     refresh_trigger: Signal<i32>
 ) -> Element {
     rsx! {
-      div { class: "bg-base-200 border border-base-300 rounded-box p-6 space-y-4",
+      div { class: "mac-panel p-6 space-y-4",
         // Header
         div { class: "space-y-1",
           h3 { class: "text-lg font-semibold", "Ambiance sounds" }

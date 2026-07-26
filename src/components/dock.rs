@@ -7,7 +7,9 @@ pub fn Dock() -> Element {
     let nav = navigator();
     let route = use_route::<crate::libs::routes::Route>();
     rsx! {
-      div { class: "dock dock-xl bg-base-300/30 backdrop-blur-lg ",
+      nav {
+        class: "dock dock-xl",
+        style: "background: rgba(var(--glass-bg, 30 30 30), 0.6); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); border-top: 1px solid rgba(255,255,255,0.08);",
         // Button Home
         button {
           class: if matches!(route, crate::libs::routes::Route::Home {}) { "dock-active" } else { "" },

@@ -11,8 +11,9 @@ MechvibesDX lets you play any sound when you type or click. Use it for education
 -   Play sounds on every keystroke (keydown/keyup) and mouse click (press/release)
 -   Works with education, business, gaming, and accessibility needs
 -   Global hotkey toggle (`Ctrl+Alt+M`)
--   System tray integration
--   Custom soundpack support
+-   System tray integration (Download packs, mute, change sounds on the fly)
+-   In-app soundpack catalog to browse and download official soundpacks instantly
+-   Custom local soundpack support
 -   Multiple themes available
 -   Logo and background customizations
 
@@ -33,7 +34,15 @@ MechvibesDX lets you play any sound when you type or click. Use it for education
 
 **Accessibility** - Audio feedback for visually impaired users
 
-## Creating soundpacks
+## Getting Soundpacks
+
+### 1. Browse and Download In-App (New!)
+You can now download soundpacks directly from the application!
+- Open the app or use the system tray menu.
+- Click **"Get Packs"** or browse the list from the tray.
+- Find a pack you like, click download, and it will be applied instantly.
+
+### 2. Creating Custom Soundpacks
 
 1. Record audio files (OGG, WAV, MP3)
 2. Create config.json mapping keys to sounds
@@ -46,11 +55,36 @@ Piano pack/
 └── icon.png
 ```
 
+## Documentation
+
+Complete architecture, design, code standards, and deployment guides are available in the [`./docs`](./docs) folder:
+
+- [Project Overview & PDR](./docs/project-overview-pdr.md)
+- [System Architecture](./docs/system-architecture.md)
+- [Codebase Summary & Directory Map](./docs/codebase-summary.md)
+- [Code Standards](./docs/code-standards.md)
+- [Design Guidelines](./docs/design-guidelines.md)
+- [Deployment & Packaging Guide](./docs/deployment-guide.md)
+- [Project Roadmap](./docs/project-roadmap.md)
+
+## Development & Testing
+
+```bash
+# Check code compilation
+cargo check
+
+# Run automated unit test suite
+cargo test
+
+# Launch app in development mode
+cargo run
+```
+
 ## Troubleshooting
 
 **No sounds?** Check if muted (`Ctrl+Alt+M`), soundpack selected, system volume
 
-**Hotkey not working?** Run as administrator, check for conflicts
+**Hotkey not working?** Run as administrator / check Accessibility permissions on macOS
 
 **Soundpack won't load?** Verify config.json syntax, supported audio formats
 

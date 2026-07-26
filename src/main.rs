@@ -12,17 +12,34 @@ use utils::constants::{ APP_NAME };
 use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::focused_input_listener::start_focused_keyboard_listener;
-use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value, get_window_focus_state };
+#[allow(unused_imports)]
+use libs::input_listener::start_unified_input_listener;
+use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value };
 use std::sync::mpsc;
-
-#[cfg(target_os = "linux")]
-use libs::evdev_input_listener::start_evdev_keyboard_listener;
 
 #[cfg(target_os = "linux")]
 use libs::evdev_input_listener::start_evdev_keyboard_listener;
 
 // Use .ico format for better Windows compatibility
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
+
+/// Keep the process active while backgrounded so input listeners are not App-Nap throttled.
+#[cfg(target_os = "macos")]
+#[allow(deprecated, unexpected_cfgs)]
+fn disable_app_nap() {
+    use cocoa::base::{id, nil};
+    use objc::{class, msg_send, sel, sel_impl};
+
+    unsafe {
+        let process_info: id = msg_send![class!(NSProcessInfo), processInfo];
+        // NSActivityUserInitiatedAllowingIdleSystemSleep = 0x00FFFFFFULL
+        let options: u64 = 0x00FF_FFFF;
+        let reason: id = msg_send![class!(NSString), stringWithUTF8String: b"MechvibesDX keyboard monitoring\0".as_ptr()];
+        let _: id = msg_send![process_info, beginActivityWithOptions: options reason: reason];
+        let _ = nil;
+        debug_print!("🔋 Disabled App Nap for reliable background key capture");
+    }
+}
 
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
     // Try to create icon from embedded ICO data
@@ -129,14 +146,22 @@ fn main() {
     init_window_focus_state_with_value(initial_focus_state);
     debug_print!("🔍 Initial window focus state: {}", if initial_focus_state { "FOCUSED" } else { "UNFOCUSED" });
 
-    // Check accessibility permissions early (required for global input on macOS)
-    libs::input_manager::set_accessibility_permissions(
-        libs::input_manager::check_accessibility_permissions()
-    );
-    debug_print!(
-        "🔒 Initial Accessibility Permissions: {}",
-        libs::input_manager::get_accessibility_permissions()
-    );
+    // macOS: request Accessibility + Input Monitoring before starting listeners.
+    // Without Input Monitoring, the packaged .app often only sees special keys
+    // (Backspace, CapsLock, …) from other apps — letters/numbers are filtered.
+    // cargo run uses a different binary path, so its TCC grants do not apply to the .app.
+    #[cfg(target_os = "macos")]
+    {
+        disable_app_nap();
+        let ok = libs::input_manager::ensure_macos_input_permissions();
+        debug_print!("🔒 Full keyboard capture permissions: {}", ok);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        libs::input_manager::set_accessibility_permissions(
+            libs::input_manager::check_accessibility_permissions()
+        );
+    }
 
     // Detect display server on Linux
     #[cfg(target_os = "linux")]
@@ -148,6 +173,9 @@ fn main() {
     // Start input listeners based on platform and display server
     #[cfg(target_os = "linux")]
     {
+        use libs::input_manager::get_window_focus_state;
+        use std::sync::{Arc, Mutex};
+
         if display_server == "wayland" {
             // On Wayland, use evdev for keyboard input (works both focused and unfocused)
             // evdev also handles hotkey detection (Ctrl+Alt+M)
@@ -173,17 +201,20 @@ fn main() {
         }
     }
 
-    // macOS: device_query-only (no rdev CGEventTap). Avoids rdev's HID-level tap
-    // which blocks letters/numbers from device_query's CGEventSourceKeyState polling.
+    // macOS: pure device_query polling for both keyboard and mouse.
+    // Avoids rdev's HID-level tap which crashes due to background thread UI assertions.
     #[cfg(target_os = "macos")]
     {
-        crate::libs::device_query_mouse_listener::start_device_query_mouse_listener(mouse_tx);
+        debug_print!("🎮 Starting keyboard poller (macOS - device_query)...");
         start_focused_keyboard_listener(keyboard_tx, None, Some(hotkey_tx));
+        debug_print!("🎮 Starting mouse poller (macOS - device_query)...");
+        crate::libs::device_query_mouse_listener::start_device_query_mouse_listener(mouse_tx);
     }
 
     // Windows: hybrid approach — rdev when unfocused, device_query when focused.
     #[cfg(target_os = "windows")]
     {
+        use libs::input_manager::get_window_focus_state;
         let focus_state = get_window_focus_state();
 
         debug_print!("🎮 Starting unified input listener (Windows - unfocused keyboard + mouse)...");
@@ -202,6 +233,17 @@ fn main() {
     let (window_tx, _window_rx) = mpsc::channel::<WindowAction>();
     WINDOW_MANAGER.set_action_sender(window_tx);
 
+    // Create AudioContext early and store globally so both the sound-processor
+    // thread and the Dioxus UI share the same instance.
+    let audio_ctx = std::sync::Arc::new(libs::AudioContext::new());
+    libs::audio::init_global_audio_context(audio_ctx);
+
+    // Spawn a dedicated sound-processor thread that is independent of the
+    // Dioxus event loop.  On macOS the main-thread run loop can be throttled
+    // (App Nap) when the window loses focus, which silences keyboard sounds
+    // that are consumed inside a Dioxus `use_future`.
+    libs::sound_processor::start_sound_processor_thread();
+
     // Window dimensions - allow vertical resizing
     let window_width = 470;
     let min_height = 600;   // Minimum height for compact mode
@@ -214,23 +256,24 @@ fn main() {
         always_eprint!("⚠️ Warning: Failed to load window icon - taskbar icon may not appear");
     }
 
-    // Create a WindowBuilder with custom appearance and vertical resizing
+    // Create a WindowBuilder with native decorations (macOS traffic lights) + transparency
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
-        .with_transparent(true) // Enable transparency for custom window styling
-        .with_always_on_top(false) // Allow normal window behavior for taskbar
+        .with_transparent(true)
+        .with_always_on_top(false)
         .with_inner_size(LogicalSize::new(window_width, default_height))
         .with_min_inner_size(LogicalSize::new(window_width, min_height))
         .with_max_inner_size(LogicalSize::new(window_width, max_height))
         .with_fullscreen(None)
-        .with_decorations(false) // Use custom title bar
-        .with_resizable(true) // Enable vertical resizing
-        .with_visible(!should_start_minimized) // Hide window if starting minimized
-        .with_window_icon(window_icon); // Set window icon for taskbar
+        .with_decorations(true) // Native title bar with traffic lights
+        .with_resizable(true)
+        .with_visible(!should_start_minimized)
+        .with_window_icon(window_icon);
 
     // Create config with our window settings and custom protocol handlers
     let config = Config::new()
         .with_window(window_builder)
+        .with_close_behaviour(dioxus::desktop::WindowCloseBehaviour::WindowHides)
         .with_menu(None);
 
     // Launch the app with our config

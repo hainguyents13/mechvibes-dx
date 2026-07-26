@@ -5,6 +5,7 @@ use std::thread;
 use std::time::{ Duration, Instant };
 
 // Maps a keyboard key to its standardized code
+#[allow(dead_code)]
 fn map_key_to_code(key: Key) -> &'static str {
     match key {
         // Common keys across all platforms
@@ -136,6 +137,7 @@ fn map_key_to_code(key: Key) -> &'static str {
 }
 
 // Maps a mouse button to its standardized code
+#[allow(dead_code)]
 fn map_button_to_code(button: Button) -> &'static str {
     match button {
         Button::Left => "MouseLeft",
@@ -160,6 +162,7 @@ fn map_button_to_code(button: Button) -> &'static str {
 ///
 /// When is_focused is provided, keyboard events are only sent when the window is UNFOCUSED
 /// to avoid duplicate events with the focused_input_listener
+#[allow(dead_code)]
 pub fn start_unified_input_listener(
     keyboard_tx: Sender<String>,
     mouse_tx: Sender<String>,
@@ -228,7 +231,11 @@ pub fn start_unified_input_listener(
                             // This prevents duplicate events with the focused_input_listener
                             if let Some(ref focus_state) = is_focused {
                                 if *focus_state.lock().unwrap() {
-                                    return; // Window is focused, skip keyboard event (focused_input_listener handles it)
+                                    // Window is focused — clear rdev's pressed set to prevent ghost
+                                    // keys when focus returns to the unfocused listener
+                                    let mut pressed = pressed_keys.lock().unwrap();
+                                    pressed.clear();
+                                    return;
                                 }
                             }
 

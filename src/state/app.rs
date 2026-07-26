@@ -83,6 +83,16 @@ pub fn use_state_trigger() -> Callback<()> {
     })
 }
 
+/// Public helper to refresh the global soundpack cache and save it to disk
+pub fn refresh_global_cache() {
+    if let Some(global_state) = GLOBAL_APP_STATE.get() {
+        if let Ok(mut state) = global_state.lock() {
+            println!("🔄 Refreshing global soundpack cache...");
+            state.refresh_cache();
+        }
+    }
+}
+
 // Reload the current soundpacks from configuration
 pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
     let mut config = crate::state::config::AppConfig::load();

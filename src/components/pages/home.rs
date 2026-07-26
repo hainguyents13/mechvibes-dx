@@ -143,13 +143,13 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
           }
           
           // Diagnostic event log
-          div { class: "bg-base-200 rounded-lg p-3 text-left space-y-1 font-mono text-[10px] mt-2 border border-base-content/10",
-            div { class: "font-semibold text-base-content/70 border-b border-base-content/10 pb-1 mb-1.5 flex justify-between",
+          div { class: "mac-panel p-3 text-left space-y-1 font-mono text-[10px] mt-2",
+            div { class: "font-semibold text-base-content/70 border-b border-white/5 pb-1 mb-1.5 flex justify-between",
               span { "🔍 Input Event Diagnostics" }
               span { class: "text-[9px] opacity-70", "Press keys or mouse to test" }
             }
             if last_events().is_empty() {
-              div { class: "text-base-content/40 italic", "No input events captured yet." }
+              div { class: "text-base-content/30 italic", "No input events captured yet." }
             } else {
               for event in last_events() {
                 div { class: "text-base-content/80", "{event}" }

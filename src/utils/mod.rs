@@ -14,3 +14,4 @@ pub mod soundpack_validator;
 pub mod spacing;
 pub mod theme;
 pub mod time;
+pub mod restart;

@@ -4,6 +4,7 @@ use rodio::{ Decoder, OutputStream, OutputStreamHandle, Sink };
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum MusicCommand {
     Play(String), // URL
     Pause,
@@ -24,6 +25,7 @@ pub struct MusicStatus {
     pub current_url: Option<String>,
 }
 
+#[allow(dead_code)]
 pub struct RodioMusicPlayer {
     _stream: OutputStream,
     stream_handle: OutputStreamHandle,
@@ -33,6 +35,7 @@ pub struct RodioMusicPlayer {
     status_receiver: Arc<Mutex<Option<mpsc::UnboundedReceiver<MusicStatus>>>>,
 }
 
+#[allow(dead_code)]
 impl RodioMusicPlayer {
     pub fn new() -> Result<Self, String> {
         let (_stream, stream_handle) = OutputStream::try_default().map_err(|e|

@@ -4,6 +4,7 @@ use std::time::Duration;
 pub struct Delay;
 
 impl Delay {
+    #[allow(dead_code)]
     pub async fn key_event() {
         futures_timer::Delay::new(Duration::from_millis(1)).await;
     }
