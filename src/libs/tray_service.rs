@@ -1,5 +1,6 @@
 // Global tray service for coordinating tray menu updates across the application
 use once_cell::sync::Lazy;
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::mpsc::{ self, Receiver, Sender };
 use std::sync::Mutex;
 
@@ -11,6 +12,21 @@ pub enum TrayUpdateMessage {
 pub struct TrayUpdateService {
     sender: Sender<TrayUpdateMessage>,
     receiver: Mutex<Receiver<TrayUpdateMessage>>,
+}
+
+// Global flag: tray wants to open the "Get Packs" tab
+static OPEN_GET_PACKS: AtomicBool = AtomicBool::new(false);
+
+pub fn request_open_get_packs() {
+    OPEN_GET_PACKS.store(true, Ordering::Relaxed);
+}
+
+pub fn peek_open_get_packs() -> bool {
+    OPEN_GET_PACKS.load(Ordering::Relaxed)
+}
+
+pub fn take_open_get_packs() -> bool {
+    OPEN_GET_PACKS.swap(false, Ordering::Relaxed)
 }
 
 impl TrayUpdateService {

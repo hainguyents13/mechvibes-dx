@@ -1,6 +1,4 @@
-use std::env;
-use std::process::Command;
-use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME, APP_NAME_LOWERCASE };
+use crate::utils::constants::{ APP_PROTOCOL, APP_PROTOCOL_URL, APP_NAME };
 
 #[allow(dead_code)]
 /// Register the mechvibes:// protocol for the application
@@ -38,6 +36,7 @@ pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
     println!("🍎 Protocol registration on macOS requires app bundle configuration in Info.plist");
     println!("Add the following to your Info.plist:");
@@ -61,6 +60,7 @@ pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "linux")]
+#[allow(dead_code)]
 pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
     use std::fs;
 
@@ -103,6 +103,7 @@ Categories=AudioVideo;Utility;
 }
 
 /// Handle incoming protocol URLs
+#[allow(dead_code)]
 pub fn handle_protocol_url(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     if !url.starts_with(APP_PROTOCOL_URL) {
         return Err("Invalid protocol URL".into());
@@ -138,17 +139,20 @@ pub fn handle_protocol_url(url: &str) -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /// Focus the application window (platform-specific)
+#[allow(dead_code)]
 #[cfg(target_os = "windows")]
 fn focus_window() {
     // On Windows, the window should automatically focus when the protocol is triggered
     println!("🪟 Focusing window on Windows");
 }
 
+#[allow(dead_code)]
 #[cfg(not(target_os = "windows"))]
 fn focus_window() {
     println!("🖥️ Window focus handling for this platform not implemented");
 }
 
+#[allow(dead_code)]
 fn install_soundpack_from_protocol(soundpack_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::state::config::AppConfig;
     use std::fs;

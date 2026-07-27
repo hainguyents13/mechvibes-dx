@@ -2,11 +2,52 @@ use crate::state::config::AppConfig;
 use crate::libs::device_manager::DeviceManager;
 use rodio::{ OutputStream, OutputStreamHandle, Sink };
 use std::collections::HashMap;
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc, Mutex, OnceLock };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::time::Instant;
 
 static AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 static MOUSE_AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
+
+// Hot-path flags: updated when config changes, read on every keypress (zero disk I/O)
+pub static SOUND_ENABLED: AtomicBool = AtomicBool::new(true);
+pub static KEYBOARD_SOUND_ENABLED: AtomicBool = AtomicBool::new(true);
+pub static MOUSE_SOUND_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Call this whenever enable_sound / enable_keyboard_sound / enable_mouse_sound
+/// change in config so the hot-path flags stay in sync.
+pub fn sync_sound_flags(enable_sound: bool, enable_keyboard: bool, enable_mouse: bool) {
+    SOUND_ENABLED.store(enable_sound, Ordering::Relaxed);
+    KEYBOARD_SOUND_ENABLED.store(enable_keyboard, Ordering::Relaxed);
+    MOUSE_SOUND_ENABLED.store(enable_mouse, Ordering::Relaxed);
+}
+
+/// Global AudioContext singleton — shared between the Dioxus UI and the
+/// dedicated sound-processing thread so that sounds play even when the
+/// main-thread run loop is throttled (macOS App Nap, window unfocused, etc.).
+///
+/// `OutputStream` from cpal/rodio is not `Sync` on macOS, so we wrap the Arc
+/// and assert Send/Sync. Access is only through Arc clones after one-time init.
+struct GlobalAudio(Arc<AudioContext>);
+// SAFETY: AudioContext is only mutated via interior Mutexes; the stream is
+// used from the audio engine threads. We never move the stream across threads
+// except via Arc clones of this holder after init.
+unsafe impl Send for GlobalAudio {}
+unsafe impl Sync for GlobalAudio {}
+
+static GLOBAL_AUDIO_CONTEXT: OnceLock<GlobalAudio> = OnceLock::new();
+
+pub fn init_global_audio_context(ctx: Arc<AudioContext>) {
+    let _ = GLOBAL_AUDIO_CONTEXT.set(GlobalAudio(ctx));
+}
+
+pub fn get_global_audio_context() -> Arc<AudioContext> {
+    GLOBAL_AUDIO_CONTEXT
+        .get()
+        .expect("Global AudioContext not initialized — call init_global_audio_context first")
+        .0
+        .clone()
+}
 
 #[derive(Clone)]
 pub struct AudioContext {
@@ -21,9 +62,12 @@ pub struct AudioContext {
     pub(crate) mouse_pressed: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) key_sinks: Arc<Mutex<HashMap<String, Sink>>>,
     pub(crate) mouse_sinks: Arc<Mutex<HashMap<String, Sink>>>,
+    #[allow(dead_code)]
     pub(crate) device_manager: DeviceManager,
     // Timing tracking for rapid event detection
+    #[allow(dead_code)]
     pub(crate) last_keyboard_sound_time: Arc<Mutex<Option<Instant>>>,
+    #[allow(dead_code)]
     pub(crate) last_mouse_sound_time: Arc<Mutex<Option<Instant>>>,
 }
 
@@ -98,10 +142,11 @@ impl AudioContext {
             last_keyboard_sound_time: Arc::new(Mutex::new(None)),
             last_mouse_sound_time: Arc::new(Mutex::new(None)),
         };
-        // Initialize volume from config
-        let config = AppConfig::load();
+        // Initialize volume from config (reuse the one already loaded above)
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
+        // Sync hot-path AtomicBool flags
+        sync_sound_flags(config.enable_sound, config.enable_keyboard_sound, config.enable_mouse_sound);
 
         // Load soundpack from config
         match super::soundpack_loader::load_soundpack(&context) {
@@ -162,6 +207,7 @@ impl AudioContext {
             .map(|v| *v)
             .unwrap_or(1.0)
     }
+    #[allow(dead_code)]
     pub fn create_with_device(device_id: Option<String>) -> Result<Self, String> {
         // Initialize device manager
         let device_manager = DeviceManager::new();
@@ -225,11 +271,13 @@ impl AudioContext {
         Ok(context)
     }
 
+    #[allow(dead_code)]
     pub fn get_current_device_info(&self) -> Option<String> {
         let config = AppConfig::load();
         config.selected_audio_device
     }
 
+    #[allow(dead_code)]
     pub fn test_current_device(&self) -> bool {
         let config = AppConfig::load();
         match &config.selected_audio_device {

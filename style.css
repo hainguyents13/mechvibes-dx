@@ -7,14 +7,111 @@
 html,
 body {
     overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
 }
-/* 
-.logo {
-  box-shadow: 0 5px 0 rgba(163, 10, 10, 0.5);
-  }
-  */
+
+/* macOS liquid glass panels */
+.glass {
+    background: rgba(128, 128, 128, 0.08);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-heavy {
+    background: rgba(128, 128, 128, 0.15);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-subtle {
+    background: rgba(128, 128, 128, 0.04);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* macOS-style rounded panels */
+.mac-panel {
+    background: rgba(var(--glass-bg, 30 30 30), 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+/* Dock glass effect */
+.dock {
+    background: rgba(var(--glass-bg, 30 30 30), 0.55);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Tab glass styling */
+.tab-glass {
+    background: rgba(128, 128, 128, 0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .logo-pressed {
     margin-top: 5px;
     margin-bottom: -5px;
     box-shadow: 0;
+}
+
+/* System font for macOS feel */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* macOS-style scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.3);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.5);
+}
+
+/* Download / Load button progress bar */
+.progress-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    transform-origin: left;
+    transition: width 0.15s ease-out;
+    pointer-events: none;
+}
+
+/* Checkmark pop-in animation */
+@keyframes check-pop {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.animate-check-pop {
+    animation: check-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Smooth height/opacity transition for loading states */
+@keyframes slide-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in {
+    animation: slide-in 0.2s ease-out forwards;
 }

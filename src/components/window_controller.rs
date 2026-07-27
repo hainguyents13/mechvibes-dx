@@ -1,4 +1,4 @@
-use crate::libs::tray::{ handle_tray_events, TrayManager, TrayMessage };
+use crate::libs::tray::{ handle_tray_events, set_downloading_pack, TrayManager, TrayMessage };
 use crate::libs::tray_service::TRAY_UPDATE_SERVICE;
 use crate::libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use crate::{ debug_print, always_eprint };
@@ -9,6 +9,7 @@ use std::sync::mpsc;
 #[component]
 pub fn WindowController() -> Element {
     let window = use_window();
+    let trigger_update = crate::state::app::use_state_trigger();
 
     // Create a static receiver for window actions
     let mut window_action_receiver = use_signal(|| None::<mpsc::Receiver<WindowAction>>); // Create a signal to hold the tray manager
@@ -94,6 +95,12 @@ pub fn WindowController() -> Element {
                                     } else {
                                         "disabled"
                                     };
+                                    // Sync the hot-path AtomicBool flag so keypress checks see the new state immediately
+                                    crate::libs::audio::sync_sound_flags(
+                                        config.enable_sound,
+                                        config.enable_keyboard_sound,
+                                        config.enable_mouse_sound,
+                                    );
                                     debug_print!("🔇 Sounds {} via tray menu", status); // Update tray menu to reflect new state
                                     tray_manager_clone.with_mut(|tray_opt| {
                                         if let Some(tray) = tray_opt {
@@ -132,10 +139,119 @@ pub fn WindowController() -> Element {
                                 println!("🌐 Opened official website in browser");
                             }
                         }
+                        TrayMessage::SetKeyboardSoundpack(pack_id) => {
+                            let mut config = crate::state::config::AppConfig::load();
+                            config.keyboard_soundpack = pack_id.clone();
+                            config.last_updated = chrono::Utc::now();
+                            if let Ok(_) = config.save() {
+                                println!("🎹 Keyboard soundpack set to {} via tray", pack_id);
+                                let audio_ctx = crate::libs::audio::get_global_audio_context();
+                                let _ = crate::libs::audio::load_keyboard_soundpack(&audio_ctx, &pack_id);
+                                crate::libs::tray_service::request_tray_update();
+                            }
+                        }
+                        TrayMessage::SetMouseSoundpack(pack_id) => {
+                            let mut config = crate::state::config::AppConfig::load();
+                            config.mouse_soundpack = pack_id.clone();
+                            config.last_updated = chrono::Utc::now();
+                            if let Ok(_) = config.save() {
+                                println!("🐭 Mouse soundpack set to {} via tray", pack_id);
+                                let audio_ctx = crate::libs::audio::get_global_audio_context();
+                                let _ = crate::libs::audio::load_mouse_soundpack(&audio_ctx, &pack_id);
+                                crate::libs::tray_service::request_tray_update();
+                            }
+                        }
+                        TrayMessage::DownloadPacks => {
+                            // Show main window and signal to open Get Packs tab
+                            window_clone.set_visible(true);
+                            window_clone.set_focus();
+                            WINDOW_MANAGER.set_visible(true);
+                            crate::libs::tray_service::request_open_get_packs();
+                            debug_print!("🌐 Requesting Get Packs tab from tray");
+                        }
+                        TrayMessage::DownloadKeyboardPack { name, url } => {
+                            println!("📥 Downloading keyboard pack '{}' from {} via tray...", name, url);
+                            let trigger_update_clone = trigger_update.clone();
+                            spawn(async move {
+                                set_downloading_pack(Some(name.clone()));
+                                crate::libs::tray_service::request_tray_update();
+                                match crate::utils::soundpack_installer::download_and_install_soundpack(
+                                    &url,
+                                    Some(crate::state::soundpack::SoundpackType::Keyboard)
+                                ).await {
+                                    Ok(info) => {
+                                        println!("✅ Successfully downloaded and installed keyboard pack: {}", info.name);
+                                        set_downloading_pack(None);
+                                        // Refresh the global cache and trigger UI state reload
+                                        crate::state::app::refresh_global_cache();
+                                        trigger_update_clone(());
+
+                                        // Auto-select the newly downloaded pack.
+                                        // Use the prefixed folder_path ("keyboard/<id>") so the
+                                        // soundpack selector matches correctly.
+                                        let folder_path = format!("keyboard/{}", info.id);
+                                        let mut config = crate::state::config::AppConfig::load();
+                                        config.keyboard_soundpack = folder_path.clone();
+                                        config.last_updated = chrono::Utc::now();
+                                        if let Ok(_) = config.save() {
+                                            let audio_ctx = crate::libs::audio::get_global_audio_context();
+                                            let _ = crate::libs::audio::load_keyboard_soundpack(&audio_ctx, &folder_path);
+                                            crate::libs::tray_service::request_tray_update();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        always_eprint!("❌ Failed to download and install keyboard pack: {}", e);
+                                        set_downloading_pack(None);
+                                        crate::libs::tray_service::request_tray_update();
+                                    }
+                                }
+                            });
+                        }
+                        TrayMessage::DownloadMousePack { name, url } => {
+                            println!("📥 Downloading mouse pack '{}' from {} via tray...", name, url);
+                            let trigger_update_clone = trigger_update.clone();
+                            spawn(async move {
+                                set_downloading_pack(Some(name.clone()));
+                                crate::libs::tray_service::request_tray_update();
+                                match crate::utils::soundpack_installer::download_and_install_soundpack(
+                                    &url,
+                                    Some(crate::state::soundpack::SoundpackType::Mouse)
+                                ).await {
+                                    Ok(info) => {
+                                        println!("✅ Successfully downloaded and installed mouse pack: {}", info.name);
+                                        set_downloading_pack(None);
+                                        // Refresh the global cache and trigger UI state reload
+                                        crate::state::app::refresh_global_cache();
+                                        trigger_update_clone(());
+
+                                        // Auto-select the newly downloaded pack.
+                                        // Use the prefixed folder_path ("mouse/<id>") so the
+                                        // soundpack selector matches correctly.
+                                        let folder_path = format!("mouse/{}", info.id);
+                                        let mut config = crate::state::config::AppConfig::load();
+                                        config.mouse_soundpack = folder_path.clone();
+                                        config.last_updated = chrono::Utc::now();
+                                        if let Ok(_) = config.save() {
+                                            let audio_ctx = crate::libs::audio::get_global_audio_context();
+                                            let _ = crate::libs::audio::load_mouse_soundpack(&audio_ctx, &folder_path);
+                                            crate::libs::tray_service::request_tray_update();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        always_eprint!("❌ Failed to download and install mouse pack: {}", e);
+                                        set_downloading_pack(None);
+                                        crate::libs::tray_service::request_tray_update();
+                                    }
+                                }
+                            });
+                        }
+                        TrayMessage::Restart => {
+                            println!("📢 Tray: Restart requested - restarting application");
+                            crate::utils::restart::restart_application();
+                        }
                         TrayMessage::Exit => {
                             println!("📢 Tray: Exit requested - closing application");
-                            // Close the window which will trigger app exit
-                            window_clone.close();
+                            std::process::exit(0);
                         }
                     }
                 }

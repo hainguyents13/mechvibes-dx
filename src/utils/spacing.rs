@@ -1,8 +1,8 @@
 /// Utility functions for consistent spacing across the app
 
 /// Get content area padding classes
-/// 112px bottom, 32px horizontal, 80px top
-pub const CONTENT_PADDING: &str = "pb-28 px-8 pt-20";
+/// 112px bottom, 32px horizontal, 48px top (for native macOS traffic lights)
+pub const CONTENT_PADDING: &str = "pb-28 px-8 pt-12";
 
 /// Get section spacing classes (vertical gaps between sections)
 /// 16px

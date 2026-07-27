@@ -8,7 +8,7 @@ use crate::utils::auto_updater::{ check_for_updates_simple, UpdateInfo };
 use crate::state::app::use_update_info_setter;
 use crate::utils::time::format_relative_time;
 use dioxus::prelude::*;
-use lucide_dioxus::{ PartyPopper, Settings };
+use lucide_dioxus::{ PartyPopper, Settings, RefreshCw };
 
 #[component]
 pub fn SettingsPage() -> Element {
@@ -67,7 +67,15 @@ pub fn SettingsPage() -> Element {
                   checked: enable_sound(),
                   on_change: {
                       let update_config = update_config.clone();
+                      let config_read = config.clone();
                       move |new_value: bool| {
+                          let cfg = config_read();
+                          // Sync AtomicBool hot-path flags so keypress handler sees change immediately
+                          crate::libs::audio::sync_sound_flags(
+                              new_value,
+                              cfg.enable_keyboard_sound,
+                              cfg.enable_mouse_sound,
+                          );
                           update_config(
                               Box::new(move |config| {
                                   config.enable_sound = new_value;
@@ -106,8 +114,14 @@ pub fn SettingsPage() -> Element {
                 }
                 // Auto Start
                 Toggler {
-                  title: "Start with Windows".to_string(),
-                  description: Some(format!("Automatically start {} when Windows boots", APP_NAME)),
+                  title: if cfg!(target_os = "windows") {
+                      "Start with Windows".to_string()
+                  } else if cfg!(target_os = "macos") {
+                      "Start at Login".to_string()
+                  } else {
+                      "Launch at Startup".to_string()
+                  },
+                  description: Some(format!("Automatically start {} when your computer boots", APP_NAME)),
                   checked: auto_start(),
                   on_change: {
                       let update_config = update_config.clone();
@@ -336,6 +350,27 @@ pub fn SettingsPage() -> Element {
             content_class: "collapse-content text-sm",
             children: rsx! {
               crate::components::app_info::AppInfoDisplay {}
+            },
+          }
+          // App Control Section
+          Collapse {
+            title: "App Control".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            children: rsx! {
+              p { class: "mb-4 text-base-content/70",
+                "Restart the application to reload audio context, layout mappings, or troubleshoot monitoring permissions."
+              }
+              div { class: "flex gap-2",
+                button {
+                  class: "btn btn-primary btn-sm gap-1 font-semibold",
+                  onclick: move |_| {
+                      crate::utils::restart::restart_application();
+                  },
+                  RefreshCw { class: "w-4 h-4" }
+                  "Restart Application"
+                }
+              }
             },
           }
           // Danger Zone Section

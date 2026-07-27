@@ -8,21 +8,27 @@ pub const APP_NAME: &str = "MechvibesDX";
 pub const APP_NAME_DISPLAY: &str = "MechvibesDX";
 
 /// The lowercase version for file names, URLs, etc.
+#[allow(dead_code)]
 pub const APP_NAME_LOWERCASE: &str = "mechvibes-dx";
 
 /// The identifier for the application (used in protocol registration, etc.)
+#[allow(dead_code)]
 pub const APP_IDENTIFIER: &str = "com.hainguyents13.mechvibesdx";
 
 /// The protocol scheme for deep linking
+#[allow(dead_code)]
 pub const APP_PROTOCOL: &str = "mechvibes";
 
 /// The protocol URL prefix
+#[allow(dead_code)]
 pub const APP_PROTOCOL_URL: &str = "mechvibes://";
 
 /// Short description of the application
+#[allow(dead_code)]
 pub const APP_DESCRIPTION_SHORT: &str = "MechvibesDX";
 
 /// Long description of the application
+#[allow(dead_code)]
 pub const APP_DESCRIPTION_LONG: &str =
     "MechvibesDX is a modern, cross-platform soundboard for mechanical keyboards. It supports a wide range of keyboard sounds and is designed to be user-friendly and customizable.";
 

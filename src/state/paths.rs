@@ -18,9 +18,16 @@ fn get_app_root() -> &'static PathBuf {
         // Try to get the directory where the executable is located
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                // Check if running in dev mode (dx serve creates target/dx/... path)
+                // Check if running in dev mode (dx serve creates target/dx/... path,
+                // cargo run creates target/debug/ or target/release/ paths)
                 let exe_path_str = exe_path.to_string_lossy();
-                if exe_path_str.contains("target\\dx\\") || exe_path_str.contains("target/dx/") {
+                if exe_path_str.contains("target/dx/")
+                    || exe_path_str.contains("target\\dx\\")
+                    || exe_path_str.contains("target/debug/")
+                    || exe_path_str.contains("target\\debug\\")
+                    || exe_path_str.contains("target/release/")
+                    || exe_path_str.contains("target\\release\\")
+                {
                     // In dev mode, use current working directory (project root)
                     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
                     println!("📂 App root (dev mode - from cwd): {}", cwd.display());
@@ -76,27 +83,27 @@ fn get_system_app_data_dir() -> PathBuf {
 
 /// Application data directory paths
 pub mod data {
-    use super::{get_app_root, get_system_app_data_dir};
+    use super::get_system_app_data_dir;
     use std::path::PathBuf;
 
     /// Application configuration file
     pub fn config_json() -> PathBuf {
-        get_app_root().join("data").join("config.json")
+        get_system_app_data_dir().join("data").join("config.json")
     }
 
     /// Application manifest file
     pub fn manifest_json() -> PathBuf {
-        get_app_root().join("data").join("manifest.json")
+        get_system_app_data_dir().join("data").join("manifest.json")
     }
 
     /// Custom themes configuration file
     pub fn themes_json() -> PathBuf {
-        get_app_root().join("data").join("themes.json")
+        get_system_app_data_dir().join("data").join("themes.json")
     }
 
     /// Soundpack cache file
     pub fn soundpack_cache_json() -> PathBuf {
-        get_app_root().join("data").join("soundpack_cache.json")
+        get_system_app_data_dir().join("data").join("soundpack_cache.json")
     }
 
     /// Custom images directory for user-uploaded images
@@ -191,11 +198,13 @@ pub mod soundpacks {
 
     /// Get the base soundpacks directory (containing keyboard/ and mouse/ folders)
     /// Returns built-in soundpacks directory
+    #[allow(dead_code)]
     pub fn get_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir().to_string_lossy().to_string()
     }
 
     /// Get keyboard soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn keyboard_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("keyboard")
@@ -204,6 +213,7 @@ pub mod soundpacks {
     }
 
     /// Get mouse soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn mouse_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("mouse")
@@ -212,6 +222,7 @@ pub mod soundpacks {
     }
 
     /// Get custom keyboard soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_keyboard_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("keyboard")
@@ -220,6 +231,7 @@ pub mod soundpacks {
     }
 
     /// Get custom mouse soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_mouse_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("mouse")
@@ -291,5 +303,28 @@ pub mod soundpacks {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_app_root() {
+        let root = get_app_root();
+        assert!(root.to_str().unwrap().len() > 0);
+    }
+
+    #[test]
+    fn test_data_config_json_path() {
+        let config_path = data::config_json();
+        assert!(config_path.to_str().unwrap().ends_with("config.json"));
+    }
+
+    #[test]
+    fn test_soundpack_dirs() {
+        let builtin_dir = soundpacks::get_builtin_soundpacks_dir();
+        assert!(builtin_dir.to_str().unwrap().ends_with("soundpacks"));
     }
 }

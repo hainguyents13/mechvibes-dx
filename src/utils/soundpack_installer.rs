@@ -2,7 +2,6 @@ use crate::utils::path;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 use uuid::Uuid;
 use zip::ZipArchive;
 
@@ -62,6 +61,7 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
 }
 
 /// Extract and install soundpack from ZIP file
+#[allow(dead_code)]
 pub fn extract_and_install_soundpack(file_path: &str) -> Result<SoundpackInfo, String> {
     // Open ZIP file
     let file = File::open(file_path).map_err(|e| format!("Failed to open ZIP file: {}", e))?;
@@ -340,6 +340,7 @@ pub fn extract_and_install_soundpack_with_type(
 }
 
 /// Handle V1 to V2 config conversion if needed
+#[allow(dead_code)]
 fn handle_config_conversion(
     config_content: &str,
     soundpack_id: &str,
@@ -441,4 +442,71 @@ fn determine_soundpack_type(config: &serde_json::Value) -> bool {
 
     // Default to keyboard
     false
+}
+
+/// Download a soundpack ZIP from a URL and install it
+pub async fn download_and_install_soundpack(
+    url: &str,
+    target_type: Option<crate::state::soundpack::SoundpackType>
+) -> Result<SoundpackInfo, String> {
+    download_and_install_soundpack_with_progress(url, target_type, None::<fn(f64)>).await
+}
+
+/// Download a soundpack ZIP with real-time progress callbacks and install it
+pub async fn download_and_install_soundpack_with_progress<F>(
+    url: &str,
+    target_type: Option<crate::state::soundpack::SoundpackType>,
+    on_progress: Option<F>
+) -> Result<SoundpackInfo, String>
+where
+    F: Fn(f64) + Send + Sync + 'static
+{
+    println!("📥 Downloading soundpack from {}...", url);
+    let client = reqwest::Client::new();
+    let mut response = client
+        .get(url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+        .send()
+        .await
+        .map_err(|e| format!("Network request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status code: {}", response.status()));
+    }
+
+    let total_size = response.content_length();
+    let mut bytes = Vec::new();
+    if let Some(total) = total_size {
+        bytes.reserve(total as usize);
+    }
+
+    let mut downloaded = 0;
+    while let Some(chunk) = response.chunk().await.map_err(|e| format!("Failed to read chunk: {}", e))? {
+        bytes.extend_from_slice(&chunk);
+        downloaded += chunk.len();
+        if let Some(total) = total_size {
+            if total > 0 {
+                let progress = (downloaded as f64 / total as f64) * 100.0;
+                if let Some(ref cb) = on_progress {
+                    cb(progress);
+                }
+            }
+        }
+    }
+
+    // Save to temporary file in the workspace/system temp
+    let temp_dir = std::env::temp_dir();
+    let temp_file_path = temp_dir.join(format!("mechvibes_download_{}.zip", uuid::Uuid::new_v4()));
+    std::fs::write(&temp_file_path, bytes)
+        .map_err(|e| format!("Failed to write temporary file: {}", e))?;
+
+    let file_path_str = temp_file_path.to_string_lossy().to_string();
+    
+    // Install using existing extractor
+    let result = extract_and_install_soundpack_with_type(&file_path_str, target_type);
+
+    // Clean up temporary file
+    let _ = std::fs::remove_file(&temp_file_path);
+
+    result
 }

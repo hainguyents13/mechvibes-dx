@@ -42,6 +42,7 @@ pub fn use_themes() -> (Signal<ThemesConfig>, Rc<dyn Fn(Box<dyn FnOnce(&mut Them
 }
 
 /// Get a reference to the global themes config (read-only)
+#[allow(dead_code)]
 pub fn get_themes_config() -> ThemesConfig {
     THEMES_CONFIG.lock().unwrap().clone()
 }

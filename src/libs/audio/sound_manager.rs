@@ -2,20 +2,17 @@ use rodio::buffer::SamplesBuffer;
 use rodio::Sink;
 use std::collections::HashMap;
 
-use super::audio_context::AudioContext;
-use crate::state::config::AppConfig;
+use super::audio_context::{
+    AudioContext,
+    SOUND_ENABLED, KEYBOARD_SOUND_ENABLED, MOUSE_SOUND_ENABLED,
+};
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
-        // println!(
-        //     "⌨️ Key event received: {} ({})",
-        //     key,
-        //     if is_keydown { "down" } else { "up" }
-        // );
-
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_keyboard_sound {
+        // Hot-path: read AtomicBool flags (no disk I/O at all)
+        if !SOUND_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+            || !KEYBOARD_SOUND_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+        {
             return;
         }
 
@@ -257,9 +254,10 @@ impl AudioContext {
     }
 
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_mouse_sound {
+        // Hot-path: read AtomicBool flags (no disk I/O at all)
+        if !SOUND_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+            || !MOUSE_SOUND_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+        {
             return;
         }
 
@@ -451,6 +449,7 @@ impl AudioContext {
     }
 
     /// Clean up finished sinks to prevent memory leaks and improve performance
+    #[allow(dead_code)]
     pub fn cleanup_finished_sinks(&self) {
         // Clean up finished keyboard sinks
         if let Ok(mut key_sinks) = self.key_sinks.lock() {

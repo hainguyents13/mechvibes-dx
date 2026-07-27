@@ -144,7 +144,7 @@ impl SoundpackCache {
     pub fn load() -> Self {
         let cache_file = Self::cache_file();
         // Load metadata cache using data utilities
-        let cache = match
+        let mut cache = match
             data::load_json_from_file::<SoundpackCache>(std::path::Path::new(&cache_file))
         {
             Ok(cache) => {
@@ -160,8 +160,12 @@ impl SoundpackCache {
             }
         };
 
-        // Auto-refresh on startup has been disabled to improve startup performance
-        // Cache will be refreshed manually via UI or when importing soundpacks
+        if cache.soundpacks.is_empty() {
+            println!("📂 Soundpack cache is empty, performing initial scan...");
+            cache.refresh_from_directory();
+            cache.save();
+        }
+
         cache
     }
     pub fn new() -> Self {

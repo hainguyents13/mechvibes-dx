@@ -5,6 +5,7 @@ use std::thread;
 use std::time::{ Duration, Instant };
 
 // Maps a keyboard key to its standardized code
+#[allow(dead_code)]
 fn map_key_to_code(key: Key) -> &'static str {
     match key {
         // Common keys across all platforms
@@ -136,6 +137,7 @@ fn map_key_to_code(key: Key) -> &'static str {
 }
 
 // Maps a mouse button to its standardized code
+#[allow(dead_code)]
 fn map_button_to_code(button: Button) -> &'static str {
     match button {
         Button::Left => "MouseLeft",
@@ -160,6 +162,7 @@ fn map_button_to_code(button: Button) -> &'static str {
 ///
 /// When is_focused is provided, keyboard events are only sent when the window is UNFOCUSED
 /// to avoid duplicate events with the focused_input_listener
+#[allow(dead_code)]
 pub fn start_unified_input_listener(
     keyboard_tx: Sender<String>,
     mouse_tx: Sender<String>,
@@ -177,176 +180,182 @@ pub fn start_unified_input_listener(
         let pressed_keys = Arc::new(Mutex::new(HashSet::<String>::new()));
         let pressed_buttons = Arc::new(Mutex::new(HashSet::<String>::new()));
 
-        // Track pressed modifier keys for hotkey detection
-        let mut ctrl_pressed = false;
-        let mut alt_pressed = false;
+        loop {
+            let keyboard_tx = keyboard_tx.clone();
+            let mouse_tx = mouse_tx.clone();
+            let hotkey_tx = hotkey_tx.clone();
+            let is_focused = is_focused.clone();
 
-        println!("🎮 Starting rdev::listen() - listening to keyboard/mouse events");
-        let result = listen(move |event: Event| {
-            match event.event_type {
-                // ===== KEYBOARD EVENTS =====
-                EventType::KeyPress(key) => {
-                    let key_code = map_key_to_code(key);
-                    if !key_code.is_empty() {
-                        // Track modifier keys for hotkey detection
-                        match key_code {
-                            "ControlLeft" | "ControlRight" => {
-                                ctrl_pressed = true;
+            let keyboard_last_press = keyboard_last_press.clone();
+            let mouse_last_press = mouse_last_press.clone();
+            let pressed_keys = pressed_keys.clone();
+            let pressed_buttons = pressed_buttons.clone();
+
+            // Track pressed modifier keys for hotkey detection
+            let mut ctrl_pressed = false;
+            let mut alt_pressed = false;
+
+            println!("🎮 Starting rdev::listen() - listening to keyboard/mouse events");
+            let result = listen(move |event: Event| {
+                match event.event_type {
+                    // ===== KEYBOARD EVENTS =====
+                    EventType::KeyPress(key) => {
+                        if let Key::Unknown(code) = key {
+                            crate::libs::input_manager::add_last_event(format!("❓ Unknown KeyDown (code: {})", code));
+                        }
+                        let key_code = map_key_to_code(key);
+                        if !key_code.is_empty() {
+                            crate::libs::input_manager::add_last_event(format!("⌨️ KeyDown: {}", key_code));
+                            // Track modifier keys for hotkey detection
+                            match key_code {
+                                "ControlLeft" | "ControlRight" => {
+                                    ctrl_pressed = true;
+                                }
+                                "AltLeft" | "AltRight" => {
+                                    alt_pressed = true;
+                                }
+                                "KeyM" => {
+                                    // Check for Ctrl+Alt+M hotkey combination
+                                    if ctrl_pressed && alt_pressed {
+                                        println!(
+                                            "🔥 Hotkey detected: Ctrl+Alt+M - Toggling global sound"
+                                        );
+                                        let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
+                                        return; // Don't process this as a regular key event
+                                    }
+                                }
+                                _ => {}
                             }
-                            "AltLeft" | "AltRight" => {
-                                alt_pressed = true;
-                            }
-                            "KeyM" => {
-                                // Check for Ctrl+Alt+M hotkey combination
-                                if ctrl_pressed && alt_pressed {
-                                    println!(
-                                        "🔥 Hotkey detected: Ctrl+Alt+M - Toggling global sound"
-                                    );
-                                    let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
-                                    return; // Don't process this as a regular key event
+
+                            // If focus state is provided, only send keyboard events when UNFOCUSED
+                            // This prevents duplicate events with the focused_input_listener
+                            if let Some(ref focus_state) = is_focused {
+                                if *focus_state.lock().unwrap() {
+                                    // Window is focused — clear rdev's pressed set to prevent ghost
+                                    // keys when focus returns to the unfocused listener
+                                    let mut pressed = pressed_keys.lock().unwrap();
+                                    pressed.clear();
+                                    return;
                                 }
                             }
-                            _ => {}
-                        }
 
-                        // If focus state is provided, only send keyboard events when UNFOCUSED
-                        // This prevents duplicate events with the focused_input_listener
-                        if let Some(ref focus_state) = is_focused {
-                            if *focus_state.lock().unwrap() {
-                                return; // Window is focused, skip keyboard event (focused_input_listener handles it)
+                            // Check if key is already pressed
+                            let mut pressed = pressed_keys.lock().unwrap();
+                            if pressed.contains(&key_code.to_string()) {
+                                return; // Key already pressed, ignore
+                            }
+                            pressed.insert(key_code.to_string());
+                            drop(pressed); // Apply debounce and detect rapid key events
+                            let now = Instant::now();
+                            let mut last = keyboard_last_press.lock().unwrap();
+                            let time_since_last = now.duration_since(*last);
+
+                            // Special handling for Backspace key - skip if too rapid (< 10ms)
+                            if key_code == "Backspace" && time_since_last < Duration::from_millis(10) {
+                                return; // Skip this Backspace event entirely
+                            }
+
+                            if time_since_last > Duration::from_millis(1) {
+                                *last = now;
+                                let _ = keyboard_tx.send(key_code.to_string());
                             }
                         }
-
-                        // Check if key is already pressed
-                        let mut pressed = pressed_keys.lock().unwrap();
-                        if pressed.contains(&key_code.to_string()) {
-                            return; // Key already pressed, ignore
-                        }
-                        pressed.insert(key_code.to_string());
-                        drop(pressed); // Apply debounce and detect rapid key events
-                        let now = Instant::now();
-                        let mut last = keyboard_last_press.lock().unwrap();
-                        let time_since_last = now.duration_since(*last);
-
-                        // Special handling for Backspace key - skip if too rapid (< 10ms)
-                        if key_code == "Backspace" && time_since_last < Duration::from_millis(10) {
-                            return; // Skip this Backspace event entirely
-                        }
-
-                        if time_since_last > Duration::from_millis(1) {
-                            *last = now;
-                            let _ = keyboard_tx.send(key_code.to_string());
-                        }
                     }
-                }
-                EventType::KeyRelease(key) => {
-                    let key_code = map_key_to_code(key);
-                    if !key_code.is_empty() {
-                        // Track modifier key releases for hotkey detection
-                        match key_code {
-                            "ControlLeft" | "ControlRight" => {
-                                ctrl_pressed = false;
+                    EventType::KeyRelease(key) => {
+                        if let Key::Unknown(code) = key {
+                            crate::libs::input_manager::add_last_event(format!("❓ Unknown KeyUp (code: {})", code));
+                        }
+                        let key_code = map_key_to_code(key);
+                        if !key_code.is_empty() {
+                            crate::libs::input_manager::add_last_event(format!("⌨️ KeyUp: {}", key_code));
+                            // Track modifier key releases for hotkey detection
+                            match key_code {
+                                "ControlLeft" | "ControlRight" => {
+                                    ctrl_pressed = false;
+                                }
+                                "AltLeft" | "AltRight" => {
+                                    alt_pressed = false;
+                                }
+                                _ => {}
                             }
-                            "AltLeft" | "AltRight" => {
-                                alt_pressed = false;
+
+                            // If focus state is provided, only send keyboard events when UNFOCUSED
+                            if let Some(ref focus_state) = is_focused {
+                                if *focus_state.lock().unwrap() {
+                                    return; // Window is focused, skip keyboard event
+                                }
                             }
-                            _ => {}
-                        }
 
-                        // If focus state is provided, only send keyboard events when UNFOCUSED
-                        if let Some(ref focus_state) = is_focused {
-                            if *focus_state.lock().unwrap() {
-                                return; // Window is focused, skip keyboard event
+                            // Remove key from pressed set
+                            let mut pressed = pressed_keys.lock().unwrap();
+                            pressed.remove(&key_code.to_string());
+                            drop(pressed);
+
+                            let _ = keyboard_tx.send(format!("UP:{}", key_code));
+                        }
+                    }
+
+                    // ===== MOUSE EVENTS =====
+                    EventType::ButtonPress(button) => {
+                        let button_code = map_button_to_code(button);
+                        if !button_code.is_empty() && button_code != "MouseUnknown" {
+                            crate::libs::input_manager::add_last_event(format!("🖱️ MouseDown: {}", button_code));
+                            // Check if button is already pressed
+                            let mut pressed = pressed_buttons.lock().unwrap();
+                            if pressed.contains(&button_code.to_string()) {
+                                return; // Button already pressed, ignore
+                            }
+                            pressed.insert(button_code.to_string());
+                            drop(pressed); // Apply debounce and detect rapid mouse events
+                            let now = Instant::now();
+                            let mut last = mouse_last_press.lock().unwrap();
+                            let time_since_last = now.duration_since(*last);
+
+                            // General rapid event detection (< 60ms) - log but still process
+                            if
+                                time_since_last < Duration::from_millis(60) &&
+                                time_since_last > Duration::from_millis(1)
+                            {
+                                println!(
+                                    "⚡ RAPID MOUSE EVENT detected: '{}' fired {:.1}ms after previous mouse event",
+                                    button_code,
+                                    time_since_last.as_millis()
+                                );
+                            }
+
+                            if time_since_last > Duration::from_millis(1) {
+                                *last = now;
+                                let _ = mouse_tx.send(button_code.to_string());
                             }
                         }
-
-                        // Remove key from pressed set
-                        let mut pressed = pressed_keys.lock().unwrap();
-                        pressed.remove(&key_code.to_string());
-                        drop(pressed);
-
-                        let _ = keyboard_tx.send(format!("UP:{}", key_code));
                     }
-                }
+                    EventType::ButtonRelease(button) => {
+                        let button_code = map_button_to_code(button);
+                        if !button_code.is_empty() && button_code != "MouseUnknown" {
+                            crate::libs::input_manager::add_last_event(format!("🖱️ MouseUp: {}", button_code));
+                            // Remove button from pressed set
+                            let mut pressed = pressed_buttons.lock().unwrap();
+                            pressed.remove(&button_code.to_string());
+                            drop(pressed);
 
-                // ===== MOUSE EVENTS =====
-                EventType::ButtonPress(button) => {
-                    let button_code = map_button_to_code(button);
-                    if !button_code.is_empty() && button_code != "MouseUnknown" {
-                        // println!("🖱️ Mouse Button Pressed: {}", button_code);
-                        // println!("🔍 DEBUG: Mouse event detected: {}", button_code);
-
-                        // Check if button is already pressed
-                        let mut pressed = pressed_buttons.lock().unwrap();
-                        if pressed.contains(&button_code.to_string()) {
-                            return; // Button already pressed, ignore
-                        }
-                        pressed.insert(button_code.to_string());
-                        drop(pressed); // Apply debounce and detect rapid mouse events
-                        let now = Instant::now();
-                        let mut last = mouse_last_press.lock().unwrap();
-                        let time_since_last = now.duration_since(*last);
-
-                        // General rapid event detection (< 60ms) - log but still process
-                        if
-                            time_since_last < Duration::from_millis(60) &&
-                            time_since_last > Duration::from_millis(1)
-                        {
-                            println!(
-                                "⚡ RAPID MOUSE EVENT detected: '{}' fired {:.1}ms after previous mouse event",
-                                button_code,
-                                time_since_last.as_millis()
-                            );
-                        }
-
-                        if time_since_last > Duration::from_millis(1) {
-                            *last = now;
-                            let _ = mouse_tx.send(button_code.to_string());
+                            let _ = mouse_tx.send(format!("UP:{}", button_code));
                         }
                     }
-                }
-                EventType::ButtonRelease(button) => {
-                    let button_code = map_button_to_code(button);
-                    if !button_code.is_empty() && button_code != "MouseUnknown" {
-                        // println!("🖱️ Mouse Button Released: {}", button_code);
-
-                        // Remove button from pressed set
-                        let mut pressed = pressed_buttons.lock().unwrap();
-                        pressed.remove(&button_code.to_string());
-                        drop(pressed);
-
-                        let _ = mouse_tx.send(format!("UP:{}", button_code));
+                    // Skip mouse wheel events for now
+                    EventType::Wheel { delta_x: _, delta_y: _ } => {
+                    }
+                    EventType::MouseMove { x: _, y: _ } => {
                     }
                 }
-                // Skip mouse wheel events for now
-                EventType::Wheel { delta_x: _, delta_y: _ } => {
-                    // let wheel_event = if delta_y > 0 {
-                    //     "MouseWheelUp"
-                    // } else if delta_y < 0 {
-                    //     "MouseWheelDown"
-                    // } else {
-                    //     return; // No vertical scroll, ignore
-                    // };
+            });
 
-                    // println!("🖱️ Mouse Wheel: {}", wheel_event);
-
-                    // // Apply longer debounce for wheel events
-                    // let now = Instant::now();
-                    // let mut last = mouse_last_press.lock().unwrap();
-                    // if now.duration_since(*last) > Duration::from_millis(50) {
-                    //     *last = now;
-                    //     let _ = mouse_tx.send(wheel_event.to_string());
-                    // }
-                }
-                EventType::MouseMove { x: _, y: _ } => {
-                    // Mouse move events are too noisy, ignore them
-                    // println!("🖱️ Mouse Move: ({}, {})", x, y);
-                }
+            if let Err(error) = result {
+                eprintln!("❌ Unified input listener error: {:?}", error);
+                crate::libs::input_manager::set_accessibility_permissions(false);
             }
-        });
 
-        if let Err(error) = result {
-            eprintln!("❌ Unified input listener error: {:?}", error);
+            println!("💤 Unified input listener failed or blocked. Retrying in 2 seconds...");
+            thread::sleep(Duration::from_secs(2));
         }
     });
 }

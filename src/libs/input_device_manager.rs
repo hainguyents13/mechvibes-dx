@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::ptr::null_mut;
-use std::ffi::OsString;
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -31,18 +29,21 @@ pub struct InputDeviceInfo {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum InputDeviceType {
     Keyboard,
     Mouse,
     Unknown,
 }
 
+#[allow(dead_code)]
 pub struct InputDeviceManager {
     devices: HashMap<String, InputDeviceInfo>,
     enabled_keyboards: Vec<String>,
     enabled_mice: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl InputDeviceManager {
     pub fn new() -> Self {
         Self {

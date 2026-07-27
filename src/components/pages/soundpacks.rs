@@ -4,7 +4,7 @@ use crate::{
 };
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use lucide_dioxus::{ Keyboard, Mouse, Music, Settings2 };
+use lucide_dioxus::{ Keyboard, Mouse, Music, Settings2, Globe };
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,14 +12,26 @@ pub enum TabType {
     Keyboard,
     Mouse,
     Manage,
+    Repository,
 }
 
 #[component]
 pub fn Soundpacks() -> Element {
     // Get app state and trigger function
     let app_state = use_app_state();
-    let trigger_update = use_state_trigger(); // Track the current active tab
+    let trigger_update = use_state_trigger();
     let mut current_tab = use_signal(|| TabType::Keyboard);
+
+    // When navigated from tray, auto-select the Get Packs tab
+    use_effect(move || {
+        spawn(async move {
+            // Small delay to ensure we're fully mounted
+            futures_timer::Delay::new(std::time::Duration::from_millis(100)).await;
+            if crate::libs::tray_service::take_open_get_packs() {
+                current_tab.set(TabType::Repository);
+            }
+        });
+    });
 
     // Get all soundpacks (this will be reactive to app_state changes)
     let all_soundpacks = app_state.get_soundpacks();
@@ -68,7 +80,7 @@ pub fn Soundpacks() -> Element {
             Keyboard { class: "w-5 h-5 mr-2" }
             "Keyboard"
           }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
+          div { class: "tab-content overflow-hidden glass-subtle py-4 px-0",
             SoundpackTable {
               soundpacks: keyboard_soundpacks,
               soundpack_type: "Keyboard",
@@ -94,7 +106,7 @@ pub fn Soundpacks() -> Element {
             Mouse { class: "w-5 h-5 mr-2" }
             "Mouse"
           }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 py-4 px-0",
+          div { class: "tab-content overflow-hidden glass-subtle py-4 px-0",
             SoundpackTable {
               soundpacks: mouse_soundpacks,
               soundpack_type: "Mouse",
@@ -120,12 +132,29 @@ pub fn Soundpacks() -> Element {
             Settings2 { class: "w-5 h-5 mr-2" }
             "Manage"
           }
-          div { class: "tab-content overflow-hidden bg-base-200 border-base-300 {crate::utils::spacing::CARD_PADDING}",
+          div { class: "tab-content overflow-hidden glass-subtle {crate::utils::spacing::CARD_PADDING}",
             SoundpackManager {
               on_import_click: EventHandler::new(move |_| {
                   eval("soundpack_import_modal.showModal()");
               }),
             }
+          }
+
+          // Repository tab
+          label { class: "tab [--tab-border-color:var(--color-base-300)] [--tab-bg:var(--color-base-200)]",
+            input { 
+              r#type: "radio", 
+              name: "soundpack-tab",
+              checked: current_tab() == TabType::Repository,
+              onchange: move |_| {
+                  current_tab.set(TabType::Repository);
+              },
+            }
+            Globe { class: "w-5 h-5 mr-2" }
+            "Get Packs"
+          }
+          div { class: "tab-content overflow-hidden glass-subtle py-4 px-0",
+            crate::components::ui::OnlineSoundpacksTable {}
           }
         }        // Import modal
         SoundpackImportModal {
@@ -135,6 +164,7 @@ pub fn Soundpacks() -> Element {
               TabType::Keyboard => Some(crate::state::soundpack::SoundpackType::Keyboard),
               TabType::Mouse => Some(crate::state::soundpack::SoundpackType::Mouse),
               TabType::Manage => None, // Let user choose in manage tab
+              TabType::Repository => None,
           },
           on_import_success: EventHandler::new(move |_| {
               trigger_update(());

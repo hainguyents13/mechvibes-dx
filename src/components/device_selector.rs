@@ -5,6 +5,7 @@ use dioxus::prelude::*;
 use lucide_dioxus::{ Headphones, Keyboard, Mouse, RefreshCw };
 
 #[derive(Clone, PartialEq, Copy)]
+#[allow(dead_code)]
 pub enum DeviceType {
     AudioOutput,
     Keyboard,

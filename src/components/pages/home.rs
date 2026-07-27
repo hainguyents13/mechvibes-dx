@@ -99,6 +99,20 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         });
     }
 
+    let mut last_events = use_signal(|| Vec::<String>::new());
+
+    use_future(move || {
+        async move {
+            loop {
+                let events = crate::libs::input_manager::get_last_events();
+                if events != last_events() {
+                    last_events.set(events);
+                }
+                Delay::new(Duration::from_millis(100)).await;
+            }
+        }
+    });
+
     rsx! {
       div { class: "flex flex-col gap-10 px-3 pb-0",
         div { class: "mb-2 mt-4",
@@ -127,8 +141,23 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               },
             }
           }
-          // div { class: "divider m-0" }
-          div { class: "text-center space-y-2 mt-8",
+          
+          // Diagnostic event log
+          div { class: "mac-panel p-3 text-left space-y-1 font-mono text-[10px] mt-2",
+            div { class: "font-semibold text-base-content/70 border-b border-white/5 pb-1 mb-1.5 flex justify-between",
+              span { "🔍 Input Event Diagnostics" }
+              span { class: "text-[9px] opacity-70", "Press keys or mouse to test" }
+            }
+            if last_events().is_empty() {
+              div { class: "text-base-content/30 italic", "No input events captured yet." }
+            } else {
+              for event in last_events() {
+                div { class: "text-base-content/80", "{event}" }
+              }
+            }
+          }
+
+          div { class: "text-center space-y-2 mt-4",
             // Version
             div { class: "text-sm text-base-content/70 font-bold",
               "{APP_NAME_DISPLAY} (v{current_version})"

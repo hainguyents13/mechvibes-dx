@@ -79,10 +79,14 @@ pub fn play_ambiance_sound(sound_id: String, audio_url: String, volume: f32) -> 
 
             // Load audio file from local path
             let audio_path = audio_url.replace("assets/", "");
-            let full_path = format!("assets/{}", audio_path);
+            let app_root = crate::state::paths::soundpacks::get_builtin_soundpacks_dir()
+                .parent()
+                .unwrap()
+                .to_path_buf();
+            let full_path = app_root.join("assets").join(audio_path);
 
             let file = File::open(&full_path).map_err(|e|
-                format!("Failed to open audio file {}: {}", full_path, e)
+                format!("Failed to open audio file {}: {}", full_path.display(), e)
             )?;
             let buf_reader = BufReader::new(file);
 

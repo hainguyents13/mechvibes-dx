@@ -7,6 +7,7 @@ pub mod soundpack_import_modal;
 pub mod soundpack_manager;
 pub mod soundpack_table;
 pub mod toggler;
+pub mod online_soundpacks;
 
 pub use collapse::Collapse;
 pub use color_picker::ColorPicker;
@@ -18,3 +19,4 @@ pub use soundpack_import_modal::SoundpackImportModal;
 pub use soundpack_manager::SoundpackManager;
 pub use soundpack_table::SoundpackTable;
 pub use toggler::Toggler;
+pub use online_soundpacks::OnlineSoundpacksTable;

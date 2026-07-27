@@ -28,6 +28,7 @@ impl WindowManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn send_action(&self, action: WindowAction) {
         if let Ok(sender_guard) = self.action_sender.lock() {
             if let Some(sender) = sender_guard.as_ref() {
@@ -42,6 +43,7 @@ impl WindowManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn hide(&self) {
         self.set_visible(false);
         self.send_action(WindowAction::Hide);
