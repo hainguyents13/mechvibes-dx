@@ -8,6 +8,7 @@ static INPUT_CHANNELS: OnceLock<InputChannels> = OnceLock::new();
 static WINDOW_FOCUS_STATE: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 
 /// Struct to hold input event channels
+#[allow(dead_code)]
 pub struct InputChannels {
     pub keyboard_rx: Arc<Mutex<mpsc::Receiver<String>>>,
     pub mouse_rx: Arc<Mutex<mpsc::Receiver<String>>>,
@@ -44,6 +45,7 @@ pub fn get_input_channels() -> &'static InputChannels {
 }
 
 /// Initialize window focus state (called from main)
+#[allow(dead_code)]
 pub fn init_window_focus_state() {
     let _ = WINDOW_FOCUS_STATE.set(Arc::new(Mutex::new(false)));
 }

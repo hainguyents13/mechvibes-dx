@@ -39,7 +39,7 @@ fn get_duration_with_symphonia(file_path: &str) -> Result<f64, Box<dyn std::erro
 
     let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
-    let mut format = probed.format;
+    let format = probed.format;
 
     // Get the default track
     let track = format
@@ -549,109 +549,6 @@ pub fn convert_v2_multi_to_single(
     Ok(())
 }
 
-/// Concatenate multiple audio files into one file
-fn concatenate_audio_files(
-    audio_files: &[(String, f64)], // (filename, duration)
-    soundpack_dir: &str,
-    output_filename: &str
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔧 Concatenating {} audio files...", audio_files.len());
-
-    let mut all_samples = Vec::new();
-    let mut sample_rate = 44100u32; // Default sample rate
-    let mut channels = 2u16; // Default to stereo
-
-    for (i, (filename, _duration)) in audio_files.iter().enumerate() {
-        let file_path = format!("{}/{}", soundpack_dir, filename);
-        println!("   📁 Loading audio file {}/{}: {}", i + 1, audio_files.len(), filename);
-
-        if !Path::new(&file_path).exists() {
-            println!("   ⚠️ Audio file not found, skipping: {}", file_path);
-            continue;
-        }
-
-        // Load audio file using Symphonia
-        match load_audio_file_samples(&file_path) {
-            Ok((samples, file_channels, file_sample_rate)) => {
-                // Use the first file's format as reference
-                if i == 0 {
-                    sample_rate = file_sample_rate;
-                    channels = file_channels;
-                    println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
-                }
-
-                // Convert to target format if needed
-                let converted_samples = if
-                    file_sample_rate != sample_rate ||
-                    file_channels != channels
-                {
-                    println!(
-                        "   🔄 Converting from {}Hz {} channels to {}Hz {} channels",
-                        file_sample_rate,
-                        file_channels,
-                        sample_rate,
-                        channels
-                    );
-                    convert_audio_format(
-                        &samples,
-                        file_channels,
-                        file_sample_rate,
-                        channels,
-                        sample_rate
-                    )
-                } else {
-                    samples
-                };
-
-                // Special debug for Enter audio file
-                if filename == "SPMEnter.wav" {
-                    let actual_duration_ms =
-                        ((converted_samples.len() as f64) /
-                            ((sample_rate as f64) * (channels as f64))) *
-                        1000.0;
-                    println!("🔍 [ENTER CONCAT DEBUG] File: {}", filename);
-                    println!("🔍 [ENTER CONCAT DEBUG] Samples: {}", converted_samples.len());
-                    println!("🔍 [ENTER CONCAT DEBUG] Sample rate: {}Hz", sample_rate);
-                    println!("🔍 [ENTER CONCAT DEBUG] Channels: {}", channels);
-                    println!(
-                        "🔍 [ENTER CONCAT DEBUG] Actual duration: {:.2}ms",
-                        actual_duration_ms
-                    );
-                    println!(
-                        "🔍 [ENTER CONCAT DEBUG] Current position in concat: {:.2}ms",
-                        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
-                            1000.0
-                    );
-                }
-
-                all_samples.extend(&converted_samples);
-                println!("   ✅ Added {} samples from {}", converted_samples.len(), filename);
-            }
-            Err(e) => {
-                println!("   ❌ Failed to load {}: {}", filename, e);
-                // Continue with other files
-            }
-        }
-    }
-
-    if all_samples.is_empty() {
-        return Err("No audio samples were loaded".into());
-    } // Save concatenated audio file
-    let output_path = format!("{}/{}", soundpack_dir, output_filename);
-    save_audio_file(&all_samples, channels, sample_rate, &output_path)?;
-
-    let final_duration_ms =
-        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) * 1000.0;
-
-    println!("✅ Successfully concatenated audio to: {}", output_path);
-    println!("🎵 Total samples: {}, Duration: {:.2}ms", all_samples.len(), final_duration_ms);
-
-    // Special debug output for comparison
-    println!("🔍 [CONCAT FINAL DEBUG] Final concatenated duration: {:.2}ms", final_duration_ms);
-
-    Ok(())
-}
-
 /// Concatenate multiple audio files and return timing information
 /// Returns HashMap with (filename -> (offset_ms, duration_ms))
 fn concatenate_audio_files_with_timing(
@@ -687,11 +584,6 @@ fn concatenate_audio_files_with_timing(
                     sample_rate = file_sample_rate;
                     channels = file_channels;
                     println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
-                    // Recalculate offset for first file with correct sample rate
-                    let corrected_offset =
-                        ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) *
-                        1000.0;
-                    // Update if needed
                 }
 
                 // Convert to target format if needed

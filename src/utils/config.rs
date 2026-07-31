@@ -1,28 +1,14 @@
 use crate::state::config::AppConfig;
-use crate::utils::delay;
 use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Hook that always loads fresh config from file
-/// This ensures components get updated config even when changed externally (like hotkeys)
+/// Hook that gets the global config from context
+/// Config is loaded once at app startup and shared across all pages
+/// This prevents config reset on page navigation
 pub fn use_fresh_config() -> Signal<AppConfig> {
-    let mut config = use_signal(|| AppConfig::load());
-
-    // Refresh config from file periodically to catch external changes
-    use_effect(move || {
-        spawn(async move {
-            loop {
-                delay::Delay::ms(100).await;
-                let fresh_config = AppConfig::load();
-                if fresh_config.last_updated != config().last_updated {
-                    config.set(fresh_config);
-                }
-            }
-        });
-    });
-
-    config
+    // Get global config from context (provided in ui.rs app())
+    use_context::<Signal<AppConfig>>()
 }
 
 /// Creates a config updater function that loads fresh config, applies changes, and saves
@@ -31,14 +17,30 @@ pub fn create_config_updater(
 ) -> Rc<dyn Fn(Box<dyn FnOnce(&mut AppConfig)>)> {
     let signal_ref = Rc::new(RefCell::new(config_signal));
     Rc::new(move |updater: Box<dyn FnOnce(&mut AppConfig)>| {
-        let mut new_config = AppConfig::load(); // Always load fresh from file
-        updater(&mut new_config);
-        new_config.last_updated = chrono::Utc::now();
-        let _ = new_config.save();
+        let old_config = AppConfig::load(); // Load current config
+        let mut new_config = old_config.clone(); // Clone for modification
 
-        // Update the signal through RefCell
-        signal_ref.borrow_mut().set(new_config);
-        println!("[config_utils] Config updated");
+        updater(&mut new_config);
+
+        // Only update timestamp and save if config data actually changed (excluding metadata)
+        if !new_config.data_equals(&old_config) {
+            new_config.last_updated = chrono::Utc::now();
+            match new_config.save() {
+                Ok(_) => {
+                    println!("✅ [config_utils] Config saved successfully");
+                    println!("   keyboard_soundpack: {}", new_config.keyboard_soundpack);
+                    println!("   mouse_soundpack: {}", new_config.mouse_soundpack);
+                }
+                Err(e) => {
+                    eprintln!("❌ [config_utils] Failed to save config: {}", e);
+                }
+            }
+
+            // Update the signal through RefCell
+            signal_ref.borrow_mut().set(new_config);
+        } else {
+            println!("[config_utils] Config unchanged, skipping save");
+        }
     })
 }
 

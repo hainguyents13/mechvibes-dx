@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+# Add user to input group for keyboard event access
+if [ "$1" = "configure" ]; then
+    # Get the user who invoked sudo (if applicable)
+    REAL_USER="${SUDO_USER:-$USER}"
+
+    if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+        echo "Adding user '$REAL_USER' to 'input' group for keyboard access..."
+        usermod -a -G input "$REAL_USER" 2>/dev/null || true
+        echo "✓ User added to input group. Please log out and log back in for changes to take effect."
+    fi
+
+    # Update icon cache
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

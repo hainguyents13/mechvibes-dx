@@ -85,52 +85,58 @@ pub fn use_state_trigger() -> Callback<()> {
 
 // Reload the current soundpacks from configuration
 pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
-    let mut config = crate::state::config::AppConfig::load();
-    let mut config_changed = false; // Load keyboard soundpack
-    match
-        crate::libs::audio::soundpack_loader::load_keyboard_soundpack_with_cache_control(
-            audio_ctx,
-            &config.keyboard_soundpack,
-            false
-        )
-    {
-        Ok(_) =>
-            debug_print!(
-                "✅ Keyboard soundpack '{}' reloaded successfully",
-                config.keyboard_soundpack
-            ),
-        Err(e) => {
-            always_eprint!(
-                "❌ Failed to reload keyboard soundpack '{}': {}. Clearing selection.",
-                config.keyboard_soundpack,
-                e
-            );
-            config.keyboard_soundpack = "".to_string();
-            config_changed = true;
+    let config = crate::state::config::AppConfig::load();
+
+    // Track if we need to update config (only for truly missing soundpacks)
+    // Don't clear config for temporary loading failures to prevent infinite loops
+
+    // Load keyboard soundpack (don't clear on error to prevent infinite reload loop)
+    if !config.keyboard_soundpack.is_empty() {
+        match
+            crate::libs::audio::soundpack_loader::load_keyboard_soundpack_with_cache_control(
+                audio_ctx,
+                &config.keyboard_soundpack,
+                false
+            )
+        {
+            Ok(_) =>
+                debug_print!(
+                    "✅ Keyboard soundpack '{}' reloaded successfully",
+                    config.keyboard_soundpack
+                ),
+            Err(e) => {
+                // Log error but don't clear config to prevent infinite loop
+                always_eprint!(
+                    "❌ Failed to reload keyboard soundpack '{}': {}",
+                    config.keyboard_soundpack,
+                    e
+                );
+                always_eprint!("   Keeping current selection to prevent infinite reload loop");
+            }
         }
-    } // Load mouse soundpack
-    match
-        crate::libs::audio::soundpack_loader::load_mouse_soundpack_with_cache_control(
-            audio_ctx,
-            &config.mouse_soundpack,
-            false
-        )
-    {
-        Ok(_) =>
-            debug_print!("✅ Mouse soundpack '{}' reloaded successfully", config.mouse_soundpack),
-        Err(e) => {
-            always_eprint!(
-                "❌ Failed to reload mouse soundpack '{}': {}. Clearing selection.",
-                config.mouse_soundpack,
-                e
-            );
-            config.mouse_soundpack = "".to_string();
-            config_changed = true;
+    }
+
+    // Load mouse soundpack (don't clear on error to prevent infinite reload loop)
+    if !config.mouse_soundpack.is_empty() {
+        match
+            crate::libs::audio::soundpack_loader::load_mouse_soundpack_with_cache_control(
+                audio_ctx,
+                &config.mouse_soundpack,
+                false
+            )
+        {
+            Ok(_) =>
+                debug_print!("✅ Mouse soundpack '{}' reloaded successfully", config.mouse_soundpack),
+            Err(e) => {
+                // Log error but don't clear config to prevent infinite loop
+                always_eprint!(
+                    "❌ Failed to reload mouse soundpack '{}': {}",
+                    config.mouse_soundpack,
+                    e
+                );
+                always_eprint!("   Keeping current selection to prevent infinite reload loop");
+            }
         }
-    } // Save config if any changes were made
-    if config_changed {
-        let _ = config.save();
-        debug_print!("💾 Config updated due to failed soundpack loads");
     }
 }
 

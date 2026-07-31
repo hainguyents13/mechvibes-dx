@@ -5,6 +5,7 @@ use uuid::Uuid;
 use zip::ZipArchive;
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum SoundpackValidationStatus {
     Valid,
     InvalidVersion,
@@ -14,6 +15,7 @@ pub enum SoundpackValidationStatus {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SoundpackValidationResult {
     pub status: SoundpackValidationStatus,
     pub config_version: Option<u32>,

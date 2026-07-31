@@ -75,7 +75,7 @@ impl Default for BackgroundCustomization {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AppConfig {
     // Metadata
     pub version: String,
@@ -115,19 +115,65 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    /// Check if config data has changed (excluding metadata fields)
+    pub fn data_equals(&self, other: &Self) -> bool {
+        // Compare all fields except metadata (version, last_updated, commit)
+        self.keyboard_soundpack == other.keyboard_soundpack
+            && self.mouse_soundpack == other.mouse_soundpack
+            && self.volume == other.volume
+            && self.mouse_volume == other.mouse_volume
+            && self.enable_volume_boost == other.enable_volume_boost
+            && self.enable_sound == other.enable_sound
+            && self.enable_keyboard_sound == other.enable_keyboard_sound
+            && self.enable_mouse_sound == other.enable_mouse_sound
+            && self.selected_audio_device == other.selected_audio_device
+            && self.enabled_keyboards == other.enabled_keyboards
+            && self.enabled_mice == other.enabled_mice
+            && self.theme == other.theme
+            && self.custom_css == other.custom_css
+            && self.logo_customization == other.logo_customization
+            && self.enable_logo_customization == other.enable_logo_customization
+            && self.background_customization == other.background_customization
+            && self.enable_background_customization == other.enable_background_customization
+            && self.music_player == other.music_player
+            && self.ambiance_active_sounds == other.ambiance_active_sounds
+            && self.ambiance_global_volume == other.ambiance_global_volume
+            && self.ambiance_is_muted == other.ambiance_is_muted
+            && self.auto_start == other.auto_start
+            && self.start_minimized == other.start_minimized
+            && self.landscape_mode == other.landscape_mode
+            && self.auto_update == other.auto_update
+    }
+
     pub fn load() -> Self {
         let config_path = paths::data::config_json();
 
         // Ensure data directory exists
         if let Some(parent) = config_path.parent() {
             if let Err(_) = path::ensure_directory_exists(parent) {
-                eprintln!("Warning: Could not create data directory");
+                eprintln!("⚠️  Could not create data directory");
             }
         }
+
+        println!("📖 Loading config from: {}", config_path.display());
 
         // Load config from file, falling back to defaults if it doesn't exist or is invalid
         match data::load_json_from_file::<AppConfig>(&config_path) {
             Ok(mut config) => {
+                let mut config_updated = false;
+
+                // Migrate old soundpack IDs to new format
+                if config.keyboard_soundpack == "oreo" {
+                    println!("🔄 Migrating keyboard soundpack: oreo -> keyboard/eg-oreo");
+                    config.keyboard_soundpack = "keyboard/eg-oreo".to_string();
+                    config_updated = true;
+                }
+                if config.mouse_soundpack == "test-mouse" {
+                    println!("🔄 Migrating mouse soundpack: test-mouse -> mouse/ping");
+                    config.mouse_soundpack = "mouse/ping".to_string();
+                    config_updated = true;
+                }
+
                 // Sync auto_start with actual registry state
                 let actual_auto_start = crate::utils::auto_startup::get_auto_startup_state();
                 if config.auto_start != actual_auto_start {
@@ -137,12 +183,21 @@ impl AppConfig {
                         actual_auto_start
                     );
                     config.auto_start = actual_auto_start;
-                    let _ = config.save(); // Save the synced state
+                    config_updated = true;
                 }
+
+                // Save if any migrations were applied
+                if config_updated {
+                    config.last_updated = chrono::Utc::now();
+                    let _ = config.save();
+                }
+
                 config
             }
             Err(e) => {
-                eprintln!("Warning: Failed to load config file: {}. Using defaults.", e);
+                eprintln!("❌ Failed to load config file: {}. Using defaults.", e);
+                eprintln!("   Config path: {}", config_path.display());
+                eprintln!("   This will reset all settings to defaults!");
                 let default_config = Self::default();
                 let _ = default_config.save();
                 default_config
@@ -152,6 +207,9 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
+        println!("💾 Saving config to: {}", config_path.display());
+        println!("   keyboard_soundpack: {}", self.keyboard_soundpack);
+        println!("   mouse_soundpack: {}", self.mouse_soundpack);
         data::save_json_to_file(self, &config_path)
     }
 }
@@ -162,8 +220,8 @@ impl Default for AppConfig {
             version: crate::utils::constants::APP_VERSION.to_string(),
             last_updated: Utc::now(),
             commit: option_env!("GIT_HASH").map(|s| s.to_string()),
-            keyboard_soundpack: "oreo".to_string(),
-            mouse_soundpack: "test-mouse".to_string(),
+            keyboard_soundpack: "keyboard/eg-oreo".to_string(),
+            mouse_soundpack: "mouse/ping".to_string(),
             volume: 1.0,
             mouse_volume: 1.0, // Default mouse volume to 100%
             enable_volume_boost: false, // Default volume boost disabled

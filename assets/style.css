@@ -4440,6 +4440,10 @@
 html, body {
   overflow: hidden;
 }
+
+/* Platform-specific backdrop-blur fallback is injected via Rust */
+/* See src/components/header.rs for Linux-specific solid backgrounds */
+
 .logo-pressed {
   margin-top: 5px;
   margin-bottom: -5px;

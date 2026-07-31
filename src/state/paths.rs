@@ -136,9 +136,25 @@ pub mod soundpacks {
         BUILTIN_SOUNDPACKS.contains(&soundpack_id)
     }
 
-    /// Get the base soundpacks directory for built-in soundpacks (app root)
+    /// Get the base soundpacks directory for built-in soundpacks
+    /// Checks multiple locations in order:
+    /// 1. /usr/share/mechvibes-dx/soundpacks (installed via DEB/system package)
+    /// 2. {app_root}/soundpacks (portable/dev mode)
     pub fn get_builtin_soundpacks_dir() -> PathBuf {
-        get_app_root().join("soundpacks")
+        // Check standard Linux data directory first (for installed packages)
+        #[cfg(target_os = "linux")]
+        {
+            let system_soundpacks = PathBuf::from("/usr/share/mechvibes-dx/soundpacks");
+            if system_soundpacks.exists() {
+                println!("📂 Using system soundpacks directory: {}", system_soundpacks.display());
+                return system_soundpacks;
+            }
+        }
+
+        // Fallback to app root (for portable/dev mode)
+        let app_root_soundpacks = get_app_root().join("soundpacks");
+        println!("📂 Using app root soundpacks directory: {}", app_root_soundpacks.display());
+        app_root_soundpacks
     }
 
     /// Get the base soundpacks directory for custom soundpacks (system app data)
@@ -191,11 +207,13 @@ pub mod soundpacks {
 
     /// Get the base soundpacks directory (containing keyboard/ and mouse/ folders)
     /// Returns built-in soundpacks directory
+    #[allow(dead_code)]
     pub fn get_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir().to_string_lossy().to_string()
     }
 
     /// Get keyboard soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn keyboard_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("keyboard")
@@ -204,6 +222,7 @@ pub mod soundpacks {
     }
 
     /// Get mouse soundpacks directory (built-in)
+    #[allow(dead_code)]
     pub fn mouse_soundpacks_dir() -> String {
         get_builtin_soundpacks_dir()
             .join("mouse")
@@ -212,6 +231,7 @@ pub mod soundpacks {
     }
 
     /// Get custom keyboard soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_keyboard_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("keyboard")
@@ -220,6 +240,7 @@ pub mod soundpacks {
     }
 
     /// Get custom mouse soundpacks directory (system app data)
+    #[allow(dead_code)]
     pub fn custom_mouse_soundpacks_dir() -> String {
         get_custom_soundpacks_dir()
             .join("mouse")
@@ -229,36 +250,60 @@ pub mod soundpacks {
 
     /// Ensure soundpack directories exist (keyboard and mouse)
     /// Creates the directories if they don't exist
+    ///
+    /// On Linux, built-in soundpacks are installed to system directories by DEB/AppImage
+    /// and should not be created here (would require root permissions).
+    /// Only custom soundpack directories are created (in user's home directory).
     pub fn ensure_soundpack_directories() -> Result<(), std::io::Error> {
         use std::fs;
 
-        // Ensure built-in soundpack directories exist
+        // Check if built-in soundpack directories exist (don't try to create them on Linux)
         let builtin_soundpacks_dir = get_builtin_soundpacks_dir();
-        let builtin_keyboard_dir = builtin_soundpacks_dir.join("keyboard");
-        let builtin_mouse_dir = builtin_soundpacks_dir.join("mouse");
 
-        if !builtin_soundpacks_dir.exists() {
-            fs::create_dir_all(&builtin_soundpacks_dir)?;
+        #[cfg(not(target_os = "linux"))]
+        {
+            // On Windows/macOS, create built-in soundpack directories if needed
+            let builtin_keyboard_dir = builtin_soundpacks_dir.join("keyboard");
+            let builtin_mouse_dir = builtin_soundpacks_dir.join("mouse");
+
+            if !builtin_soundpacks_dir.exists() {
+                fs::create_dir_all(&builtin_soundpacks_dir)?;
+                crate::debug_print!(
+                    "📁 Created built-in soundpacks directory: {}",
+                    builtin_soundpacks_dir.display()
+                );
+            }
+
+            if !builtin_keyboard_dir.exists() {
+                fs::create_dir_all(&builtin_keyboard_dir)?;
+                crate::debug_print!(
+                    "⌨️ Created built-in keyboard soundpacks directory: {}",
+                    builtin_keyboard_dir.display()
+                );
+            }
+
+            if !builtin_mouse_dir.exists() {
+                fs::create_dir_all(&builtin_mouse_dir)?;
+                crate::debug_print!(
+                    "🖱️ Created built-in mouse soundpacks directory: {}",
+                    builtin_mouse_dir.display()
+                );
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // On Linux, just log the built-in soundpacks directory location
+            // (should be installed by DEB/AppImage package)
             crate::debug_print!(
-                "📁 Created built-in soundpacks directory: {}",
+                "📂 Built-in soundpacks directory: {}",
                 builtin_soundpacks_dir.display()
             );
-        }
-
-        if !builtin_keyboard_dir.exists() {
-            fs::create_dir_all(&builtin_keyboard_dir)?;
-            crate::debug_print!(
-                "⌨️ Created built-in keyboard soundpacks directory: {}",
-                builtin_keyboard_dir.display()
-            );
-        }
-
-        if !builtin_mouse_dir.exists() {
-            fs::create_dir_all(&builtin_mouse_dir)?;
-            crate::debug_print!(
-                "🖱️ Created built-in mouse soundpacks directory: {}",
-                builtin_mouse_dir.display()
-            );
+            if !builtin_soundpacks_dir.exists() {
+                crate::debug_print!(
+                    "⚠️  Built-in soundpacks directory not found (expected for installed packages)"
+                );
+            }
         }
 
         // Ensure custom soundpack directories exist

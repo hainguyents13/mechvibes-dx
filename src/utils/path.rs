@@ -31,6 +31,7 @@ pub fn get_soundpacks_dir_absolute() -> String {
 }
 
 /// Get absolute path for custom soundpacks directory (system app data)
+#[allow(dead_code)]
 pub fn get_custom_soundpacks_dir_absolute() -> String {
     paths::soundpacks::get_custom_soundpacks_dir()
         .to_string_lossy()

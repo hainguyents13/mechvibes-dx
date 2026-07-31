@@ -8,12 +8,18 @@ use std::time::Instant;
 static AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 static MOUSE_AUDIO_VOLUME: std::sync::OnceLock<Mutex<f32>> = std::sync::OnceLock::new();
 
+// Cached config flags to avoid loading config on every keypress
+static ENABLE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+static ENABLE_KEYBOARD_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+static ENABLE_MOUSE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
+
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct AudioContext {
     _stream: Arc<OutputStream>,
     pub(crate) stream_handle: OutputStreamHandle,
-    pub(crate) keyboard_samples: Arc<Mutex<Option<(Vec<f32>, u16, u32)>>>,
-    pub(crate) mouse_samples: Arc<Mutex<Option<(Vec<f32>, u16, u32)>>>,
+    pub(crate) keyboard_samples: Arc<Mutex<Option<(Arc<Vec<f32>>, u16, u32)>>>,
+    pub(crate) mouse_samples: Arc<Mutex<Option<(Arc<Vec<f32>>, u16, u32)>>>,
     pub(crate) key_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
     pub(crate) mouse_map: Arc<Mutex<HashMap<String, Vec<[f32; 2]>>>>,
     pub(crate) max_voices: usize,
@@ -41,13 +47,18 @@ impl AudioContext {
         let device_manager = DeviceManager::new();
         let config = AppConfig::load();
 
-        // Try to use selected device or fall back to default
+        // Use selected device from config or fall back to default
+        // Note: On Linux, this will enumerate devices and may briefly interrupt audio playback
         let (stream, stream_handle) = match &config.selected_audio_device {
             Some(device_id) => {
+                println!("🔊 [AudioContext] Attempting to use selected device: {}", device_id);
                 match device_manager.get_output_device_by_id(device_id) {
                     Ok(Some(device)) => {
                         match rodio::OutputStream::try_from_device(&device) {
-                            Ok((stream, handle)) => (stream, handle),
+                            Ok((stream, handle)) => {
+                                println!("✅ [AudioContext] Using selected device: {}", device_id);
+                                (stream, handle)
+                            }
                             Err(e) => {
                                 eprintln!(
                                     "❌ Failed to create stream from selected device {}: {}",
@@ -76,6 +87,7 @@ impl AudioContext {
                 }
             }
             None => {
+                println!("🔊 [AudioContext] Using system default audio device");
                 rodio::OutputStream
                     ::try_default()
                     .expect("Failed to create default audio output stream")
@@ -98,10 +110,13 @@ impl AudioContext {
             last_keyboard_sound_time: Arc::new(Mutex::new(None)),
             last_mouse_sound_time: Arc::new(Mutex::new(None)),
         };
-        // Initialize volume from config
+        // Initialize volume and sound flags from config
         let config = AppConfig::load();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
+        ENABLE_SOUND.get_or_init(|| Mutex::new(config.enable_sound));
+        ENABLE_KEYBOARD_SOUND.get_or_init(|| Mutex::new(config.enable_keyboard_sound));
+        ENABLE_MOUSE_SOUND.get_or_init(|| Mutex::new(config.enable_mouse_sound));
 
         // Load soundpack from config
         match super::soundpack_loader::load_soundpack(&context) {
@@ -162,81 +177,63 @@ impl AudioContext {
             .map(|v| *v)
             .unwrap_or(1.0)
     }
-    pub fn create_with_device(device_id: Option<String>) -> Result<Self, String> {
-        // Initialize device manager
-        let device_manager = DeviceManager::new();
 
-        // Create stream with selected device
-        let (stream, stream_handle) = match &device_id {
-            Some(id) => {
-                match device_manager.get_output_device_by_id(id) {
-                    Ok(Some(device)) => {
-                        match rodio::OutputStream::try_from_device(&device) {
-                            Ok((stream, handle)) => (stream, handle),
-                            Err(e) => {
-                                eprintln!("❌ Failed to create stream from device {}: {}", id, e);
-                                return Err(format!("Failed to use device: {}", e));
-                            }
-                        }
-                    }
-                    Ok(None) => {
-                        eprintln!("❌ Device {} not found", id);
-                        return Err(format!("Device not found: {}", id));
-                    }
-                    Err(e) => {
-                        eprintln!("❌ Error accessing device {}: {}", id, e);
-                        return Err(format!("Error accessing device: {}", e));
-                    }
-                }
-            }
-            None => {
-                rodio::OutputStream
-                    ::try_default()
-                    .map_err(|e| format!("Failed to create default stream: {}", e))?
-            }
-        };
-
-        let context = Self {
-            _stream: Arc::new(stream),
-            stream_handle,
-            keyboard_samples: Arc::new(Mutex::new(None)),
-            mouse_samples: Arc::new(Mutex::new(None)),
-            key_map: Arc::new(Mutex::new(HashMap::new())),
-            mouse_map: Arc::new(Mutex::new(HashMap::new())),
-            max_voices: 20, // Increased max voices to reduce audio interruptions
-            key_pressed: Arc::new(Mutex::new(HashMap::new())),
-            mouse_pressed: Arc::new(Mutex::new(HashMap::new())),
-            key_sinks: Arc::new(Mutex::new(HashMap::new())),
-            mouse_sinks: Arc::new(Mutex::new(HashMap::new())),
-            device_manager,
-            last_keyboard_sound_time: Arc::new(Mutex::new(None)),
-            last_mouse_sound_time: Arc::new(Mutex::new(None)),
-        };
-
-        // Initialize volume from config
-        let config = AppConfig::load();
-        AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
-        MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume)); // Load soundpack from config
-        match super::soundpack_loader::load_soundpack(&context) {
-            Ok(_) => {}
-            Err(e) => eprintln!("❌ Failed to load initial soundpack: {}", e),
-        }
-
-        Ok(context)
+    // Cached config flag getters (no file I/O, safe to call in hot path)
+    pub fn is_sound_enabled(&self) -> bool {
+        ENABLE_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
     }
 
-    pub fn get_current_device_info(&self) -> Option<String> {
-        let config = AppConfig::load();
-        config.selected_audio_device
+    pub fn is_keyboard_sound_enabled(&self) -> bool {
+        ENABLE_KEYBOARD_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
     }
 
-    pub fn test_current_device(&self) -> bool {
-        let config = AppConfig::load();
-        match &config.selected_audio_device {
-            Some(device_id) => {
-                self.device_manager.test_output_device(device_id).unwrap_or(false)
-            }
-            None => true, // Default device is always considered available
+    pub fn is_mouse_sound_enabled(&self) -> bool {
+        ENABLE_MOUSE_SOUND.get()
+            .and_then(|v| v.lock().ok())
+            .map(|v| *v)
+            .unwrap_or(true)
+    }
+
+    // Cached config flag setters (update cache + save to file)
+    pub fn set_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
         }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_sound = enabled;
+        let _ = config.save();
+    }
+
+    pub fn set_keyboard_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_KEYBOARD_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
+        }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_keyboard_sound = enabled;
+        let _ = config.save();
+    }
+
+    pub fn set_mouse_sound_enabled(&self, enabled: bool) {
+        if let Some(global) = ENABLE_MOUSE_SOUND.get() {
+            let mut g = global.lock().unwrap();
+            *g = enabled;
+        }
+
+        // Save to config file
+        let mut config = AppConfig::load();
+        config.enable_mouse_sound = enabled;
+        let _ = config.save();
     }
 }

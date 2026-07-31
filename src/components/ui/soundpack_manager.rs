@@ -118,7 +118,24 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               class: "btn btn-soft btn-sm",
               onclick: move |_| {
                   let builtin_keyboard_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("keyboard");
-                  let _ = crate::utils::path::open_path(&builtin_keyboard_dir.to_string_lossy());
+                  println!("🔍 Opening built-in keyboard soundpacks folder: {}", builtin_keyboard_dir.display());
+
+                  // Check if directory exists
+                  if !builtin_keyboard_dir.exists() {
+                      println!("❌ Built-in keyboard soundpacks directory not found: {}", builtin_keyboard_dir.display());
+                      println!("   This might be expected on Linux installations.");
+                      println!("   Trying parent directory instead...");
+
+                      // Try opening parent directory (soundpacks root)
+                      let soundpacks_root = crate::state::paths::soundpacks::get_builtin_soundpacks_dir();
+                      if soundpacks_root.exists() {
+                          let _ = crate::utils::path::open_path(&soundpacks_root.to_string_lossy());
+                      } else {
+                          println!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
+                      }
+                  } else {
+                      let _ = crate::utils::path::open_path(&builtin_keyboard_dir.to_string_lossy());
+                  }
               },
               FolderOpen { class: "w-4 h-4 mr-1" }
               "Keyboard"
@@ -127,7 +144,24 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               class: "btn btn-soft btn-sm",
               onclick: move |_| {
                   let builtin_mouse_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("mouse");
-                  let _ = crate::utils::path::open_path(&builtin_mouse_dir.to_string_lossy());
+                  println!("🔍 Opening built-in mouse soundpacks folder: {}", builtin_mouse_dir.display());
+
+                  // Check if directory exists
+                  if !builtin_mouse_dir.exists() {
+                      println!("❌ Built-in mouse soundpacks directory not found: {}", builtin_mouse_dir.display());
+                      println!("   This might be expected on Linux installations.");
+                      println!("   Trying parent directory instead...");
+
+                      // Try opening parent directory (soundpacks root)
+                      let soundpacks_root = crate::state::paths::soundpacks::get_builtin_soundpacks_dir();
+                      if soundpacks_root.exists() {
+                          let _ = crate::utils::path::open_path(&soundpacks_root.to_string_lossy());
+                      } else {
+                          println!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
+                      }
+                  } else {
+                      let _ = crate::utils::path::open_path(&builtin_mouse_dir.to_string_lossy());
+                  }
               },
               FolderOpen { class: "w-4 h-4 mr-1" }
               "Mouse"

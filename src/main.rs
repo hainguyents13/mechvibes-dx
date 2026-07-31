@@ -22,24 +22,42 @@ use libs::evdev_input_listener::start_evdev_keyboard_listener;
 #[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex};
 
-// Use .ico format for better Windows compatibility
+// Platform-specific icon files for optimal quality
+#[cfg(target_os = "windows")]
 const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 
+#[cfg(not(target_os = "windows"))]
+const EMBEDDED_ICON: &[u8] = include_bytes!("../assets/icon.png");
+
 fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
-    // Try to create icon from embedded ICO data
-    // Windows taskbar works best with 32x32 icons
-    match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
+    // Platform-specific icon format and size
+    // Windows: ICO format (multi-size), 32x32 for taskbar
+    // Linux/macOS: PNG format, 64x64 for better X11/Wayland support
+
+    #[cfg(target_os = "windows")]
+    let format = image::ImageFormat::Ico;
+
+    #[cfg(not(target_os = "windows"))]
+    let format = image::ImageFormat::Png;
+
+    match image::load_from_memory_with_format(EMBEDDED_ICON, format) {
         Ok(img) => {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            debug_print!("📐 Loaded icon from ICO: {}x{}", width, height);
+            debug_print!("📐 Loaded icon: {}x{}", width, height);
 
-            // Always resize to 32x32 for maximum Windows taskbar compatibility
-            // This is the standard size Windows expects for taskbar icons
+            // Platform-specific target sizes
+            #[cfg(target_os = "windows")]
             let target_size = 32u32;
 
+            #[cfg(target_os = "linux")]
+            let target_size = 64u32;
+
+            #[cfg(target_os = "macos")]
+            let target_size = 64u32;
+
             let final_rgba = if width != target_size || height != target_size {
-                debug_print!("🔄 Resizing icon from {}x{} to {}x{} for Windows taskbar", width, height, target_size, target_size);
+                debug_print!("🔄 Resizing icon from {}x{} to {}x{}", width, height, target_size, target_size);
                 image::imageops::resize(&rgba, target_size, target_size, image::imageops::FilterType::Lanczos3)
             } else {
                 debug_print!("✅ Icon already at optimal size ({}x{})", width, height);
@@ -195,6 +213,26 @@ fn main() {
     }
 
     // Create a WindowBuilder with custom appearance and vertical resizing
+    // On Linux, disable transparency to ensure proper border-radius and shadow rendering
+    #[cfg(target_os = "linux")]
+    let window_builder = {
+        debug_print!("🐧 Linux detected: Configuring window without transparency for proper CSS rendering");
+        WindowBuilder::default()
+            .with_title(APP_NAME)
+            .with_transparent(false) // Disable transparency on Linux for better CSS rendering
+            .with_always_on_top(false)
+            .with_inner_size(LogicalSize::new(window_width, default_height))
+            .with_min_inner_size(LogicalSize::new(window_width, min_height))
+            .with_max_inner_size(LogicalSize::new(window_width, max_height))
+            .with_fullscreen(None)
+            .with_decorations(false)
+            .with_resizable(true)
+            .with_visible(!should_start_minimized)
+            .with_window_icon(window_icon)
+    };
+
+    // On Windows, enable transparency for custom window styling
+    #[cfg(not(target_os = "linux"))]
     let window_builder = WindowBuilder::default()
         .with_title(APP_NAME)
         .with_transparent(true) // Enable transparency for custom window styling

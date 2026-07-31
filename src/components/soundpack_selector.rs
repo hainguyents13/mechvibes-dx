@@ -197,11 +197,12 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
             div {
               class: "bg-base-200 border border-base-300 rounded-box shadow-lg z-50 ",
               style: format!(
-                  "position: absolute; position-anchor: --soundpack-anchor-{:?}; position-area: block-end; width: anchor-size(width); margin-top: 4px;",
+                  "position: absolute; position-anchor: --soundpack-anchor-{:?}; position-area: block-end; width: anchor-size(width); margin-top: 4px; background-color: oklch(var(--b2)) !important;",
                   soundpack_type,
               ),
               // Search input
               div { class: "p-3 border-b border-base-200",
+                style: "background-color: oklch(var(--b2)) !important;",
                 div { class: "relative",
                   Search { class: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" }
                   input {
@@ -216,6 +217,7 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
 
               // Soundpack list
               div { class: "overflow-y-auto max-h-50",
+                style: "background-color: oklch(var(--b2)) !important;",
                 if filtered_soundpacks.read().is_empty() {
                   div { class: "p-4 text-center text-base-content/50",
                     "{not_found_text}"

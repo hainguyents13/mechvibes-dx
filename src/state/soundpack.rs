@@ -144,7 +144,7 @@ impl SoundpackCache {
     pub fn load() -> Self {
         let cache_file = Self::cache_file();
         // Load metadata cache using data utilities
-        let cache = match
+        let mut cache = match
             data::load_json_from_file::<SoundpackCache>(std::path::Path::new(&cache_file))
         {
             Ok(cache) => {
@@ -160,8 +160,13 @@ impl SoundpackCache {
             }
         };
 
-        // Auto-refresh on startup has been disabled to improve startup performance
-        // Cache will be refreshed manually via UI or when importing soundpacks
+        // Auto-refresh if cache is empty or missing
+        if cache.soundpacks.is_empty() {
+            println!("🔄 Cache is empty, refreshing from soundpack directories...");
+            cache.refresh_from_directory();
+            cache.save();
+        }
+
         cache
     }
     pub fn new() -> Self {
@@ -259,8 +264,11 @@ impl SoundpackCache {
             soundpack_type,
             type_dir.display()
         );
+        println!("   Directory exists: {}", type_dir.exists());
 
         if type_dir.exists() {
+            println!("✅ Directory found, reading entries...");
+
             if let Ok(entries) = std::fs::read_dir(&type_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_name) = entry.file_name().to_str() {
@@ -290,10 +298,15 @@ impl SoundpackCache {
                     }
                 }
             } else {
-                println!("⚠️ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
+                println!("❌ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
             }
         } else {
             println!("⚠️ [CACHE DEBUG] Directory does not exist: {}", type_dir.display());
+            println!("   Expected at: {}", type_dir.display());
+            if let Some(parent) = type_dir.parent() {
+                println!("   Parent directory: {}", parent.display());
+                println!("   Parent exists: {}", parent.exists());
+            }
         }
     }
 

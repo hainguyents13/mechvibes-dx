@@ -3,8 +3,14 @@ use tray_icon::{
     menu::{ Menu, MenuEvent, MenuItem, PredefinedMenuItem, MenuId },
     TrayIcon,
     TrayIconBuilder,
+    TrayIconEvent,
 };
 use crate::utils::constants::APP_NAME;
+use std::sync::Mutex;
+use std::time::Instant;
+
+// Track last click time for double-click detection
+static LAST_CLICK_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 
 // Embed the icon at compile time for cross-platform reliability
 const EMBEDDED_ICON: &[u8] = include_bytes!("../../assets/icon.ico");
@@ -170,6 +176,43 @@ impl TrayManager {
 }
 
 pub fn handle_tray_events() -> Option<TrayMessage> {
+    // Handle tray icon click events
+    if let Ok(event) = TrayIconEvent::receiver().try_recv() {
+        match event {
+            TrayIconEvent::Click {
+                id: _,
+                position: _,
+                rect: _,
+                button,
+                button_state,
+            } => {
+                // Only respond to left button release (avoids duplicate events)
+                if button == tray_icon::MouseButton::Left && button_state == tray_icon::MouseButtonState::Up {
+                    // Double-click detection: 500ms window
+                    let now = Instant::now();
+                    let mut last_click = LAST_CLICK_TIME.lock().unwrap();
+
+                    let is_double_click = if let Some(last_time) = *last_click {
+                        now.duration_since(last_time).as_millis() < 500
+                    } else {
+                        false
+                    };
+
+                    *last_click = Some(now);
+                    drop(last_click);
+
+                    if is_double_click {
+                        println!("🔼 Tray icon double-clicked - showing window");
+                        return Some(TrayMessage::Show);
+                    }
+                }
+            }
+            _ => {
+                // Silently ignore other events (Move, Enter, Leave, etc.)
+            }
+        }
+    }
+
     // Handle menu events
     if let Ok(event) = MenuEvent::receiver().try_recv() {
         println!("🖱️ Tray menu event received: {:?}", event);

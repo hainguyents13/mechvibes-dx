@@ -1,0 +1,50 @@
+version: 1
+
+AppDir:
+  path: ./AppDir
+
+  app_info:
+    id: com.hainguyen.mechvibes-dx
+    name: Mechvibes DX
+    icon: mechvibes-dx
+    version: 0.4.0
+    exec: usr/bin/mechvibes-dx
+    exec_args: $@
+
+  apt:
+    arch: amd64
+    sources:
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse'
+        key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
+
+    include:
+      - libasound2
+      - libevdev2
+      - libxdo3
+      - libwebkit2gtk-4.1-0
+      - libgtk-3-0
+      - libayatana-appindicator3-1
+
+  files:
+    include:
+      - usr/bin/mechvibes-dx
+      - usr/share/icons/hicolor/512x512/apps/mechvibes-dx.png
+
+  runtime:
+    env:
+      APPDIR_LIBRARY_PATH: $APPDIR/usr/lib/x86_64-linux-gnu:$APPDIR/usr/lib
+
+  test:
+    fedora-30:
+      image: appimagecrafters/tests-env:fedora-30
+      command: ./AppRun
+    debian-stable:
+      image: appimagecrafters/tests-env:debian-stable
+      command: ./AppRun
+    ubuntu-xenial:
+      image: appimagecrafters/tests-env:ubuntu-xenial
+      command: ./AppRun
+
+AppImage:
+  arch: x86_64
+  update-information: gh-releases-zsync|hainguyents13|mechvibes-dx|latest|mechvibes-dx-*x86_64.AppImage.zsync

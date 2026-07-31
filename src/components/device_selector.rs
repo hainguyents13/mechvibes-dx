@@ -24,6 +24,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
     let audio_devices = use_signal(|| Vec::<DeviceInfo>::new());
     let input_devices = use_signal(|| Vec::<InputDeviceInfo>::new());
     let is_loading = use_signal(|| false);
+    let has_loaded = use_signal(|| false); // Track if devices have been loaded at least once
     let error_message = use_signal(String::new);
     let device_status = use_signal(|| std::collections::HashMap::<String, bool>::new());
 
@@ -37,44 +38,49 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         }
     });
 
-    // Load devices on component mount and when refresh is triggered
-    let load_devices = {
+    // Load devices from cache (audio) or fresh (input devices)
+    let load_cached_devices = {
         let mut audio_devices = audio_devices.clone();
         let mut input_devices = input_devices.clone();
         let mut is_loading = is_loading.clone();
+        let mut has_loaded = has_loaded.clone();
         let mut error_message = error_message.clone();
         let device_type = props.device_type;
 
         use_callback(move |_| {
             spawn(async move {
+                println!("📋 [DeviceSelector] Loading devices...");
                 is_loading.set(true);
                 error_message.set(String::new());
 
                 match device_type {
                     DeviceType::AudioOutput => {
-                        let device_manager = DeviceManager::new();
-                        match device_manager.get_output_devices() {
+                        // Use cached audio devices to avoid enumeration interference
+                        match DeviceManager::get_cached_output_devices() {
                             Ok(device_list) => {
+                                println!("✅ [DeviceSelector] Loaded {} cached audio devices", device_list.len());
                                 audio_devices.set(device_list);
+                                has_loaded.set(true);
                             }
                             Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to load cached devices: {}", e);
                                 error_message.set(format!("Failed to load audio devices: {}", e));
+                                has_loaded.set(true);
                             }
                         }
                     }
                     DeviceType::Keyboard | DeviceType::Mouse => {
-                        let mut input_manager = InputDeviceManager::new();
-                        match input_manager.enumerate_devices() {
-                            Ok(_) => {
-                                let device_list = match device_type {
-                                    DeviceType::Keyboard => input_manager.get_keyboards(),
-                                    DeviceType::Mouse => input_manager.get_mice(),
-                                    _ => Vec::new(),
-                                };
+                        // Input devices don't interfere with audio, load fresh
+                        match InputDeviceManager::get_devices() {
+                            Ok(device_list) => {
+                                println!("✅ [DeviceSelector] Loaded {} input devices", device_list.len());
                                 input_devices.set(device_list);
+                                has_loaded.set(true);
                             }
                             Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to load input devices: {}", e);
                                 error_message.set(format!("Failed to load input devices: {}", e));
+                                has_loaded.set(true);
                             }
                         }
                     }
@@ -85,10 +91,41 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         })
     };
 
-    // Load devices on mount
-    use_effect(move || {
-        load_devices.call(());
-    });
+    // Refresh device cache (re-enumerate)
+    let refresh_device_cache = {
+        let load_cached = load_cached_devices.clone();
+        let device_type = props.device_type;
+
+        use_callback(move |_| {
+            spawn(async move {
+                println!("🔄 [DeviceSelector] User clicked refresh - re-enumerating devices...");
+                match device_type {
+                    DeviceType::AudioOutput => {
+                        // Refresh audio device cache
+                        match DeviceManager::refresh_cache() {
+                            Ok(_) => {
+                                println!("✅ [DeviceSelector] Audio cache refreshed successfully");
+                                // Reload from refreshed cache
+                                load_cached.call(());
+                            }
+                            Err(e) => {
+                                println!("❌ [DeviceSelector] Failed to refresh audio cache: {}", e);
+                            }
+                        }
+                    }
+                    DeviceType::Keyboard | DeviceType::Mouse => {
+                        // Input devices - just reload fresh
+                        println!("🔄 [DeviceSelector] Reloading input devices...");
+                        load_cached.call(());
+                    }
+                }
+            });
+        })
+    };
+
+    // Don't auto-load devices on mount to avoid audio interruption
+    // User must click refresh button to load devices
+    // This prevents ALSA enumeration from interfering with audio playback
 
     // Test device status (only for audio devices)
     let test_device_status = {
@@ -286,7 +323,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                 span { "{props.label}" }
                 button {
                     class: "btn btn-ghost btn-xs",
-                    onclick: move |_| load_devices.call(()),
+                    onclick: move |_| refresh_device_cache.call(()),
                     disabled: is_loading(),
                     title: "Refresh device list",
                     if is_loading() {
@@ -307,8 +344,13 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         if audio_devices().is_empty() && !is_loading() {
                             div { class: "text-center text-base-content/50 py-8",
                                 {device_icon()}
-                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
-                            }                        } else {
+                                if !has_loaded() {
+                                    div { class: "mt-2 text-sm", "Click the refresh button to load available devices" }
+                                } else {
+                                    div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                }
+                            }
+                        } else {
                             div { class: "space-y-2",
                                 // Unified device list (system default + hardware devices)
                                 for (device_id, device_name, badge_text, is_default) in all_audio_devices().iter() {
@@ -357,7 +399,11 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         if input_devices().is_empty() && !is_loading() {
                             div { class: "text-center text-base-content/50 py-8",
                                 {device_icon()}
-                                div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                if !has_loaded() {
+                                    div { class: "mt-2 text-sm", "Click the refresh button to load available devices" }
+                                } else {
+                                    div { class: "mt-2 text-sm", "{no_devices_message()}" }
+                                }
                             }
                         } else {
                             div { class: "space-y-2",
@@ -405,7 +451,21 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         "⚠️ Selected device may not be available. Audio may not work properly."
                     }
                 }
-            }        }
+            }
+
+            // Linux-specific information
+            if cfg!(target_os = "linux") && props.device_type == DeviceType::AudioOutput {
+                div { class: "alert alert-info mt-2",
+                    div { class: "text-xs",
+                        if !has_loaded() {
+                            "ℹ️ Linux: Click refresh to load available devices. This may briefly interrupt audio playback due to ALSA device enumeration."
+                        } else {
+                            "ℹ️ Linux: Device changes require app restart. Refresh button will interrupt audio playback (ALSA limitation)."
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -420,6 +480,7 @@ pub fn AudioOutputSelector() -> Element {
     }
 }
 
+#[allow(dead_code)]
 #[component]
 pub fn KeyboardSelector() -> Element {
     rsx! {
@@ -431,6 +492,7 @@ pub fn KeyboardSelector() -> Element {
     }
 }
 
+#[allow(dead_code)]
 #[component]
 pub fn MouseSelector() -> Element {
     rsx! {

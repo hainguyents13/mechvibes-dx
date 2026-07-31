@@ -11,9 +11,12 @@ pub fn start_evdev_keyboard_listener(
     hotkey_tx: Sender<String>,
     _is_focused: Arc<Mutex<bool>>,
 ) {
+    println!("🔍 [evdev] start_evdev_keyboard_listener() called - spawning thread");
     thread::spawn(move || {
-        use evdev::{Device, EventType, Key};
+        use evdev::{Device, EventType, KeyCode};
 
+        println!("🔍 [evdev] Thread started - initializing keyboard listener");
+        println!("🔍 [evdev] Current user: {:?}", std::env::var("USER"));
         println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
         // Track modifier keys for hotkey detection
@@ -22,38 +25,50 @@ pub fn start_evdev_keyboard_listener(
 
         // Find all keyboard devices
         let mut keyboards = Vec::new();
-        
-        match evdev::enumerate().map(|t| t.collect::<Vec<_>>()) {
-            Ok(devices) => {
-                for (path, mut device) in devices {
-                    // Check if device has keyboard capabilities
-                    if device.supported_keys().is_some() {
-                        println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
 
-                        // Set device to non-blocking mode to prevent blocking on idle devices
-                        if let Err(e) = device.set_nonblocking(true) {
-                            eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
-                        }
+        println!("🔍 [evdev] Enumerating input devices...");
+        let devices: Vec<_> = evdev::enumerate().collect();
+        let device_count = devices.len();
+        println!("🔍 [evdev] Found {} total input devices", device_count);
 
-                        keyboards.push(device);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("❌ [evdev] Failed to enumerate devices: {}", e);
-                eprintln!("💡 [evdev] Make sure you're in the 'input' group: sudo usermod -a -G input $USER");
-                return;
-            }
-        }
-        
-        if keyboards.is_empty() {
-            eprintln!("❌ [evdev] No keyboard devices found!");
-            eprintln!("💡 [evdev] Make sure you have permission to access /dev/input/event*");
+        if device_count == 0 {
+            eprintln!("❌ [evdev] No devices found - cannot access /dev/input/event* devices");
+            eprintln!("💡 [evdev] Troubleshooting steps:");
+            eprintln!("   1. Check if you're in the 'input' group: groups $USER");
+            eprintln!("   2. Add yourself to input group: sudo usermod -a -G input $USER");
+            eprintln!("   3. Log out and log back in for group changes to take effect");
+            eprintln!("   4. Check /dev/input permissions: ls -la /dev/input/event*");
             return;
         }
-        
-        println!("🔍 [evdev] Monitoring {} keyboard device(s)", keyboards.len());
-        
+
+        for (path, mut device) in devices {
+            // Check if device has keyboard capabilities
+            if device.supported_keys().is_some() {
+                println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+
+                // Set device to non-blocking mode to prevent blocking on idle devices
+                if let Err(e) = device.set_nonblocking(true) {
+                    eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
+                }
+
+                keyboards.push(device);
+            } else {
+                println!("🔍 [evdev] Skipping non-keyboard device: {:?}", path.display());
+            }
+        }
+
+        if keyboards.is_empty() {
+            eprintln!("❌ [evdev] No keyboard devices found among the {} input devices!", device_count);
+            eprintln!("💡 [evdev] This might indicate a permission issue or unusual hardware setup");
+            return;
+        }
+
+        println!("✅ [evdev] Successfully initialized {} keyboard device(s)", keyboards.len());
+        println!("🔍 [evdev] Starting event monitoring loop...");
+
+        let mut event_count = 0;
+        let mut first_event_logged = false;
+
         // Monitor all keyboards in a loop
         loop {
             for device in &mut keyboards {
@@ -62,9 +77,17 @@ pub fn start_evdev_keyboard_listener(
                     Ok(events) => {
                         for event in events {
                             if event.event_type() == EventType::KEY {
+                                event_count += 1;
+                                if !first_event_logged {
+                                    println!("✅ [evdev] First keyboard event detected!");
+                                    first_event_logged = true;
+                                }
+
                                 let key_value = event.value();
 
-                                if let Ok(key) = Key::new(event.code()) {
+                                // Convert event code to KeyCode
+                                let key = KeyCode(event.code());
+                                {
                                     let key_code = map_evdev_keycode(key);
                                     if !key_code.is_empty() {
                                         // Handle key press (value == 1)
@@ -89,6 +112,9 @@ pub fn start_evdev_keyboard_listener(
                                             }
 
                                             // Send key press event
+                                            if event_count <= 5 {
+                                                println!("🔍 [evdev] Sending key press: {}", key_code);
+                                            }
                                             let _ = keyboard_tx.send(key_code.to_string());
                                         }
                                         // Handle key release (value == 0)
@@ -129,71 +155,71 @@ pub fn start_evdev_keyboard_listener(
 }
 
 #[cfg(target_os = "linux")]
-fn map_evdev_keycode(key: evdev::Key) -> &'static str {
-    use evdev::Key::*;
-    
+fn map_evdev_keycode(key: evdev::KeyCode) -> &'static str {
+    use evdev::KeyCode;
+
     match key {
         // Letters
-        KEY_A => "KeyA", KEY_B => "KeyB", KEY_C => "KeyC", KEY_D => "KeyD",
-        KEY_E => "KeyE", KEY_F => "KeyF", KEY_G => "KeyG", KEY_H => "KeyH",
-        KEY_I => "KeyI", KEY_J => "KeyJ", KEY_K => "KeyK", KEY_L => "KeyL",
-        KEY_M => "KeyM", KEY_N => "KeyN", KEY_O => "KeyO", KEY_P => "KeyP",
-        KEY_Q => "KeyQ", KEY_R => "KeyR", KEY_S => "KeyS", KEY_T => "KeyT",
-        KEY_U => "KeyU", KEY_V => "KeyV", KEY_W => "KeyW", KEY_X => "KeyX",
-        KEY_Y => "KeyY", KEY_Z => "KeyZ",
-        
+        KeyCode::KEY_A => "KeyA", KeyCode::KEY_B => "KeyB", KeyCode::KEY_C => "KeyC", KeyCode::KEY_D => "KeyD",
+        KeyCode::KEY_E => "KeyE", KeyCode::KEY_F => "KeyF", KeyCode::KEY_G => "KeyG", KeyCode::KEY_H => "KeyH",
+        KeyCode::KEY_I => "KeyI", KeyCode::KEY_J => "KeyJ", KeyCode::KEY_K => "KeyK", KeyCode::KEY_L => "KeyL",
+        KeyCode::KEY_M => "KeyM", KeyCode::KEY_N => "KeyN", KeyCode::KEY_O => "KeyO", KeyCode::KEY_P => "KeyP",
+        KeyCode::KEY_Q => "KeyQ", KeyCode::KEY_R => "KeyR", KeyCode::KEY_S => "KeyS", KeyCode::KEY_T => "KeyT",
+        KeyCode::KEY_U => "KeyU", KeyCode::KEY_V => "KeyV", KeyCode::KEY_W => "KeyW", KeyCode::KEY_X => "KeyX",
+        KeyCode::KEY_Y => "KeyY", KeyCode::KEY_Z => "KeyZ",
+
         // Numbers
-        KEY_1 => "Digit1", KEY_2 => "Digit2", KEY_3 => "Digit3", KEY_4 => "Digit4",
-        KEY_5 => "Digit5", KEY_6 => "Digit6", KEY_7 => "Digit7", KEY_8 => "Digit8",
-        KEY_9 => "Digit9", KEY_0 => "Digit0",
-        
+        KeyCode::KEY_1 => "Digit1", KeyCode::KEY_2 => "Digit2", KeyCode::KEY_3 => "Digit3", KeyCode::KEY_4 => "Digit4",
+        KeyCode::KEY_5 => "Digit5", KeyCode::KEY_6 => "Digit6", KeyCode::KEY_7 => "Digit7", KeyCode::KEY_8 => "Digit8",
+        KeyCode::KEY_9 => "Digit9", KeyCode::KEY_0 => "Digit0",
+
         // Function keys
-        KEY_F1 => "F1", KEY_F2 => "F2", KEY_F3 => "F3", KEY_F4 => "F4",
-        KEY_F5 => "F5", KEY_F6 => "F6", KEY_F7 => "F7", KEY_F8 => "F8",
-        KEY_F9 => "F9", KEY_F10 => "F10", KEY_F11 => "F11", KEY_F12 => "F12",
-        
+        KeyCode::KEY_F1 => "F1", KeyCode::KEY_F2 => "F2", KeyCode::KEY_F3 => "F3", KeyCode::KEY_F4 => "F4",
+        KeyCode::KEY_F5 => "F5", KeyCode::KEY_F6 => "F6", KeyCode::KEY_F7 => "F7", KeyCode::KEY_F8 => "F8",
+        KeyCode::KEY_F9 => "F9", KeyCode::KEY_F10 => "F10", KeyCode::KEY_F11 => "F11", KeyCode::KEY_F12 => "F12",
+
         // Special keys
-        KEY_SPACE => "Space",
-        KEY_ENTER => "Enter",
-        KEY_BACKSPACE => "Backspace",
-        KEY_TAB => "Tab",
-        KEY_ESC => "Escape",
-        KEY_CAPSLOCK => "CapsLock",
-        KEY_LEFTSHIFT => "ShiftLeft",
-        KEY_RIGHTSHIFT => "ShiftRight",
-        KEY_LEFTCTRL => "ControlLeft",
-        KEY_RIGHTCTRL => "ControlRight",
-        KEY_LEFTALT => "AltLeft",
-        KEY_RIGHTALT => "AltRight",
-        KEY_LEFTMETA => "MetaLeft",
-        KEY_RIGHTMETA => "MetaRight",
-        
+        KeyCode::KEY_SPACE => "Space",
+        KeyCode::KEY_ENTER => "Enter",
+        KeyCode::KEY_BACKSPACE => "Backspace",
+        KeyCode::KEY_TAB => "Tab",
+        KeyCode::KEY_ESC => "Escape",
+        KeyCode::KEY_CAPSLOCK => "CapsLock",
+        KeyCode::KEY_LEFTSHIFT => "ShiftLeft",
+        KeyCode::KEY_RIGHTSHIFT => "ShiftRight",
+        KeyCode::KEY_LEFTCTRL => "ControlLeft",
+        KeyCode::KEY_RIGHTCTRL => "ControlRight",
+        KeyCode::KEY_LEFTALT => "AltLeft",
+        KeyCode::KEY_RIGHTALT => "AltRight",
+        KeyCode::KEY_LEFTMETA => "MetaLeft",
+        KeyCode::KEY_RIGHTMETA => "MetaRight",
+
         // Arrow keys
-        KEY_UP => "ArrowUp",
-        KEY_DOWN => "ArrowDown",
-        KEY_LEFT => "ArrowLeft",
-        KEY_RIGHT => "ArrowRight",
-        
+        KeyCode::KEY_UP => "ArrowUp",
+        KeyCode::KEY_DOWN => "ArrowDown",
+        KeyCode::KEY_LEFT => "ArrowLeft",
+        KeyCode::KEY_RIGHT => "ArrowRight",
+
         // Editing keys
-        KEY_INSERT => "Insert",
-        KEY_DELETE => "Delete",
-        KEY_HOME => "Home",
-        KEY_END => "End",
-        KEY_PAGEUP => "PageUp",
-        KEY_PAGEDOWN => "PageDown",
-        
+        KeyCode::KEY_INSERT => "Insert",
+        KeyCode::KEY_DELETE => "Delete",
+        KeyCode::KEY_HOME => "Home",
+        KeyCode::KEY_END => "End",
+        KeyCode::KEY_PAGEUP => "PageUp",
+        KeyCode::KEY_PAGEDOWN => "PageDown",
+
         // Punctuation
-        KEY_MINUS => "Minus",
-        KEY_EQUAL => "Equal",
-        KEY_LEFTBRACE => "BracketLeft",
-        KEY_RIGHTBRACE => "BracketRight",
-        KEY_BACKSLASH => "Backslash",
-        KEY_SEMICOLON => "Semicolon",
-        KEY_APOSTROPHE => "Quote",
-        KEY_GRAVE => "Backquote",
-        KEY_COMMA => "Comma",
-        KEY_DOT => "Period",
-        KEY_SLASH => "Slash",
+        KeyCode::KEY_MINUS => "Minus",
+        KeyCode::KEY_EQUAL => "Equal",
+        KeyCode::KEY_LEFTBRACE => "BracketLeft",
+        KeyCode::KEY_RIGHTBRACE => "BracketRight",
+        KeyCode::KEY_BACKSLASH => "Backslash",
+        KeyCode::KEY_SEMICOLON => "Semicolon",
+        KeyCode::KEY_APOSTROPHE => "Quote",
+        KeyCode::KEY_GRAVE => "Backquote",
+        KeyCode::KEY_COMMA => "Comma",
+        KeyCode::KEY_DOT => "Period",
+        KeyCode::KEY_SLASH => "Slash",
         
         _ => "",
     }

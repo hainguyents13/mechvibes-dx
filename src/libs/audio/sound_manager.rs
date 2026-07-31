@@ -3,7 +3,6 @@ use rodio::Sink;
 use std::collections::HashMap;
 
 use super::audio_context::AudioContext;
-use crate::state::config::AppConfig;
 
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
@@ -13,9 +12,8 @@ impl AudioContext {
         //     if is_keydown { "down" } else { "up" }
         // );
 
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_keyboard_sound {
+        // Check enable_sound from cached config (no file I/O in hot path)
+        if !self.is_sound_enabled() || !self.is_keyboard_sound_enabled() {
             return;
         }
 
@@ -104,8 +102,10 @@ impl AudioContext {
         self.play_sound_segment(key, start, end, is_keydown);
     }
     fn play_sound_segment(&self, key: &str, start: f32, end: f32, is_keydown: bool) {
+        // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
-        if let Some((samples, channels, sample_rate)) = pcm_opt {
+        if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
+            let samples = &**samples_arc; // Deref Arc to access Vec
             // Calculate total audio duration in milliseconds
             let total_duration =
                 ((samples.len() as f32) / (sample_rate as f32) / (channels as f32)) * 1000.0;
@@ -257,9 +257,8 @@ impl AudioContext {
     }
 
     pub fn play_mouse_event_sound(&self, button: &str, is_buttondown: bool) {
-        // Check enable_sound from config before playing audio
-        let config = AppConfig::load();
-        if !config.enable_sound || !config.enable_mouse_sound {
+        // Check enable_sound from cached config (no file I/O in hot path)
+        if !self.is_sound_enabled() || !self.is_mouse_sound_enabled() {
             return;
         }
 
@@ -324,8 +323,10 @@ impl AudioContext {
         duration: f32,
         is_buttondown: bool
     ) {
+        // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.mouse_samples.lock().unwrap().clone();
-        if let Some((samples, channels, sample_rate)) = pcm_opt {
+        if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
+            let samples = &**samples_arc; // Deref Arc to access Vec
             // Calculate total audio duration in milliseconds
             let total_duration =
                 ((samples.len() as f32) / (sample_rate as f32) / (channels as f32)) * 1000.0;
@@ -450,32 +451,4 @@ impl AudioContext {
         }
     }
 
-    /// Clean up finished sinks to prevent memory leaks and improve performance
-    pub fn cleanup_finished_sinks(&self) {
-        // Clean up finished keyboard sinks
-        if let Ok(mut key_sinks) = self.key_sinks.lock() {
-            let finished_keys: Vec<String> = key_sinks
-                .iter()
-                .filter(|(_, sink)| sink.empty())
-                .map(|(key, _)| key.clone())
-                .collect();
-
-            for key in finished_keys {
-                key_sinks.remove(&key);
-            }
-        }
-
-        // Clean up finished mouse sinks
-        if let Ok(mut mouse_sinks) = self.mouse_sinks.lock() {
-            let finished_buttons: Vec<String> = mouse_sinks
-                .iter()
-                .filter(|(_, sink)| sink.empty())
-                .map(|(button, _)| button.clone())
-                .collect();
-
-            for button in finished_buttons {
-                mouse_sinks.remove(&button);
-            }
-        }
-    }
 }
