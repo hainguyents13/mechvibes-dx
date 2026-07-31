@@ -317,6 +317,28 @@ impl DeviceManager {
             None => Ok(false),
         }
     }
+
+    /// Get the sample rate of the currently selected output device (or the
+    /// system default if none selected/available). Returns `None` on any
+    /// enumeration/config error - callers should treat that as "skip
+    /// resampling, keep the file's native rate" (same as pre-resample
+    /// baseline behavior), not assume a hardcoded rate: guessing wrong would
+    /// make rodio's realtime resampler run on top of ours, which is worse
+    /// than not resampling at all.
+    pub fn get_current_output_sample_rate(&self) -> Option<u32> {
+        let config = crate::state::config::AppConfig::load();
+
+        let device = match &config.selected_audio_device {
+            Some(device_id) =>
+                match self.get_output_device_by_id(device_id) {
+                    Ok(Some(device)) => Some(device),
+                    _ => self.host.default_output_device(),
+                }
+            None => self.host.default_output_device(),
+        };
+
+        device.and_then(|d| d.default_output_config().ok()).map(|c| c.sample_rate().0)
+    }
 }
 
 impl Default for DeviceManager {

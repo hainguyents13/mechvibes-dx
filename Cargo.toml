@@ -1,6 +1,6 @@
 [package]
 name = "mechvibes-dx"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Hải Nguyễn <hainguyen.ts13@gmail.com>"]
 edition = "2024"
 description = "A modern mechanical keyboard sound simulator with customizable soundpacks"
@@ -27,6 +27,7 @@ rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "t
 rodio = "0.20.1"
 cpal = "0.15"
 hound = "3.5"
+rubato = "0.15"
 symphonia = { version = "0.5", features = [
   "mp3",
   "wav",

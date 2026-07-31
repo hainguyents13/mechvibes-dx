@@ -115,19 +115,30 @@ pub fn app() -> Element {
             async move {
                 loop {
                     if let Ok(receiver) = keyboard_rx.try_lock() {
-                        if let Ok(keycode) = receiver.try_recv() {
+                        // Drain the whole backlog this tick instead of one event -
+                        // a burst of keys can outpace the tick rate (each write()
+                        // triggers a re-render), otherwise leftover events keep
+                        // playing sound after the user has already lifted their hand.
+                        let mut last_state: Option<(bool, String)> = None;
+                        while let Ok(keycode) = receiver.try_recv() {
                             if keycode.starts_with("UP:") {
                                 let key = &keycode[3..];
                                 ctx.play_key_event_sound(key, false);
-
-                                // Update keyboard state - key released
-                                keyboard_state.write().key_pressed = false;
+                                last_state = Some((false, key.to_string()));
                             } else if !keycode.is_empty() {
                                 ctx.play_key_event_sound(&keycode, true);
-                                // Update keyboard state - key pressed
-                                let mut state = keyboard_state.write();
-                                state.key_pressed = true;
-                                state.last_key = keycode.clone();
+                                last_state = Some((true, keycode.clone()));
+                            }
+                        }
+
+                        // Coalesce UI state to one write per batch (using the last
+                        // event's state) so a burst doesn't trigger a re-render
+                        // per keystroke.
+                        if let Some((pressed, key)) = last_state {
+                            let mut state = keyboard_state.write();
+                            state.key_pressed = pressed;
+                            if pressed {
+                                state.last_key = key;
                             }
                         }
                     }
@@ -149,7 +160,8 @@ pub fn app() -> Element {
             async move {
                 loop {
                     if let Ok(receiver) = mouse_rx.try_lock() {
-                        if let Ok(button_code) = receiver.try_recv() {
+                        // Drain the whole backlog this tick (see keyboard loop above).
+                        while let Ok(button_code) = receiver.try_recv() {
                             if button_code.starts_with("UP:") {
                                 let button = &button_code[3..];
                                 ctx.play_mouse_event_sound(button, false);
@@ -171,7 +183,7 @@ pub fn app() -> Element {
             async move {
                 loop {
                     if let Ok(receiver) = hotkey_rx.try_lock() {
-                        if let Ok(hotkey_command) = receiver.try_recv() {
+                        while let Ok(hotkey_command) = receiver.try_recv() {
                             if hotkey_command == "TOGGLE_SOUND" {
                                 // Load current config, toggle enable_sound, and save
                                 let mut config = crate::state::config::AppConfig::load();

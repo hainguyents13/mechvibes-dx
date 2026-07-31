@@ -1,17 +1,102 @@
 use rodio::buffer::SamplesBuffer;
-use rodio::Sink;
-use std::collections::HashMap;
+use rodio::{ OutputStreamHandle, Sink };
+use std::sync::{ Arc, Mutex };
+use std::time::Duration;
 
 use super::audio_context::AudioContext;
 
+const FADE_IN_MS: f32 = 2.0;
+const FADE_OUT_MS: f32 = 5.0;
+const EVICT_RAMP_MS: u64 = 10;
+
+/// Applies a linear fade-in/fade-out to interleaved PCM samples in place.
+/// Operates per-frame (one frame = `channels` consecutive samples) so all
+/// channels in a frame share the same gain and stay in phase.
+fn apply_fade(samples: &mut [f32], channels: u16, sample_rate: u32) {
+    let channels = channels.max(1) as usize;
+    let frame_count = samples.len() / channels;
+    if frame_count == 0 {
+        return;
+    }
+
+    let mut fade_in_frames = ((FADE_IN_MS / 1000.0) * (sample_rate as f32)) as usize;
+    let mut fade_out_frames = ((FADE_OUT_MS / 1000.0) * (sample_rate as f32)) as usize;
+
+    // Scale down fades on very short segments so in/out never overlap-cancel.
+    // A segment of 0-1 frames has no room for any fade (half == 0), which the
+    // clamp below already expresses correctly.
+    let half = frame_count / 2;
+    if fade_in_frames > half {
+        fade_in_frames = half;
+    }
+    if fade_out_frames > half {
+        fade_out_frames = half;
+    }
+
+    for frame in 0..fade_in_frames {
+        let gain = (frame as f32) / (fade_in_frames as f32);
+        let base = frame * channels;
+        for c in 0..channels {
+            samples[base + c] *= gain;
+        }
+    }
+
+    for frame in 0..fade_out_frames {
+        let gain = (frame as f32) / (fade_out_frames as f32);
+        let frame_idx = frame_count - 1 - frame;
+        let base = frame_idx * channels;
+        for c in 0..channels {
+            samples[base + c] *= gain;
+        }
+    }
+}
+
+/// Removes finished sinks, then evicts the oldest voice (ramped down to
+/// avoid a click) if the pool is still at or above `max_voices`.
+fn manage_active_sinks(sinks: &mut Vec<Sink>, max_voices: usize) {
+    sinks.retain(|s| !s.empty());
+
+    if sinks.len() >= max_voices {
+        let old_sink = sinks.remove(0);
+        std::thread::spawn(move || {
+            const STEPS: u32 = 10;
+            let starting_volume = old_sink.volume();
+            for step in 1..=STEPS {
+                let gain = starting_volume * (1.0 - (step as f32) / (STEPS as f32));
+                old_sink.set_volume(gain.max(0.0));
+                std::thread::sleep(Duration::from_millis(EVICT_RAMP_MS / (STEPS as u64)));
+            }
+            old_sink.stop();
+        });
+    }
+}
+
+/// Builds a faded sink for `segment` and pushes it onto the voice pool,
+/// evicting old voices softly if the pool is full.
+fn spawn_voice(
+    stream_handle: &OutputStreamHandle,
+    mut segment_samples: Vec<f32>,
+    channels: u16,
+    sample_rate: u32,
+    volume: f32,
+    sinks: &Arc<Mutex<Vec<Sink>>>,
+    max_voices: usize
+) {
+    apply_fade(&mut segment_samples, channels, sample_rate);
+    let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
+
+    if let Ok(sink) = Sink::try_new(stream_handle) {
+        sink.set_volume(volume);
+        sink.append(segment);
+
+        let mut pool = sinks.lock().unwrap();
+        manage_active_sinks(&mut pool, max_voices);
+        pool.push(sink);
+    }
+}
+
 impl AudioContext {
     pub fn play_key_event_sound(&self, key: &str, is_keydown: bool) {
-        // println!(
-        //     "⌨️ Key event received: {} ({})",
-        //     key,
-        //     if is_keydown { "down" } else { "up" }
-        // );
-
         // Check enable_sound from cached config (no file I/O in hot path)
         if !self.is_sound_enabled() || !self.is_keyboard_sound_enabled() {
             return;
@@ -99,9 +184,9 @@ impl AudioContext {
         };
         drop(key_map);
 
-        self.play_sound_segment(key, start, end, is_keydown);
+        self.play_sound_segment(key, start, end);
     }
-    fn play_sound_segment(&self, key: &str, start: f32, end: f32, is_keydown: bool) {
+    fn play_sound_segment(&self, key: &str, start: f32, end: f32) {
         // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.keyboard_samples.lock().unwrap().clone();
         if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
@@ -126,14 +211,6 @@ impl AudioContext {
             }
             // Use epsilon tolerance for floating point comparison (1ms tolerance)
             const EPSILON: f32 = 1.0; // 1ms tolerance
-            // eprintln!(
-            //     "🔍 Playing sound for key '{}': start={:.3}ms, end={:.3}ms, duration={:.3}ms (total duration: {:.3}ms)",
-            //     key,
-            //     start,
-            //     end,
-            //     duration,
-            //     total_duration
-            // );
 
             // Check if start time exceeds audio duration - this is an error condition
             if start >= total_duration + EPSILON {
@@ -177,19 +254,15 @@ impl AudioContext {
                 // Use clamped values if they're reasonable
                 if clamped_duration > 1.0 && clamped_end_sample > start_sample {
                     let segment_samples = samples[start_sample..clamped_end_sample].to_vec();
-                    let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
-
-                    if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                        sink.set_volume(self.get_volume());
-                        sink.append(segment);
-
-                        let mut key_sinks = self.key_sinks.lock().unwrap();
-                        self.manage_active_sinks(&mut key_sinks);
-                        key_sinks.insert(
-                            format!("{}-{}", key, if is_keydown { "down" } else { "up" }),
-                            sink
-                        );
-                    }
+                    spawn_voice(
+                        &self.stream_handle,
+                        segment_samples,
+                        channels,
+                        sample_rate,
+                        self.get_volume(),
+                        &self.key_sinks,
+                        self.max_voices
+                    );
                     return;
                 }
 
@@ -215,44 +288,17 @@ impl AudioContext {
             }
 
             let segment_samples = samples[start_sample..end_sample].to_vec();
-            let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
-
-            if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                sink.set_volume(self.get_volume());
-                sink.append(segment);
-
-                let mut key_sinks = self.key_sinks.lock().unwrap();
-                self.manage_active_sinks(&mut key_sinks);
-                key_sinks.insert(
-                    format!("{}-{}", key, if is_keydown { "down" } else { "up" }),
-                    sink
-                );
-            }
+            spawn_voice(
+                &self.stream_handle,
+                segment_samples,
+                channels,
+                sample_rate,
+                self.get_volume(),
+                &self.key_sinks,
+                self.max_voices
+            );
         } else {
             eprintln!("❌ No keyboard PCM buffer available");
-        }
-    }
-
-    fn manage_active_sinks(&self, key_sinks: &mut std::sync::MutexGuard<HashMap<String, Sink>>) {
-        // First, clean up finished sinks (those that have stopped playing)
-        let finished_keys: Vec<String> = key_sinks
-            .iter()
-            .filter(|(_, sink)| sink.empty())
-            .map(|(key, _)| key.clone())
-            .collect();
-
-        for key in finished_keys {
-            key_sinks.remove(&key);
-        }
-
-        // Only remove active sinks if we still exceed max_voices after cleanup
-        if key_sinks.len() >= self.max_voices {
-            // Find the oldest sink (first in iteration order) and remove it
-            if let Some((old_key, _)) = key_sinks.iter().next().map(|(k, _)| (k.clone(), ())) {
-                key_sinks.remove(&old_key);
-                let mut pressed = self.key_pressed.lock().unwrap();
-                pressed.insert(old_key, false);
-            }
         }
     }
 
@@ -313,16 +359,10 @@ impl AudioContext {
         };
         drop(mouse_map);
 
-        self.play_mouse_sound_segment(button, start, duration, is_buttondown);
+        self.play_mouse_sound_segment(button, start, duration);
     }
 
-    fn play_mouse_sound_segment(
-        &self,
-        button: &str,
-        start: f32,
-        duration: f32,
-        is_buttondown: bool
-    ) {
+    fn play_mouse_sound_segment(&self, button: &str, start: f32, duration: f32) {
         // Clone Arc pointer (8 bytes) instead of entire Vec (potentially MBs)
         let pcm_opt = self.mouse_samples.lock().unwrap().clone();
         if let Some((samples_arc, channels, sample_rate)) = pcm_opt {
@@ -407,48 +447,17 @@ impl AudioContext {
             }
 
             let segment_samples = samples[start_sample..end_sample].to_vec();
-            let segment = SamplesBuffer::new(channels, sample_rate, segment_samples);
-
-            if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                sink.set_volume(self.get_mouse_volume());
-                sink.append(segment);
-
-                let mut mouse_sinks = self.mouse_sinks.lock().unwrap();
-                self.manage_active_mouse_sinks(&mut mouse_sinks);
-                mouse_sinks.insert(
-                    format!("{}-{}", button, if is_buttondown { "down" } else { "up" }),
-                    sink
-                );
-            }
+            spawn_voice(
+                &self.stream_handle,
+                segment_samples,
+                channels,
+                sample_rate,
+                self.get_mouse_volume(),
+                &self.mouse_sinks,
+                self.max_voices
+            );
         } else {
             eprintln!("❌ No mouse PCM buffer available");
         }
     }
-
-    fn manage_active_mouse_sinks(
-        &self,
-        mouse_sinks: &mut std::sync::MutexGuard<HashMap<String, Sink>>
-    ) {
-        // First, clean up finished sinks (those that have stopped playing)
-        let finished_buttons: Vec<String> = mouse_sinks
-            .iter()
-            .filter(|(_, sink)| sink.empty())
-            .map(|(button, _)| button.clone())
-            .collect();
-
-        for button in finished_buttons {
-            mouse_sinks.remove(&button);
-        }
-
-        // Only remove active sinks if we still exceed max_voices after cleanup
-        if mouse_sinks.len() >= self.max_voices {
-            // Find the oldest sink (first in iteration order) and remove it
-            if let Some((old_button, _)) = mouse_sinks.iter().next().map(|(k, _)| (k.clone(), ())) {
-                mouse_sinks.remove(&old_button);
-                let mut pressed = self.mouse_pressed.lock().unwrap();
-                pressed.insert(old_button, false);
-            }
-        }
-    }
-
 }

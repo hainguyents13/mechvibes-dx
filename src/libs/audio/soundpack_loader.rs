@@ -82,10 +82,26 @@ pub fn load_mouse_soundpack_with_cache_control(
     }
 }
 
+/// (samples, channels, sample_rate) for a decoded/resampled audio buffer.
+type DecodedAudio = (Vec<f32>, u16, u32);
+
+/// Loads and decodes a soundpack's audio file, then resamples it to
+/// `device_rate` if given. Returns `(original, resampled)`; `original` keeps
+/// the file's native rate so a later device switch can re-resample without
+/// re-reading from disk.
+///
+/// `device_rate` is passed in by the caller (from `AudioContext`'s cached
+/// rate) rather than probed here - probing the device on every soundpack
+/// load can briefly interrupt other audio on Linux/ALSA (see the
+/// enumeration-avoidance note in `ui.rs`). `None` (rate unknown, or probe
+/// failed at startup) means skip resampling and keep the file's native rate,
+/// same as pre-resample baseline behavior - guessing a rate would risk
+/// resampling twice (once here, once again by rodio realtime).
 fn load_audio_file(
     soundpack_path: &str,
-    soundpack: &SoundPack
-) -> Result<(Vec<f32>, u16, u32), String> {
+    soundpack: &SoundPack,
+    device_rate: Option<u32>
+) -> Result<(DecodedAudio, DecodedAudio), String> {
     let sound_file_path = soundpack.audio_file
         .as_ref()
         .map(|src| format!("{}/{}", soundpack_path, src.trim_start_matches("./")))
@@ -96,9 +112,36 @@ fn load_audio_file(
     }
 
     // Use Symphonia for audio loading instead of Rodio
-    match load_audio_with_symphonia(&sound_file_path) {
-        Ok((samples, channels, sample_rate)) => { Ok((samples, channels, sample_rate)) }
-        Err(e) => { Err(format!("Failed to load audio: {}", e)) }
+    let (samples, channels, file_rate) = load_audio_with_symphonia(&sound_file_path).map_err(
+        |e| format!("Failed to load audio: {}", e)
+    )?;
+
+    match device_rate {
+        Some(device_rate) if device_rate != file_rate => {
+            let start = std::time::Instant::now();
+            let resampled = super::resampler::resample_interleaved(
+                &samples,
+                channels,
+                file_rate,
+                device_rate
+            );
+            println!(
+                "🔁 Resampled soundpack audio {}Hz -> {}Hz in {:.1}ms",
+                file_rate,
+                device_rate,
+                start.elapsed().as_secs_f64() * 1000.0
+            );
+            let original = (samples, channels, file_rate);
+            Ok((original, (resampled, channels, device_rate)))
+        }
+        _ => {
+            // Either the device rate matches the file rate, or it's unknown
+            // (probe failed) - either way, skip resampling and reuse the
+            // same buffer for original/resampled (no need to clone: both
+            // tuples describe identical audio at the file's native rate).
+            let decoded = (samples, channels, file_rate);
+            Ok((decoded.clone(), decoded))
+        }
     }
 }
 
@@ -438,12 +481,13 @@ pub fn load_keyboard_soundpack_optimized(
         return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
     }
 
-    // Load audio samples directly from file
-    let samples = load_audio_file(&soundpack_path, &soundpack)?;
+    // Load audio samples directly from file (resampled to cached device rate)
+    let device_rate = context.cached_device_rate.lock().ok().and_then(|r| *r);
+    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, device_rate)?;
 
     // Create key mappings (only for keyboard soundpacks)
-    let key_mappings = create_key_mappings(&soundpack, &samples.0); // Update audio context with keyboard data
-    update_keyboard_context(context, samples, key_mappings, &soundpack)?;
+    let key_mappings = create_key_mappings(&soundpack, &resampled.0); // Update audio context with keyboard data
+    update_keyboard_context(context, original, resampled, key_mappings, &soundpack)?;
 
     // Update metadata cache - create metadata with no error since loading succeeded
     let mut cache = SoundpackCache::load();
@@ -519,12 +563,13 @@ pub fn load_mouse_soundpack_optimized(
         return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
     }
 
-    // Load audio samples directly from file
-    let samples = load_audio_file(&soundpack_path, &soundpack)?;
+    // Load audio samples directly from file (resampled to cached device rate)
+    let device_rate = context.cached_device_rate.lock().ok().and_then(|r| *r);
+    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, device_rate)?;
 
     // Create mouse mappings (only for mouse soundpacks)
-    let mouse_mappings = create_mouse_mappings(&soundpack, &samples.0); // Update audio context with mouse data
-    update_mouse_context(context, samples, mouse_mappings, &soundpack)?;
+    let mouse_mappings = create_mouse_mappings(&soundpack, &resampled.0); // Update audio context with mouse data
+    update_mouse_context(context, original, resampled, mouse_mappings, &soundpack)?;
 
     // Update metadata cache - create metadata with no error since loading succeeded
     let mut cache = SoundpackCache::load();
@@ -574,11 +619,12 @@ pub fn load_mouse_soundpack_optimized(
 
 fn update_keyboard_context(
     context: &AudioContext,
-    samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
+    original: (Vec<f32>, u16, u32), // pre-resample (samples, channels, sample_rate)
+    resampled: (Vec<f32>, u16, u32), // device-rate (samples, channels, sample_rate)
     key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
     soundpack: &SoundPack
 ) -> Result<(), String> {
-    let (audio_samples, channels, sample_rate) = samples;
+    let (audio_samples, channels, sample_rate) = resampled;
     let sample_count = audio_samples.len();
     let key_mapping_count = key_mappings.len();
     let soundpack_name = soundpack.name.clone();
@@ -589,6 +635,13 @@ fn update_keyboard_context(
         println!("🎹 Updated keyboard samples: {} samples", sample_count);
     } else {
         return Err("Failed to acquire lock on keyboard_samples".to_string());
+    }
+
+    // Keep pre-resample samples so a future device switch can re-resample
+    // without re-reading the soundpack file from disk.
+    if let Ok(mut cached_original) = context.keyboard_samples_original.lock() {
+        let (orig_samples, orig_channels, orig_rate) = original;
+        *cached_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
     }
 
     // Update key mappings
@@ -636,11 +689,12 @@ fn update_keyboard_context(
 
 fn update_mouse_context(
     context: &AudioContext,
-    samples: (Vec<f32>, u16, u32), // (samples, channels, sample_rate)
+    original: (Vec<f32>, u16, u32), // pre-resample (samples, channels, sample_rate)
+    resampled: (Vec<f32>, u16, u32), // device-rate (samples, channels, sample_rate)
     mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
     soundpack: &SoundPack
 ) -> Result<(), String> {
-    let (audio_samples, channels, sample_rate) = samples;
+    let (audio_samples, channels, sample_rate) = resampled;
     let sample_count = audio_samples.len();
     let mouse_mapping_count = mouse_mappings.len();
     let soundpack_name = soundpack.name.clone();
@@ -651,6 +705,13 @@ fn update_mouse_context(
         println!("🖱️ Updated mouse samples: {} samples", sample_count);
     } else {
         return Err("Failed to acquire lock on mouse_samples".to_string());
+    }
+
+    // Keep pre-resample samples so a future device switch can re-resample
+    // without re-reading the soundpack file from disk.
+    if let Ok(mut cached_original) = context.mouse_samples_original.lock() {
+        let (orig_samples, orig_channels, orig_rate) = original;
+        *cached_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
     }
 
     // Update mouse mappings
