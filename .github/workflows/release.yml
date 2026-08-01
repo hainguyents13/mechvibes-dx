@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Gate - tag must match Cargo.toml version
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}" -replace '^v', ''
+          $cargoToml = [IO.File]::ReadAllText("Cargo.toml", [Text.Encoding]::UTF8)
+          if ($cargoToml -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
+            Write-Error "Could not find version in Cargo.toml"
+            exit 1
+          }
+          $cargoVersion = $Matches[1]
+          if ($tagVersion -ne $cargoVersion) {
+            Write-Error "Tag version ($tagVersion) does not match Cargo.toml version ($cargoVersion)"
+            exit 1
+          }
+          Write-Host "Tag version matches Cargo.toml version: $tagVersion"
+          "APP_VERSION=$tagVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Gate - extract changelog notes
+        shell: pwsh
+        run: |
+          # Capture output and exit code from the script invocation directly
+          # rather than relying on $LASTEXITCODE after a pipe - a .ps1 (not
+          # a native exe) doesn't reliably set $LASTEXITCODE when piped, and
+          # $null -ne 0 is $true in PowerShell, so that pattern silently
+          # always looks like failure.
+          $notes = & .\scripts\extract-changelog.ps1 -Version $env:APP_VERSION
+          $scriptSucceeded = $?
+          if (-not $scriptSucceeded) {
+            Write-Error "Failed to extract CHANGELOG.md section for $env:APP_VERSION"
+            exit 1
+          }
+          $notes | Out-File -FilePath notes.md -Encoding utf8
+          Write-Host "Extracted release notes for $env:APP_VERSION"
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          # No `clippy -D warnings` here on purpose - the repo currently has
+          # pre-existing clippy warnings unrelated to release correctness;
+          # gating on them would make every release red until that debt is
+          # paid down separately.
+          $ErrorActionPreference = "Continue"
+          cargo test --release
+          $testExit = $LASTEXITCODE
+          cargo check --release
+          $checkExit = $LASTEXITCODE
+          $ErrorActionPreference = "Stop"
+          if ($testExit -ne 0 -or $checkExit -ne 0) {
+            Write-Error "cargo test or cargo check failed"
+            exit 1
+          }
+
+      - name: Build release binary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          cargo build --release
+          $buildExit = $LASTEXITCODE
+          $ErrorActionPreference = "Stop"
+          if ($buildExit -ne 0) {
+            Write-Error "cargo build --release failed"
+            exit 1
+          }
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build installer
+        shell: pwsh
+        run: .\scripts\build-windows-installer.ps1 -SkipBuild
+
+      - name: Verify installer asset
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path "dist" -Filter "MechvibesDX-*-Setup-x64.exe" | Select-Object -First 1
+          if (-not $installer) {
+            Write-Error "No installer asset found in dist/ matching 'MechvibesDX-*-Setup-x64.exe'"
+            exit 1
+          }
+          if ($installer.Name -notmatch "x64" -or $installer.Name -notmatch "\.exe$") {
+            Write-Error "Installer asset name '$($installer.Name)' does not match auto-updater's expected filter (must contain 'x64' and end in '.exe')"
+            exit 1
+          }
+          Write-Host "Verified installer asset: $($installer.FullName)"
+          "INSTALLER_PATH=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: "v${{ env.APP_VERSION }}"
+          body_path: notes.md
+          files: ${{ env.INSTALLER_PATH }}
