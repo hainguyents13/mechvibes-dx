@@ -109,4 +109,3 @@ assets = [
   ["README.md", "usr/share/doc/mechvibes-dx/", "644"],
   ["soundpacks/**/*", "usr/share/mechvibes-dx/soundpacks/", "644"],
 ]
-maintainer-scripts = "debian/"

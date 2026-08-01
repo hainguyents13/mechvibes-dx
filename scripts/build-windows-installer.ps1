@@ -31,22 +31,35 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# Read version from Cargo.toml (single source of truth - no more manual sync
+# between Cargo.toml and the installer script).
+$CargoTomlPath = Join-Path $ProjectRoot "Cargo.toml"
+$CargoTomlContent = Get-Content $CargoTomlPath -Raw
+if ($CargoTomlContent -notmatch '(?m)^\s*version\s*=\s*"([^"]+)"') {
+    Write-Host "ERROR: Could not find version in Cargo.toml" -ForegroundColor Red
+    exit 1
+}
+$AppVersion = $Matches[1]
+Write-Host "App version (from Cargo.toml): $AppVersion" -ForegroundColor Cyan
+Write-Host ""
+
 # Step 1: Build release binary
+if ($SkipBuild) {
+    Write-Host "[1/4] Skipping build (using existing binary)" -ForegroundColor Yellow
+    Write-Host ""
+}
 if (-not $SkipBuild) {
     Write-Host "[1/4] Building release binary..." -ForegroundColor Yellow
     Write-Host "Running: cargo build --release" -ForegroundColor Gray
 
     cargo build --release
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Build failed" -ForegroundColor Red
         exit 1
     }
-    
-    Write-Host "✓ Build completed successfully" -ForegroundColor Green
-    Write-Host ""
-} else {
-    Write-Host "[1/4] Skipping build (using existing binary)" -ForegroundColor Yellow
+
+    Write-Host "Build completed successfully" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -69,16 +82,20 @@ $DistDir = Join-Path $ProjectRoot "dist"
 if (-not (Test-Path $DistDir)) {
     New-Item -ItemType Directory -Path $DistDir | Out-Null
 }
-Write-Host "✓ Output directory ready: $DistDir" -ForegroundColor Green
+Write-Host "Output directory ready: $DistDir" -ForegroundColor Green
 Write-Host ""
 
 # Step 3: Build installer with Inno Setup
 Write-Host "[3/4] Building Inno Setup installer..." -ForegroundColor Yellow
 
-# Check if Inno Setup is installed
+# Check if Inno Setup is installed. Checks common install locations across
+# the installer types users end up with (traditional installer under
+# Program Files, or a per-user install e.g. via winget under
+# LocalAppData\Programs).
 $InnoSetupPaths = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+    "${env:LOCALAPPDATA}\Programs\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles(x86)}\Inno Setup 5\ISCC.exe",
     "${env:ProgramFiles}\Inno Setup 5\ISCC.exe"
 )
@@ -106,14 +123,14 @@ if (-not (Test-Path $InnoScript)) {
 }
 
 Write-Host "Running Inno Setup compiler..." -ForegroundColor Gray
-& $ISCC $InnoScript
+& $ISCC "/DAppVersion=$AppVersion" $InnoScript
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Inno Setup compilation failed" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "✓ Inno Setup installer created successfully" -ForegroundColor Green
+Write-Host "Inno Setup installer created successfully" -ForegroundColor Green
 Write-Host ""
 
 # Step 4: Summary
@@ -122,15 +139,14 @@ Write-Host "==================" -ForegroundColor Yellow
 Write-Host "Executable: $ExePath" -ForegroundColor Gray
 Write-Host "Output directory: $DistDir" -ForegroundColor Gray
 
-$InstallerPath = Get-ChildItem -Path $DistDir -Filter "MechvibesDX-*-Setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$InstallerPath = Get-ChildItem -Path $DistDir -Filter "MechvibesDX-*-Setup-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if ($InstallerPath) {
     Write-Host "Installer: $($InstallerPath.FullName)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "✓ Installer ready!" -ForegroundColor Green
+    Write-Host "Installer ready!" -ForegroundColor Green
 }
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Build completed successfully!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
-

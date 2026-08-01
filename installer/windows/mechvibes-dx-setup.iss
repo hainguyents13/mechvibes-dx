@@ -1,8 +1,17 @@
 ; MechvibesDX Inno Setup Script
 ; Requires Inno Setup 6.0 or later: https://jrsoftware.org/isinfo.php
+;
+; Version is NOT hardcoded here - pass it at compile time:
+;   ISCC.exe /DAppVersion=0.5.2 installer\windows\mechvibes-dx-setup.iss
+; scripts/build-windows-installer.ps1 does this automatically by reading
+; Cargo.toml, so there is a single source of truth for the version.
+
+#ifndef AppVersion
+  #error AppVersion must be defined, e.g. ISCC /DAppVersion=0.5.2 mechvibes-dx-setup.iss
+#endif
 
 #define MyAppName "MechvibesDX"
-#define MyAppVersion "0.5.2"
+#define MyAppVersion AppVersion
 #define MyAppPublisher "Hai Nguyen"
 #define MyAppURL "https://github.com/hainguyents13/mechvibes-dx"
 #define MyAppExeName "mechvibes-dx.exe"
@@ -20,9 +29,11 @@ AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-; LicenseFile=..\..\LICENSE
+LicenseFile=..\..\LICENSE
+; OutputBaseFilename MUST contain "x64" and end in ".exe" to match the
+; in-app auto-updater's asset filter (src/utils/auto_updater.rs).
 OutputDir=..\..\dist
-OutputBaseFilename=MechvibesDX-{#MyAppVersion}-Setup
+OutputBaseFilename=MechvibesDX-{#MyAppVersion}-Setup-x64
 SetupIconFile=..\..\assets\icon.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -33,6 +44,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
+CloseApplications=yes
+CloseApplicationsFilter=*.exe
+RestartApplications=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -54,10 +68,6 @@ Source: "..\..\soundpacks\*"; DestDir: "{app}\soundpacks"; Flags: ignoreversion 
 ; Data folder (default config files) - only if doesn't exist to preserve user data
 Source: "..\..\data\*"; DestDir: "{app}\data"; Flags: ignoreversion onlyifdoesntexist recursesubdirs createallsubdirs
 
-; Documentation
-;Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
-; Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
@@ -75,11 +85,6 @@ Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
 Type: filesandordirs; Name: "{userappdata}\Mechvibes"
 
 [Code]
-function InitializeSetup(): Boolean;
-begin
-  Result := True;
-end;
-
 procedure RefreshIconCache();
 var
   ResultCode: Integer;
