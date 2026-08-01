@@ -65,8 +65,11 @@ Source: "..\..\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recurses
 ; Soundpacks folder (built-in soundpacks)
 Source: "..\..\soundpacks\*"; DestDir: "{app}\soundpacks"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Data folder (default config files) - only if doesn't exist to preserve user data
-Source: "..\..\data\*"; DestDir: "{app}\data"; Flags: ignoreversion onlyifdoesntexist recursesubdirs createallsubdirs
+; No [Files] entry for data/ - it's not part of the source tree (config.json,
+; manifest.json, etc. are runtime state, not shipped defaults). The app
+; creates data/ itself on first run and falls back to defaults for any
+; missing file (see AppConfig::load() in src/state/config.rs), so nothing
+; needs to be bundled here.
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0
