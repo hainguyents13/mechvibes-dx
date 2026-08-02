@@ -83,6 +83,30 @@ fn load_icon() -> Option<dioxus::desktop::tao::window::Icon> {
 }
 
 fn main() {
+    // Input worker mode: this must be the very first thing main() does. The
+    // worker shares this executable but must never touch app state, the
+    // tray, config or the Dioxus runtime - it only registers Raw Input and
+    // streams events to the parent over stdout. See input_worker.rs.
+    #[cfg(target_os = "windows")]
+    if std::env::args().any(|arg| arg == libs::input_worker::WORKER_ARG) {
+        libs::input_worker::run();
+        return;
+    }
+
+    // Refuse to start a second copy: two instances means two input listeners
+    // and two audio engines, so every keystroke would play twice. Claimed
+    // after the worker branch above on purpose - the worker is a child of an
+    // instance that already holds this lock and must not be turned away.
+    // Held for the whole run; Windows releases it when this process dies.
+    #[cfg(target_os = "windows")]
+    let _instance_guard = match libs::single_instance::acquire() {
+        Some(guard) => guard,
+        None => {
+            always_eprint!("⚠️ {} is already running - exiting this instance", APP_NAME);
+            return;
+        }
+    };
+
     // Initialize debug logging first
     utils::logger::init_debug_logging();
 
@@ -191,9 +215,39 @@ fn main() {
         }
     }
 
-    // Windows + macOS: hybrid approach (rdev + device_query) - rdev handles
-    // keyboard when unfocused, device_query when focused.
-    #[cfg(not(target_os = "linux"))]
+    // Windows: capture runs in a separate worker process using Raw Input, so
+    // events arrive regardless of which window has focus. It cannot run in
+    // this process - tao/wry takes the process-wide Raw Input registration
+    // once the webview is built (see rawinput_listener.rs). If the worker
+    // can't be kept alive we fall back to the rdev + device_query hybrid
+    // below, which works while unfocused only.
+    #[cfg(target_os = "windows")]
+    {
+        let fallback_keyboard_tx = keyboard_tx.clone();
+        let fallback_mouse_tx = mouse_tx.clone();
+        let fallback_hotkey_tx = hotkey_tx.clone();
+
+        debug_print!("🎮 Starting Raw Input worker process...");
+        libs::input_worker_host::start_input_worker_host(
+            keyboard_tx,
+            mouse_tx,
+            hotkey_tx,
+            Box::new(move || {
+                let focus_state = get_window_focus_state();
+                start_unified_input_listener(
+                    fallback_keyboard_tx.clone(),
+                    fallback_mouse_tx,
+                    fallback_hotkey_tx,
+                    Some(focus_state.clone())
+                );
+                start_focused_keyboard_listener(fallback_keyboard_tx, focus_state);
+            })
+        );
+    }
+
+    // macOS: hybrid approach (rdev + device_query) - rdev handles keyboard
+    // when unfocused, device_query when focused.
+    #[cfg(target_os = "macos")]
     {
         let focus_state = get_window_focus_state();
 

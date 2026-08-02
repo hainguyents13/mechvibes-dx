@@ -62,6 +62,10 @@ winapi = { version = "0.3", features = [
   "devguid",
   "cfgmgr32",
   "winreg",
+  "libloaderapi",
+  "errhandlingapi",
+  "synchapi",
+  "handleapi",
 ] }
 
 

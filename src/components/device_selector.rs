@@ -13,6 +13,15 @@ pub enum DeviceType {
     Mouse,
 }
 
+/// Tells the Windows input worker host to reload its enabled-device filter,
+/// so toggling a keyboard/mouse here takes effect immediately instead of on
+/// the next app start. No-op elsewhere: on Linux/macOS the listeners read
+/// the filter themselves.
+fn notify_input_filter_changed() {
+    #[cfg(target_os = "windows")]
+    crate::libs::input_worker_host::notify_config_changed();
+}
+
 #[derive(Props, Clone, PartialEq)]
 pub struct DeviceSelectorProps {
     device_type: DeviceType,
@@ -205,6 +214,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                             }
                         })
                     );
+                    notify_input_filter_changed();
                 }
                 DeviceType::Mouse => {
                     let device_id_clone = device_id.clone();
@@ -217,6 +227,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                             }
                         })
                     );
+                    notify_input_filter_changed();
                 }
             }
         })

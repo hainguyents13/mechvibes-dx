@@ -15,5 +15,18 @@ pub mod window_manager;
 #[cfg(target_os = "linux")]
 pub mod evdev_input_listener;
 
+// Windows input worker: Raw Input capture runs in a separate process
+// (`input_worker`, driven by `rawinput_listener`) because tao/wry claims the
+// process-wide Raw Input registration in the UI process. The UI side spawns
+// and reads it via `input_worker_host`.
+#[cfg(target_os = "windows")]
+pub mod input_worker;
+#[cfg(target_os = "windows")]
+pub mod input_worker_host;
+#[cfg(target_os = "windows")]
+pub mod rawinput_listener;
+#[cfg(target_os = "windows")]
+pub mod single_instance;
+
 // Re-export main audio types
 pub use audio::AudioContext;
