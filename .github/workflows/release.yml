@@ -397,6 +397,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          name: "MechvibesDX ${{ needs.windows-build.outputs.app_version }}"
+          # Plain "vX.Y.Z" title by user preference (260803) - the repo name
+          # already says what the project is.
+          name: "v${{ needs.windows-build.outputs.app_version }}"
           body_path: notes.md
           files: release/*
