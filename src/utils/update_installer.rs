@@ -353,17 +353,18 @@ pub fn discard_staged(staged: &StagedUpdate) {
 /// Arguments handed to the Inno Setup installer for an unattended upgrade.
 ///
 /// `/NORESTART` matters: without it Inno may reboot the machine when it thinks
-/// a locked file requires it. The app relaunch is handled by `/RESTARTAPPLICATIONS`
-/// together with `CloseApplications=yes` in the `.iss`, which records the
-/// running app before shutting it down and starts it again afterwards - the
-/// `[Run]` entry is marked `skipifsilent` and therefore does NOT fire here.
+/// a locked file requires it.
+///
+/// `/RESTARTAPPLICATIONS` is deliberately NOT passed. It asks Restart Manager
+/// to revive the apps it closed, but RM can only revive processes that called
+/// the Windows `RegisterApplicationRestart` API, and this app never does - a
+/// /LOG trace of a real silent install shows RM logging "Attempting to restart
+/// applications" and nothing coming back. Passing it advertised a guarantee
+/// that did not exist and invited the `.iss` to be written as though the
+/// relaunch were covered. The relaunch comes from the silent-only `[Run]`
+/// entry in `installer/windows/mechvibes-dx-setup.iss` - one path, verified.
 #[cfg(target_os = "windows")]
-pub const INSTALLER_SILENT_ARGS: [&str; 4] = [
-    "/VERYSILENT",
-    "/SUPPRESSMSGBOXES",
-    "/NORESTART",
-    "/RESTARTAPPLICATIONS",
-];
+pub const INSTALLER_SILENT_ARGS: [&str; 3] = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"];
 
 /// Spawns the installer detached and returns once it is running.
 ///

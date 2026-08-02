@@ -561,8 +561,9 @@ pub fn restore_staged_update() {
 /// The caller must then close the app. The input worker child process needs no
 /// separate signal: it exits on stdin EOF as soon as our handles close (see
 /// `input_worker.rs`), so no orphan survives. Inno's `CloseApplications=yes`
-/// plus `/RESTARTAPPLICATIONS` closes anything still holding the binary and
-/// starts the app again once files are in place.
+/// closes anything still holding the binary, and the silent-only `[Run]` entry
+/// in the `.iss` starts the app again once the files are in place - that entry
+/// is the single relaunch path, verified against a real /LOG trace.
 ///
 /// Returns an error without touching the app's lifecycle if anything fails, so
 /// a blocked or missing installer leaves the user exactly where they were.

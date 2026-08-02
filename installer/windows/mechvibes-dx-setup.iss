@@ -82,27 +82,34 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 ; Interactive installs: the usual "run it now" checkbox on the last page.
-; `skipifsilent` means this does NOT fire during an auto-update, which runs
-; with /VERYSILENT and has no final page - the relaunch there comes from
-; CloseApplications + RestartApplications above (Restart Manager records the
-; running app before closing it and starts it again afterwards), which the
-; in-app updater triggers by passing /RESTARTAPPLICATIONS.
+; `skipifsilent` keeps it off the auto-update path, which has no final page.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
 
-; Silent installs (i.e. auto-update) only: this is what actually relaunches
-; the app, and it is NOT redundant with RestartApplications above.
+; Silent installs (i.e. auto-update): the ONE path that brings the app back.
 ;
-; RestartApplications only restarts processes that called the Windows
-; RegisterApplicationRestart API - verified in the Inno 6 docs for the
-; directive. MechvibesDX never calls it, so Restart Manager closes the app
-; but will not bring it back. Without this entry an auto-update would leave
-; the user with no running app and no window explaining why.
+; Do not add a `Check: not RmSessionStarted` guard here. That was tried and
+; it broke auto-update completely - the app closed and never returned. A
+; /LOG trace of a real silent install shows why:
 ;
-; `runasoriginaluser` matters because Setup may be elevated: the app has to
-; come back as the user who owns the tray/audio session, not as admin.
-; `RmSessionStarted` is guarded against so we never end up with two copies
-; running in the case where Restart Manager did handle the relaunch.
-Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser skipifnotsilent; Check: not RmSessionStarted
+;   Found 1 files to register with RestartManager.
+;   RestartManager found an application using one of our files: MechvibesDX
+;   Shutting down applications using our files.
+;   Attempting to restart applications.
+;
+; CloseApplications=yes uses Restart Manager to close us, so a session is
+; ALWAYS started and RmSessionStarted is ALWAYS true here - it says a session
+; exists, not that our app will be revived. Restart Manager only revives
+; processes that called RegisterApplicationRestart, which this app never
+; does, so "Attempting to restart applications" is a no-op for us. The guard
+; therefore skipped the only working relaunch on every single silent install.
+;
+; Double-launch is not a risk worth guarding against anyway: the app takes a
+; named single-instance mutex at startup and a second copy exits immediately
+; (src/libs/single_instance.rs, main.rs).
+;
+; `runasoriginaluser`: Setup may be elevated, but the app has to come back as
+; the user who owns the tray and audio session, not as admin.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser skipifnotsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
