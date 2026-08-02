@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.2] - 2026-08-03
+
+### Added
+
+- **One-click update install (Windows)**: when a new version is available, the Settings page now shows a "Download & install" button that downloads the installer in the background, verifies its SHA-256 checksum against the release's `SHA256SUMS.txt`, and — after you confirm — installs silently and relaunches the app. Nothing is downloaded until you click, and choosing "Later" keeps the verified download ready for next time. If anything fails (offline, checksum mismatch, older release without checksums), the button falls back to opening the download page as before.
+- **Linux `.deb` package**: releases now include an installable Debian/Ubuntu package. Note: it does not add your user to the `input` group — run `sudo usermod -a -G input $USER` and re-log once after installing.
+- **macOS build (experimental)**: an unsigned, untested arm64 build now ships with each release for adventurous testers; see the bundled README for Gatekeeper and Accessibility steps.
+- Releases now include a `SHA256SUMS.txt` covering every asset.
+
+### Changed
+
+- **Tray icon dims while muted**, and the tray's mute entry is now a fixed-label "Mute sounds" item with a check mark instead of swapping text. The correct state also shows immediately when the app starts already muted.
+- The update notification in the title bar now takes you to Settings instead of opening a browser download directly, so every install path goes through checksum verification.
+- On Linux and macOS, the updater no longer offers the Windows installer; it links to the releases page instead.
+
+### Fixed
+
+- Removed noisy window-focus logging and dead internal plumbing left over from the pre-worker input architecture.
+
 ## [0.6.1] - 2026-08-02
 
 ### Fixed
@@ -50,4 +69,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
