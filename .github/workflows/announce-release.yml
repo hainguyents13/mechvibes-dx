@@ -6,12 +6,22 @@ name: Announce release
 on:
   release:
     types: [published]
-  # Manual run = TEST MODE: posts a clearly-labelled test message with all
-  # pings suppressed, so the webhook + formatting can be verified without
-  # publishing a release or notifying the whole server.
+  # Manual run without a tag = TEST MODE: posts a clearly-labelled test
+  # message with all pings suppressed. Manual run WITH a tag = announce that
+  # published release for real. The manual path is not just a convenience:
+  # GitHub does not deliver `release: published` for drafts that were created
+  # with GITHUB_TOKEN (anti-recursion rule), and our drafts are created by
+  # release.yml - so publishing in the UI may fire nothing. When that
+  # happens, run: gh workflow run announce-release.yml -f tag=vX.Y.Z
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release tag to announce for real (e.g. v0.6.3). Leave empty for a ping-free test message."
+        required: false
+        type: string
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   discord:
@@ -24,7 +34,9 @@ jobs:
           # New Webhook -> copy URL, then `gh secret set DISCORD_RELEASE_WEBHOOK`.
           # A webhook URL is all this needs - no bot, no bot token.
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          IS_TEST: ${{ github.event_name == 'workflow_dispatch' }}
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_URL: ${{ github.event.release.html_url }}
           # Passed via env on purpose: release notes contain quotes/newlines/
@@ -38,10 +50,25 @@ jobs:
             exit 0
           fi
 
-          if [ "$IS_TEST" = "true" ]; then
-            RELEASE_NAME="v0.0.0-test"
-            RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases"
-            RELEASE_BODY=$'### Fixed\n\n- **This is a test announcement** fired manually from GitHub Actions — please ignore.\n- Verifies the webhook, formatting, and truncation without pinging anyone.'
+          IS_TEST=false
+          if [ "$IS_DISPATCH" = "true" ]; then
+            if [ -n "$DISPATCH_TAG" ]; then
+              # Real announcement for an already-published release. Refuses
+              # drafts so a manual typo can never leak an unreviewed build.
+              release_json=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${DISPATCH_TAG}")
+              if [ "$(echo "$release_json" | jq -r '.draft')" = "true" ]; then
+                echo "::error::Release ${DISPATCH_TAG} is still a draft - publish it first"
+                exit 1
+              fi
+              RELEASE_NAME=$(echo "$release_json" | jq -r '.name')
+              RELEASE_URL=$(echo "$release_json" | jq -r '.html_url')
+              RELEASE_BODY=$(echo "$release_json" | jq -r '.body')
+            else
+              IS_TEST=true
+              RELEASE_NAME="v0.0.0-test"
+              RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases"
+              RELEASE_BODY=$'### Fixed\n\n- **This is a test announcement** fired manually from GitHub Actions — please ignore.\n- Verifies the webhook, formatting, and truncation without pinging anyone.'
+            fi
           fi
 
           # Plain message in the Mantine-announcement style (greeting +
