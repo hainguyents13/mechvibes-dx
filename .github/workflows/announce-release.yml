@@ -33,19 +33,21 @@ jobs:
             exit 0
           fi
 
-          # Discord embed description caps at 4096 chars; truncate with a
-          # pointer to the full notes rather than failing the whole post.
+          # Plain message in the Mantine-announcement style (greeting +
+          # what's new + links), not an embed. Discord caps `content` at
+          # 2000 chars, so the notes body is trimmed to leave room for the
+          # greeting and the links footer, which must always survive.
           payload=$(jq -n \
-            --arg title "MechvibesDX $RELEASE_NAME is out" \
+            --arg name "$RELEASE_NAME" \
             --arg url "$RELEASE_URL" \
             --arg body "$RELEASE_BODY" \
-            '{
-              embeds: [{
-                title: $title,
-                url: $url,
-                description: ($body | if length > 3500 then .[:3500] + "\n\n[Full notes on GitHub](\($url))" else . end),
-                color: 5763719
-              }]
+            '
+            ("Hi @everyone, MechvibesDX \($name) is out! 🎉\n\nHere is what’s new:\n\n") as $head |
+            ("\n\n**Download & full changelog:**\n- GitHub release – \($url)\n- Or just open the app and click *Download & install* (Settings → Updates)") as $foot |
+            (2000 - ($head | length) - ($foot | length) - 10) as $room |
+            {
+              content: ($head + (if ($body | length) > $room then ($body | .[:$room]) + "\n…" else $body end) + $foot),
+              allowed_mentions: { parse: ["everyone"] }
             }')
 
           curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
