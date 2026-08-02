@@ -128,21 +128,21 @@ Windows is the only fully supported platform: installer, upgrade path, and in-ap
 
 Linux gets a working `.deb` but no automated input-group setup and no auto-update. AppImage is not built — the tooling is heavy and the legacy `scripts/build-linux-installer.sh` is unverified; it remains a roadmap item.
 
-## How in-app auto-update works (Windows)
+## How in-app update install works (Windows)
 
-Windows is the only platform with an unattended upgrade path. The flow:
+Windows is the only platform with an unattended upgrade path. **Nothing is ever downloaded automatically** — a version check only notifies, and the ~50 MB transfer starts solely when the user clicks "Download & install" in Settings. There is no auto-download setting, because downloading is already an explicit act.
 
-1. A check (at startup, or on the 24h tick) finds a newer non-prerelease tag.
-2. The app downloads `SHA256SUMS.txt` **first**. No checksums, no download — this costs one small request instead of ~50 MB that would have to be discarded.
-3. The installer streams to `%TEMP%\mechvibes-updates\<name>.exe.partial`, is verified against its digest, and only then renamed to its final name. An interrupted download can never be mistaken for a finished one.
-4. The user gets a "Restart now / Later" prompt. **Later** keeps the verified file; the prompt returns next launch (the hash is re-checked then, so a file altered in between is discarded rather than run).
-5. **Restart now** re-verifies once more, clears the staged entry from config, spawns the installer detached with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RESTARTAPPLICATIONS`, and closes the app.
+1. A check (at startup, or on the 24h tick) finds a newer non-prerelease tag and shows a badge in the title bar. The badge routes to Settings; it does **not** open the raw `.exe` in a browser, which would bypass verification.
+2. The user clicks **"Download & install vX.Y.Z"**. The button then carries the whole state machine: `Downloading new version...` → `Restart to finish update` / `Later` → `Installing...`.
+3. The app downloads `SHA256SUMS.txt` **first**. No checksums, no download — this costs one small request instead of ~50 MB that would have to be discarded.
+4. The installer streams to `%TEMP%\mechvibes-updates\<name>.exe.partial`, is verified against its digest, and only then renamed to its final name. An interrupted download can never be mistaken for a finished one.
+5. **Restart to finish update** re-verifies once more, clears the staged entry from config, spawns the installer detached with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RESTARTAPPLICATIONS`, and closes the app. **Later** keeps the verified file, so returning to the button — or restarting the app — offers the install again without downloading a second time (the hash is re-checked then, so a file altered in between is discarded rather than run).
 
 Two details in `installer/windows/mechvibes-dx-setup.iss` that the update flow depends on — do not remove them without reading this:
 
 - `CloseApplications=yes` lets Setup close the running app that holds `mechvibes-dx.exe`.
 - The second `[Run]` entry (`skipifnotsilent`, `Check: not RmSessionStarted`) is what actually **relaunches** the app after a silent install. `RestartApplications=yes` alone is not enough: per the Inno 6 docs it only restarts processes that called the Windows `RegisterApplicationRestart` API, and this app never does. Without that entry an auto-update would close the app and never bring it back.
 
-Everything in this flow fails soft. A network error, a missing `SHA256SUMS.txt`, a hash mismatch, or a blocked installer all leave the app running and fall back to the browser download button.
+Everything in this flow fails soft. A network error, a missing `SHA256SUMS.txt`, a hash mismatch, or a blocked installer all leave the app running; the button shows a short reason and an "Open download page" link, which is the pre-Phase-6 behavior.
 
 macOS is experimental: unsigned, unnotarized, and never run on real hardware by the maintainer. It ships so users can try it and report back.

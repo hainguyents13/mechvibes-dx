@@ -205,32 +205,9 @@ pub fn SettingsPage() -> Element {
               div { class: "space-y-4",
                 p { class: "text-sm text-base-content/70",
                   if crate::utils::update_installer::silent_update_supported() {
-                    "Automatic update checking runs every 24 hours. New versions download in the background and ask before restarting."
+                    "Update checking runs every 24 hours. Nothing is downloaded until you choose to install."
                   } else {
-                    "Automatic update checking runs every 24 hours in the background. Updates are installed manually from the releases page."
-                  }
-                }
-                // Progress for the staged-download flow. Absent on platforms
-                // without a silent installer, and absent on failure - in both
-                // cases the download link below is the way forward.
-                {
-                  let stage = crate::utils::auto_updater::get_update_stage();
-                  match stage {
-                    crate::utils::auto_updater::UpdateStage::Downloading { version } => rsx! {
-                      div { class: "alert alert-info alert-soft text-sm",
-                        span { class: "loading loading-spinner loading-xs mr-2" }
-                        "Downloading update v{version}..."
-                      }
-                    },
-                    crate::utils::auto_updater::UpdateStage::Ready { version, .. } => rsx! {
-                      div { class: "alert alert-success alert-soft text-sm",
-                        "Update v{version} is downloaded and verified. Restart to install."
-                      }
-                    },
-                    crate::utils::auto_updater::UpdateStage::Failed { reason, .. } => rsx! {
-                      div { class: "alert alert-warning alert-soft text-sm", "{reason}" }
-                    },
-                    crate::utils::auto_updater::UpdateStage::Idle => rsx! {},
+                    "Update checking runs every 24 hours in the background. Updates are installed manually from the releases page."
                   }
                 }
                 div { class: "flex items-center gap-3",
@@ -310,14 +287,11 @@ pub fn SettingsPage() -> Element {
                       PartyPopper { class: "w-6 h-6 mr-2" }
                       div {
                         p { "Update available: v{info.latest_version}" }
-                        div { class: "mt-2 space-x-2 text-sm",
-                          if let Some(url) = &info.download_url {
-                            a {
-                              href: "{url}",
-                              target: "_blank",
-                              class: "btn btn-sm btn-soft",
-                              "Download"
-                            }
+                        div { class: "mt-2 space-y-2 text-sm",
+                          // Owns the whole download -> verify -> restart
+                          // sequence, including its own error states.
+                          crate::components::update_button::UpdateInstallButton {
+                            info: info.clone(),
                           }
                           if let Some(release_url) = &info.release_notes {
                             a {
@@ -341,14 +315,20 @@ pub fn SettingsPage() -> Element {
                     div { class: "alert alert-success text-sm",
                       div {
                         p { "🎉 Update available: v{available_version}" }
-                        div { class: "mt-2 space-x-2",
-                          if let Some(url) = &auto_update_config().available_download_url {
-                            a {
-                              href: "{url}",
-                              target: "_blank",
-                              class: "link link-primary",
-                              "Download"
-                            }
+                        div { class: "mt-2 space-y-2",
+                          // Rebuilt from the fields the last check persisted,
+                          // so a saved update offers the same one-click
+                          // install as a freshly checked one.
+                          crate::components::update_button::UpdateInstallButton {
+                            info: UpdateInfo {
+                              current_version: current_version.to_string(),
+                              latest_version: available_version.clone(),
+                              update_available: true,
+                              download_url: auto_update_config().available_download_url.clone(),
+                              release_notes: None,
+                              published_at: None,
+                              is_prerelease: false,
+                            },
                           }
                           a {
                             href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{available_version}",

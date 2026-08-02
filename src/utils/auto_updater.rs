@@ -301,11 +301,11 @@ impl UpdateService {
                                 update_info.current_version,
                                 update_info.latest_version
                             );
-                            // Set global update state for UI notification (no UI trigger here)
-                            crate::state::app::set_update_info(Some(update_info.clone()));
-                            // Pull the installer down now so the prompt can
-                            // offer an instant restart rather than a download.
-                            stage_update_in_background(&update_info).await;
+                            // Notify only. Downloading is a deliberate user
+                            // action (the "Download & install" button in
+                            // Settings), never something a background check
+                            // starts on its own.
+                            crate::state::app::set_update_info(Some(update_info));
                         } else {
                             println!("✅ No updates available");
                             // Clear update info if no updates
@@ -407,13 +407,17 @@ fn set_update_stage(stage: UpdateStage) {
     }
 }
 
-/// Downloads and verifies the installer for `update_info` in the background.
+/// Downloads and verifies the installer for `update_info`.
 ///
-/// Safe to call whenever a check reports an update: it is a no-op on
-/// platforms without a silent installer, when an update is already staged, or
-/// when a download is already running. Never returns an error to the caller -
-/// failures land in [`UpdateStage::Failed`] and the UI degrades to a link.
-pub async fn stage_update_in_background(update_info: &UpdateInfo) {
+/// Only ever called from the "Download & install" button - nothing in the
+/// check paths starts a transfer, because a ~50 MB download is the user's
+/// decision to make, not a side effect of a background version check.
+///
+/// Idempotent: a no-op on platforms without a silent installer, when a
+/// download is already in flight, or when this version is already staged and
+/// still verifies. Never returns an error - failures land in
+/// [`UpdateStage::Failed`] and the UI falls back to the browser link.
+pub async fn download_and_stage_update(update_info: &UpdateInfo) {
     if !update_installer::silent_update_supported() {
         return;
     }
@@ -445,7 +449,8 @@ pub async fn stage_update_in_background(update_info: &UpdateInfo) {
     };
 
     // A staged installer from a previous session that still verifies is
-    // reused as-is, so "Later" never costs a second download.
+    // reused as-is, so choosing "Later" and coming back never costs a second
+    // download.
     let config = AppConfig::load();
     if let Some(staged) = &config.auto_update.staged_update {
         if let Ok(path) = staged.validate(&version) {
@@ -460,7 +465,7 @@ pub async fn stage_update_in_background(update_info: &UpdateInfo) {
     }
 
     set_update_stage(UpdateStage::Downloading { version: version.clone() });
-    println!("📥 Downloading update {} in the background...", version);
+    println!("📥 Downloading update {} (user requested)...", version);
 
     let user_agent = AutoUpdater::new().user_agent();
     match update_installer::download_and_verify(&download_url, &version, &user_agent).await {
@@ -484,7 +489,7 @@ pub async fn stage_update_in_background(update_info: &UpdateInfo) {
                     "The downloaded installer failed verification and was discarded.".to_string(),
                 other => other.to_string(),
             };
-            eprintln!("⚠️  Auto-update staging failed ({}); falling back to manual download", e);
+            eprintln!("⚠️  Update download failed ({}); falling back to manual download", e);
             set_update_stage(UpdateStage::Failed { version, reason });
         }
     }
@@ -588,15 +593,6 @@ pub fn install_staged_update() -> Result<(), StageError> {
     Ok(())
 }
 
-/// Drops a staged update at the user's request ("don't remind me / discard").
-pub fn dismiss_staged_update() {
-    let mut config = AppConfig::load();
-    if let Some(staged) = config.auto_update.staged_update.take() {
-        update_installer::discard_staged(&staged);
-        let _ = config.save();
-    }
-    set_update_stage(UpdateStage::Idle);
-}
 
 // Check if there's a saved update available in config
 pub fn get_saved_update_info() -> Option<UpdateInfo> {
@@ -707,10 +703,10 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
 
             let _ = config.save();
 
-            // Update global state
+            // Update global state. Notification only - see the note in
+            // UpdateService::start: nothing downloads without a user click.
             if update_info.update_available {
                 crate::state::app::set_update_info(Some(update_info.clone()));
-                stage_update_in_background(&update_info).await;
             } else {
                 crate::state::app::set_update_info(None);
             }
@@ -774,5 +770,68 @@ mod tests {
             AutoUpdater::releases_page_url("0.7.0"),
             "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v0.7.0"
         );
+    }
+
+    fn asset(name: &str) -> GitHubAsset {
+        GitHubAsset {
+            name: name.to_string(),
+            browser_download_url: format!("https://example.com/{}", name),
+            content_type: "application/octet-stream".to_string(),
+            size: 1,
+        }
+    }
+
+    /// The full asset list of a real release, in the order the GitHub API
+    /// returns it - the Windows installer first, which is exactly why the old
+    /// `assets[0]` fallback served .exe files to Linux and macOS.
+    fn release_assets() -> Vec<GitHubAsset> {
+        vec![
+            asset("MechvibesDX-0.7.0-Setup-x64.exe"),
+            asset("SHA256SUMS.txt"),
+            asset("mechvibes-dx-0.7.0-macos-arm64-experimental.tar.gz"),
+            asset("mechvibes-dx_0.7.0_amd64.deb")
+        ]
+    }
+
+    #[test]
+    fn picks_the_asset_this_platform_can_actually_install() {
+        let url = AutoUpdater::new().find_download_url(&release_assets());
+
+        #[cfg(target_os = "windows")]
+        assert_eq!(url.as_deref(), Some("https://example.com/MechvibesDX-0.7.0-Setup-x64.exe"));
+
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            url.as_deref(),
+            Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64-experimental.tar.gz")
+        );
+
+        #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+        assert_eq!(url.as_deref(), Some("https://example.com/mechvibes-dx_0.7.0_amd64.deb"));
+    }
+
+    /// The regression that mattered: no platform may ever be handed a
+    /// Windows installer it cannot run. Asserted for every platform rather
+    /// than only the one being compiled, via the filename that comes back.
+    #[test]
+    fn never_offers_a_windows_installer_to_a_non_windows_build() {
+        let url = AutoUpdater::new().find_download_url(&release_assets()).unwrap_or_default();
+        if !cfg!(target_os = "windows") {
+            assert!(!url.ends_with(".exe"), "non-Windows build was offered {}", url);
+        }
+    }
+
+    /// A release with no asset for this platform must yield None so the UI
+    /// shows a link to the release page, rather than falling back to whatever
+    /// asset happened to be listed first.
+    #[test]
+    fn returns_none_when_no_asset_suits_this_platform() {
+        let assets = vec![asset("SHA256SUMS.txt"), asset("source-code.zip")];
+        assert_eq!(AutoUpdater::new().find_download_url(&assets), None);
+    }
+
+    #[test]
+    fn returns_none_for_a_release_with_no_assets_at_all() {
+        assert_eq!(AutoUpdater::new().find_download_url(&[]), None);
     }
 }

@@ -38,10 +38,6 @@ pub fn TitleBar() -> Element {
         window_minimize.set_minimized(true);
     };
     rsx! {
-      // Lives here rather than on a page so the "update ready" prompt is
-      // reachable from anywhere in the app; it renders nothing unless a
-      // verified installer is actually waiting.
-      crate::components::update_prompt::UpdatePrompt {}
       div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300/70 to-transparent backdrop-blur-sm transition-all ",
       // Left side - app title and draggable area
         div {
@@ -66,24 +62,13 @@ pub fn TitleBar() -> Element {
                 "data-tip": "New version {update.latest_version} available!",
                 button {
                   class: "btn btn-success btn-xs",
-                  onclick: {
-                    // On Windows this is the direct installer; elsewhere
-                    // find_download_url returns None (no in-place upgrade
-                    // path exists) and we send the user to the release page
-                    // rather than handing them an unusable .exe.
-                    let url = update.download_url.clone().unwrap_or_else(|| {
-                      crate::utils::auto_updater::AutoUpdater::releases_page_url(
-                        &update.latest_version,
-                      )
-                    });
-                    move |_| {
-                      println!("🔗 Opening update URL: {}", url);
-                      if let Err(e) = open::that(&url) {
-                        eprintln!("Failed to open URL: {}", e);
-                      } else {
-                        println!("✅ Successfully opened URL: {}", url);
-                      }
-                    }
+                  // Notification only: this routes to Settings, where the
+                  // single install control lives. It deliberately no longer
+                  // opens the raw .exe in a browser - that would bypass the
+                  // SHA256 verification the in-app path performs, and on
+                  // Linux/macOS there is no installable asset to open at all.
+                  onclick: move |_| {
+                    navigator().push(crate::libs::routes::Route::Settings {});
                   },
                   Download { class: "w-3 h-3" }
                   "{update.latest_version}"
