@@ -142,6 +142,11 @@ fn main() {
     state::app::init_app_state();
     state::app::init_update_state();
 
+    // Drop an update record left by an older build that has since been
+    // installed - otherwise the app advertises an update to the version it
+    // is already running until the next check happens to go through.
+    utils::auto_updater::clear_stale_available_version();
+
     // Pick up an installer staged by a previous session ("Later"). Re-hashes
     // the file before trusting it, and drops it if the app has since been
     // updated some other way.

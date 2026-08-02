@@ -594,34 +594,69 @@ pub fn install_staged_update() -> Result<(), StageError> {
 }
 
 
-// Check if there's a saved update available in config
+/// The saved update from config, but **only** if it is genuinely newer than
+/// the running build.
+///
+/// This is the single read path for `auto_update.available_version`, and it
+/// must stay that way. The config file on disk is untrusted input: version
+/// 0.6.1 records "0.6.2 is available", the user upgrades to 0.6.2 by any
+/// route that does not go through a check (a manual download, the installer,
+/// a reinstall), and that stale line now describes an update to the very
+/// version already running. The write paths do clear it, but they only run
+/// when a check actually reaches the network - and the startup check is
+/// rate-limited to once an hour, so there is a window where nothing clears
+/// anything. Filtering on read closes that window regardless of what the
+/// file says.
+///
+/// Comparison is semver, never string equality: "0.10.0" > "0.9.0" is only
+/// true numerically.
 pub fn get_saved_update_info() -> Option<UpdateInfo> {
     let config = crate::state::config::AppConfig::load();
-    if let Some(available_version) = &config.auto_update.available_version {
-        let current_version = crate::utils::constants::APP_VERSION;
+    let available_version = config.auto_update.available_version.as_ref()?;
+    let current_version = crate::utils::constants::APP_VERSION;
 
-        // Check if saved version is newer than current version
-        if
-            let (Ok(current), Ok(available)) = (
-                Version::parse(current_version),
-                Version::parse(available_version),
-            )
-        {
-            if available > current {
-                return Some(UpdateInfo {
-                    current_version: current_version.to_string(),
-                    latest_version: available_version.clone(),
-                    update_available: true,
-                    download_url: config.auto_update.available_download_url.clone(),
-                    release_notes: Some(AutoUpdater::releases_page_url(available_version)),
-                    published_at: None, // Not saved in config
-                    is_prerelease: false, // Not saved in config
-                });
-            }
-        }
+    if !is_upgrade(current_version, available_version) {
+        return None;
     }
 
-    None
+    Some(UpdateInfo {
+        current_version: current_version.to_string(),
+        latest_version: available_version.clone(),
+        update_available: true,
+        download_url: config.auto_update.available_download_url.clone(),
+        release_notes: Some(AutoUpdater::releases_page_url(available_version)),
+        published_at: None, // Not saved in config
+        is_prerelease: false, // Not saved in config
+    })
+}
+
+/// Drops a saved update that is no longer newer than the running build.
+///
+/// The companion to the read-side filter: without this, a stale entry stays
+/// in `config.json` forever, invisibly, and any future code that reads the
+/// field directly would resurrect the bug. Called at startup, so upgrading
+/// by any means cleans the record up once rather than on every read.
+///
+/// Returns whether anything was cleared, which the tests assert on.
+pub fn clear_stale_available_version() -> bool {
+    let mut config = AppConfig::load();
+    let Some(available_version) = config.auto_update.available_version.clone() else {
+        return false;
+    };
+
+    if is_upgrade(crate::utils::constants::APP_VERSION, &available_version) {
+        return false;
+    }
+
+    println!(
+        "🧹 Clearing stale update record: v{} is not newer than the running v{}",
+        available_version,
+        crate::utils::constants::APP_VERSION
+    );
+    config.auto_update.available_version = None;
+    config.auto_update.available_download_url = None;
+    let _ = config.save();
+    true
 }
 
 // Check for updates on app startup (when app was completely closed)
@@ -833,5 +868,68 @@ mod tests {
     #[test]
     fn returns_none_for_a_release_with_no_assets_at_all() {
         assert_eq!(AutoUpdater::new().find_download_url(&[]), None);
+    }
+
+    /// Decides whether a saved `available_version` may be shown, given the
+    /// running build. Extracted so the rule can be tested against arbitrary
+    /// version pairs - `get_saved_update_info` itself is pinned to the real
+    /// `APP_VERSION` and the on-disk config, neither of which a unit test
+    /// should mutate.
+    fn saved_update_is_showable(current: &str, saved: &str) -> bool {
+        is_upgrade(current, saved)
+    }
+
+    /// The exact bug a user hit on 0.6.2: an older build had written
+    /// "0.6.2 is available" into config, the user upgraded to 0.6.2 outside
+    /// the update flow, and Settings then offered an update to the version
+    /// already running.
+    #[test]
+    fn a_saved_update_equal_to_the_running_version_is_never_offered() {
+        assert!(!saved_update_is_showable("0.6.2", "0.6.2"));
+    }
+
+    #[test]
+    fn a_saved_update_older_than_the_running_version_is_never_offered() {
+        // Reinstalling an older build must not make the app offer to
+        // "update" backwards either.
+        assert!(!saved_update_is_showable("0.6.2", "0.6.1"));
+        assert!(!saved_update_is_showable("1.0.0", "0.9.9"));
+    }
+
+    #[test]
+    fn a_saved_update_newer_than_the_running_version_is_still_offered() {
+        // The fix must not break the case the feature exists for.
+        assert!(saved_update_is_showable("0.6.2", "0.6.3"));
+        assert!(saved_update_is_showable("0.6.2", "0.7.0"));
+    }
+
+    /// String comparison would rank "0.9.0" above "0.10.0"; semver does not.
+    #[test]
+    fn version_comparison_is_numeric_not_lexicographic() {
+        assert!(saved_update_is_showable("0.9.0", "0.10.0"));
+        assert!(!saved_update_is_showable("0.10.0", "0.9.0"));
+    }
+
+    /// A config written by a future build, or hand-edited, must not crash or
+    /// be treated as an update.
+    #[test]
+    fn a_malformed_saved_version_is_never_offered() {
+        assert!(!saved_update_is_showable("0.6.2", "not-a-version"));
+        assert!(!saved_update_is_showable("0.6.2", ""));
+    }
+
+    /// The clearing rule used by `clear_stale_available_version`: an entry is
+    /// dropped exactly when it is not an upgrade.
+    #[test]
+    fn the_clear_rule_drops_stale_entries_and_keeps_real_ones() {
+        let should_clear = |current: &str, saved: &str| !is_upgrade(current, saved);
+
+        // Stale: same version (the reported bug) and older versions.
+        assert!(should_clear("0.6.2", "0.6.2"));
+        assert!(should_clear("0.6.2", "0.6.1"));
+        // Junk that could never be installed.
+        assert!(should_clear("0.6.2", "garbage"));
+        // A genuine pending update must survive the cleanup.
+        assert!(!should_clear("0.6.2", "0.6.3"));
     }
 }

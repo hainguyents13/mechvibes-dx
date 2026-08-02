@@ -310,28 +310,21 @@ pub fn SettingsPage() -> Element {
                     }
                   }
                 } else {
-                  // Check if there's a saved update in config even if not in current state
-                  if let Some(available_version) = &auto_update_config().available_version {
+                  // A saved update from a previous session. Read through
+                  // get_saved_update_info(), never straight off the config:
+                  // it drops any entry that is not actually newer than the
+                  // running build. Reading the raw field here is what once
+                  // made an upgraded app advertise an update to itself.
+                  if let Some(saved) = crate::utils::auto_updater::get_saved_update_info() {
                     div { class: "alert alert-success text-sm",
                       div {
-                        p { "🎉 Update available: v{available_version}" }
+                        p { "🎉 Update available: v{saved.latest_version}" }
                         div { class: "mt-2 space-y-2",
-                          // Rebuilt from the fields the last check persisted,
-                          // so a saved update offers the same one-click
-                          // install as a freshly checked one.
                           crate::components::update_button::UpdateInstallButton {
-                            info: UpdateInfo {
-                              current_version: current_version.to_string(),
-                              latest_version: available_version.clone(),
-                              update_available: true,
-                              download_url: auto_update_config().available_download_url.clone(),
-                              release_notes: None,
-                              published_at: None,
-                              is_prerelease: false,
-                            },
+                            info: saved.clone(),
                           }
                           a {
-                            href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{available_version}",
+                            href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{saved.latest_version}",
                             target: "_blank",
                             class: "link link-secondary",
                             "View Release Notes"
