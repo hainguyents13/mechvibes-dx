@@ -7,6 +7,20 @@ How to ship a new Windows release of MechvibesDX, end to end.
 - Rust toolchain (`rustup`) and Cargo on `PATH`.
 - [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed, for local installer builds. CI installs it automatically via `choco install innosetup`.
 - Push access to `main` and permission to create tags on the repo.
+- Activate the repo's local quality gates (versioned git hooks):
+
+  ```powershell
+  git config core.hooksPath .githooks
+  ```
+
+## Local gates (every commit and push)
+
+The `.githooks/` hooks enforce that nothing broken leaves your machine:
+
+- **pre-commit** runs `cargo check` — the tree must compile before any commit.
+- **pre-push** runs `cargo test` — the full suite must pass before anything reaches origin (mirrors the CI smoke gate, so a red push never wastes a CI run or lands on another session's clone).
+
+`--no-verify` bypasses them in an emergency, but CI runs the same gates on release tags, so a bypassed failure only postpones the red light.
 
 ## Release steps
 
