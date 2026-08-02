@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.3] - 2026-08-03
+
+### Fixed
+
+- **The app no longer offers an update to the version you are already running.** A version recorded before a manual upgrade could linger and make the app advertise itself as an update; the saved value is now cleared at startup and every update prompt double-checks the version before showing anything.
+- **The app now relaunches itself after a one-click update.** Previously "Restart to finish update" closed the app and the freshly installed version never started — an over-cautious installer guard was skipping the relaunch step. Verified end to end: close, silent install, automatic restart.
+
 ## [0.6.2] - 2026-08-03
 
 ### Added
@@ -69,5 +76,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
 
