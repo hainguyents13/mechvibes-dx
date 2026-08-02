@@ -190,8 +190,8 @@ pub fn SettingsPage() -> Element {
                 // Audio Output Device
                 AudioOutputSelector {}
                 // Device Information
-                div { class: "text-xs mt-2 text-base-content font-bold",
-                  "* Restart the application for changes to take effect"
+                div { class: "text-xs mt-2 text-base-content/70",
+                  "Device changes apply immediately — no restart needed. If audio ever stops working (e.g. after unplugging a device), restarting the app can help."
                 }
               }
             },

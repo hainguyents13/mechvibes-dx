@@ -7,6 +7,7 @@ pub mod input_manager;
 pub mod protocol;
 pub mod routes;
 pub mod theme;
+pub mod trace;
 pub mod tray;
 pub mod tray_service;
 pub mod ui;

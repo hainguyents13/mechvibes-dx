@@ -320,6 +320,10 @@ fn pump_worker(
             continue;
         };
 
+        if event.kind == 'K' {
+            crate::libs::trace::record(crate::libs::trace::Point::WorkerSend, event.code, 0.0);
+        }
+
         let sent = match event.kind {
             'K' => keyboard_tx.send(wire),
             _ => mouse_tx.send(wire),

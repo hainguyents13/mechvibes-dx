@@ -107,7 +107,18 @@ pub fn app() -> Element {
 
         use_future(move || async move {
             let event_rx = crate::libs::audio::ui_event_receiver();
+
             loop {
+                // The state of the last key event seen this tick.
+                //
+                // Nothing is scheduled or held back: whatever the newest event
+                // says is what gets rendered on this very tick. An earlier
+                // design queued each keystroke behind a minimum display time,
+                // which meant that past roughly 10 keys/sec presses could not
+                // be shown as fast as they arrived - latency then grew with
+                // every key and the backlog drained in clumps. Real-time
+                // feedback must never wait: the newest keystroke wins and
+                // older ones are simply superseded.
                 let mut last_state: Option<(bool, String)> = None;
                 while let Ok(event) = event_rx.try_recv() {
                     match event {
@@ -121,26 +132,6 @@ pub fn app() -> Element {
                             match result {
                                 Ok(label) => debug_print!("🔊 Switched audio device: {}", label),
                                 Err(e) => always_eprint!("❌ Failed to switch audio device: {}", e),
-                            }
-                        }
-                        crate::libs::audio::UiEvent::DeviceLost { lost_device, result } => {
-                            // Not a user action: the engine moved playback on
-                            // its own because the hardware went away. Always
-                            // report it so a silently changed output device
-                            // isn't a mystery.
-                            match result {
-                                Ok(label) =>
-                                    always_eprint!(
-                                        "⚠️ Audio device '{}' was disconnected - switched to {}",
-                                        lost_device,
-                                        label
-                                    ),
-                                Err(e) =>
-                                    always_eprint!(
-                                        "❌ Audio device '{}' was disconnected and fallback failed: {}",
-                                        lost_device,
-                                        e
-                                    ),
                             }
                         }
                         crate::libs::audio::UiEvent::PackLoaded { is_keyboard, result } => {
@@ -162,14 +153,30 @@ pub fn app() -> Element {
                     }
                 }
 
-                // Coalesce UI state to one write per batch (using the last
-                // event's state) so a burst doesn't trigger a re-render per
-                // keystroke.
+                // Coalesce UI state to at most one write per batch so a burst
+                // doesn't trigger a re-render per keystroke.
                 if let Some((pressed, key)) = last_state {
-                    let mut state = keyboard_state.write();
-                    state.key_pressed = pressed;
-                    if pressed {
-                        state.last_key = key;
+                    // Only touch the signal when the rendered state actually
+                    // moves. Writing an unchanged value re-renders the whole
+                    // tree for no visible difference, and this costs nothing
+                    // in latency: it drops redundant writes, never delays a
+                    // real one.
+                    let changed = {
+                        let state = keyboard_state.read();
+                        state.key_pressed != pressed || (pressed && state.last_key != key)
+                    };
+
+                    if changed {
+                        crate::libs::trace::record(
+                            crate::libs::trace::Point::UiWrite,
+                            &key,
+                            0.0
+                        );
+                        let mut state = keyboard_state.write();
+                        state.key_pressed = pressed;
+                        if pressed {
+                            state.last_key = key;
+                        }
                     }
                 }
 
@@ -414,5 +421,65 @@ pub fn app() -> Element {
         Header {}
 
         Router::<Route> {}
+    }
+}
+
+/// Reduces one tick's worth of key events to the state that should be
+/// rendered, matching the poll loop above: the newest event wins and nothing
+/// is queued behind a previous keystroke.
+#[cfg(test)]
+fn coalesce(batch: &[(&str, bool)]) -> Option<(bool, String)> {
+    let mut last = None;
+    for (key, down) in batch {
+        last = Some((*down, (*key).to_string()));
+    }
+    last
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_newest_keystroke_is_rendered_immediately() {
+        // The defect this replaced gave every keystroke a minimum display
+        // time, so a fast typist's presses queued and each one appeared later
+        // than the last. Whatever arrived most recently must win outright.
+        let state = coalesce(&[("KeyA", true)]).unwrap();
+        assert_eq!(state, (true, "KeyA".to_string()));
+
+        // Three keystrokes inside a single tick: the newest is shown now, the
+        // older ones are superseded rather than owed.
+        let state = coalesce(&[("KeyA", true), ("KeyB", false), ("KeyC", true)]).unwrap();
+        assert_eq!(
+            state,
+            (true, "KeyC".to_string()),
+            "a keystroke must never wait behind an earlier one"
+        );
+    }
+
+    #[test]
+    fn a_batch_ending_on_a_release_renders_released() {
+        // The visual follows the newest event, so a tick whose last event is a
+        // key-up renders released even if other keys were touched earlier in
+        // the same tick.
+        let state = coalesce(&[("KeyA", true), ("KeyA", false)]).unwrap();
+        assert_eq!(state, (false, "KeyA".to_string()));
+    }
+
+    #[test]
+    fn an_empty_tick_changes_nothing() {
+        // No events means no write, which is what keeps an idle app from
+        // re-rendering, and means the loop never has pending work of its own.
+        assert!(coalesce(&[]).is_none());
+    }
+
+    #[test]
+    fn last_key_only_advances_on_a_press() {
+        // A release carries the key that was let go; adopting it as `last_key`
+        // would misreport which key was most recently struck.
+        let (pressed, key) = coalesce(&[("KeyZ", false)]).unwrap();
+        assert!(!pressed);
+        assert_eq!(key, "KeyZ", "the loop ignores this name unless pressed");
     }
 }

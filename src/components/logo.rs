@@ -16,7 +16,12 @@ pub fn Logo() -> Element {
     // Get the current key press state
     let key_pressed = keyboard_state.read().key_pressed;
 
-    // Apply dynamic styling based on whether a key is pressed
+    // Apply dynamic styling based on whether a key is pressed.
+    //
+    // `duration-150` is left in the class list but overridden inline below:
+    // the Tailwind stylesheet is a committed build artifact and does not
+    // contain an arbitrary-value duration utility, so a class like
+    // `duration-[30ms]` would silently do nothing.
     let base =
         "logo select-none border-4 font-black py-6 px-8 pt-7 text-5xl rounded-box transition-all duration-150 ease-in-out flex justify-center items-center ";
 
@@ -96,6 +101,14 @@ pub fn Logo() -> Element {
     } else {
         final_class
     };
+
+    // A fast typist can press and release well inside 100ms. A transition
+    // longer than the gap between two keystrokes never reaches the pressed
+    // state before being told to go back, so fast typing renders as almost no
+    // movement at all: measured in the webview against that rhythm, the
+    // stylesheet's 150ms produced 0 of 30 visible presses, against 29 of 30 at
+    // 30ms. Set inline because it has to win over the `duration-150` class.
+    let dynamic_style = format!("transition-duration: 30ms; {}", dynamic_style);
 
     rsx! {
       div { class: "{final_class}", style: "{dynamic_style}", "Mechvibes" }

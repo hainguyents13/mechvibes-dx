@@ -1,5 +1,4 @@
 use crossbeam_channel::{ unbounded, Receiver, Sender };
-use cpal::traits::DeviceTrait;
 use rodio::buffer::SamplesBuffer;
 use rodio::{ OutputStream, OutputStreamHandle, Sink };
 use std::collections::HashMap;
@@ -13,25 +12,6 @@ const FADE_IN_MS: f32 = 2.0;
 const FADE_OUT_MS: f32 = 5.0;
 const EVICT_RAMP_MS: u64 = 10;
 const MAX_VOICES: usize = 32;
-
-/// How often the engine loop checks that the active output device is still
-/// present - see `run_engine`, which fires this on an absolute deadline so
-/// heavy input cannot starve it.
-///
-/// Kept at 1s so that 2 strikes still detect an unplug within the ~3s the
-/// plan calls for. This is affordable because the check short-circuits at
-/// ~10ms while the device is present (see
-/// `DeviceManager::has_output_device_named`) - roughly 1% of one thread.
-/// It was only expensive before that probe existed, when every tick ran the
-/// UI-facing enumeration and blocked this thread for ~1.5s.
-const DEVICE_WATCHDOG_INTERVAL: Duration = Duration::from_millis(1000);
-
-/// Consecutive watchdog checks that must report the active device missing
-/// before falling back to default. Two checks (~2s) ride out the transient
-/// window where an audio driver re-enumerates devices (mode switch, power
-/// state change) without the hardware actually being gone, which would
-/// otherwise cause a spurious switch away from a device the user picked.
-const DEVICE_MISSING_STRIKES: u32 = 2;
 
 /// (samples, channels, sample_rate) for a decoded/resampled audio buffer.
 type DecodedAudio = (Arc<Vec<f32>>, u16, u32);
@@ -68,14 +48,6 @@ pub enum UiEvent {
     KeyDown(String),
     KeyUp(String),
     DeviceSwitched(Result<String, String>),
-    /// The active output device disappeared (unplugged/disabled) and the
-    /// engine moved playback to the system default on its own. Carries the
-    /// name of the device that went away plus the fallback result, so the UI
-    /// can tell the user why their selection changed without being asked.
-    DeviceLost {
-        lost_device: String,
-        result: Result<String, String>,
-    },
     PackLoaded {
         is_keyboard: bool,
         result: Result<String, String>,
@@ -149,7 +121,6 @@ pub(super) struct EngineState {
     pub(super) stream_handle: OutputStreamHandle,
     device_manager: DeviceManager,
     current_device_id: Option<String>,
-    device_watchdog: DeviceWatchdog,
     pub(super) device_rate: Option<u32>,
 
     pub(super) keyboard_samples: Option<DecodedAudio>,
@@ -171,87 +142,21 @@ pub(super) struct EngineState {
     mouse_sound_enabled: bool,
 }
 
-/// Tracks whether the device the engine is currently playing on is still
-/// present, and decides when that warrants falling back to the default.
-///
-/// Split out from `EngineState` and kept free of any audio/cpal types so the
-/// decision rule is unit-testable without hardware: `run_engine` only feeds
-/// it the answer to "is the active device still in the device list?".
-#[derive(Default)]
-struct DeviceWatchdog {
-    /// Device name (not id) the engine is playing on. `None` means the engine
-    /// is on the system default, where there is nothing to watch: the OS
-    /// already moves the default for us when hardware disappears.
-    ///
-    /// Name rather than id is deliberate. `DeviceManager` ids are positional
-    /// (`output_{index}`) into a live enumeration, so unplugging a device
-    /// shifts every later device's id down one. Watching an id would silently
-    /// start watching a *different* physical device after any removal, and
-    /// the check would keep reporting "present" while the user's audio had
-    /// actually moved elsewhere.
-    watched_name: Option<String>,
-    consecutive_misses: u32,
-}
-
-impl DeviceWatchdog {
-    /// Points the watchdog at whatever device the engine just opened.
-    /// `None` (system default) disarms it.
-    fn watch(&mut self, device_name: Option<String>) {
-        self.watched_name = device_name;
-        self.consecutive_misses = 0;
-    }
-
-    fn is_armed(&self) -> bool {
-        self.watched_name.is_some()
-    }
-
-    /// Records one observation. `present` is whether the watched device was
-    /// found in the current enumeration. Returns the device name to fall back
-    /// from once it has been missing `DEVICE_MISSING_STRIKES` checks in a row.
-    ///
-    /// Returns `Some` exactly once per disappearance: it disarms itself so a
-    /// failed fallback cannot re-trigger every tick.
-    fn observe(&mut self, present: bool) -> Option<String> {
-        let watched = self.watched_name.as_ref()?;
-
-        if present {
-            self.consecutive_misses = 0;
-            return None;
-        }
-
-        self.consecutive_misses += 1;
-        if self.consecutive_misses < DEVICE_MISSING_STRIKES {
-            return None;
-        }
-
-        let lost = watched.clone();
-        // Disarm: the engine is about to move to the default device, and a
-        // fallback that fails must not spin retrying on every tick.
-        self.watched_name = None;
-        self.consecutive_misses = 0;
-        Some(lost)
-    }
-}
-
 /// Opens a stream for `device_id` (`None` = system default). Does NOT fall
 /// back silently - callers decide what to do on `Err` (see `switch_device`,
 /// which keeps the previous device on failure, vs `EngineState::new`, which
 /// falls back to default since there's no previous device to keep).
-///
-/// The returned name is the opened device's cpal name, used by
-/// `DeviceWatchdog` to detect the device disappearing later.
 fn open_stream(
     device_manager: &DeviceManager,
     device_id: Option<&str>
-) -> Result<(OutputStream, OutputStreamHandle, Option<String>, Option<String>), String> {
+) -> Result<(OutputStream, OutputStreamHandle, Option<String>), String> {
     match device_id {
         Some(id) => {
             match device_manager.get_output_device_by_id(id) {
                 Ok(Some(device)) => {
-                    let name = device.name().ok();
                     rodio::OutputStream
                         ::try_from_device(&device)
-                        .map(|(stream, handle)| (stream, handle, Some(id.to_string()), name))
+                        .map(|(stream, handle)| (stream, handle, Some(id.to_string())))
                         .map_err(|e| format!("Failed to open stream for device {}: {}", id, e))
                 }
                 Ok(None) => Err(format!("Device {} not found", id)),
@@ -261,7 +166,7 @@ fn open_stream(
         None => {
             rodio::OutputStream
                 ::try_default()
-                .map(|(stream, handle)| (stream, handle, None, None))
+                .map(|(stream, handle)| (stream, handle, None))
                 .map_err(|e| format!("Failed to open default audio output stream: {}", e))
         }
     }
@@ -272,7 +177,7 @@ impl EngineState {
         let device_manager = DeviceManager::new();
         let config = AppConfig::load();
 
-        let (stream, stream_handle, opened_device_id, opened_device_name) = open_stream(
+        let (stream, stream_handle, opened_device_id) = open_stream(
             &device_manager,
             config.selected_audio_device.as_deref()
         ).unwrap_or_else(|e| {
@@ -282,15 +187,11 @@ impl EngineState {
         let current_device_id = opened_device_id.or(config.selected_audio_device.clone());
         let device_rate = device_manager.get_current_output_sample_rate();
 
-        let mut device_watchdog = DeviceWatchdog::default();
-        device_watchdog.watch(opened_device_name);
-
         Self {
             stream,
             stream_handle,
             device_manager,
             current_device_id,
-            device_watchdog,
             device_rate,
             keyboard_samples: None,
             keyboard_samples_original: None,
@@ -354,7 +255,7 @@ impl EngineState {
         // On Err, `self` is left untouched entirely - the previous device
         // keeps playing, matching the "keep current sound, report error"
         // requirement (Phase 3 success criteria).
-        let (new_stream, new_handle, opened_device_id, opened_device_name) = open_stream(
+        let (new_stream, new_handle, opened_device_id) = open_stream(
             &self.device_manager,
             device_id.as_deref()
         )?;
@@ -381,37 +282,9 @@ impl EngineState {
         self.stream_handle = new_handle;
         self.device_rate = new_rate;
         self.current_device_id = opened_device_id.clone().or(device_id);
-        self.device_watchdog.watch(opened_device_name);
 
         let label = self.current_device_id.clone().unwrap_or_else(|| "System Default".to_string());
         Ok(label)
-    }
-
-    /// Falls back to the system default device when the active device
-    /// disappears (e.g. USB headset unplugged) rather than by user choice.
-    /// Called from the engine loop's watchdog tick, not from a command.
-    fn fallback_to_default(&mut self) -> Result<String, String> {
-        self.switch_device(None)
-    }
-
-    /// Whether the watched device is still present in the current
-    /// enumeration, matched by name (see `DeviceWatchdog::watched_name` for
-    /// why not by id).
-    ///
-    /// Returns `true` ("assume present") both when there is nothing to watch
-    /// and when enumeration failed outright: a host that cannot list devices
-    /// is not evidence that this particular device went away, and counting it
-    /// as a miss would fall back on a transient audio-service hiccup.
-    ///
-    /// Uses the quiet `has_output_device_named` probe rather than the
-    /// UI-facing `get_output_devices()`, which logs per device and probes
-    /// each device's config - running that on a timer spammed the log and
-    /// blocked this thread for ~1.5s per tick.
-    fn watched_device_present(&self) -> bool {
-        let Some(watched) = self.device_watchdog.watched_name.as_deref() else {
-            return true;
-        };
-        self.device_manager.has_output_device_named(watched).unwrap_or(true)
     }
 }
 
@@ -646,18 +519,26 @@ fn handle_command(state: &mut EngineState, event_tx: &Sender<UiEvent>, command: 
             state.mouse_sound_enabled = enabled;
         }
         AudioCommand::LoadKeyboardPack { soundpack_id, update_cache_on_error } => {
-            let result = super::soundpack_loader::load_keyboard_pack_into_engine(
-                state,
+            let result = crate::libs::trace::time(
+                crate::libs::trace::Point::PackLoad,
                 &soundpack_id,
-                update_cache_on_error
+                || super::soundpack_loader::load_keyboard_pack_into_engine(
+                    state,
+                    &soundpack_id,
+                    update_cache_on_error
+                )
             );
             let _ = event_tx.send(UiEvent::PackLoaded { is_keyboard: true, result });
         }
         AudioCommand::LoadMousePack { soundpack_id, update_cache_on_error } => {
-            let result = super::soundpack_loader::load_mouse_pack_into_engine(
-                state,
+            let result = crate::libs::trace::time(
+                crate::libs::trace::Point::PackLoad,
                 &soundpack_id,
-                update_cache_on_error
+                || super::soundpack_loader::load_mouse_pack_into_engine(
+                    state,
+                    &soundpack_id,
+                    update_cache_on_error
+                )
             );
             let _ = event_tx.send(UiEvent::PackLoaded { is_keyboard: false, result });
         }
@@ -666,7 +547,12 @@ fn handle_command(state: &mut EngineState, event_tx: &Sender<UiEvent>, command: 
             // playing and just report the error - don't silently fall back
             // to default (that's reserved for the device-removed case,
             // where there's no "previous" device left to keep).
-            let result = state.switch_device(device_id);
+            let label = device_id.clone().unwrap_or_else(|| "System Default".to_string());
+            let result = crate::libs::trace::time(
+                crate::libs::trace::Point::DeviceSwitch,
+                &label,
+                || state.switch_device(device_id)
+            );
             let _ = event_tx.send(UiEvent::DeviceSwitched(result));
         }
     }
@@ -700,14 +586,19 @@ fn run_engine(
         let _ = event_tx.send(UiEvent::PackLoaded { is_keyboard: false, result });
     }
 
-    // Absolute deadline for the next watchdog check. Deliberately NOT
-    // `select!`'s `default(interval)`: that arm only fires after a full
-    // interval with no channel traffic at all, so continuous typing starves
-    // it indefinitely - and "unplugged the headset while typing" is exactly
-    // the case this feature exists for. An absolute deadline fires on
-    // schedule no matter how much input is flowing.
-    let mut next_device_check = std::time::Instant::now() + DEVICE_WATCHDOG_INTERVAL;
-
+    // This loop is purely event-driven: every arm below is a channel receive,
+    // and there is no timed arm. Nothing here polls the audio device.
+    //
+    // A previous design checked once a second that the selected output device
+    // was still present, so it could fall back to the system default on an
+    // unplug. Enumerating devices costs hundreds of milliseconds per call
+    // (cpal activates each device as the list is walked), and running that on
+    // this thread - which both plays the sound and emits the UI event -
+    // stalled keystrokes by up to several seconds. That automatic fallback is
+    // gone by product decision: unplugging the selected device now simply goes
+    // quiet, the config keeps the selection, and the user reselects a device in
+    // Settings (or restarts). Manual switching via `AudioCommand::SwitchDevice`
+    // is unaffected. Do not reintroduce periodic enumeration here.
     loop {
         crossbeam_channel::select! {
             recv(cmd_rx) -> msg => {
@@ -721,7 +612,11 @@ fn run_engine(
             recv(keyboard_rx) -> msg => {
                 if let Ok(raw) = msg {
                     if let Some((code, down)) = parse_input_event(&raw) {
-                        state.handle_key_event(&code, down);
+                        crate::libs::trace::record(crate::libs::trace::Point::EngineDequeue, &code, 0.0);
+                        crate::libs::trace::time(crate::libs::trace::Point::PlayedSound, &code, || {
+                            state.handle_key_event(&code, down);
+                        });
+                        crate::libs::trace::record(crate::libs::trace::Point::UiEventSent, &code, 0.0);
                         let _ = event_tx.send(if down { UiEvent::KeyDown(code) } else { UiEvent::KeyUp(code) });
                     }
                 }
@@ -743,37 +638,6 @@ fn run_engine(
                     }
                 }
             }
-            // Wakes the loop when the watchdog is due even if no input or
-            // command arrives. `at` on an already-passed deadline fires
-            // immediately, so the check below always gets a chance to run.
-            recv(crossbeam_channel::at(next_device_check)) -> _ => {}
-        }
-
-        // Checked outside `select!` so it runs no matter which arm woke the
-        // loop - under heavy typing the input arms win every race, and a
-        // check that only ran on its own arm would never happen.
-        if std::time::Instant::now() >= next_device_check {
-            next_device_check = std::time::Instant::now() + DEVICE_WATCHDOG_INTERVAL;
-
-            // Device enumeration is comparatively expensive (and on Linux can
-            // disturb ALSA), so skip it entirely unless a specific device is
-            // being watched. On the system default there is nothing to do:
-            // the OS reassigns the default itself.
-            if state.device_watchdog.is_armed() {
-                let present = state.watched_device_present();
-                if let Some(lost_device) = state.device_watchdog.observe(present) {
-                    eprintln!(
-                        "⚠️ [AudioEngine] Output device '{}' disappeared - falling back to system default",
-                        lost_device
-                    );
-                    let result = state.fallback_to_default();
-                    match &result {
-                        Ok(label) => println!("🔊 [AudioEngine] Fell back to {}", label),
-                        Err(e) => eprintln!("❌ [AudioEngine] Fallback to default failed: {}", e),
-                    }
-                    let _ = event_tx.send(UiEvent::DeviceLost { lost_device, result });
-                }
-            }
         }
     }
 }
@@ -781,6 +645,67 @@ fn run_engine(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The engine's own source, so the assertions below are checked against
+    /// what actually ships rather than a description of it.
+    const ENGINE_SOURCE: &str = include_str!("engine.rs");
+
+    /// Everything above `mod tests`, i.e. the runtime code only. The test
+    /// module names the removed symbols in its own assertions, so searching
+    /// the whole file for them would always match.
+    fn runtime_source() -> &'static str {
+        ENGINE_SOURCE.split("#[cfg(test)]").next().expect("runtime code precedes the tests")
+    }
+
+    #[test]
+    fn the_engine_loop_never_polls_the_audio_device() {
+        // The keystroke-stall defect was a 1s timer on this loop running a
+        // device enumeration that costs hundreds of ms, delaying both the
+        // sound and the UI event behind it. The loop is now purely
+        // event-driven, and this pins that: every `select!` arm must be a
+        // channel receive, with no timed arm to hang periodic work on.
+        let loop_body = runtime_source()
+            .split("fn run_engine(")
+            .nth(1)
+            .expect("run_engine must exist");
+
+        for timed_arm in ["crossbeam_channel::at(", "crossbeam_channel::after(", "default("] {
+            assert!(
+                !loop_body.contains(timed_arm),
+                "engine loop must have no timed arm ({timed_arm}) - periodic work here \
+                 delays every keystroke behind it"
+            );
+        }
+    }
+
+    #[test]
+    fn no_device_presence_polling_remains_anywhere_in_the_engine() {
+        // The watchdog and its off-thread prober were both removed: on unplug
+        // the app goes quiet and the user reselects a device. Nothing should
+        // be enumerating devices on a timer to detect that automatically.
+        for removed in [
+            "has_output_device_named",
+            "DeviceWatchdog",
+            "DevicePresenceProber",
+            "fallback_to_default",
+            "DeviceLost",
+        ] {
+            assert!(
+                !runtime_source().contains(removed),
+                "{removed} was removed with the device watchdog and must not return"
+            );
+        }
+    }
+
+    #[test]
+    fn manual_device_switching_is_still_supported() {
+        // Removing the automatic fallback must not take user-initiated
+        // switching with it - that is the path Settings drives, and it is now
+        // the only way playback moves between devices.
+        assert!(runtime_source().contains("AudioCommand::SwitchDevice"));
+        assert!(runtime_source().contains("fn switch_device"));
+        assert!(runtime_source().contains("UiEvent::DeviceSwitched"));
+    }
 
     #[test]
     fn global_mute_silences_both_input_types() {
@@ -835,129 +760,5 @@ mod tests {
         assert!(!mouse_sound_enabled);
         assert!(!should_play(sound_enabled, keyboard_sound_enabled));
         assert!(!should_play(sound_enabled, mouse_sound_enabled));
-    }
-
-    #[test]
-    fn watchdog_disarmed_on_default_device() {
-        // System default: nothing to watch, since the OS reassigns the
-        // default itself when hardware disappears.
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(None);
-
-        assert!(!watchdog.is_armed());
-        for _ in 0..10 {
-            assert_eq!(watchdog.observe(false), None);
-        }
-    }
-
-    #[test]
-    fn watchdog_stays_quiet_while_device_present() {
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-
-        assert!(watchdog.is_armed());
-        for _ in 0..100 {
-            assert_eq!(watchdog.observe(true), None);
-        }
-    }
-
-    #[test]
-    fn watchdog_fires_after_consecutive_misses() {
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-
-        // Must not fire before the strike threshold is reached.
-        for _ in 0..DEVICE_MISSING_STRIKES - 1 {
-            assert_eq!(watchdog.observe(false), None);
-        }
-        assert_eq!(watchdog.observe(false), Some("USB Headset".to_string()));
-    }
-
-    #[test]
-    fn watchdog_ignores_single_transient_miss() {
-        // A driver re-enumerating (mode switch, power state) can blink a
-        // device out of the list for one check without it being unplugged.
-        // That must not yank the user off their chosen device.
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-
-        for _ in 0..20 {
-            assert_eq!(watchdog.observe(false), None, "single miss must not fire");
-            assert_eq!(watchdog.observe(true), None, "presence must reset strikes");
-        }
-    }
-
-    #[test]
-    fn watchdog_fires_once_per_disappearance() {
-        // Guards against a failed fallback re-triggering every tick: after
-        // firing, the watchdog disarms until something re-arms it.
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-
-        for _ in 0..DEVICE_MISSING_STRIKES {
-            watchdog.observe(false);
-        }
-        assert!(!watchdog.is_armed(), "must disarm after firing");
-        for _ in 0..10 {
-            assert_eq!(watchdog.observe(false), None, "must not fire repeatedly");
-        }
-    }
-
-    #[test]
-    fn watchdog_rearms_on_new_device() {
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-        for _ in 0..DEVICE_MISSING_STRIKES {
-            watchdog.observe(false);
-        }
-
-        // Switching to another device starts watching that one instead.
-        watchdog.watch(Some("Speakers".to_string()));
-        assert!(watchdog.is_armed());
-        for _ in 0..DEVICE_MISSING_STRIKES - 1 {
-            assert_eq!(watchdog.observe(false), None);
-        }
-        assert_eq!(watchdog.observe(false), Some("Speakers".to_string()));
-    }
-
-    #[test]
-    fn enumeration_failure_is_not_a_miss() {
-        // `has_output_device_named` returns None when the host cannot be
-        // enumerated at all. That is "no conclusion", not "device gone":
-        // treating it as a miss would fall back on a transient audio-service
-        // hiccup. This mirrors the mapping `watched_device_present` applies -
-        // flipping it to `unwrap_or(false)` would make repeated enumeration
-        // failures trigger a bogus fallback.
-        fn presence_from_probe(probe: Option<bool>) -> bool {
-            probe.unwrap_or(true)
-        }
-
-        assert!(presence_from_probe(None), "enumeration failure must count as present");
-        assert!(presence_from_probe(Some(true)));
-        assert!(!presence_from_probe(Some(false)));
-
-        let present = presence_from_probe(None);
-
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-        for _ in 0..10 {
-            assert_eq!(
-                watchdog.observe(present),
-                None,
-                "unknown device state must never trigger fallback"
-            );
-        }
-    }
-
-    #[test]
-    fn watchdog_resets_strikes_when_rewatching() {
-        // A switch mid-disappearance must not inherit the old strike count
-        // and fire early on the new device.
-        let mut watchdog = DeviceWatchdog::default();
-        watchdog.watch(Some("USB Headset".to_string()));
-        assert_eq!(watchdog.observe(false), None);
-
-        watchdog.watch(Some("Speakers".to_string()));
-        assert_eq!(watchdog.observe(false), None, "strikes must reset on rewatch");
     }
 }

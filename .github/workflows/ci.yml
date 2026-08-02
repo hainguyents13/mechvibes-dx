@@ -60,8 +60,8 @@ jobs:
         run: cargo check --locked --all-targets
 
       # Safe on a headless runner: the test suite is pure logic. The audio
-      # tests cover the DeviceWatchdog state machine and the resampler, and
-      # neither opens a device. The Windows-only tests sit behind file-level
+      # tests cover the voice pool, mute rules, and the resampler, and none
+      # of them opens a device. The Windows-only tests sit behind file-level
       # `#![cfg(target_os = "windows")]` gates, so they compile out here.
       - name: Cargo test
         run: cargo test --locked

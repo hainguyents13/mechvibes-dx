@@ -115,6 +115,11 @@ fn main() {
 
     env_logger::init();
 
+    // Opt-in latency tracing (MECHVIBES_TRACE=1). Must run before the input
+    // worker, audio engine or UI loop start, since each of those records
+    // trace points and reads the enabled flag once it is live.
+    libs::trace::init();
+
     debug_print!("🚀 Initializing {}...", APP_NAME);
 
     // Initialize app manifest first

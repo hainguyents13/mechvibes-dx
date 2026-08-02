@@ -559,7 +559,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         if !has_loaded() {
                             "ℹ️ Linux: Click refresh to load available devices. This may briefly interrupt audio playback due to ALSA device enumeration."
                         } else {
-                            "ℹ️ Linux: Device changes require app restart. Refresh button will interrupt audio playback (ALSA limitation)."
+                            "ℹ️ Linux: Refresh button will briefly interrupt audio playback (ALSA limitation)."
                         }
                     }
                 }
