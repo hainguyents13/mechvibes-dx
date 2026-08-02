@@ -1,18 +1,21 @@
 name: Announce release
 
-# Fires when a release is PUBLISHED - not when the CI creates the draft.
-# Publishing is the human approval step, so the announcement can never get
-# ahead of a build the maintainer hasn't signed off on.
+# Fires AUTOMATICALLY when a release is PUBLISHED - not when the CI creates
+# the draft. Publishing is the human approval step, so the announcement can
+# never get ahead of a build the maintainer hasn't signed off on. Verified
+# live with v0.7.0: clicking Publish posted on its own, even though the
+# draft was created by release.yml with GITHUB_TOKEN (GitHub's anti-recursion
+# rule only suppresses events *performed by* that token, and Publish is
+# performed by the human).
 on:
   release:
     types: [published]
-  # Manual run without a tag = TEST MODE: posts a clearly-labelled test
-  # message with all pings suppressed. Manual run WITH a tag = announce that
-  # published release for real. The manual path is not just a convenience:
-  # GitHub does not deliver `release: published` for drafts that were created
-  # with GITHUB_TOKEN (anti-recursion rule), and our drafts are created by
-  # release.yml - so publishing in the UI may fire nothing. When that
-  # happens, run: gh workflow run announce-release.yml -f tag=vX.Y.Z
+  # Manual runs are for the exceptional cases only - a normal release needs
+  # nothing beyond clicking Publish. No tag and no message = TEST MODE
+  # (ping-free labelled test). With a tag = re-announce that already-published
+  # release (recovery). With a message = post it verbatim. CAUTION: publishing
+  # already auto-posts, so a manual run about the same release makes a SECOND
+  # message (this bit us on v0.7.0 - one had to be deleted by hand).
   workflow_dispatch:
     inputs:
       tag:
