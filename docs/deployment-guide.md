@@ -75,13 +75,12 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    |---|---|---|
    | `MechvibesDX-<version>-Setup-x64.exe` | Windows | The installer. **The only asset the auto-updater consumes** — its name must keep containing `x64` and ending in `.exe`. |
    | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
-   | `mechvibes-dx-<version>-linux-x86_64.tar.gz` | Linux (portable) | Binary + soundpacks + `README-linux.txt`. |
    | `mechvibes-dx-<version>-macos-<arch>-experimental.*` | macOS | **Experimental, unsigned, untested.** |
    | `README-macos-<version>.txt` | macOS | Gatekeeper and Accessibility instructions. |
 
    Download and install the Windows installer on a real machine if this is a release you're not fully confident in.
 
-   **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. `README-linux.txt` and the generated release notes both say this; keep that wording if you touch either.
+   **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803 — the `.deb` is the only Linux artifact; non-Debian users build from source.)
 
    **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac, is not signed, and is not notarized. Gatekeeper will block it. The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
 

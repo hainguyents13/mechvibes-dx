@@ -165,16 +165,20 @@ jobs:
       # --no-build: the binary is already built above, and cargo-deb's own
       # build would not reuse it. `[package.metadata.deb]` in Cargo.toml owns
       # the file list; it deliberately has no maintainer-scripts, so the
-      # package does NOT add the user to the `input` group - README-linux.txt
-      # and the release notes have to say so.
+      # package does NOT add the user to the `input` group - the release
+      # notes have to say so.
       - name: Build .deb package
         run: cargo deb --no-build
 
+      # Installable only - the portable tarball was dropped by user decision
+      # (260803): one canonical Linux artifact, and the .deb already carries
+      # the desktop entry, icon and soundpacks. Non-Debian users build from
+      # source per README.md until a broader packaging pass (AppImage) lands.
       - name: Stage Linux assets
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p dist staging/mechvibes-dx
+          mkdir -p dist
 
           DEB_SOURCE=$(ls target/debian/mechvibes-dx_"${VERSION}"*.deb | head -1)
           if [ ! -f "$DEB_SOURCE" ]; then
@@ -182,19 +186,6 @@ jobs:
             exit 1
           fi
           cp "$DEB_SOURCE" "dist/mechvibes-dx_${VERSION}_amd64.deb"
-
-          # Portable tarball for non-Debian distros: binary + soundpacks +
-          # desktop entry + icon, laid out so the README's install snippet is
-          # a plain copy. The binary is dynamically linked, hence the runtime
-          # dependency list in README-linux.txt.
-          cp target/release/mechvibes-dx staging/mechvibes-dx/
-          cp -r soundpacks staging/mechvibes-dx/
-          cp mechvibes-dx.desktop staging/mechvibes-dx/
-          cp assets/icon.png staging/mechvibes-dx/mechvibes-dx.png
-          cp README-linux.txt staging/mechvibes-dx/
-
-          tar -czf "dist/mechvibes-dx-${VERSION}-linux-x86_64.tar.gz" \
-            -C staging mechvibes-dx
 
           ls -la dist/
 
@@ -364,7 +355,6 @@ jobs:
           if ls release/*.deb >/dev/null 2>&1; then
             {
               echo "- **Linux (Debian/Ubuntu)**: \`.deb\` — install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
-              echo "- **Linux (portable)**: \`.tar.gz\` — extract and run; see \`README-linux.txt\` inside for runtime dependencies and the same \`input\` group step."
             } >> notes.md
           fi
           if ls release/*macos* >/dev/null 2>&1; then
