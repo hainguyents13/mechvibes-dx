@@ -318,6 +318,32 @@ impl DeviceManager {
         }
     }
 
+    /// Quietly checks whether an output device with `name` is currently
+    /// present. Returns `None` if the host could not be enumerated at all -
+    /// callers must treat that as "no conclusion", NOT as "device missing"
+    /// (see the audio engine's device watchdog).
+    ///
+    /// Deliberately separate from `get_output_devices()`, which is the
+    /// UI-facing path: that one logs a line per device and probes
+    /// `default_output_config()` on each, which is far too heavy and far too
+    /// noisy to run on a timer.
+    ///
+    /// Measured on Windows/WASAPI: materializing the full device list costs
+    /// ~1.2-2.0s (cpal activates each device as the iterator is consumed),
+    /// while the short-circuit below returns in ~10ms when the device is
+    /// present, because it stops at the first match instead of walking the
+    /// rest. Only a genuine miss pays the full walk, and that happens a
+    /// couple of times per unplug rather than on every check.
+    pub fn has_output_device_named(&self, name: &str) -> Option<bool> {
+        let devices = self.host.output_devices().ok()?;
+        for device in devices {
+            if device.name().map(|n| n == name).unwrap_or(false) {
+                return Some(true);
+            }
+        }
+        Some(false)
+    }
+
     /// Get the sample rate of the currently selected output device (or the
     /// system default if none selected/available). Returns `None` on any
     /// enumeration/config error - callers should treat that as "skip

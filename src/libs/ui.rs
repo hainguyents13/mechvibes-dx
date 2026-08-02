@@ -123,6 +123,26 @@ pub fn app() -> Element {
                                 Err(e) => always_eprint!("❌ Failed to switch audio device: {}", e),
                             }
                         }
+                        crate::libs::audio::UiEvent::DeviceLost { lost_device, result } => {
+                            // Not a user action: the engine moved playback on
+                            // its own because the hardware went away. Always
+                            // report it so a silently changed output device
+                            // isn't a mystery.
+                            match result {
+                                Ok(label) =>
+                                    always_eprint!(
+                                        "⚠️ Audio device '{}' was disconnected - switched to {}",
+                                        lost_device,
+                                        label
+                                    ),
+                                Err(e) =>
+                                    always_eprint!(
+                                        "❌ Audio device '{}' was disconnected and fallback failed: {}",
+                                        lost_device,
+                                        e
+                                    ),
+                            }
+                        }
                         crate::libs::audio::UiEvent::PackLoaded { is_keyboard, result } => {
                             match result {
                                 Ok(name) =>
