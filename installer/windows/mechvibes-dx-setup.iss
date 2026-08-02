@@ -81,7 +81,28 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --minimized"; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
+; Interactive installs: the usual "run it now" checkbox on the last page.
+; `skipifsilent` means this does NOT fire during an auto-update, which runs
+; with /VERYSILENT and has no final page - the relaunch there comes from
+; CloseApplications + RestartApplications above (Restart Manager records the
+; running app before closing it and starts it again afterwards), which the
+; in-app updater triggers by passing /RESTARTAPPLICATIONS.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+
+; Silent installs (i.e. auto-update) only: this is what actually relaunches
+; the app, and it is NOT redundant with RestartApplications above.
+;
+; RestartApplications only restarts processes that called the Windows
+; RegisterApplicationRestart API - verified in the Inno 6 docs for the
+; directive. MechvibesDX never calls it, so Restart Manager closes the app
+; but will not bring it back. Without this entry an auto-update would leave
+; the user with no running app and no window explaining why.
+;
+; `runasoriginaluser` matters because Setup may be elevated: the app has to
+; come back as the user who owns the tray/audio session, not as admin.
+; `RmSessionStarted` is guarded against so we never end up with two copies
+; running in the case where Restart Manager did handle the relaunch.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser skipifnotsilent; Check: not RmSessionStarted
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"

@@ -38,6 +38,10 @@ pub fn TitleBar() -> Element {
         window_minimize.set_minimized(true);
     };
     rsx! {
+      // Lives here rather than on a page so the "update ready" prompt is
+      // reachable from anywhere in the app; it renders nothing unless a
+      // verified installer is actually waiting.
+      crate::components::update_prompt::UpdatePrompt {}
       div { class: "fixed inset-0 h-10 z-999 flex justify-between items-center select-none gap-0 bg-gradient-to-b from-base-300/70 to-transparent backdrop-blur-sm transition-all ",
       // Left side - app title and draggable area
         div {
@@ -57,27 +61,32 @@ pub fn TitleBar() -> Element {
           // Update notification (separate from draggable area)
           if let Some(update) = update_info.clone() {
             if update.update_available {
-              div { 
+              div {
                 class: "tooltip tooltip-bottom ml-2",
                 "data-tip": "New version {update.latest_version} available!",
-                if let Some(url) = &update.download_url {
-                  button { 
-                    class: "btn btn-success btn-xs",
-                    onclick: {
-                      let url = url.clone();
-                      move |_| {
-                        println!("🔗 Opening update URL: {}", url);
-                        // Open URL in default browser
-                        if let Err(e) = open::that(&url) {
-                          eprintln!("Failed to open URL: {}", e);
-                        } else {
-                          println!("✅ Successfully opened URL: {}", url);
-                        }
+                button {
+                  class: "btn btn-success btn-xs",
+                  onclick: {
+                    // On Windows this is the direct installer; elsewhere
+                    // find_download_url returns None (no in-place upgrade
+                    // path exists) and we send the user to the release page
+                    // rather than handing them an unusable .exe.
+                    let url = update.download_url.clone().unwrap_or_else(|| {
+                      crate::utils::auto_updater::AutoUpdater::releases_page_url(
+                        &update.latest_version,
+                      )
+                    });
+                    move |_| {
+                      println!("🔗 Opening update URL: {}", url);
+                      if let Err(e) = open::that(&url) {
+                        eprintln!("Failed to open URL: {}", e);
+                      } else {
+                        println!("✅ Successfully opened URL: {}", url);
                       }
-                    },
-                    Download { class: "w-3 h-3" }
-                    "{update.latest_version}"
-                  }
+                    }
+                  },
+                  Download { class: "w-3 h-3" }
+                  "{update.latest_version}"
                 }
               }
             }

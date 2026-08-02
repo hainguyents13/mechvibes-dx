@@ -204,7 +204,34 @@ pub fn SettingsPage() -> Element {
             children: rsx! {
               div { class: "space-y-4",
                 p { class: "text-sm text-base-content/70",
-                  "Automatic update checking runs every 24 hours in the background."
+                  if crate::utils::update_installer::silent_update_supported() {
+                    "Automatic update checking runs every 24 hours. New versions download in the background and ask before restarting."
+                  } else {
+                    "Automatic update checking runs every 24 hours in the background. Updates are installed manually from the releases page."
+                  }
+                }
+                // Progress for the staged-download flow. Absent on platforms
+                // without a silent installer, and absent on failure - in both
+                // cases the download link below is the way forward.
+                {
+                  let stage = crate::utils::auto_updater::get_update_stage();
+                  match stage {
+                    crate::utils::auto_updater::UpdateStage::Downloading { version } => rsx! {
+                      div { class: "alert alert-info alert-soft text-sm",
+                        span { class: "loading loading-spinner loading-xs mr-2" }
+                        "Downloading update v{version}..."
+                      }
+                    },
+                    crate::utils::auto_updater::UpdateStage::Ready { version, .. } => rsx! {
+                      div { class: "alert alert-success alert-soft text-sm",
+                        "Update v{version} is downloaded and verified. Restart to install."
+                      }
+                    },
+                    crate::utils::auto_updater::UpdateStage::Failed { reason, .. } => rsx! {
+                      div { class: "alert alert-warning alert-soft text-sm", "{reason}" }
+                    },
+                    crate::utils::auto_updater::UpdateStage::Idle => rsx! {},
+                  }
                 }
                 div { class: "flex items-center gap-3",
                   button {

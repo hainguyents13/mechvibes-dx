@@ -8,5 +8,6 @@ pub mod soundpack_selector;
 pub mod theme_toggler;
 pub mod titlebar;
 pub mod ui;
+pub mod update_prompt;
 pub mod volume_slider;
 pub mod window_controller;

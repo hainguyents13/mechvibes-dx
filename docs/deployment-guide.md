@@ -77,8 +77,13 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
    | `mechvibes-dx-<version>-macos-<arch>-experimental.*` | macOS | **Experimental, unsigned, untested.** |
    | `README-macos-<version>.txt` | macOS | Gatekeeper and Accessibility instructions. |
+   | `SHA256SUMS.txt` | all | Digests of every other asset. **The in-app auto-updater refuses to run an installer that is not listed here with a matching hash**, so a release missing this file silently degrades every Windows user to a manual download. |
 
    Download and install the Windows installer on a real machine if this is a release you're not fully confident in.
+
+   **`SHA256SUMS.txt` is what makes silent auto-update possible.** The `release` job generates it with `sha256sum *` over the collected assets and then asserts the Windows installer is covered, so it cannot go out empty or stale. The app downloads it from the same release, finds the line for the installer, and verifies the file before executing anything; a mismatch deletes the download. Note the honest limit of this: the hash and the binary come from the same GitHub release, so it protects against corrupted transfers and tampering in flight, **not** against a compromised repository. Code signing remains the open item for that.
+
+   Releases published before this step existed (v0.6.1 and earlier) have no `SHA256SUMS.txt`. That is handled, not broken: the app reports "checksums unavailable" and falls back to the browser download button, which is the pre-Phase-6 behavior.
 
    **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803 — the `.deb` is the only Linux artifact; non-Debian users build from source.)
 
@@ -121,6 +126,23 @@ Install Inno Setup 6 from https://jrsoftware.org/isinfo.php, or if already insta
 
 Windows is the only fully supported platform: installer, upgrade path, and in-app auto-update.
 
-Linux gets working binaries (`.deb` + portable `.tar.gz`) but no automated input-group setup and no auto-update. AppImage is not built — the tooling is heavy and the legacy `scripts/build-linux-installer.sh` is unverified; it remains a roadmap item.
+Linux gets a working `.deb` but no automated input-group setup and no auto-update. AppImage is not built — the tooling is heavy and the legacy `scripts/build-linux-installer.sh` is unverified; it remains a roadmap item.
+
+## How in-app auto-update works (Windows)
+
+Windows is the only platform with an unattended upgrade path. The flow:
+
+1. A check (at startup, or on the 24h tick) finds a newer non-prerelease tag.
+2. The app downloads `SHA256SUMS.txt` **first**. No checksums, no download — this costs one small request instead of ~50 MB that would have to be discarded.
+3. The installer streams to `%TEMP%\mechvibes-updates\<name>.exe.partial`, is verified against its digest, and only then renamed to its final name. An interrupted download can never be mistaken for a finished one.
+4. The user gets a "Restart now / Later" prompt. **Later** keeps the verified file; the prompt returns next launch (the hash is re-checked then, so a file altered in between is discarded rather than run).
+5. **Restart now** re-verifies once more, clears the staged entry from config, spawns the installer detached with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RESTARTAPPLICATIONS`, and closes the app.
+
+Two details in `installer/windows/mechvibes-dx-setup.iss` that the update flow depends on — do not remove them without reading this:
+
+- `CloseApplications=yes` lets Setup close the running app that holds `mechvibes-dx.exe`.
+- The second `[Run]` entry (`skipifnotsilent`, `Check: not RmSessionStarted`) is what actually **relaunches** the app after a silent install. `RestartApplications=yes` alone is not enough: per the Inno 6 docs it only restarts processes that called the Windows `RegisterApplicationRestart` API, and this app never does. Without that entry an auto-update would close the app and never bring it back.
+
+Everything in this flow fails soft. A network error, a missing `SHA256SUMS.txt`, a hash mismatch, or a blocked installer all leave the app running and fall back to the browser download button.
 
 macOS is experimental: unsigned, unnotarized, and never run on real hardware by the maintainer. It ships so users can try it and report back.

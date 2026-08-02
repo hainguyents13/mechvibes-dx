@@ -142,6 +142,11 @@ fn main() {
     state::app::init_app_state();
     state::app::init_update_state();
 
+    // Pick up an installer staged by a previous session ("Later"). Re-hashes
+    // the file before trusting it, and drops it if the app has since been
+    // updated some other way.
+    utils::auto_updater::restore_staged_update();
+
     // Initialize ambiance player
     state::ambiance::initialize_global_ambiance_player();
     debug_print!("🎵 Ambiance player initialized");

@@ -364,6 +364,35 @@ jobs:
           echo "Assets to publish:"
           ls -la release/
 
+      # The in-app auto-updater downloads this file from the release, finds
+      # the line for the installer it is about to run, and refuses to execute
+      # anything whose digest does not match. Generated here, in the single
+      # writer job, so it covers exactly the assets that actually ship.
+      #
+      # Names are stored bare (no directory), which is what the updater's
+      # parser expects. Releases published before this step existed have no
+      # SHA256SUMS.txt at all; the app treats that as "verification
+      # unavailable" and falls back to the manual download button.
+      - name: Generate SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          echo "Checksums covering $(($(wc -l < SHA256SUMS.txt))) assets:"
+          cat SHA256SUMS.txt
+
+      # A sums file that misses the installer would silently disable
+      # verification for every user, so assert coverage rather than trust it.
+      - name: Verify checksums cover the Windows installer
+        run: |
+          set -euo pipefail
+          installer=$(cd release && ls MechvibesDX-*-Setup-x64.exe)
+          if ! grep -q " [*]\?${installer}\$" release/SHA256SUMS.txt; then
+            echo "::error::SHA256SUMS.txt has no entry for ${installer}"
+            exit 1
+          fi
+          echo "SHA256SUMS.txt covers ${installer}"
+
       - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
