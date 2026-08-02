@@ -5,6 +5,7 @@ use crate::state::soundpack::{ SoundpackCache, SoundpackMetadata };
 use std::sync::Arc;
 
 use super::audio_context::AudioContext;
+use super::engine::{ AudioCommand, EngineState };
 
 /// Determine soundpack type based on the soundpack path
 fn determine_soundpack_type(soundpack_id: &str) -> crate::state::soundpack::SoundpackType {
@@ -18,9 +19,13 @@ fn determine_soundpack_type(soundpack_id: &str) -> crate::state::soundpack::Soun
     }
 }
 
+/// Requests both keyboard and mouse soundpacks be (re)loaded from config.
+/// Loading happens asynchronously on the engine thread - callers that need
+/// to know the outcome should watch `UiEvent::PackLoaded` (see `ui.rs`)
+/// rather than this function's return value, which only reflects whether
+/// the request was sent.
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
     let config = AppConfig::load();
-    // Load both keyboard and mouse soundpacks
     load_keyboard_soundpack(context, &config.keyboard_soundpack)?;
     load_mouse_soundpack(context, &config.mouse_soundpack)?;
     Ok(())
@@ -30,56 +35,49 @@ pub fn load_keyboard_soundpack(context: &AudioContext, soundpack_id: &str) -> Re
     load_keyboard_soundpack_with_cache_control(context, soundpack_id, true)
 }
 
+/// Sends a `LoadKeyboardPack` command to the engine thread. Errors from the
+/// actual load (missing file, parse failure, etc.) surface later via
+/// `UiEvent::PackLoaded`, not this function's return value.
 pub fn load_keyboard_soundpack_with_cache_control(
     context: &AudioContext,
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
-    // Skip loading if soundpack ID is empty
     if soundpack_id.is_empty() {
         println!("⚠️ Skipping keyboard soundpack loading: empty soundpack ID");
-        return Ok(()); // Return success to avoid error handling
+        return Ok(());
     }
 
-    println!("🎹 Loading keyboard soundpack: {}", soundpack_id);
-    match load_keyboard_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            // Capture the error in cache only if requested
-            if update_cache_on_error {
-                capture_soundpack_loading_error(soundpack_id, &e);
-            }
-            Err(e)
-        }
-    }
+    println!("🎹 Requesting keyboard soundpack load: {}", soundpack_id);
+    context.send(AudioCommand::LoadKeyboardPack {
+        soundpack_id: soundpack_id.to_string(),
+        update_cache_on_error,
+    });
+    Ok(())
 }
 
 pub fn load_mouse_soundpack(context: &AudioContext, soundpack_id: &str) -> Result<(), String> {
     load_mouse_soundpack_with_cache_control(context, soundpack_id, true)
 }
 
+/// Sends a `LoadMousePack` command to the engine thread. See
+/// `load_keyboard_soundpack_with_cache_control` for the async-result note.
 pub fn load_mouse_soundpack_with_cache_control(
     context: &AudioContext,
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
-    // Skip loading if soundpack ID is empty
     if soundpack_id.is_empty() {
         println!("⚠️ Skipping mouse soundpack loading: empty soundpack ID");
-        return Ok(()); // Return success to avoid error handling
+        return Ok(());
     }
 
-    println!("🖱️ Loading mouse soundpack: {}", soundpack_id);
-    match load_mouse_soundpack_optimized(context, soundpack_id, update_cache_on_error) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            // Capture the error in cache only if requested
-            if update_cache_on_error {
-                capture_soundpack_loading_error(soundpack_id, &e);
-            }
-            Err(e)
-        }
-    }
+    println!("🖱️ Requesting mouse soundpack load: {}", soundpack_id);
+    context.send(AudioCommand::LoadMousePack {
+        soundpack_id: soundpack_id.to_string(),
+        update_cache_on_error,
+    });
+    Ok(())
 }
 
 /// (samples, channels, sample_rate) for a decoded/resampled audio buffer.
@@ -448,315 +446,6 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
     Ok((samples, channels, sample_rate))
 }
 
-/// Direct keyboard soundpack loading
-pub fn load_keyboard_soundpack_optimized(
-    context: &AudioContext,
-    soundpack_id: &str,
-    update_cache_on_error: bool
-) -> Result<(), String> {
-    println!("📂 Direct loading keyboard soundpack: {}", soundpack_id);
-
-    // Load soundpack directly from filesystem
-    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
-
-    // Load config.json
-    let config_path = paths::soundpacks::config_json(soundpack_id);
-    let config_content = std::fs
-        ::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?; // Only load V2 config format - V1 configs must be converted first
-    let mut soundpack: SoundPack = serde_json::from_str(&config_content).map_err(|e| {
-        // Check if this might be a V1 config
-        if config_content.contains("\"key_define_type\"") || config_content.contains("\"defines\"") {
-            format!("This appears to be a V1 soundpack config. Please convert it to V2 format first using the refresh/convert function. Parse error: {}", e)
-        } else {
-            format!("Failed to parse V2 soundpack config: {}", e)
-        }
-    })?;
-
-    // Override soundpack_type based on folder path (more reliable than JSON content)
-    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
-
-    // Verify this is a keyboard soundpack
-    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Keyboard {
-        return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
-    }
-
-    // Load audio samples directly from file (resampled to cached device rate)
-    let device_rate = context.cached_device_rate.lock().ok().and_then(|r| *r);
-    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, device_rate)?;
-
-    // Create key mappings (only for keyboard soundpacks)
-    let key_mappings = create_key_mappings(&soundpack, &resampled.0); // Update audio context with keyboard data
-    update_keyboard_context(context, original, resampled, key_mappings, &soundpack)?;
-
-    // Update metadata cache - create metadata with no error since loading succeeded
-    let mut cache = SoundpackCache::load();
-    match create_soundpack_metadata(&soundpack_path, &soundpack) {
-        Ok(metadata) => {
-            cache.add_soundpack(metadata);
-        }
-        Err(e) => {
-            println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
-
-            // Only add error metadata to cache if requested (not during startup)
-            if update_cache_on_error {
-                // Create minimal metadata with error information
-                let error_metadata = SoundpackMetadata {
-                    id: soundpack.id.clone(), // Use original ID from config
-                    name: soundpack.name.clone(),
-                    author: soundpack.author.clone(),
-                    description: soundpack.description.clone(),
-                    version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
-                    tags: soundpack.tags.clone().unwrap_or_default(),
-                    icon: soundpack.icon.clone(),
-                    soundpack_type: determine_soundpack_type(soundpack_id),
-                    folder_path: soundpack_id.to_string(), // Add folder_path for correct path resolution
-                    last_modified: 0,
-                    last_accessed: std::time::SystemTime
-                        ::now()
-                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                    config_version: soundpack.config_version
-                        .as_ref()
-                        .and_then(|v| v.parse::<u32>().ok()),
-                    is_valid_v2: true,
-                    validation_status: "loaded_with_metadata_error".to_string(),
-                    can_be_converted: false,
-                    last_error: Some(format!("Metadata creation failed: {}", e)),
-                };
-                cache.add_soundpack(error_metadata);
-            }
-        }
-    }
-    cache.save();
-
-    println!("✅ Successfully loaded keyboard soundpack: {} (direct from files)", soundpack.name);
-    Ok(())
-}
-
-/// Direct mouse soundpack loading
-pub fn load_mouse_soundpack_optimized(
-    context: &AudioContext,
-    soundpack_id: &str,
-    update_cache_on_error: bool
-) -> Result<(), String> {
-    println!("📂 Direct loading mouse soundpack: {}", soundpack_id);
-
-    // Load soundpack directly from filesystem
-    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
-
-    // Load config.json
-    let config_path = paths::soundpacks::config_json(soundpack_id);
-    let config_content = std::fs
-        ::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
-    let mut soundpack: SoundPack = serde_json
-        ::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
-
-    // Override soundpack_type based on folder path (more reliable than JSON content)
-    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
-
-    // Verify this is a mouse soundpack
-    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Mouse {
-        return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
-    }
-
-    // Load audio samples directly from file (resampled to cached device rate)
-    let device_rate = context.cached_device_rate.lock().ok().and_then(|r| *r);
-    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, device_rate)?;
-
-    // Create mouse mappings (only for mouse soundpacks)
-    let mouse_mappings = create_mouse_mappings(&soundpack, &resampled.0); // Update audio context with mouse data
-    update_mouse_context(context, original, resampled, mouse_mappings, &soundpack)?;
-
-    // Update metadata cache - create metadata with no error since loading succeeded
-    let mut cache = SoundpackCache::load();
-    match create_soundpack_metadata(&soundpack_path, &soundpack) {
-        Ok(metadata) => {
-            cache.add_soundpack(metadata);
-        }
-        Err(e) => {
-            println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
-
-            // Only add error metadata to cache if requested (not during startup)
-            if update_cache_on_error {
-                // Create minimal metadata with error information
-                let error_metadata = SoundpackMetadata {
-                    id: soundpack.id.clone(), // Use original ID from config
-                    name: soundpack.name.clone(),
-                    author: soundpack.author.clone(),
-                    description: soundpack.description.clone(),
-                    version: soundpack.version.clone().unwrap_or_else(|| "1.0".to_string()),
-                    tags: soundpack.tags.clone().unwrap_or_default(),
-                    icon: soundpack.icon.clone(),
-                    soundpack_type: determine_soundpack_type(soundpack_id),
-                    folder_path: soundpack_id.to_string(), // Add folder_path for correct path resolution
-                    last_modified: 0,
-                    last_accessed: std::time::SystemTime
-                        ::now()
-                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                    config_version: soundpack.config_version
-                        .as_ref()
-                        .and_then(|v| v.parse::<u32>().ok()),
-                    is_valid_v2: true,
-                    validation_status: "loaded_with_metadata_error".to_string(),
-                    can_be_converted: false,
-                    last_error: Some(format!("Metadata creation failed: {}", e)),
-                };
-                cache.add_soundpack(error_metadata);
-            }
-        }
-    }
-    cache.save();
-
-    println!("✅ Successfully loaded mouse soundpack: {} (direct from files)", soundpack.name);
-    Ok(())
-}
-
-fn update_keyboard_context(
-    context: &AudioContext,
-    original: (Vec<f32>, u16, u32), // pre-resample (samples, channels, sample_rate)
-    resampled: (Vec<f32>, u16, u32), // device-rate (samples, channels, sample_rate)
-    key_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
-    soundpack: &SoundPack
-) -> Result<(), String> {
-    let (audio_samples, channels, sample_rate) = resampled;
-    let sample_count = audio_samples.len();
-    let key_mapping_count = key_mappings.len();
-    let soundpack_name = soundpack.name.clone();
-
-    // Update keyboard samples (wrap in Arc to avoid cloning on every keypress)
-    if let Ok(mut cached) = context.keyboard_samples.lock() {
-        *cached = Some((Arc::new(audio_samples), channels, sample_rate));
-        println!("🎹 Updated keyboard samples: {} samples", sample_count);
-    } else {
-        return Err("Failed to acquire lock on keyboard_samples".to_string());
-    }
-
-    // Keep pre-resample samples so a future device switch can re-resample
-    // without re-reading the soundpack file from disk.
-    if let Ok(mut cached_original) = context.keyboard_samples_original.lock() {
-        let (orig_samples, orig_channels, orig_rate) = original;
-        *cached_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
-    }
-
-    // Update key mappings
-    if let Ok(mut key_map) = context.key_map.lock() {
-        let old_count = key_map.len();
-        key_map.clear();
-
-        for (key, mappings) in key_mappings {
-            let converted_mappings: Vec<[f32; 2]> = mappings
-                .into_iter()
-                .map(|(start, end)| [start as f32, end as f32])
-                .collect();
-            key_map.insert(key.clone(), converted_mappings);
-        }
-
-        println!("🗝️ Updated key mappings: {} -> {} keys", old_count, key_map.len());
-    } else {
-        return Err("Failed to acquire lock on key_map".to_string());
-    }
-
-    // Clear active keyboard audio state
-    if let Ok(mut sinks) = context.key_sinks.lock() {
-        let old_sinks = sinks.len();
-        sinks.clear();
-        if old_sinks > 0 {
-            println!("🔇 Cleared {} active key sinks", old_sinks);
-        }
-    }
-
-    if let Ok(mut pressed) = context.key_pressed.lock() {
-        let old_pressed = pressed.len();
-        pressed.clear();
-        if old_pressed > 0 {
-            println!("⌨️ Cleared {} pressed keys", old_pressed);
-        }
-    }
-
-    println!(
-        "✅ Successfully loaded keyboard soundpack: {} ({} key mappings) - Memory properly cleaned",
-        soundpack_name,
-        key_mapping_count
-    );
-    Ok(())
-}
-
-fn update_mouse_context(
-    context: &AudioContext,
-    original: (Vec<f32>, u16, u32), // pre-resample (samples, channels, sample_rate)
-    resampled: (Vec<f32>, u16, u32), // device-rate (samples, channels, sample_rate)
-    mouse_mappings: std::collections::HashMap<String, Vec<(f64, f64)>>,
-    soundpack: &SoundPack
-) -> Result<(), String> {
-    let (audio_samples, channels, sample_rate) = resampled;
-    let sample_count = audio_samples.len();
-    let mouse_mapping_count = mouse_mappings.len();
-    let soundpack_name = soundpack.name.clone();
-
-    // Update mouse samples (wrap in Arc to avoid cloning on every click)
-    if let Ok(mut cached) = context.mouse_samples.lock() {
-        *cached = Some((Arc::new(audio_samples), channels, sample_rate));
-        println!("🖱️ Updated mouse samples: {} samples", sample_count);
-    } else {
-        return Err("Failed to acquire lock on mouse_samples".to_string());
-    }
-
-    // Keep pre-resample samples so a future device switch can re-resample
-    // without re-reading the soundpack file from disk.
-    if let Ok(mut cached_original) = context.mouse_samples_original.lock() {
-        let (orig_samples, orig_channels, orig_rate) = original;
-        *cached_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
-    }
-
-    // Update mouse mappings
-    if let Ok(mut mouse_map) = context.mouse_map.lock() {
-        let old_count = mouse_map.len();
-        mouse_map.clear();
-
-        for (button, mappings) in mouse_mappings {
-            let converted_mappings: Vec<[f32; 2]> = mappings
-                .into_iter()
-                .map(|(start, end)| [start as f32, end as f32])
-                .collect();
-            mouse_map.insert(button.clone(), converted_mappings);
-        }
-
-        println!("🖱️ Updated mouse mappings: {} -> {} buttons", old_count, mouse_map.len());
-    } else {
-        return Err("Failed to acquire lock on mouse_map".to_string());
-    }
-
-    // Clear active mouse audio state
-    if let Ok(mut mouse_sinks) = context.mouse_sinks.lock() {
-        let old_sinks = mouse_sinks.len();
-        mouse_sinks.clear();
-        if old_sinks > 0 {
-            println!("🔇 Cleared {} active mouse sinks", old_sinks);
-        }
-    }
-
-    if let Ok(mut mouse_pressed) = context.mouse_pressed.lock() {
-        let old_pressed = mouse_pressed.len();
-        mouse_pressed.clear();
-        if old_pressed > 0 {
-            println!("🖱️ Cleared {} pressed mouse buttons", old_pressed);
-        }
-    }
-
-    println!(
-        "✅ Successfully loaded mouse soundpack: {} ({} mouse mappings) - Memory properly cleaned",
-        soundpack_name,
-        mouse_mapping_count
-    );
-    Ok(())
-}
-
 fn create_soundpack_metadata(
     soundpack_path: &str,
     soundpack: &SoundPack
@@ -894,6 +583,150 @@ fn create_mouse_mappings(
     }
 
     mouse_mappings
+}
+
+/// Loads a keyboard soundpack directly into engine-owned state (Phase 3).
+/// Mirrors `load_keyboard_soundpack_optimized` but writes to `EngineState`
+/// fields instead of an `&AudioContext`, since the engine thread owns its
+/// data as plain fields rather than `Arc<Mutex<...>>`.
+pub(super) fn load_keyboard_pack_into_engine(
+    state: &mut EngineState,
+    soundpack_id: &str,
+    update_cache_on_error: bool
+) -> Result<String, String> {
+    if soundpack_id.is_empty() {
+        return Err("empty soundpack ID".to_string());
+    }
+
+    match load_keyboard_pack_into_engine_inner(state, soundpack_id) {
+        Ok(name) => Ok(name),
+        Err(e) => {
+            if update_cache_on_error {
+                capture_soundpack_loading_error(soundpack_id, &e);
+            }
+            Err(e)
+        }
+    }
+}
+
+fn load_keyboard_pack_into_engine_inner(
+    state: &mut EngineState,
+    soundpack_id: &str
+) -> Result<String, String> {
+    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
+    let config_path = paths::soundpacks::config_json(soundpack_id);
+    let config_content = std::fs
+        ::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let mut soundpack: SoundPack = serde_json
+        ::from_str(&config_content)
+        .map_err(|e| format!("Failed to parse V2 soundpack config: {}", e))?;
+    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
+
+    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Keyboard {
+        return Err("This is a mouse soundpack, not a keyboard soundpack".to_string());
+    }
+
+    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, state.device_rate)?;
+    let key_mappings = create_key_mappings(&soundpack, &resampled.0);
+
+    let (audio_samples, channels, sample_rate) = resampled;
+    state.keyboard_samples = Some((Arc::new(audio_samples), channels, sample_rate));
+    let (orig_samples, orig_channels, orig_rate) = original;
+    state.keyboard_samples_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
+
+    state.key_map.clear();
+    for (key, mappings) in key_mappings {
+        let converted: Vec<[f32; 2]> = mappings
+            .into_iter()
+            .map(|(start, end)| [start as f32, end as f32])
+            .collect();
+        state.key_map.insert(key, converted);
+    }
+    state.key_sinks.clear();
+
+    update_soundpack_cache(&soundpack_path, &soundpack, soundpack_id);
+    println!("✅ [Engine] Loaded keyboard soundpack: {}", soundpack.name);
+    Ok(soundpack.name)
+}
+
+/// Loads a mouse soundpack directly into engine-owned state (Phase 3).
+/// See `load_keyboard_pack_into_engine` for the rationale.
+pub(super) fn load_mouse_pack_into_engine(
+    state: &mut EngineState,
+    soundpack_id: &str,
+    update_cache_on_error: bool
+) -> Result<String, String> {
+    if soundpack_id.is_empty() {
+        return Err("empty soundpack ID".to_string());
+    }
+
+    match load_mouse_pack_into_engine_inner(state, soundpack_id) {
+        Ok(name) => Ok(name),
+        Err(e) => {
+            if update_cache_on_error {
+                capture_soundpack_loading_error(soundpack_id, &e);
+            }
+            Err(e)
+        }
+    }
+}
+
+fn load_mouse_pack_into_engine_inner(
+    state: &mut EngineState,
+    soundpack_id: &str
+) -> Result<String, String> {
+    let soundpack_path = paths::soundpacks::soundpack_dir(soundpack_id);
+    let config_path = paths::soundpacks::config_json(soundpack_id);
+    let config_content = std::fs
+        ::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let mut soundpack: SoundPack = serde_json
+        ::from_str(&config_content)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    soundpack.soundpack_type = determine_soundpack_type(soundpack_id);
+
+    if soundpack.soundpack_type != crate::state::soundpack::SoundpackType::Mouse {
+        return Err("This is a keyboard soundpack, not a mouse soundpack".to_string());
+    }
+
+    let (original, resampled) = load_audio_file(&soundpack_path, &soundpack, state.device_rate)?;
+    let mouse_mappings = create_mouse_mappings(&soundpack, &resampled.0);
+
+    let (audio_samples, channels, sample_rate) = resampled;
+    state.mouse_samples = Some((Arc::new(audio_samples), channels, sample_rate));
+    let (orig_samples, orig_channels, orig_rate) = original;
+    state.mouse_samples_original = Some((Arc::new(orig_samples), orig_channels, orig_rate));
+
+    state.mouse_map.clear();
+    for (button, mappings) in mouse_mappings {
+        let converted: Vec<[f32; 2]> = mappings
+            .into_iter()
+            .map(|(start, end)| [start as f32, end as f32])
+            .collect();
+        state.mouse_map.insert(button, converted);
+    }
+    state.mouse_sinks.clear();
+
+    update_soundpack_cache(&soundpack_path, &soundpack, soundpack_id);
+    println!("✅ [Engine] Loaded mouse soundpack: {}", soundpack.name);
+    Ok(soundpack.name)
+}
+
+/// Shared metadata-cache update used by both engine loaders (extracted from
+/// the duplicated tail of `load_keyboard_soundpack_optimized`/
+/// `load_mouse_soundpack_optimized`).
+fn update_soundpack_cache(soundpack_path: &str, soundpack: &SoundPack, soundpack_id: &str) {
+    let mut cache = SoundpackCache::load();
+    match create_soundpack_metadata(soundpack_path, soundpack) {
+        Ok(metadata) => {
+            cache.add_soundpack(metadata);
+        }
+        Err(e) => {
+            println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
+        }
+    }
+    cache.save();
 }
 
 /// Capture soundpack loading error and update the cache

@@ -1,8 +1,7 @@
 use crate::components::window_controller::WindowController;
 use crate::components::header::Header;
 use crate::libs::routes::Route;
-use crate::libs::tray_service::request_tray_update;
-use crate::libs::input_manager::{ get_input_channels, set_window_focus };
+use crate::libs::input_manager::set_window_focus;
 use crate::libs::AudioContext;
 use crate::state::keyboard::KeyboardState;
 use crate::state::paths;
@@ -26,9 +25,6 @@ pub fn app() -> Element {
             is_loading.set(false);
         });
     });
-
-    // Get input channels from global state (initialized in main)
-    let input_channels = get_input_channels();
 
     // Create update signal for event-driven state management
     let update_signal = use_signal(|| 0u32);
@@ -80,14 +76,13 @@ pub fn app() -> Element {
         });
     });
 
-    // Extract receivers from input channels
-    let keyboard_rx = input_channels.keyboard_rx.clone();
-    let mouse_rx = input_channels.mouse_rx.clone();
-    let hotkey_rx = input_channels.hotkey_rx.clone();
-
     // ===== WINDOW FOCUS TRACKING =====
-    // Track window focus state to switch between rdev (unfocused) and device_query (focused)
-    // This is a hybrid approach to work around the rdev + Wry/Winit incompatibility on Windows
+    // Lets the rdev (unfocused) / device_query (focused) hybrid listeners
+    // hand off to each other, working around rdev not seeing keys while the
+    // Wry/Winit window has focus. Used by macOS and Linux/X11, and on
+    // Windows only if the Raw Input worker process fails and we fall back to
+    // that hybrid (see input_worker_host.rs) - the worker itself is
+    // focus-independent and ignores this state.
     {
         use dioxus::desktop::tao::event::WindowEvent;
 
@@ -102,108 +97,63 @@ pub fn app() -> Element {
         });
     }
 
-    // Process keyboard events and update both audio and UI state
+    // Update KeyboardState (for the on-screen key visualizer) from the audio
+    // engine's UiEvent stream. The engine now reads raw input directly and
+    // plays sound itself (see engine.rs) - this loop no longer drives
+    // playback, it only mirrors key state for the UI and surfaces
+    // device-switch/pack-load results.
     {
-        let ctx = audio_context.clone();
-        let keyboard_rx = keyboard_rx.clone();
         let mut keyboard_state = keyboard_state;
 
-        use_future(move || {
-            let ctx = ctx.clone();
-            let keyboard_rx = keyboard_rx.clone();
-
-            async move {
-                loop {
-                    if let Ok(receiver) = keyboard_rx.try_lock() {
-                        // Drain the whole backlog this tick instead of one event -
-                        // a burst of keys can outpace the tick rate (each write()
-                        // triggers a re-render), otherwise leftover events keep
-                        // playing sound after the user has already lifted their hand.
-                        let mut last_state: Option<(bool, String)> = None;
-                        while let Ok(keycode) = receiver.try_recv() {
-                            if keycode.starts_with("UP:") {
-                                let key = &keycode[3..];
-                                ctx.play_key_event_sound(key, false);
-                                last_state = Some((false, key.to_string()));
-                            } else if !keycode.is_empty() {
-                                ctx.play_key_event_sound(&keycode, true);
-                                last_state = Some((true, keycode.clone()));
+        use_future(move || async move {
+            let event_rx = crate::libs::audio::ui_event_receiver();
+            loop {
+                let mut last_state: Option<(bool, String)> = None;
+                while let Ok(event) = event_rx.try_recv() {
+                    match event {
+                        crate::libs::audio::UiEvent::KeyDown(key) => {
+                            last_state = Some((true, key));
+                        }
+                        crate::libs::audio::UiEvent::KeyUp(key) => {
+                            last_state = Some((false, key));
+                        }
+                        crate::libs::audio::UiEvent::DeviceSwitched(result) => {
+                            match result {
+                                Ok(label) => debug_print!("🔊 Switched audio device: {}", label),
+                                Err(e) => always_eprint!("❌ Failed to switch audio device: {}", e),
                             }
                         }
-
-                        // Coalesce UI state to one write per batch (using the last
-                        // event's state) so a burst doesn't trigger a re-render
-                        // per keystroke.
-                        if let Some((pressed, key)) = last_state {
-                            let mut state = keyboard_state.write();
-                            state.key_pressed = pressed;
-                            if pressed {
-                                state.last_key = key;
-                            }
-                        }
-                    }
-                    delay::Delay::key_event().await;
-                }
-            }
-        });
-    }
-
-    // Process mouse events and play sounds
-    {
-        let ctx = audio_context.clone();
-        let mouse_rx = mouse_rx.clone();
-
-        use_future(move || {
-            let ctx = ctx.clone();
-            let mouse_rx = mouse_rx.clone();
-
-            async move {
-                loop {
-                    if let Ok(receiver) = mouse_rx.try_lock() {
-                        // Drain the whole backlog this tick (see keyboard loop above).
-                        while let Ok(button_code) = receiver.try_recv() {
-                            if button_code.starts_with("UP:") {
-                                let button = &button_code[3..];
-                                ctx.play_mouse_event_sound(button, false);
-                            } else if !button_code.is_empty() {
-                                ctx.play_mouse_event_sound(&button_code, true);
+                        crate::libs::audio::UiEvent::PackLoaded { is_keyboard, result } => {
+                            match result {
+                                Ok(name) =>
+                                    debug_print!(
+                                        "✅ Loaded {} pack: {}",
+                                        if is_keyboard { "keyboard" } else { "mouse" },
+                                        name
+                                    ),
+                                Err(e) =>
+                                    always_eprint!(
+                                        "❌ Failed to load {} pack: {}",
+                                        if is_keyboard { "keyboard" } else { "mouse" },
+                                        e
+                                    ),
                             }
                         }
                     }
-                    delay::Delay::key_event().await;
                 }
-            }
-        });
-    } // Process hotkey Ctrl+Alt+M to toggle global sound
-    {
-        let hotkey_rx = hotkey_rx.clone();
 
-        use_future(move || {
-            let hotkey_rx = hotkey_rx.clone();
-            async move {
-                loop {
-                    if let Ok(receiver) = hotkey_rx.try_lock() {
-                        while let Ok(hotkey_command) = receiver.try_recv() {
-                            if hotkey_command == "TOGGLE_SOUND" {
-                                // Load current config, toggle enable_sound, and save
-                                let mut config = crate::state::config::AppConfig::load();
-                                config.enable_sound = !config.enable_sound;
-                                config.last_updated = chrono::Utc::now();
-                                match config.save() {
-                                    Ok(_) => {
-                                        // Request tray menu update to reflect the new sound state
-                                        request_tray_update();
-                                        debug_print!("🔄 Sound toggled: {}", config.enable_sound);
-                                    }
-                                    Err(e) => {
-                                        always_eprint!("❌ Failed to save config after sound toggle: {}", e);
-                                    }
-                                }
-                            }
-                        }
+                // Coalesce UI state to one write per batch (using the last
+                // event's state) so a burst doesn't trigger a re-render per
+                // keystroke.
+                if let Some((pressed, key)) = last_state {
+                    let mut state = keyboard_state.write();
+                    state.key_pressed = pressed;
+                    if pressed {
+                        state.last_key = key;
                     }
-                    delay::Delay::key_event().await;
                 }
+
+                delay::Delay::key_event().await;
             }
         });
     } // Initialize update service for background update checking

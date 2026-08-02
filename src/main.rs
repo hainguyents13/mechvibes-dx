@@ -115,13 +115,6 @@ fn main() {
     state::app::init_app_state();
     state::app::init_update_state();
 
-    // Initialize music player
-    if let Err(e) = state::music::initialize_music_player() {
-        debug_eprint!("⚠️ Failed to initialize music player: {}", e);
-    } else {
-        debug_print!("🎵 Music player initialized successfully");
-    }
-
     // Initialize ambiance player
     state::ambiance::initialize_global_ambiance_player();
     debug_print!("🎵 Ambiance player initialized");
@@ -129,18 +122,33 @@ fn main() {
     // Note: Update service will be initialized within the UI components
     // to ensure proper Dioxus runtime context
 
-    // Create input event channels for communication between input listener and UI
-    let (keyboard_tx, keyboard_rx) = mpsc::channel::<String>();
-    let (mouse_tx, mouse_rx) = mpsc::channel::<String>();
-    let (hotkey_tx, hotkey_rx) = mpsc::channel::<String>();
+    // Create input event channels for communication between input listeners
+    // and the audio engine (crossbeam so the engine thread can `select!` on
+    // these alongside its own AudioCommand channel without polling).
+    let (keyboard_tx, keyboard_rx) = crossbeam_channel::unbounded::<String>();
+    let (mouse_tx, mouse_rx) = crossbeam_channel::unbounded::<String>();
+    let (hotkey_tx, hotkey_rx) = crossbeam_channel::unbounded::<String>();
 
     // Clone senders for global access (for window-level keyboard events)
     let keyboard_tx_clone = keyboard_tx.clone();
     let mouse_tx_clone = mouse_tx.clone();
     let hotkey_tx_clone = hotkey_tx.clone();
 
+    // Engine gets its own receiver clones so it can `select!` on keyboard,
+    // mouse and hotkey events directly - no UI polling loop in the middle.
+    let engine_keyboard_rx = keyboard_rx.clone();
+    let engine_mouse_rx = mouse_rx.clone();
+    let engine_hotkey_rx = hotkey_rx.clone();
+
     // Initialize global input channels for UI to access (including senders for window events)
     init_input_channels(keyboard_rx, mouse_rx, hotkey_rx, keyboard_tx_clone, mouse_tx_clone, hotkey_tx_clone);
+
+    // Spawn the audio engine thread before the Dioxus/webview runtime starts.
+    // The engine owns rodio's OutputStream exclusively on a plain OS thread
+    // (OutputStream is not Send), and drives keyboard/mouse playback via a
+    // blocking select!/recv() loop instead of the UI polling it every ~1ms.
+    libs::audio::spawn_engine(engine_keyboard_rx, engine_mouse_rx, engine_hotkey_rx);
+    debug_print!("🎧 Audio engine thread started");
 
     // Initialize window focus state
     // If window starts visible (not minimized), it will be focused
@@ -183,8 +191,8 @@ fn main() {
         }
     }
 
-    // On Windows and macOS, use the hybrid approach (rdev + device_query)
-    // rdev handles keyboard when unfocused, device_query when focused
+    // Windows + macOS: hybrid approach (rdev + device_query) - rdev handles
+    // keyboard when unfocused, device_query when focused.
     #[cfg(not(target_os = "linux"))]
     {
         let focus_state = get_window_focus_state();

@@ -2,26 +2,226 @@ use serde::{ Deserialize, Serialize };
 use crate::state::config::AppConfig;
 use std::collections::HashMap;
 use std::sync::{ Arc, Mutex };
+use std::sync::mpsc;
 use std::thread;
-use rodio::{ Decoder, Sink, Source };
+use rodio::{ Decoder, OutputStream, OutputStreamHandle, Sink, Source };
 use std::fs::File;
 use std::io::BufReader;
 
-// Simple global state for playing sounds
-static GLOBAL_AMBIANCE_SINKS: std::sync::OnceLock<
-    Arc<Mutex<HashMap<String, Sink>>>
+use crate::libs::device_manager::DeviceManager;
+
+/// Commands for the single background thread that owns the shared ambiance
+/// `OutputStream`. All sounds share one stream/handle (rather than each
+/// `play_ambiance_sound` call opening its own, as before Phase 3) so a
+/// device switch has exactly one stream to rebuild.
+enum AmbianceEngineCommand {
+    Play {
+        sound_id: String,
+        audio_url: String,
+        volume: f32,
+    },
+    Stop(String),
+    SetVolume {
+        sound_id: String,
+        volume: f32,
+    },
+    SetAllVolume(f32),
+    PauseAll,
+    ResumeAll,
+    /// `resume` carries the sounds that were actually audible before the
+    /// switch (empty if paused/muted) - see `switch_ambiance_player_device`,
+    /// which reads `AmbiancePlayerState` to build this since the engine
+    /// thread only knows about `Sink`s, not playback intent.
+    SwitchDevice {
+        device_id: Option<String>,
+        resume: Vec<(String, String, f32)>, // (sound_id, audio_url, effective_volume)
+    },
+}
+
+static AMBIANCE_ENGINE_TX: std::sync::OnceLock<
+    Mutex<Option<mpsc::Sender<AmbianceEngineCommand>>>
 > = std::sync::OnceLock::new();
 
 // Global ambiance player state
 static GLOBAL_AMBIANCE_PLAYER_STATE: std::sync::OnceLock<Arc<Mutex<AmbiancePlayerState>>> = std::sync::OnceLock::new();
 
+fn send_engine_command(command: AmbianceEngineCommand) {
+    if let Some(tx_slot) = AMBIANCE_ENGINE_TX.get() {
+        if let Some(tx) = tx_slot.lock().unwrap().as_ref() {
+            let _ = tx.send(command);
+        }
+    }
+}
+
+/// Switches the ambiance player's shared output device at runtime (`None` =
+/// system default). Sounds that were actually audible (playing, not paused,
+/// not muted) before the switch are re-started on the new stream - existing
+/// `Sink`s are bound to the old `OutputStreamHandle` and can't just move
+/// over. No-ops if the engine hasn't started yet.
+pub fn switch_ambiance_player_device(device_id: Option<String>) {
+    let resume = get_global_ambiance_player_state_copy()
+        .map(|state| {
+            if !state.is_playing || state.is_muted {
+                return Vec::new();
+            }
+            state.active_sounds
+                .iter()
+                .filter_map(|(sound_id, &volume)| {
+                    state
+                        .get_sound_by_id(sound_id)
+                        .map(|sound| {
+                            (sound_id.clone(), sound.audio_url.clone(), volume * state.global_volume)
+                        })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    send_engine_command(AmbianceEngineCommand::SwitchDevice { device_id, resume });
+}
+
+/// Opens, decodes, and starts a looping `Sink` for `audio_url` on
+/// `stream_handle`. Shared by `Play` and the `SwitchDevice` resume step so
+/// both build sinks the same way.
+fn build_ambiance_sink(
+    stream_handle: &OutputStreamHandle,
+    audio_url: &str,
+    volume: f32
+) -> Result<Sink, String> {
+    let audio_path = audio_url.replace("assets/", "");
+    let full_path = format!("assets/{}", audio_path);
+    let file = File::open(&full_path).map_err(|e|
+        format!("Failed to open audio file {}: {}", full_path, e)
+    )?;
+    let decoder = Decoder::new(BufReader::new(file)).map_err(|e|
+        format!("Failed to decode audio: {}", e)
+    )?;
+    let sink = Sink::try_new(stream_handle).map_err(|e|
+        format!("Failed to create audio sink: {}", e)
+    )?;
+    sink.set_volume(volume.clamp(0.0, 1.0));
+    sink.append(decoder.repeat_infinite());
+    Ok(sink)
+}
+
+fn open_stream(device_id: Option<&str>) -> Result<(OutputStream, OutputStreamHandle), String> {
+    if let Some(id) = device_id {
+        let device_manager = DeviceManager::new();
+        if let Ok(Some(device)) = device_manager.get_output_device_by_id(id) {
+            if let Ok(pair) = rodio::OutputStream::try_from_device(&device) {
+                return Ok(pair);
+            }
+        }
+        eprintln!("❌ [Ambiance] Failed to open device {}, falling back to default", id);
+    }
+    rodio::OutputStream
+        ::try_default()
+        .map_err(|e| format!("Failed to create audio output stream: {}", e))
+}
+
 // Initialize global ambiance player
 pub fn initialize_global_ambiance_player() {
-    let _sinks_ref = GLOBAL_AMBIANCE_SINKS.get_or_init(|| { Arc::new(Mutex::new(HashMap::new())) });
+    let (tx, rx) = mpsc::channel::<AmbianceEngineCommand>();
+    AMBIANCE_ENGINE_TX.get_or_init(|| Mutex::new(Some(tx)));
 
     // Initialize global state
     let _state_ref = GLOBAL_AMBIANCE_PLAYER_STATE.get_or_init(|| {
         Arc::new(Mutex::new(AmbiancePlayerState::initialize()))
+    });
+
+    // One thread owns the shared OutputStream for its whole lifetime -
+    // OutputStream (via cpal::Stream) is not Send, so it must be created on
+    // and never leave this thread; SwitchDevice rebuilds it in place here.
+    thread::spawn(move || {
+        let initial_device = AppConfig::load().selected_audio_device;
+        let (mut stream, mut stream_handle) = match open_stream(initial_device.as_deref()) {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("❌ [Ambiance] Failed to open audio stream: {}", e);
+                return;
+            }
+        };
+        let mut sinks: HashMap<String, Sink> = HashMap::new();
+
+        while let Ok(command) = rx.recv() {
+            match command {
+                AmbianceEngineCommand::Play { sound_id, audio_url, volume } => {
+                    if let Some(old) = sinks.remove(&sound_id) {
+                        old.stop();
+                    }
+
+                    match build_ambiance_sink(&stream_handle, &audio_url, volume) {
+                        Ok(sink) => {
+                            sinks.insert(sound_id.clone(), sink);
+                            println!("🎵 [Ambiance] Started playing sound: {}", sound_id);
+                        }
+                        Err(e) => eprintln!("❌ [Ambiance] Failed to play sound {}: {}", sound_id, e),
+                    }
+                }
+                AmbianceEngineCommand::Stop(sound_id) => {
+                    if let Some(sink) = sinks.remove(&sound_id) {
+                        sink.stop();
+                        println!("🔇 [Ambiance] Stopped sound: {}", sound_id);
+                    }
+                }
+                AmbianceEngineCommand::SetVolume { sound_id, volume } => {
+                    if let Some(sink) = sinks.get(&sound_id) {
+                        sink.set_volume(volume.clamp(0.0, 1.0));
+                    }
+                }
+                AmbianceEngineCommand::SetAllVolume(volume) => {
+                    let clamped = volume.clamp(0.0, 1.0);
+                    for sink in sinks.values() {
+                        sink.set_volume(clamped);
+                    }
+                }
+                AmbianceEngineCommand::PauseAll => {
+                    for sink in sinks.values() {
+                        sink.pause();
+                    }
+                }
+                AmbianceEngineCommand::ResumeAll => {
+                    for sink in sinks.values() {
+                        sink.play();
+                    }
+                }
+                AmbianceEngineCommand::SwitchDevice { device_id, resume } => {
+                    match open_stream(device_id.as_deref()) {
+                        Ok((new_stream, new_handle)) => {
+                            // Sinks are bound to the stream_handle they were
+                            // created from and can't move to the new stream,
+                            // so drop them and rebuild fresh ones on the new
+                            // handle for whatever was actually audible.
+                            for sink in sinks.values() {
+                                sink.stop();
+                            }
+                            sinks.clear();
+                            stream = new_stream;
+                            stream_handle = new_handle;
+
+                            for (sound_id, audio_url, volume) in resume {
+                                match build_ambiance_sink(&stream_handle, &audio_url, volume) {
+                                    Ok(sink) => {
+                                        sinks.insert(sound_id, sink);
+                                    }
+                                    Err(e) =>
+                                        eprintln!(
+                                            "❌ [Ambiance] Failed to resume sound {} after device switch: {}",
+                                            sound_id,
+                                            e
+                                        ),
+                                }
+                            }
+                            println!("🎵 [Ambiance] Switched output device");
+                        }
+                        Err(e) => eprintln!("❌ [Ambiance] Failed to switch device: {}", e),
+                    }
+                }
+            }
+        }
+
+        // Keep `stream` alive for the thread's lifetime.
+        let _ = &stream;
     });
 
     println!("🎵 Global ambiance player initialized");
@@ -58,151 +258,52 @@ pub fn get_global_ambiance_player_state_copy() -> Option<AmbiancePlayerState> {
 
 // Play a sound
 pub fn play_ambiance_sound(sound_id: String, audio_url: String, volume: f32) -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let mut sinks_lock = sinks_ref.lock().unwrap();
-
-    // Stop existing sound if playing
-    if let Some(sink) = sinks_lock.remove(&sound_id) {
-        sink.stop();
-    }
-
-    // Create new audio stream for this sound
-    thread::spawn(move || {
-        let result = (|| -> Result<(), String> {
-            let (_stream, stream_handle) = rodio::OutputStream
-                ::try_default()
-                .map_err(|e| format!("Failed to create audio output stream: {}", e))?;
-
-            let sink = Sink::try_new(&stream_handle).map_err(|e|
-                format!("Failed to create audio sink: {}", e)
-            )?;
-
-            // Load audio file from local path
-            let audio_path = audio_url.replace("assets/", "");
-            let full_path = format!("assets/{}", audio_path);
-
-            let file = File::open(&full_path).map_err(|e|
-                format!("Failed to open audio file {}: {}", full_path, e)
-            )?;
-            let buf_reader = BufReader::new(file);
-
-            let decoder = Decoder::new(buf_reader).map_err(|e|
-                format!("Failed to decode audio: {}", e)
-            )?;
-
-            sink.set_volume(volume.clamp(0.0, 1.0));
-            sink.append(decoder.repeat_infinite());
-
-            // Store sink in global map
-            if let Some(sinks_ref) = GLOBAL_AMBIANCE_SINKS.get() {
-                let mut sinks_lock = sinks_ref.lock().unwrap();
-                sinks_lock.insert(sound_id.clone(), sink);
-            }
-
-            println!("🎵 Started playing ambiance sound: {}", sound_id);
-
-            // Keep the stream alive
-            loop {
-                thread::sleep(std::time::Duration::from_secs(1));
-                // Check if sink is still in the map (not stopped)
-                if let Some(sinks_ref) = GLOBAL_AMBIANCE_SINKS.get() {
-                    let sinks_lock = sinks_ref.lock().unwrap();
-                    if !sinks_lock.contains_key(&sound_id) {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            Ok(())
-        })();
-
-        if let Err(e) = result {
-            eprintln!("❌ Failed to play ambiance sound {}: {}", sound_id, e);
-        }
-    });
-
+    send_engine_command(AmbianceEngineCommand::Play { sound_id, audio_url, volume });
     Ok(())
 }
 
 // Stop a sound
 pub fn stop_ambiance_sound(sound_id: &str) -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let mut sinks_lock = sinks_ref.lock().unwrap();
-
-    if let Some(sink) = sinks_lock.remove(sound_id) {
-        sink.stop();
-        println!("🔇 Stopped ambiance sound: {}", sound_id);
-    }
-
+    send_engine_command(AmbianceEngineCommand::Stop(sound_id.to_string()));
     Ok(())
 }
 
 // Pause all sounds
 pub fn pause_all_ambiance_sounds() -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let sinks_lock = sinks_ref.lock().unwrap();
-
-    for sink in sinks_lock.values() {
-        sink.pause();
-    }
+    send_engine_command(AmbianceEngineCommand::PauseAll);
     println!("⏸️ Paused all ambiance sounds");
-
     Ok(())
 }
 
 // Resume all sounds
 pub fn resume_all_ambiance_sounds() -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let sinks_lock = sinks_ref.lock().unwrap();
-
-    for sink in sinks_lock.values() {
-        sink.play();
-    }
+    send_engine_command(AmbianceEngineCommand::ResumeAll);
     println!("▶️ Resumed all ambiance sounds");
-
     Ok(())
 }
 
 // Set sound volume
 pub fn set_ambiance_sound_volume(sound_id: &str, volume: f32) -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let sinks_lock = sinks_ref.lock().unwrap();
-
-    if let Some(sink) = sinks_lock.get(sound_id) {
-        sink.set_volume(volume.clamp(0.0, 1.0));
-    }
-
+    send_engine_command(AmbianceEngineCommand::SetVolume {
+        sound_id: sound_id.to_string(),
+        volume,
+    });
     Ok(())
 }
 
 // Set global volume for all sounds
 pub fn set_global_ambiance_volume(volume: f32) -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let sinks_lock = sinks_ref.lock().unwrap();
-
-    let clamped_volume = volume.clamp(0.0, 1.0);
-    for sink in sinks_lock.values() {
-        sink.set_volume(clamped_volume);
-    }
-
+    send_engine_command(AmbianceEngineCommand::SetAllVolume(volume));
     Ok(())
 }
 
 // Set global mute for all sounds
 pub fn set_global_ambiance_mute(muted: bool) -> Result<(), String> {
-    let sinks_ref = GLOBAL_AMBIANCE_SINKS.get().ok_or("Ambiance player not initialized")?;
-    let sinks_lock = sinks_ref.lock().unwrap();
-
-    for sink in sinks_lock.values() {
-        if muted {
-            sink.pause();
-        } else {
-            sink.play();
-        }
+    if muted {
+        send_engine_command(AmbianceEngineCommand::PauseAll);
+    } else {
+        send_engine_command(AmbianceEngineCommand::ResumeAll);
     }
-
     Ok(())
 }
 

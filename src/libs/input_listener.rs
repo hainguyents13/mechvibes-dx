@@ -1,6 +1,7 @@
+use crossbeam_channel::Sender;
 use rdev::{ listen, Button, Event, EventType, Key };
 use std::collections::HashSet;
-use std::sync::{ mpsc::Sender, Arc, Mutex };
+use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::{ Duration, Instant };
 

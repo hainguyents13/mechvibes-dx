@@ -1,5 +1,6 @@
-/// Global input manager to handle input channels between main and UI
-use std::sync::{ mpsc, Arc, Mutex, OnceLock };
+/// Global input manager to handle input channels between main and the audio engine
+use crossbeam_channel::{ Receiver, Sender };
+use std::sync::{ Arc, Mutex, OnceLock };
 
 /// Static global holder for input channels
 static INPUT_CHANNELS: OnceLock<InputChannels> = OnceLock::new();
@@ -7,30 +8,32 @@ static INPUT_CHANNELS: OnceLock<InputChannels> = OnceLock::new();
 /// Static global holder for window focus state
 static WINDOW_FOCUS_STATE: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 
-/// Struct to hold input event channels
+/// Struct to hold input event channels. Crossbeam receivers are `Clone`, so
+/// the engine thread can hold its own receiver directly instead of sharing
+/// one behind a `Mutex` (kept here only for the sender clones UI code uses).
 #[allow(dead_code)]
 pub struct InputChannels {
-    pub keyboard_rx: Arc<Mutex<mpsc::Receiver<String>>>,
-    pub mouse_rx: Arc<Mutex<mpsc::Receiver<String>>>,
-    pub hotkey_rx: Arc<Mutex<mpsc::Receiver<String>>>,
-    pub keyboard_tx: Arc<Mutex<mpsc::Sender<String>>>,
-    pub mouse_tx: Arc<Mutex<mpsc::Sender<String>>>,
-    pub hotkey_tx: Arc<Mutex<mpsc::Sender<String>>>,
+    pub keyboard_rx: Receiver<String>,
+    pub mouse_rx: Receiver<String>,
+    pub hotkey_rx: Receiver<String>,
+    pub keyboard_tx: Arc<Mutex<Sender<String>>>,
+    pub mouse_tx: Arc<Mutex<Sender<String>>>,
+    pub hotkey_tx: Arc<Mutex<Sender<String>>>,
 }
 
 /// Initialize input channels (called from main)
 pub fn init_input_channels(
-    keyboard_rx: mpsc::Receiver<String>,
-    mouse_rx: mpsc::Receiver<String>,
-    hotkey_rx: mpsc::Receiver<String>,
-    keyboard_tx: mpsc::Sender<String>,
-    mouse_tx: mpsc::Sender<String>,
-    hotkey_tx: mpsc::Sender<String>
+    keyboard_rx: Receiver<String>,
+    mouse_rx: Receiver<String>,
+    hotkey_rx: Receiver<String>,
+    keyboard_tx: Sender<String>,
+    mouse_tx: Sender<String>,
+    hotkey_tx: Sender<String>
 ) {
     let channels = InputChannels {
-        keyboard_rx: Arc::new(Mutex::new(keyboard_rx)),
-        mouse_rx: Arc::new(Mutex::new(mouse_rx)),
-        hotkey_rx: Arc::new(Mutex::new(hotkey_rx)),
+        keyboard_rx,
+        mouse_rx,
+        hotkey_rx,
         keyboard_tx: Arc::new(Mutex::new(keyboard_tx)),
         mouse_tx: Arc::new(Mutex::new(mouse_tx)),
         hotkey_tx: Arc::new(Mutex::new(hotkey_tx)),

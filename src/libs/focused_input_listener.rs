@@ -1,6 +1,7 @@
+use crossbeam_channel::Sender;
 use device_query::{ DeviceQuery, DeviceState, Keycode };
 use std::collections::HashSet;
-use std::sync::{ mpsc::Sender, Arc, Mutex };
+use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Duration;
 

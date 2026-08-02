@@ -1,8 +1,10 @@
+use crate::libs::audio::{ AudioCommand, AudioContext };
 use crate::libs::device_manager::{ DeviceInfo, DeviceManager };
 use crate::libs::input_device_manager::{ InputDeviceInfo, InputDeviceManager };
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::{ Headphones, Keyboard, Mouse, RefreshCw };
+use std::sync::Arc;
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum DeviceType {
@@ -156,10 +158,12 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
     };
 
     // Handle device selection/toggling
+    let audio_ctx: Arc<AudioContext> = use_context();
     let handle_device_action = {
         let update_config = update_config.clone();
         let device_type = props.device_type;
         let test_device_status = test_device_status.clone();
+        let audio_ctx = audio_ctx.clone();
 
         use_callback(move |device_id: String| {
             match device_type {
@@ -168,15 +172,27 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                     test_device_status.call(device_id.clone());
 
                     let device_id_clone = device_id.clone();
+                    let switch_target = if device_id_clone == "default" {
+                        None
+                    } else {
+                        Some(device_id_clone.clone())
+                    };
                     update_config(
                         Box::new(move |config| {
-                            config.selected_audio_device = if device_id_clone == "default" {
-                                None
-                            } else {
-                                Some(device_id_clone)
-                            };
+                            config.selected_audio_device = switch_target.clone();
                         })
                     );
+
+                    // Apply at runtime: the audio engine and ambiance
+                    // player both switch immediately, not just on next
+                    // startup.
+                    let runtime_target = if device_id == "default" {
+                        None
+                    } else {
+                        Some(device_id)
+                    };
+                    audio_ctx.send(AudioCommand::SwitchDevice(runtime_target.clone()));
+                    crate::state::ambiance::switch_ambiance_player_device(runtime_target);
                 }
                 DeviceType::Keyboard => {
                     let device_id_clone = device_id.clone();

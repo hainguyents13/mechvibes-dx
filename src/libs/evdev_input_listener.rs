@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 #[cfg(target_os = "linux")]
-use std::sync::mpsc::Sender;
+use crossbeam_channel::Sender;
 
 #[cfg(target_os = "linux")]
 pub fn start_evdev_keyboard_listener(

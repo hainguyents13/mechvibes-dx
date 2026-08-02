@@ -115,6 +115,17 @@ impl InputDeviceManager {
         Ok(())
     }
 
+    /// Computes the same `id` (hash of the Raw Input device name) that
+    /// `enumerate_devices`/`get_devices` produce for a `HANDLE`, so a live
+    /// `WM_INPUT`'s `RAWINPUT.header.hDevice` can be matched against
+    /// `AppConfig.enabled_keyboards`/`enabled_mice` without re-implementing
+    /// the lookup. Used by `rawinput_listener.rs`'s per-device filtering.
+    #[cfg(windows)]
+    pub fn device_id_for_handle(device_handle: HANDLE) -> Result<String, String> {
+        let manager = InputDeviceManager::new();
+        unsafe { manager.get_device_info(device_handle) }.map(|info| info.id)
+    }
+
     #[cfg(windows)]
     unsafe fn get_device_info(&self, device_handle: HANDLE) -> Result<InputDeviceInfo, String> {
         let mut name_size = 0u32;
