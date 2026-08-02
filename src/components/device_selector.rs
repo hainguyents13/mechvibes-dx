@@ -4,13 +4,53 @@ use crate::libs::input_device_manager::{ InputDeviceInfo, InputDeviceManager };
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use lucide_dioxus::{ Headphones, Keyboard, Mouse, RefreshCw };
-use std::sync::Arc;
+use std::sync::{ Arc, Mutex, OnceLock };
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum DeviceType {
     AudioOutput,
     Keyboard,
     Mouse,
+}
+
+/// Input devices enumerated during this app session, kept outside the component
+/// tree so they survive the unmount that happens on every tab switch.
+/// Audio outputs already have an equivalent cache in `DeviceManager`.
+static ENUMERATED_INPUT_DEVICES: OnceLock<Mutex<Vec<InputDeviceInfo>>> = OnceLock::new();
+
+/// Whether the user has enumerated devices at least once this session.
+/// Enumeration stays lazy — nothing runs until the refresh button is pressed —
+/// but once it has run, re-entering the page shows the result instead of
+/// falling back to the "click refresh" placeholder.
+static DEVICES_ENUMERATED: OnceLock<Mutex<bool>> = OnceLock::new();
+
+fn input_device_cache() -> &'static Mutex<Vec<InputDeviceInfo>> {
+    ENUMERATED_INPUT_DEVICES.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn devices_enumerated_flag() -> &'static Mutex<bool> {
+    DEVICES_ENUMERATED.get_or_init(|| Mutex::new(false))
+}
+
+/// Records that an enumeration has completed, so remounts can restore results.
+fn mark_devices_enumerated() {
+    if let Ok(mut flag) = devices_enumerated_flag().lock() {
+        *flag = true;
+    }
+}
+
+fn have_devices_been_enumerated() -> bool {
+    devices_enumerated_flag().lock().map(|flag| *flag).unwrap_or(false)
+}
+
+fn store_input_devices(devices: &[InputDeviceInfo]) {
+    if let Ok(mut cache) = input_device_cache().lock() {
+        *cache = devices.to_vec();
+    }
+}
+
+fn cached_input_devices() -> Vec<InputDeviceInfo> {
+    input_device_cache().lock().map(|cache| cache.clone()).unwrap_or_default()
 }
 
 /// Tells the Windows input worker host to reload its enabled-device filter,
@@ -71,11 +111,13 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                             Ok(device_list) => {
                                 println!("✅ [DeviceSelector] Loaded {} cached audio devices", device_list.len());
                                 audio_devices.set(device_list);
+                                mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                             Err(e) => {
                                 println!("❌ [DeviceSelector] Failed to load cached devices: {}", e);
                                 error_message.set(format!("Failed to load audio devices: {}", e));
+                                mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                         }
@@ -85,12 +127,15 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         match InputDeviceManager::get_devices() {
                             Ok(device_list) => {
                                 println!("✅ [DeviceSelector] Loaded {} input devices", device_list.len());
+                                store_input_devices(&device_list);
                                 input_devices.set(device_list);
+                                mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                             Err(e) => {
                                 println!("❌ [DeviceSelector] Failed to load input devices: {}", e);
                                 error_message.set(format!("Failed to load input devices: {}", e));
+                                mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                         }
@@ -134,9 +179,36 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
         })
     };
 
-    // Don't auto-load devices on mount to avoid audio interruption
-    // User must click refresh button to load devices
-    // This prevents ALSA enumeration from interfering with audio playback
+    // Enumeration stays lazy: nothing is probed on first mount, because ALSA
+    // enumeration can interrupt audio playback. But once the user has loaded
+    // devices this session, restore that result on remount so switching tabs
+    // does not appear to wipe the list.
+    use_hook({
+        let mut audio_devices = audio_devices;
+        let mut input_devices = input_devices;
+        let mut has_loaded = has_loaded;
+        let device_type = props.device_type;
+
+        move || {
+            if !have_devices_been_enumerated() {
+                return;
+            }
+
+            match device_type {
+                DeviceType::AudioOutput => {
+                    // Reading the cache is a plain clone; it does not re-enumerate.
+                    if let Ok(device_list) = DeviceManager::get_cached_output_devices() {
+                        audio_devices.set(device_list);
+                    }
+                }
+                DeviceType::Keyboard | DeviceType::Mouse => {
+                    input_devices.set(cached_input_devices());
+                }
+            }
+
+            has_loaded.set(true);
+        }
+    });
 
     // Test device status (only for audio devices)
     let test_device_status = {
