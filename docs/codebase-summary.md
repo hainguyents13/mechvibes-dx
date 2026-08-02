@@ -1,8 +1,9 @@
 # Codebase Summary — MechvibesDX
 
-**Last Updated:** 2026-08-02 · **Language:** Rust (1.97.1) + Dioxus 0.7.10  
+**Last Updated:** 2026-08-03 · **Language:** Rust (1.97.1) + Dioxus 0.7.10  
 **Build:** `cargo build --release` (Windows); CI via GitHub Actions  
-**Platform targets:** Windows (primary), Linux (X11/Wayland), macOS
+**Platform targets:** Windows (primary), Linux (X11/Wayland), macOS  
+**Current version:** v0.7.0 (device watchdog removed, input injection filter added, trace facility enabled)
 
 ## Directory Tree & Module Organization
 
@@ -146,20 +147,23 @@ mechvibes-dx/
 2. **Single-instance guard (Windows):** Acquire mutex keyed by exe path hash.
    - If already held: print error and exit.
 
-3. **Initialize logging:** `utils::logger::setup()`.
+3. **Initialize trace facility (Phase 7):** `libs::trace::init()` (enabled by `MECHVIBES_TRACE=1`).
+   - Zero-overhead when disabled; writer thread spawned when enabled.
 
-4. **Spawn input listeners:** Platform-specific.
+4. **Initialize logging:** `utils::logger::setup()`.
+
+5. **Spawn input listeners:** Platform-specific.
    - Windows: `input_worker_host.rs` (spawns worker + reads stdout).
    - Linux: `input_listener.rs` (rdev) + `evdev_input_listener.rs` (optional direct).
    - macOS: `input_listener.rs` (rdev).
 
-5. **Spawn audio engine:** `libs::audio::engine::spawn_engine()` before Dioxus.
+6. **Spawn audio engine:** `libs::audio::engine::spawn_engine()` before Dioxus.
    - Initializes `OutputStream` on main thread (cpal opens device).
-   - Engine thread starts, enters `select!` loop.
+   - Engine thread starts, enters `select!` loop (purely event-driven, no polling).
 
-6. **Ambiance player init:** Separate `OutputStream`, separate thread.
+7. **Ambiance player init:** Separate `OutputStream`, separate thread.
 
-7. **Launch Dioxus:** `dioxus::launch(root)` hands control to webview event loop.
+8. **Launch Dioxus:** `dioxus::launch(root)` hands control to webview event loop.
 
 ### UI Render Loop (`src/libs/ui.rs`)
 
@@ -213,10 +217,10 @@ mechvibes-dx/
    - If failure: keeps old stream, returns `Err(...)`.
    - Emits `UiEvent::DeviceSwitched(result)`.
 
-5. **Watchdog (separate, always running):**
-   - Every 1 second, checks if active device still exists.
-   - If missing for 2 checks: calls `DeviceManager::fallback_to_default()`.
-   - Emits `UiEvent::DeviceLost { lost_device, result }`.
+**Watchdog (removed Phase 7):**
+- The 1-second timer that polled device presence is gone.
+- On device unplug: app goes silent, config retains selection, user manually reselects.
+- No automatic fallback at runtime (startup fallback to default still applies if saved device unavailable at launch).
 
 ## Key Data Structures
 
@@ -290,15 +294,16 @@ pub(super) struct EngineState {
     stream_handle: OutputStreamHandle,
     keyboard_sinks: Vec<Sink>,     // Voice pool
     mouse_sinks: Vec<Sink>,
-    keyboard_samples: Arc<Vec<f32>>,
-    mouse_samples: Arc<Vec<f32>>,
+    keyboard_samples: Option<DecodedAudio>,
+    mouse_samples: Option<DecodedAudio>,
     device_manager: DeviceManager,
-    device_missing_strikes: u32,
-    // ... plus fields for caching, tracking state
+    current_device_id: Option<String>,
+    device_rate: Option<u32>,
+    // ... plus fields for key/mouse press state, volume, sound enabled flags
 }
 ```
 
-**Invariant:** Only touched by engine thread. No `Arc<Mutex<>>` here.
+**Invariant:** Only touched by engine thread. No `Arc<Mutex<>>` here. Purely event-driven—no timer or polling.
 
 ### `InputChannels` (Engine's Input Sources, `src/libs/input_manager.rs`)
 
@@ -382,6 +387,20 @@ pub struct InputChannels {
    - Ensure `cargo build --target ...` compiles.
    - Manual audio playback test (type a key → hear sound).
 
+## Input Filtering & Injection Detection (Phase 7)
+
+**Windows injected-input filter (`src/libs/input_worker.rs:89–119`):**
+
+Keyboard events with NULL source device (`hDevice`) are dropped before transmission to the host. This silences software-injected keys without blocking per-device filtering or hotkey detection.
+
+**Use cases:**
+- Vietnamese IME Telex: typing `dd` triggers automatic corrections (backspace + ð character), all injected by `SendInput` with no device handle. Without filtering, each correction plays as machine-gun sounds.
+- Same mechanism applies to other IMEs, AutoHotkey scripts, and remote-desktop clients.
+
+**Known trade-off:** Legitimate synthetic clicks that users expect to hear (on-screen keyboards) are also silent. A per-user setting can be added if needed.
+
+**Mouse events:** Unaffected; they pass through regardless of device presence.
+
 ## Dependency Overview
 
 **Key crates (from `Cargo.toml`):**
@@ -412,7 +431,8 @@ pub struct InputChannels {
 
 **Key test modules:**
 - `src/libs/audio/resampler.rs::{test_resample_*}` — resampling correctness
-- `src/libs/audio/engine.rs::{test_voice_pool, test_device_watchdog}` — engine logic
+- `src/libs/audio/engine.rs::{test_voice_pool, test_the_engine_loop_never_polls_the_audio_device, test_no_device_presence_polling_remains_anywhere_in_the_engine, test_manual_device_switching_is_still_supported}` — engine logic (Phase 7: no polling tests)
+- `src/libs/input_worker.rs::{test_injected_keystrokes_are_dropped, test_real_keystrokes_still_pass, test_mouse_events_are_never_dropped}` — injection filter (Phase 7)
 - `src/libs/rawinput_listener.rs::{test_*}` — key code mapping (Windows)
 - `src/libs/input_worker_host.rs::{test_restart_backoff, test_device_filter}` — worker supervision
 
@@ -444,7 +464,7 @@ cargo test --release  # For audio tests (opt=2 in dev profile)
 - Linux: DEB package (Ubuntu/Debian) + AppImage (universal).
 - macOS: dx bundle (app not installer; pending user test).
 
-**Current release:** v0.6.0 (Phase 3 + Phase 6 on main, uncommitted).
+**Current release:** v0.7.0 (Phase 3 + Phase 6 + Phase 7 on main).
 
 ## Build & Development
 
@@ -480,6 +500,8 @@ cargo clippy               # Lint (baseline ~180 warnings pre-existing)
 | Device switch crashes | UI thread directly manipulated `OutputStream` | Engine thread owns it; send command via channel. |
 | Slow pack load | Resampling happens per-keystroke | Resampled at load-time (Phase 2); built-in. |
 | Worker spawns but no input | Raw Input registration conflicts in same process | Worker is separate process; built-in. |
+| Sound stops after unplug | No automatic device polling (Phase 7 design) | User manually selects device in Settings or restarts. |
+| IME corrections trigger sounds | Injected keystrokes (Phase 7) | Filter drops NULL-device events (Vietnamese Telex, etc.); built-in. |
 | Config not persisting | JSON write fails silently | Check `utils/config.rs` error handling; add logging. |
 | Linux: no input detected | User not in `input` group | Instructions in README.md + app prompts user. |
 
@@ -487,12 +509,13 @@ cargo clippy               # Lint (baseline ~180 warnings pre-existing)
 
 1. **Ambiance unified stream:** Merge with keyboard engine stream (reduce thread count).
 2. **Config migration system:** Remove dead `MusicPlayerConfig` field.
-3. **Per-device filtering (Linux):** Direct evdev device selection.
-4. **macOS focus tracking:** Determine if needed; implement via CGEventTap if yes.
-5. **Toast notifications:** Centralized system (currently only stderr for device-lost).
-6. **Soundpack preview:** Play pack sound without saving config.
-7. **Customizable key bindings:** Remap hotkey from Ctrl+Alt+M.
-8. **Cloud soundpacks:** Download/share packs online (infrastructure).
+3. **Injected input opt-in:** Make the keyboard injection filter configurable for users who want on-screen keyboards or remote-desktop input to trigger sounds.
+4. **Per-device filtering (Linux):** Direct evdev device selection.
+5. **macOS focus tracking:** Determine if needed; implement via CGEventTap if yes.
+6. **Toast notifications:** Centralized system (currently only stderr).
+7. **Soundpack preview:** Play pack sound without saving config.
+8. **Customizable key bindings:** Remap hotkey from Ctrl+Alt+M.
+9. **Cloud soundpacks:** Download/share packs online (infrastructure).
 
 ---
 

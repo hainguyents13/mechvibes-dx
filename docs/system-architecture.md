@@ -1,7 +1,7 @@
 # System Architecture — MechvibesDX
 
-**Last Updated:** 2026-08-02 · **Version:** 0.6.0  
-**Status:** Reflects actual codebase post-Phase 3 (audio engine thread) and Phase 6 (Windows input worker process).
+**Last Updated:** 2026-08-03 · **Version:** 0.7.0  
+**Status:** Reflects actual codebase post-Phase 3 (audio engine thread), Phase 6 (Windows input worker process), and Phase 7 (device watchdog removal, input injection filter, trace facility).
 
 ## Overview
 
@@ -11,6 +11,12 @@ The architecture prioritizes:
 1. **Low-latency audio**: Dedicated engine thread owns `OutputStream` (non-`Send` type) exclusively.
 2. **Platform-specific input capture**: Windows uses a separate worker process to bypass Raw Input registration conflicts; Linux/macOS use in-process listeners.
 3. **Clean separation of concerns**: Audio engine runs independently of UI polling; input listeners run on their own threads; configuration changes propagate through typed command channels.
+
+## UI & UX Changes (Phase 7)
+
+**Logo press feedback:** Last-event-wins semantics restored. CSS transition reduced to 30ms inline (from 150ms) to capture fast typists (15–20 keys/sec) — measured at 0/30 visible presses with 150ms vs 29/30 with 30ms.
+
+**Settings Devices note:** Updated to clarify "Device changes apply immediately — no restart needed. If audio stops working (e.g., after unplugging), restarting the app can help."
 
 ## High-Level Data Flow
 
@@ -37,8 +43,8 @@ The architecture prioritizes:
         │  • Owns OutputStream (rodio)            │
         │  • Voice pool (Vec<Sink>, 32 max)      │
         │  • Fade/anti-click management          │
-        │  • Device watchdog (1Hz tick)           │
         │  • Receives AudioCommand via channel   │
+        │  • Purely event-driven (no polling)    │
         └────────────────────┬────────────────────┘
                              │
         ┌────────────────────▼────────────────────┐
@@ -71,7 +77,7 @@ The architecture prioritizes:
 - Used to send `AudioCommand` across thread boundaries.
 - Panics are treated as unrecoverable (engine thread exits → app can no longer make sound).
 
-**`EngineState`** (`engine.rs:148–170+`)
+**`EngineState`** (`engine.rs:119–143`)
 - All audio state owned exclusively by the engine thread.
 - Key fields:
   - `stream: OutputStream` — rodio's bridge to the OS audio subsystem.
@@ -80,14 +86,13 @@ The architecture prioritizes:
   - `mouse_sinks: Vec<Sink>` — separate pool for mouse events.
   - `keyboard_samples`/`mouse_samples` — decoded, resampled audio buffers (one per loaded pack).
   - `device_manager: DeviceManager` — tracks current output device and available devices.
-  - `device_missing_strikes: u32` — counter for watchdog (see Device Watchdog below).
 
 **`run_engine()` Main Loop** (`engine.rs:200+`)
 - Runs on the audio engine thread.
-- Uses `crossbeam_channel::select!` to multiplex:
+- Uses `crossbeam_channel::select!` to multiplex (purely event-driven, no timed arms):
   1. **Command channel** (`cmd_rx`) — UI-initiated operations (volume, pack load, device switch).
   2. **Input channels** (`keyboard_rx`, `mouse_rx`, `hotkey_rx`) — raw `"KeyA"` / `"UP:KeyA"` strings from listeners.
-  3. **Device watchdog deadline** (via `crossbeam_channel::at`) — fires every 1 second to check if the active device is still present.
+  3. **Hotkey channel** (`hotkey_rx`) — Ctrl+Alt+M sound toggle (handled separately on Windows; detected in-process on Linux/macOS).
 
 #### Voice Pool & Anti-Click (Phase 1)
 
@@ -100,7 +105,7 @@ The architecture prioritizes:
 - **Eviction (soft)**: When pool exceeds `MAX_VOICES` (32), oldest sinks are ramped down over 10ms instead of dropped immediately.
 - **Eviction (hard)**: Once fade-out completes, the sink is removed from the pool to free resources.
 
-**Key file:** `engine.rs:80–140` (`spawn_voice`, `apply_fade`, `manage_active_sinks`).
+**Key functions:** `apply_fade` (line 383), `manage_active_sinks` (line 421), `play_segment` (line 332).
 
 #### Resampling On Load (Phase 2)
 
@@ -114,24 +119,43 @@ The architecture prioritizes:
 
 **Key file:** `src/libs/audio/resampler.rs` (sinc interpolation), `soundpack_loader.rs` (integration).
 
-#### Device Switching & Watchdog (Phase 3)
+#### Device Switching (Phase 3, Watchdog Removed in Phase 7)
 
-**Why it matters:** Unplugging headphones or switching to a different speaker should not crash the app or silently continue on a wrong device.
+**Why it matters:** Unplugging headphones or switching to a different speaker should not crash the app.
 
 **Architecture:**
 - UI's device selector sends `AudioCommand::SwitchDevice(Option<String>)`.
 - Engine calls `DeviceManager::open_stream()` which closes the old `OutputStream` and opens a new one on the selected device.
-- If the device doesn't exist, the command returns `Err(...)` and the old stream remains active.
+- If the device doesn't exist, the command returns `Err(...)` and the old stream remains active (keep current sound, report error).
 
-**Device Watchdog:**
-- Fires every 1 second (via absolute deadline in `select!`).
-- Checks if the active device name still exists via `DeviceManager::has_output_device_named()`.
-- If missing for 2 consecutive checks (~2 seconds), falls back to system default.
-- The check is ~10ms in the happy path (device present), ~1.5s only if truly missing (full re-enumeration).
+**Device Watchdog (Removed Phase 7):**
+The automatic device-presence polling (1-second timer checking `has_output_device_named()`, auto-fallback on 2 strikes) was removed entirely. Reason: cpal's device enumeration costs hundreds of milliseconds per call, and running it on the engine loop (which also plays sound and emits UI events) stalled keystrokes by up to several seconds.
 
-**Why absolute deadline, not `select! default`:** Starving the watchdog with high keystroke traffic would delay device-unplug detection indefinitely. Absolute deadline ensures ~3-second responsiveness even under heavy input.
+**New behavior on device unplug:**
+- Unplugging the selected output device → app goes silent.
+- Config keeps the selection; user manually reselects in Settings or restarts.
+- Manual switching via `AudioCommand::SwitchDevice` is unaffected.
+- At startup, the saved device selection is attempted; if unavailable, falls back to system default (no startup-only fallback applies at runtime).
 
-**Key files:** `engine.rs:300+` (main loop), `device_manager.rs:80+` (`has_output_device_named`), `engine.rs:150-190` (UiEvent::DeviceLost emission).
+**Guard test:** `the_engine_loop_never_polls_the_audio_device` in `engine.rs:661-679` enforces zero timed arms in the engine's `select!` loop. Future periodic work must never run on the engine thread.
+
+**Key files:** `engine.rs:561-643` (main loop, purely event-driven), `engine.rs:254-288` (device switch handler).
+
+#### Latency Tracing Facility (Phase 7)
+
+**Location:** `src/libs/trace.rs`  
+**Opt-in:** Set `MECHVIBES_TRACE=1` before launching the app.
+
+**Why it matters:** Diagnosing latency across the keyboard→worker→engine→sound→UI path without introducing the very stall being measured.
+
+**Design:**
+- Zero overhead when disabled (atomic load that fails immediately per keystroke).
+- Non-blocking: all I/O is delegated to a dedicated writer thread using an unbounded channel.
+- Emits one summary console line per keystroke with per-hop durations (worker→host→engine→sound→UI).
+- Marks hops ≥50ms as slow.
+- Full detailed log written to `%TEMP%/mechvibes-trace-{pid}.log` for offline analysis.
+
+**Key files:** `trace.rs:1-373` (implementation).
 
 #### Ambiance Player Integration
 
@@ -162,6 +186,7 @@ The architecture prioritizes:
    - Decodes `RAWINPUT` structures and extracts key codes and device handles.
    - Memoizes device-ID lookups (one `InputDeviceManager::device_id_for_handle()` per device, not per keystroke).
    - Suppresses key-repeat events (held key produces one down + one up, not multiple downs).
+   - **Filters injected keystrokes** (Phase 7): Drops keyboard events with NULL `hDevice` (software-injected via `SendInput`, e.g., Vietnamese IME Telex corrections like `dd→đ`). Preserves physical keys and mouse events. Filtering is transparent per-device and does not affect hotkey detection.
    - Does **NOT** filter by device or detect hotkey — config lives in the UI process.
 
 3. **Host (Supervisor)** (`src/libs/input_worker_host.rs`)
@@ -174,13 +199,17 @@ The architecture prioritizes:
 
 **Wire Format (worker → host):**
 ```
-K<TAB>{device_id}<TAB>{code}<TAB>down|up    # keyboard
+K<TAB>{device_id}<TAB>{code}<TAB>down|up    # keyboard (only physical devices)
 M<TAB>{device_id}<TAB>{code}<TAB>down|up    # mouse
 ```
 
+**Injected-input filter (Phase 7):** Keyboard events with NULL device handle (injected by software like IMEs or SendInput) never reach the wire; they are dropped in `is_physical_keyboard_event()` before serialization. This silences Vietnamese IME Telex corrections (e.g., `dd→đ`) which the user didn't type directly.
+
+**Known trade-off (Phase 7):** On-screen keyboards, AutoHotkey, and remote-desktop client input are also injected (silent). A per-user opt-in can be added if demand exists.
+
 **Key invariant:** Single-instance guard on startup (`single_instance.rs`) prevents multiple UI processes from running (which would spawn multiple input workers competing over Raw Input).
 
-**Key files:** `input_worker.rs`, `rawinput_listener.rs`, `input_worker_host.rs`, `single_instance.rs`.
+**Key files:** `input_worker.rs:89-119` (injection filter), `rawinput_listener.rs`, `input_worker_host.rs`, `single_instance.rs`.
 
 #### Linux: evdev + X11/Wayland (In-Process)
 
@@ -307,7 +336,7 @@ pub enum AudioCommand {
 }
 ```
 
-#### UI Event Channel (Bidirectional)
+#### UI Event Channel
 
 Engine → UI (for status updates):
 ```rust
@@ -315,10 +344,10 @@ pub enum UiEvent {
     KeyDown(String),
     KeyUp(String),
     DeviceSwitched(Result<String, String>),
-    DeviceLost { lost_device: String, result: Result<String, String> },
     PackLoaded { is_keyboard: bool, result: Result<String, String> },
 }
 ```
+Note: `DeviceLost` was removed in Phase 7 (watchdog removal). On device unplug, the app goes silent with no event.
 
 ## Critical Design Decisions & Rationale
 
@@ -328,7 +357,7 @@ pub enum UiEvent {
 | **Windows worker process** | In-process Raw Input (Phase 4) | tao/wry's Raw Input registration conflicts with ours at the process level — empirically verified. Only solution is separate process. |
 | **Voice pool (Vec) not HashMap** | Keep per-key HashMap with hard eviction | HashMap `insert()` drops the old sink immediately → click/chop. Voice pool with soft fade-out over 10ms preserves tail. |
 | **Offline resampling (rubato)** | Real-time resampling (rodio default) | Offline sinc (higher quality) vs. real-time linear (faster, lower quality). Audio is the main product; offline is negligible cost at load time. |
-| **Device watchdog on 1s deadline** | Lazy check on next keystroke | Input can be sparse (user idle). 1-second absolute deadline ensures unplug detection within ~3s regardless of input rate. Starving a `select! default` with high keystroke traffic would break this SLA. |
+| **No device watchdog** | Previous design: 1s poll timer with auto-fallback | Polling cost hundreds of milliseconds per check, stalling keystrokes. User decision: go silent on unplug instead of polling. Manual switch (Settings) remains the only way to change devices. |
 | **No device config in worker** | Worker reads config directly | Config lives in UI (persistence, multi-process coordination). Pipe remains one-directional. Host applies filtering post-capture. |
 | **Ambiance on separate thread** | Ambiance sharing keyboard engine stream | Ambiance is long-lived (can play for minutes). Sharing a stream would mix device-switch logic. Separate `OutputStream` is cleaner; only downside is 2 audio threads. |
 
@@ -358,8 +387,9 @@ pub enum UiEvent {
 
 | Failure | Behavior |
 |---------|----------|
-| Audio device not found | Use system default; report via `UiEvent::DeviceSwitched(Err(...))`. |
-| Audio device unplugged | Watchdog detects; auto-fallback to default; emit `UiEvent::DeviceLost`. |
+| Audio device not found at startup | Fall back to system default; report via `UiEvent::DeviceSwitched(Err(...))`. |
+| Audio device not found via manual switch | Keep previous device; report error via `UiEvent::DeviceSwitched(Err(...))`. |
+| Audio device unplugged at runtime | No automatic fallback; app goes silent. User manually reselects in Settings or restarts. |
 | Soundpack decode error | Log error; emit `UiEvent::PackLoaded(Err(...))`. |
 | Resampler fails | Skip resample, use original sample rate (fallback). |
 | Windows worker crash | Restart with exponential backoff (0.5s → 1s → 2s → 4s → 8s). After 5 fails, fall back to rdev. |
@@ -370,8 +400,9 @@ pub enum UiEvent {
 
 **Unit tests:**
 - `resampler.rs`: Impulse response, chunk truncation, tail flush.
-- `engine.rs`: Voice pool FIFO, fade math, device watchdog counter.
+- `engine.rs`: Voice pool FIFO, fade math, purely event-driven loop (no timed arms), no device polling.
 - `rawinput_listener.rs`: Key code mapping, device ID memoization.
+- `input_worker.rs`: Injected keystroke filtering (NULL device detection).
 - `input_worker_host.rs`: Restart backoff, device filtering logic.
 
 **Integration tests:**
@@ -389,19 +420,22 @@ pub enum UiEvent {
 
 1. **Ambiance:** Separate `OutputStream` means potentially 2 concurrent audio threads. Could be unified with careful stream-sharing logic (future).
 
-2. **Per-device filtering (Windows):** Only keyboard/mouse. Other input types (gamepad, etc.) not supported.
+2. **Injected input filtering (Windows):** Keyboard-only. Filters software-injected keys (e.g., IME corrections, SendInput, on-screen keyboards). A per-user opt-in can be added if demand exists.
 
-3. **Focus tracking (macOS):** Not implemented. Unclear if macOS has the same focus issue as Windows; needs testing.
+3. **Per-device filtering (Windows):** Only keyboard/mouse. Other input types (gamepad, etc.) not supported.
 
-4. **Wayland:** rdev on Wayland is newer; edge cases possible.
+4. **Focus tracking (macOS):** Not implemented. Unclear if macOS has the same focus issue as Windows; needs testing.
 
-5. **Config migration:** `MusicPlayerConfig` is a dead field (music player removed); kept for backward compat. Could be pruned in a major version.
+5. **Wayland:** rdev on Wayland is newer; edge cases possible.
+
+6. **Config migration:** `MusicPlayerConfig` is a dead field (music player removed); kept for backward compat. Could be pruned in a major version.
 
 ## File Reference Map
 
 | Path | Purpose |
 |------|---------|
-| `src/libs/audio/engine.rs` | Engine thread, voice pool, device watchdog |
+| `src/libs/trace.rs` | Opt-in latency tracing (MECHVIBES_TRACE=1) |
+| `src/libs/audio/engine.rs` | Engine thread, voice pool, device switching |
 | `src/libs/audio/audio_context.rs` | Facade for UI; forwards to engine |
 | `src/libs/audio/soundpack_loader.rs` | Decode, resample, load packs into engine |
 | `src/libs/audio/resampler.rs` | Sinc resampling (rubato) |
