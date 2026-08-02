@@ -150,6 +150,17 @@ fn next_failure_count(failures: u32, uptime: Option<Duration>) -> u32 {
     }
 }
 
+/// How long to wait before starting the next worker: 1s, 2s, 4s, 8s, capped.
+/// Keeps a crash-looping worker from spinning the CPU.
+///
+/// `failures` is 0 when the worker that just died had been up long enough to
+/// count as healthy, and that case has to wait the *shortest* time, not the
+/// longest - a healthy worker dying once is the "user killed it in Task
+/// Manager" case, where input should come back immediately.
+fn restart_delay(failures: u32) -> Duration {
+    Duration::from_secs(1u64 << failures.saturating_sub(1).min(3))
+}
+
 /// Starts the worker supervision thread. Returns immediately; input starts
 /// flowing once the worker is up.
 ///
@@ -199,9 +210,7 @@ pub fn start_input_worker_host(
                 return;
             }
 
-            // 1s, 2s, 4s, 8s - capped by MAX_RESTARTS well before this grows
-            // large, but keeps a crash-looping worker from spinning the CPU.
-            std::thread::sleep(Duration::from_secs(1u64 << (failures - 1).min(3)));
+            std::thread::sleep(restart_delay(failures));
         }
     });
 }
@@ -307,16 +316,8 @@ fn pump_worker(
             }
         }
 
-        if !filter.allows(event.kind, event.device_id) {
+        let Some(wire) = wire_for_event(&event, &filter, &mut held) else {
             continue;
-        }
-
-        let wire = if event.is_down {
-            held.push((event.kind, event.code.to_string()));
-            event.code.to_string()
-        } else {
-            held.retain(|(kind, code)| !(*kind == event.kind && code == event.code));
-            format!("UP:{}", event.code)
         };
 
         let sent = match event.kind {
@@ -357,6 +358,37 @@ struct WorkerEvent<'a> {
     device_id: &'a str,
     code: &'a str,
     is_down: bool,
+}
+
+/// Decides what to put on the wire for one event, updating `held` to match.
+/// `None` means the event is dropped and nothing is sent.
+///
+/// The device filter gates presses only. A release is forwarded whenever its
+/// press was forwarded, whatever the filter says by then: disabling a keyboard
+/// while one of its keys is held would otherwise swallow the release, and the
+/// engine's debounce would treat the next press of that key as a duplicate and
+/// stay silent. Keying the decision off `held` rather than off the filter also
+/// stops a disabled device from leaking a lone keyup sound, which testing the
+/// filter on the down alone would not.
+fn wire_for_event(
+    event: &WorkerEvent<'_>,
+    filter: &DeviceFilter,
+    held: &mut Vec<(char, String)>
+) -> Option<String> {
+    if event.is_down {
+        if !filter.allows(event.kind, event.device_id) {
+            return None;
+        }
+        held.push((event.kind, event.code.to_string()));
+        return Some(event.code.to_string());
+    }
+
+    let is_held = |(kind, code): &(char, String)| *kind == event.kind && code == event.code;
+    if !held.iter().any(is_held) {
+        return None;
+    }
+    held.retain(|entry| !is_held(entry));
+    Some(format!("UP:{}", event.code))
 }
 
 /// Parses one `K\t{device_id}\t{code}\t{down|up}` line. Returns `None` for
@@ -467,6 +499,93 @@ mod tests {
     fn spawn_failure_counts_as_a_failure() {
         assert_eq!(next_failure_count(0, None), 1);
         assert_eq!(next_failure_count(2, None), 3);
+    }
+
+    #[test]
+    fn healthy_worker_death_retries_immediately_rather_than_underflowing() {
+        // A worker up longer than HEALTHY_UPTIME resets the count to 0, and
+        // that 0 reaches the backoff. Computing `failures - 1` here panicked
+        // in debug builds and wrapped to the 8s cap in release, which is the
+        // opposite of what a healthy worker's first death deserves.
+        let failures = next_failure_count(4, Some(HEALTHY_UPTIME));
+        assert_eq!(failures, 0);
+        assert_eq!(restart_delay(failures), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn restart_delay_doubles_then_caps() {
+        assert_eq!(restart_delay(1), Duration::from_secs(1));
+        assert_eq!(restart_delay(2), Duration::from_secs(2));
+        assert_eq!(restart_delay(3), Duration::from_secs(4));
+        assert_eq!(restart_delay(4), Duration::from_secs(8));
+        // Capped, and never shifts past what a u64 can hold.
+        assert_eq!(restart_delay(5), Duration::from_secs(8));
+        assert_eq!(restart_delay(u32::MAX), Duration::from_secs(8));
+    }
+
+    fn filter_for(keyboards: Vec<&str>) -> DeviceFilter {
+        DeviceFilter {
+            generation: 0,
+            enabled_keyboards: keyboards.into_iter().map(String::from).collect(),
+            enabled_mice: Vec::new(),
+        }
+    }
+
+    fn event<'a>(device_id: &'a str, code: &'a str, is_down: bool) -> WorkerEvent<'a> {
+        WorkerEvent { kind: 'K', device_id, code, is_down }
+    }
+
+    #[test]
+    fn release_survives_the_device_being_disabled_mid_hold() {
+        let mut held = Vec::new();
+
+        // Key goes down while the keyboard is still enabled.
+        let allowed = filter_for(vec![]);
+        assert_eq!(wire_for_event(&event("kb1", "KeyX", true), &allowed, &mut held).as_deref(), Some("KeyX"));
+
+        // User disables that keyboard in Settings while the key is still held.
+        let disabled = filter_for(vec!["kb2"]);
+        assert_eq!(
+            wire_for_event(&event("kb1", "KeyX", false), &disabled, &mut held).as_deref(),
+            Some("UP:KeyX"),
+            "release of an already-forwarded press must not be filtered away"
+        );
+        assert!(held.is_empty(), "release must clear the held entry");
+    }
+
+    #[test]
+    fn disabled_device_sends_neither_press_nor_release() {
+        let filter = filter_for(vec!["kb1"]);
+        let mut held = Vec::new();
+
+        assert!(wire_for_event(&event("kb2", "KeyX", true), &filter, &mut held).is_none());
+        assert!(held.is_empty());
+        // No matching press was forwarded, so the release is dropped too -
+        // a lone keyup would otherwise reach the engine from a muted device.
+        assert!(wire_for_event(&event("kb2", "KeyX", false), &filter, &mut held).is_none());
+    }
+
+    #[test]
+    fn release_without_a_press_is_dropped() {
+        let filter = filter_for(vec![]);
+        let mut held = Vec::new();
+        assert!(wire_for_event(&event("kb1", "KeyX", false), &filter, &mut held).is_none());
+    }
+
+    #[test]
+    fn held_tracks_kind_and_code_independently() {
+        let filter = filter_for(vec![]);
+        let mut held = Vec::new();
+
+        wire_for_event(&event("kb1", "KeyX", true), &filter, &mut held);
+        let mouse_down = WorkerEvent { kind: 'M', device_id: "m1", code: "KeyX", is_down: true };
+        wire_for_event(&mouse_down, &filter, &mut held);
+        assert_eq!(held.len(), 2);
+
+        // Releasing the mouse "KeyX" must not clear the keyboard's entry.
+        let mouse_up = WorkerEvent { kind: 'M', device_id: "m1", code: "KeyX", is_down: false };
+        assert_eq!(wire_for_event(&mouse_up, &filter, &mut held).as_deref(), Some("UP:KeyX"));
+        assert_eq!(held, vec![('K', "KeyX".to_string())]);
     }
 
     #[test]

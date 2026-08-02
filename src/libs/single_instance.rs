@@ -43,8 +43,17 @@ const ERROR_ALREADY_EXISTS: u32 = 183;
 /// The path is hashed rather than embedded: a mutex name has a length limit
 /// and treats backslashes as kernel-namespace separators, both of which a
 /// raw path would trip over.
+///
+/// Canonicalized first so that the same executable reached by different
+/// spellings - an 8.3 short name, a `subst` drive, a symlink - still hashes
+/// to one name. Lowercasing alone only settles case, and two spellings of one
+/// exe would each claim their own mutex and defeat the guard entirely.
+/// Canonicalization can fail (the file was moved out from under us); the
+/// uncanonicalized path is a fine fallback, since a missed alias is no worse
+/// than the behavior before.
 fn mutex_name() -> String {
     let exe = std::env::current_exe()
+        .map(|p| std::fs::canonicalize(&p).unwrap_or(p))
         .map(|p| p.to_string_lossy().to_lowercase())
         .unwrap_or_default();
 

@@ -229,7 +229,10 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_INPUT => {
             handle_wm_input(lparam);
-            0
+            // MSDN requires DefWindowProc to run for WM_INPUT so the system
+            // can clean up the raw input buffer behind this message; a
+            // handler that returns 0 on its own leaks it.
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_DESTROY => {
             unsafe {
@@ -256,7 +259,18 @@ fn handle_wm_input(lparam: LPARAM) {
         return;
     }
 
-    let mut buffer = vec![0u8; size as usize];
+    // Backed by `u64` for two reasons a `Vec<u8>` cannot give: `RAWINPUT`
+    // needs 8-byte alignment (its header holds a HANDLE and a WPARAM), and
+    // the reference below must cover a whole `RAWINPUT`. Windows reports
+    // only the bytes the actual event needs - a keyboard packet is smaller
+    // than the mouse arm of the union - so a buffer sized to `size` alone
+    // would leave the reference pointing at less memory than its type
+    // claims. Both are UB by Rust's rules even where the reads happen to
+    // stay in bounds today.
+    let capacity = (size as usize).max(std::mem::size_of::<RAWINPUT>());
+    let words = capacity.div_ceil(std::mem::size_of::<u64>());
+    let mut buffer = vec![0u64; words];
+
     let read = unsafe {
         GetRawInputData(
             lparam as HRAWINPUT,
@@ -270,6 +284,10 @@ fn handle_wm_input(lparam: LPARAM) {
         return;
     }
 
+    // SAFETY: `buffer` is `u64`-aligned and at least `size_of::<RAWINPUT>()`
+    // bytes long, and `GetRawInputData` reported it filled `size` of those
+    // bytes with a `RAWINPUT`. The trailing bytes beyond `size` are the
+    // zeroes the vec was created with, never read for the reported `dwType`.
     let raw = unsafe { &*(buffer.as_ptr() as *const RAWINPUT) };
 
     match raw.header.dwType {

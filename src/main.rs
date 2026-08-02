@@ -87,8 +87,11 @@ fn main() {
     // worker shares this executable but must never touch app state, the
     // tray, config or the Dioxus runtime - it only registers Raw Input and
     // streams events to the parent over stdout. See input_worker.rs.
+    // `args_os` rather than `args`: the latter panics on an argument that is
+    // not valid Unicode, which would kill the app before any logging exists
+    // to say why.
     #[cfg(target_os = "windows")]
-    if std::env::args().any(|arg| arg == libs::input_worker::WORKER_ARG) {
+    if std::env::args_os().any(|arg| arg == libs::input_worker::WORKER_ARG) {
         libs::input_worker::run();
         return;
     }
