@@ -19,6 +19,13 @@ on:
         description: "Published release tag to announce for real (e.g. v0.6.3). Leave empty for a ping-free test message."
         required: false
         type: string
+      # For hand-written announcements (e.g. a multi-release recap). Posted
+      # VERBATIM with a real @everyone ping - include your own greeting and
+      # links, nothing is added around it. Takes precedence over `tag`.
+      message:
+        description: "Custom message to post verbatim (real ping). Overrides tag/notes formatting."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -36,6 +43,9 @@ jobs:
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           DISPATCH_TAG: ${{ inputs.tag }}
+          # Env-passed like RELEASE_BODY: quotes/newlines/markdown must never
+          # be interpolated into the script text itself.
+          DISPATCH_MESSAGE: ${{ inputs.message }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_URL: ${{ github.event.release.html_url }}
@@ -47,6 +57,21 @@ jobs:
           set -euo pipefail
           if [ -z "$WEBHOOK" ]; then
             echo "::notice::DISCORD_RELEASE_WEBHOOK secret not set - skipping announcement"
+            exit 0
+          fi
+
+          # Verbatim mode: the author owns the whole message, so no head/foot
+          # is added and no truncation is applied - over-limit is an error the
+          # author must fix, not something to silently cut.
+          if [ "$IS_DISPATCH" = "true" ] && [ -n "$DISPATCH_MESSAGE" ]; then
+            if [ "$(printf %s "$DISPATCH_MESSAGE" | wc -m)" -gt 2000 ]; then
+              echo "::error::Custom message exceeds Discord's 2000-character cap"
+              exit 1
+            fi
+            payload=$(jq -n --arg msg "$DISPATCH_MESSAGE" \
+              '{content: $msg, allowed_mentions: {parse: ["everyone"]}}')
+            curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
+            echo "Posted custom announcement to Discord"
             exit 0
           fi
 
