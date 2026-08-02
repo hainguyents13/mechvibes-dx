@@ -8,9 +8,18 @@ on:
 permissions:
   contents: write
 
+# Three build jobs run in parallel on their own runners, each uploading its
+# artifacts. A single `release` job then downloads everything and creates one
+# draft release. The alternative - letting every job call action-gh-release
+# against the same tag - races: concurrent runs read the draft, append their
+# own asset, and write back, so the last writer can drop the others' files.
+# One writer, no race.
 jobs:
-  release:
+  windows-build:
+    name: Windows installer
     runs-on: windows-latest
+    outputs:
+      app_version: ${{ steps.version_gate.outputs.app_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -22,6 +31,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Gate - tag must match Cargo.toml version
+        id: version_gate
         shell: pwsh
         run: |
           $tagVersion = "${{ github.ref_name }}" -replace '^v', ''
@@ -37,6 +47,7 @@ jobs:
           }
           Write-Host "Tag version matches Cargo.toml version: $tagVersion"
           "APP_VERSION=$tagVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "app_version=$tagVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Gate - extract changelog notes
         shell: pwsh
@@ -105,12 +116,268 @@ jobs:
             exit 1
           }
           Write-Host "Verified installer asset: $($installer.FullName)"
-          "INSTALLER_PATH=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            dist/MechvibesDX-*-Setup-x64.exe
+            notes.md
+          if-no-files-found: error
+
+  linux-build:
+    name: Linux packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Same list as ci.yml's linux-check job. Keep the two in sync: this
+      # build failing on a missing -dev package means CI would have caught it.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libevdev-dev \
+            libxdo-dev
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Install cargo-deb
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+
+      # --no-build: the binary is already built above, and cargo-deb's own
+      # build would not reuse it. `[package.metadata.deb]` in Cargo.toml owns
+      # the file list; it deliberately has no maintainer-scripts, so the
+      # package does NOT add the user to the `input` group - README-linux.txt
+      # and the release notes have to say so.
+      - name: Build .deb package
+        run: cargo deb --no-build
+
+      - name: Stage Linux assets
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist staging/mechvibes-dx
+
+          DEB_SOURCE=$(ls target/debian/mechvibes-dx_"${VERSION}"*.deb | head -1)
+          if [ ! -f "$DEB_SOURCE" ]; then
+            echo "::error::No .deb produced for version ${VERSION} in target/debian/"
+            exit 1
+          fi
+          cp "$DEB_SOURCE" "dist/mechvibes-dx_${VERSION}_amd64.deb"
+
+          # Portable tarball for non-Debian distros: binary + soundpacks +
+          # desktop entry + icon, laid out so the README's install snippet is
+          # a plain copy. The binary is dynamically linked, hence the runtime
+          # dependency list in README-linux.txt.
+          cp target/release/mechvibes-dx staging/mechvibes-dx/
+          cp -r soundpacks staging/mechvibes-dx/
+          cp mechvibes-dx.desktop staging/mechvibes-dx/
+          cp assets/icon.png staging/mechvibes-dx/mechvibes-dx.png
+          cp README-linux.txt staging/mechvibes-dx/
+
+          tar -czf "dist/mechvibes-dx-${VERSION}-linux-x86_64.tar.gz" \
+            -C staging mechvibes-dx
+
+          ls -la dist/
+
+      # The Windows auto-updater picks the first asset whose name contains
+      # "x64" AND ends in ".exe"; anything else it ignores (falling back to
+      # assets[0] only if nothing matches, which cannot happen while the
+      # Windows installer is present). "x86_64"/"amd64" contain no "x64"
+      # substring and these are .deb/.tar.gz, so they are doubly safe - but
+      # assert it rather than trust it, since a rename could break Windows
+      # updates silently.
+      - name: Verify Linux asset names cannot hijack the Windows auto-updater
+        run: |
+          set -euo pipefail
+          status=0
+          for f in dist/*; do
+            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
+            case "$name" in
+              *x64*.exe)
+                echo "::error::Linux asset '$name' matches the Windows auto-updater filter (contains 'x64' and ends in '.exe')"
+                status=1
+                ;;
+            esac
+          done
+          exit $status
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: dist/*
+          if-no-files-found: error
+
+  macos-build:
+    name: macOS binary (experimental)
+    runs-on: macos-latest
+    # First time this crate has ever been fed to a macOS compiler - every
+    # cfg gate here was written blind. A red job is a useful result, not a
+    # reason to block the Windows and Linux assets, so the release job
+    # tolerates this one failing.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo check
+        run: cargo check --release --locked
+
+      # `dx bundle` is NOT attempted here, and that is a verified decision
+      # rather than an omission. Run 30758484323 tried it on macos-latest with
+      # dioxus-cli 0.7.10 and it failed after 4m27s:
+      #
+      #   Failed to copy resource ./soundpacks/mouse/chat -> .../Contents/Resources/chat
+      #   the source path is neither a regular file nor a symlink to a regular file
+      #
+      # That is upstream DioxusLabs/dioxus#5723 showing its real shape: the
+      # 0.7.x resource copier only handles regular files, so every directory
+      # entry in Dioxus.toml's `resources` fails. Windows surfaced it as
+      # PermissionDenied (os error 5), macOS as InvalidInput - same bug, and
+      # NOT specific to the NSIS/Windows path as previously assumed.
+      #
+      # Worse than a clean failure: it exits non-zero having already created
+      # a half-built MechvibesDx.app with an EMPTY Contents/Resources. Any
+      # "use the .app if one exists" logic ships an app with no soundpacks.
+      # So until the fix lands (confirmed present in 0.8.0-alpha.1), macOS
+      # gets the plain binary, which is complete and honest.
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Stage macOS assets
+        id: stage
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH=$(uname -m)
+          mkdir -p dist staging
+
+          # Binary plus the resources it expects beside it, same layout as
+          # the Linux tarball. Assert the soundpacks actually made it in: the
+          # failure mode this job already hit once was shipping an archive
+          # whose Resources were silently empty.
+          mkdir -p staging/mechvibes-dx
+          cp target/release/mechvibes-dx staging/mechvibes-dx/
+          cp -r soundpacks staging/mechvibes-dx/
+          cp README-macos.txt staging/mechvibes-dx/
+
+          packs=$(find staging/mechvibes-dx/soundpacks -name "*.ogg" | wc -l)
+          if [ "$packs" -eq 0 ]; then
+            echo "::error::No soundpacks staged - refusing to ship a silent app"
+            exit 1
+          fi
+          echo "Staged $packs soundpack audio files"
+
+          tar -czf "dist/mechvibes-dx-${VERSION}-macos-${ARCH}-experimental.tar.gz" \
+            -C staging mechvibes-dx
+
+          cp README-macos.txt "dist/README-macos-${VERSION}.txt"
+          ls -la dist/
+
+      - name: Verify macOS asset names cannot hijack the Windows auto-updater
+        run: |
+          set -euo pipefail
+          status=0
+          for f in dist/*; do
+            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
+            case "$name" in
+              *x64*.exe)
+                echo "::error::macOS asset '$name' matches the Windows auto-updater filter"
+                status=1
+                ;;
+            esac
+          done
+          exit $status
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    runs-on: ubuntu-latest
+    # Windows is the only hard dependency: it owns the version/changelog
+    # gates and produces the asset the in-app auto-updater consumes. Linux
+    # and macOS are joined with always() so a failure there still lets the
+    # Windows release through - `needs.windows-build.result` is checked
+    # explicitly so a failed Windows job does NOT get silently skipped past.
+    needs: [windows-build, linux-build, macos-build]
+    if: always() && needs.windows-build.result == 'success'
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # notes.md is the release body, not an asset.
+          find artifacts -type f ! -name notes.md -exec cp {} release/ \;
+          cp artifacts/windows-release/notes.md notes.md
+
+          if ! ls release/MechvibesDX-*-Setup-x64.exe >/dev/null 2>&1; then
+            echo "::error::Windows installer missing from collected assets"
+            exit 1
+          fi
+
+          # Record which platforms actually made it, so the release body can
+          # say so instead of leaving a maintainer to diff the asset list.
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Downloads"
+            echo ""
+            echo "- **Windows**: \`MechvibesDX-<version>-Setup-x64.exe\` — installer, the only asset the in-app updater uses."
+          } >> notes.md
+          if ls release/*.deb >/dev/null 2>&1; then
+            {
+              echo "- **Linux (Debian/Ubuntu)**: \`.deb\` — install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
+              echo "- **Linux (portable)**: \`.tar.gz\` — extract and run; see \`README-linux.txt\` inside for runtime dependencies and the same \`input\` group step."
+            } >> notes.md
+          fi
+          if ls release/*macos* >/dev/null 2>&1; then
+            echo "- **macOS (experimental, untested)**: unsigned and never run on a real Mac. Gatekeeper will block it — see \`README-macos.txt\`. Treat as a preview." >> notes.md
+          fi
+
+          echo "Assets to publish:"
+          ls -la release/
 
       - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          name: "MechvibesDX ${{ env.APP_VERSION }}"
+          name: "MechvibesDX ${{ needs.windows-build.outputs.app_version }}"
           body_path: notes.md
-          files: ${{ env.INSTALLER_PATH }}
+          files: release/*

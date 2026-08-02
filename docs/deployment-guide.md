@@ -1,6 +1,8 @@
 # Deployment Guide
 
-How to ship a new Windows release of MechvibesDX, end to end.
+How to ship a new release of MechvibesDX, end to end.
+
+Windows is the primary target: it is the only platform with an installer and the only one the in-app auto-updater serves. Linux and macOS binaries ride along on the same tag.
 
 ## Prerequisites (one-time, per machine)
 
@@ -54,11 +56,34 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
 5. **Wait for GitHub Actions**
 
-   The workflow (~10-15 minutes): validates the tag matches `Cargo.toml`'s version, extracts the CHANGELOG section as release notes, runs `cargo test --release` + `cargo check --release` as a smoke test, builds the release binary, builds the installer (via `scripts/build-windows-installer.ps1`, same script used locally), and publishes a **draft** GitHub release with the installer attached.
+   The workflow runs four jobs (~15 minutes end to end):
+
+   - **`windows-build`** — validates the tag matches `Cargo.toml`'s version, extracts the CHANGELOG section as release notes, runs `cargo test --release` + `cargo check --release` as a smoke test, builds the release binary, and builds the installer via `scripts/build-windows-installer.ps1` (the same script used locally).
+   - **`linux-build`** — builds the release binary on `ubuntu-latest` and packages a `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`) plus a portable `.tar.gz`.
+   - **`macos-build`** — first attempts `dx bundle`; if that fails, falls back to a plain `cargo build --release` tarball. Marked `continue-on-error`, so a red macOS job never blocks the release.
+   - **`release`** — downloads all three jobs' artifacts and creates one **draft** release with everything attached.
+
+   The build jobs run in parallel and each uploads artifacts; only the final `release` job writes to GitHub Releases. That single-writer design is deliberate — having each job call `action-gh-release` against the same tag races, and the last writer can drop the others' assets.
+
+   `release` requires `windows-build` to succeed but tolerates the other two failing, so a Linux or macOS regression degrades the release rather than blocking it.
 
 6. **Review the draft release**
 
-   Go to the repo's Releases page, open the draft, and sanity-check the notes and the attached `MechvibesDX-<version>-Setup-x64.exe`. Download and install it on a real Windows machine if this is a release you're not fully confident in.
+   Go to the repo's Releases page, open the draft, and check the notes and assets:
+
+   | Asset | Platform | Notes |
+   |---|---|---|
+   | `MechvibesDX-<version>-Setup-x64.exe` | Windows | The installer. **The only asset the auto-updater consumes** — its name must keep containing `x64` and ending in `.exe`. |
+   | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
+   | `mechvibes-dx-<version>-linux-x86_64.tar.gz` | Linux (portable) | Binary + soundpacks + `README-linux.txt`. |
+   | `mechvibes-dx-<version>-macos-<arch>-experimental.*` | macOS | **Experimental, unsigned, untested.** |
+   | `README-macos-<version>.txt` | macOS | Gatekeeper and Accessibility instructions. |
+
+   Download and install the Windows installer on a real machine if this is a release you're not fully confident in.
+
+   **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. `README-linux.txt` and the generated release notes both say this; keep that wording if you touch either.
+
+   **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac, is not signed, and is not notarized. Gatekeeper will block it. The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
 
 7. **Publish**
 
@@ -82,9 +107,21 @@ The workflow does not build an installer or create a release if this fails. Fix 
 **"No installer asset found" / asset name doesn't match the auto-updater filter**
 The auto-updater only recognizes Windows assets whose filename contains `x64` and ends in `.exe`. If you renamed the `.iss` script's `OutputBaseFilename`, keep that constraint (see `src/utils/auto_updater.rs`'s `find_download_url`).
 
+Note the same filter constrains the *other* platforms' asset names in reverse: no Linux or macOS asset may contain `x64` and end in `.exe`, or it could be served to Windows users as an update. Both jobs assert this before uploading, and the names use `x86_64`/`amd64`/`arm64` (none of which contain the substring `x64`) with non-`.exe` extensions. If the filter in `find_download_url` ever loosens, revisit those assertions.
+
+**`linux-build` fails on a missing `-dev` package**
+Its system-dependency list mirrors `ci.yml`'s `linux-check` job. If you add a dependency to one, add it to the other — otherwise CI stays green while releases break.
+
+**`macos-build` is red**
+Expected to be possible: the crate's macOS support is unverified. The job is `continue-on-error`, so the release still goes out with Windows and Linux assets and simply omits the macOS one. Fix it or leave it; it does not gate a release.
+
 **Local installer build fails with "Inno Setup not found"**
 Install Inno Setup 6 from https://jrsoftware.org/isinfo.php, or if already installed via winget, confirm it's at one of the paths `scripts/build-windows-installer.ps1` checks (`Program Files\Inno Setup 6`, or `%LOCALAPPDATA%\Programs\Inno Setup 6` for a per-user winget install).
 
 ## Scope note
 
-This pipeline currently covers **Windows only**. Linux packaging (`.deb`/AppImage) is being redesigned separately and isn't part of this release workflow yet.
+Windows is the only fully supported platform: installer, upgrade path, and in-app auto-update.
+
+Linux gets working binaries (`.deb` + portable `.tar.gz`) but no automated input-group setup and no auto-update. AppImage is not built — the tooling is heavy and the legacy `scripts/build-linux-installer.sh` is unverified; it remains a roadmap item.
+
+macOS is experimental: unsigned, unnotarized, and never run on real hardware by the maintainer. It ships so users can try it and report back.
