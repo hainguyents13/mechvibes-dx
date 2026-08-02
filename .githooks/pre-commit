@@ -1,0 +1,11 @@
+#!/bin/sh
+# Local gate: the tree must compile before a commit is allowed.
+# Full tests run at pre-push; this stays fast (incremental cargo check).
+# Bypass in emergencies with --no-verify (discouraged - CI will catch it anyway).
+
+echo "[pre-commit] cargo check..."
+if ! cargo check --quiet; then
+    echo "[pre-commit] BLOCKED: cargo check failed - fix compile errors before committing."
+    exit 1
+fi
+echo "[pre-commit] OK"

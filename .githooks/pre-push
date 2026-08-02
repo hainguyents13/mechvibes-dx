@@ -1,0 +1,11 @@
+#!/bin/sh
+# Local gate: the full test suite must pass before anything leaves this machine.
+# Mirrors the CI smoke gate (cargo test) so a broken push never reaches origin
+# or another session. Bypass in emergencies with --no-verify (discouraged).
+
+echo "[pre-push] cargo test..."
+if ! cargo test --quiet; then
+    echo "[pre-push] BLOCKED: tests failed - fix them before pushing."
+    exit 1
+fi
+echo "[pre-push] OK"
