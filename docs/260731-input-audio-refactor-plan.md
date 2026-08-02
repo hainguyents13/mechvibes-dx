@@ -3,6 +3,12 @@
 > Ngày: 260731 · Trạng thái: đã duyệt phân tích, chờ triển khai
 > Tài liệu tự chứa: người thực hiện không cần ngữ cảnh hội thoại trước đó.
 
+> **📌 Note (260802):** Kiến trúc hiện tại được mô tả chi tiết trong 2 tài liệu mới:
+> - [`system-architecture.md`](./system-architecture.md) — Sơ đồ, luồng dữ liệu, 3 mảng lớn, thiết kế quyết định
+> - [`codebase-summary.md`](./codebase-summary.md) — Cây thư mục annotated, entry point, công việc phổ biến
+> 
+> Tài liệu này được giữ nguyên như bối cảnh lịch sử + validation log cho quyết định kiến trúc (xem mục cuối).
+
 ## 1. Bối cảnh
 
 MechvibesDX (Rust + Dioxus 0.7 desktop) là bản viết lại của Mechvibes cũ (Electron + iohook). Bản cũ chạy input hook trong hidden process riêng, trao đổi với UI qua IPC → mượt, không dính UI. Bản DX hiện gom tất cả vào 1 process và đang gặp 4 vấn đề người dùng báo cáo:
