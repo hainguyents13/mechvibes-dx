@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-08-03
+
+### Fixed
+
+- **Severe input lag when a specific audio output device was selected**: the app checked device presence inside the audio engine loop every second, and that check could take up to ~2 seconds depending on your device's position in the system list — delaying both the sound and the logo animation by that much, seemingly at random. Sound now plays within ~15ms of a keystroke regardless of which output device is selected.
+- **Vietnamese input methods (Telex/UniKey/EVKey) no longer cause bursts of clumped sounds**: when an IME rewrites text (e.g. "dd" → "đ", or restoring a mistyped syllable), it synthetically injects backspaces and replacement keys — each of which used to play a sound all at once. Software-injected keystrokes are now ignored; only keys you physically press make sound. Note this also means on-screen keyboards and macro tools no longer trigger sounds.
+- **Logo animation keeps up with fast typing**: the pressed-state transition was too slow to render each stroke at speed; each keystroke now shows a distinct pulse.
+
+### Changed
+
+- **Removed the automatic switch to the system default output when the selected device disappears.** The background polling this required is gone completely — zero periodic device probing while you type. If you unplug the device you selected, the app stays silent until you pick another one in Settings (or restart); your saved choice is kept. Selecting "System Default" is unaffected — the OS handles device changes itself.
+- Settings → Devices note updated: device changes apply immediately, no restart needed (restart remains a troubleshooting option).
+
+### Added
+
+- **Diagnostic trace mode**: launch with the environment variable `MECHVIBES_TRACE=1` to print one line per keystroke with per-stage timings (input capture → audio engine → sound → UI) — useful when reporting latency issues.
+
 ## [0.6.3] - 2026-08-03
 
 ### Fixed
@@ -76,6 +93,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
 
 
