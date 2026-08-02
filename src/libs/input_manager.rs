@@ -71,15 +71,11 @@ pub fn get_window_focus_state() -> Arc<Mutex<bool>> {
 /// can't be sustained (see `input_worker_host.rs`), but that fallback is live,
 /// so the plumbing stays.
 ///
-/// The log is `debug_print!` rather than `println!` because focus flips on
-/// every alt-tab and click-away, which spammed release-build consoles. It
-/// stays available under the debug console for diagnosing the fallback path.
+/// Deliberately unlogged: focus flips on every alt-tab and click-away, which
+/// drowns out everything else in the console. When diagnosing the fallback
+/// listeners' handoff, read the state where it's consumed instead.
 pub fn set_window_focus(focused: bool) {
     if let Some(state) = WINDOW_FOCUS_STATE.get() {
         *state.lock().unwrap() = focused;
-        crate::debug_print!(
-            "🔍 Window focus state changed: {}",
-            if focused { "FOCUSED" } else { "UNFOCUSED" }
-        );
     }
 }
