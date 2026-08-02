@@ -13,7 +13,7 @@ use libs::ui;
 use libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use libs::input_listener::start_unified_input_listener;
 use libs::focused_input_listener::start_focused_keyboard_listener;
-use libs::input_manager::{ init_input_channels, init_window_focus_state_with_value, get_window_focus_state };
+use libs::input_manager::{ init_window_focus_state_with_value, get_window_focus_state };
 use std::sync::mpsc;
 
 #[cfg(target_os = "linux")]
@@ -156,25 +156,11 @@ fn main() {
     let (mouse_tx, mouse_rx) = crossbeam_channel::unbounded::<String>();
     let (hotkey_tx, hotkey_rx) = crossbeam_channel::unbounded::<String>();
 
-    // Clone senders for global access (for window-level keyboard events)
-    let keyboard_tx_clone = keyboard_tx.clone();
-    let mouse_tx_clone = mouse_tx.clone();
-    let hotkey_tx_clone = hotkey_tx.clone();
-
-    // Engine gets its own receiver clones so it can `select!` on keyboard,
-    // mouse and hotkey events directly - no UI polling loop in the middle.
-    let engine_keyboard_rx = keyboard_rx.clone();
-    let engine_mouse_rx = mouse_rx.clone();
-    let engine_hotkey_rx = hotkey_rx.clone();
-
-    // Initialize global input channels for UI to access (including senders for window events)
-    init_input_channels(keyboard_rx, mouse_rx, hotkey_rx, keyboard_tx_clone, mouse_tx_clone, hotkey_tx_clone);
-
     // Spawn the audio engine thread before the Dioxus/webview runtime starts.
     // The engine owns rodio's OutputStream exclusively on a plain OS thread
     // (OutputStream is not Send), and drives keyboard/mouse playback via a
     // blocking select!/recv() loop instead of the UI polling it every ~1ms.
-    libs::audio::spawn_engine(engine_keyboard_rx, engine_mouse_rx, engine_hotkey_rx);
+    libs::audio::spawn_engine(keyboard_rx, mouse_rx, hotkey_rx);
     debug_print!("🎧 Audio engine thread started");
 
     // Initialize window focus state

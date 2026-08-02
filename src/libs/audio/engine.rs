@@ -105,11 +105,11 @@ static UI_EVENT_RX: OnceLock<Receiver<UiEvent>> = OnceLock::new();
 /// once, before `dioxus::launch`, so `OutputStream` is opened and lives on a
 /// plain OS thread rather than inside the webview/Dioxus runtime.
 ///
-/// `keyboard_rx`/`mouse_rx`/`hotkey_rx` are clones of the same crossbeam
-/// receivers the UI's `InputChannels` holds - the engine reads raw
-/// `"KeyA"` / `"UP:KeyA"` strings directly from the input listeners (rdev,
-/// device_query, evdev) via `select!`, the same wire format those listeners
-/// already produce, instead of the UI polling and forwarding them.
+/// `keyboard_rx`/`mouse_rx`/`hotkey_rx` are the sole consumers of the input
+/// channels - the engine reads raw `"KeyA"` / `"UP:KeyA"` strings directly
+/// from the input listeners (rdev, device_query, evdev, raw-input worker)
+/// via `select!`, the same wire format those listeners already produce,
+/// instead of the UI polling and forwarding them.
 pub fn spawn_engine(
     keyboard_rx: Receiver<String>,
     mouse_rx: Receiver<String>,
@@ -128,9 +128,8 @@ pub fn spawn_engine(
     handle
 }
 
-/// Returns the engine handle. Panics if `spawn_engine` hasn't run yet - this
-/// mirrors the existing `get_input_channels()` contract (main.rs sets it up
-/// before the UI can possibly ask for it).
+/// Returns the engine handle. Panics if `spawn_engine` hasn't run yet -
+/// main.rs sets it up before the UI can possibly ask for it.
 pub fn engine_handle() -> AudioEngineHandle {
     ENGINE_HANDLE.get().expect("Audio engine not started").clone()
 }
