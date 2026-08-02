@@ -64,9 +64,22 @@ pub fn get_window_focus_state() -> Arc<Mutex<bool>> {
 }
 
 /// Set window focus state (called from UI event handler)
+///
+/// The state itself is still needed on every platform: the rdev (unfocused) /
+/// device_query (focused) hybrid listeners use it to hand off to each other.
+/// On Windows that hybrid is only reached when the Raw Input worker process
+/// can't be sustained (see `input_worker_host.rs`), but that fallback is live,
+/// so the plumbing stays.
+///
+/// The log is `debug_print!` rather than `println!` because focus flips on
+/// every alt-tab and click-away, which spammed release-build consoles. It
+/// stays available under the debug console for diagnosing the fallback path.
 pub fn set_window_focus(focused: bool) {
     if let Some(state) = WINDOW_FOCUS_STATE.get() {
         *state.lock().unwrap() = focused;
-        println!("🔍 Window focus state changed: {}", if focused { "FOCUSED" } else { "UNFOCUSED" });
+        crate::debug_print!(
+            "🔍 Window focus state changed: {}",
+            if focused { "FOCUSED" } else { "UNFOCUSED" }
+        );
     }
 }
