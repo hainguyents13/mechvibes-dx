@@ -1,0 +1,90 @@
+name: CI
+
+# Verifies the crate actually compiles on Linux. Everything up to now was
+# built and tested on Windows only, so the `#[cfg(target_os = ...)]` gates
+# added for the input worker were reviewed by eye but never fed to a Linux
+# compiler. A cfg typo, a Linux-only module that stopped compiling, or a
+# `use` that only resolves on Windows would all have shipped silently.
+#
+# Tags are deliberately not a trigger: release.yml owns tag builds, and
+# duplicating them here would double the work on every release.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# One run per branch/PR. A quick follow-up push cancels the previous run
+# instead of leaving two builds racing for the same answer.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-check:
+    name: Linux (check + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Mirrors the "Linux (Ubuntu/Debian)" list in README.md. The AppImage
+      # extras from that list (autoconf, automake, libtool, libfuse2) are
+      # omitted on purpose: they are packaging tools, and this job never
+      # bundles an AppImage. libasound2-dev backs rodio/cpal, libevdev-dev
+      # backs the Linux input listener, and the webkit/gtk/appindicator/rsvg
+      # set backs the Dioxus desktop webview and tray icon.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libevdev-dev \
+            libxdo-dev
+
+      - name: Cargo check
+        run: cargo check --locked --all-targets
+
+      # Safe on a headless runner: the test suite is pure logic. The audio
+      # tests cover the DeviceWatchdog state machine and the resampler, and
+      # neither opens a device. The Windows-only tests sit behind file-level
+      # `#![cfg(target_os = "windows")]` gates, so they compile out here.
+      - name: Cargo test
+        run: cargo test --locked
+
+  windows-check:
+    name: Windows (check + test)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # No system deps step: the webview is part of Windows, and the Windows
+      # input path uses winapi, which needs no extra packages.
+      - name: Cargo check
+        run: cargo check --locked --all-targets
+
+      # This is the half that exercises the input-worker tests, which are
+      # cfg'd out of the Linux job.
+      - name: Cargo test
+        run: cargo test --locked
