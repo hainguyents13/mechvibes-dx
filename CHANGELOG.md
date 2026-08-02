@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1] - 2026-08-02
+
+### Fixed
+
+- **Mute buttons had no effect on sound**: the mute toggles on the home page, in Settings, and in the tray menu only saved the preference without telling the running audio engine, and the icon could get out of sync and toggle back on the next click. All mute paths now apply immediately and stay consistent with the Ctrl+Alt+M hotkey.
+- **Soundpack selector dropdown was transparent/unreadable**: a stale CSS variable from an older theme version made the dropdown background compute to transparent.
+- **Device list disappeared when switching tabs**: the enumerated audio/input device list is now remembered for the rest of the session instead of resetting to the "refresh" placeholder every time you leave and re-enter Settings.
+- **Reset to Defaults** now applies volume and mute state to the running engine immediately instead of requiring a restart.
+- Removed constant config file read/write churn (the app was rewriting its config about once per second while typing) and noisy window-focus logging in release builds.
+
 ## [0.6.0] - 2026-08-02
 
 ### Added
