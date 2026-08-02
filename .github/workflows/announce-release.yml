@@ -6,6 +6,10 @@ name: Announce release
 on:
   release:
     types: [published]
+  # Manual run = TEST MODE: posts a clearly-labelled test message with all
+  # pings suppressed, so the webhook + formatting can be verified without
+  # publishing a release or notifying the whole server.
+  workflow_dispatch:
 
 permissions: {}
 
@@ -20,6 +24,7 @@ jobs:
           # New Webhook -> copy URL, then `gh secret set DISCORD_RELEASE_WEBHOOK`.
           # A webhook URL is all this needs - no bot, no bot token.
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          IS_TEST: ${{ github.event_name == 'workflow_dispatch' }}
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_URL: ${{ github.event.release.html_url }}
           # Passed via env on purpose: release notes contain quotes/newlines/
@@ -33,6 +38,12 @@ jobs:
             exit 0
           fi
 
+          if [ "$IS_TEST" = "true" ]; then
+            RELEASE_NAME="v0.0.0-test"
+            RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases"
+            RELEASE_BODY=$'### Fixed\n\n- **This is a test announcement** fired manually from GitHub Actions — please ignore.\n- Verifies the webhook, formatting, and truncation without pinging anyone.'
+          fi
+
           # Plain message in the Mantine-announcement style (greeting +
           # what's new + links), not an embed. Discord caps `content` at
           # 2000 chars, so the notes body is trimmed to leave room for the
@@ -41,13 +52,16 @@ jobs:
             --arg name "$RELEASE_NAME" \
             --arg url "$RELEASE_URL" \
             --arg body "$RELEASE_BODY" \
+            --argjson test "$IS_TEST" \
             '
             ("Hi @everyone, MechvibesDX \($name) is out! 🎉\n\nHere is what’s new:\n\n") as $head |
             ("\n\n**Download & full changelog:**\n- GitHub release – \($url)\n- Or just open the app and click *Download & install* (Settings → Updates)") as $foot |
             (2000 - ($head | length) - ($foot | length) - 10) as $room |
             {
               content: ($head + (if ($body | length) > $room then ($body | .[:$room]) + "\n…" else $body end) + $foot),
-              allowed_mentions: { parse: ["everyone"] }
+              # Test runs suppress ALL pings - "@everyone" renders as plain
+              # text and nobody gets notified. Real releases ping for real.
+              allowed_mentions: { parse: (if $test then [] else ["everyone"] end) }
             }')
 
           curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
