@@ -1,6 +1,6 @@
 use tray_icon::{
     Icon,
-    menu::{ Menu, MenuEvent, MenuItem, PredefinedMenuItem, MenuId },
+    menu::{ CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, MenuId },
     TrayIcon,
     TrayIconBuilder,
     TrayIconEvent,
@@ -15,6 +15,11 @@ static LAST_CLICK_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 // Embed the icon at compile time for cross-platform reliability
 const EMBEDDED_ICON: &[u8] = include_bytes!("../../assets/icon.ico");
 
+/// Alpha multiplier applied to the normal icon to produce the muted variant.
+/// Low enough to read as clearly "off" at 16x16 tray size, high enough that the
+/// icon silhouette stays recognizable against both light and dark taskbars.
+const MUTED_ICON_ALPHA: f32 = 0.4;
+
 pub enum TrayMessage {
     Show,
     Exit,
@@ -24,15 +29,88 @@ pub enum TrayMessage {
     OpenWebsite,
 }
 
+/// Scales the alpha channel of an RGBA buffer in place to dim the icon.
+///
+/// Only every 4th byte is touched: RGB must survive untouched, because the tray
+/// composites the icon over the taskbar and dimming the color channels would
+/// recolor the icon rather than fade it. Fully transparent pixels stay
+/// transparent, so the silhouette never grows.
+fn fade_alpha(pixels: &mut [u8]) {
+    for pixel in pixels.chunks_exact_mut(4) {
+        pixel[3] = ((pixel[3] as f32) * MUTED_ICON_ALPHA).round() as u8;
+    }
+}
+
+/// Both tray icon variants, decoded once at startup.
+///
+/// The embedded ICO is decoded a single time and the faded variant is derived
+/// from the same pixel buffer, so toggling mute never re-decodes an image -
+/// it just hands a cheap `Icon` clone back to the tray.
+struct TrayIcons {
+    normal: Icon,
+    muted: Icon,
+}
+
+impl TrayIcons {
+    fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let img = image::load_from_memory_with_format(
+            EMBEDDED_ICON,
+            image::ImageFormat::Ico
+        ).map_err(|e| {
+            eprintln!("❌ Failed to load embedded tray icon data: {}", e);
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to load embedded icon: {}", e)
+            )
+        })?;
+
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        let normal_pixels = rgba.into_raw();
+
+        // Derive the muted variant by scaling only the alpha channel, leaving
+        // RGB untouched. The tray composites against the taskbar background,
+        // so reducing alpha is what actually reads as "dimmed" - darkening RGB
+        // instead would just look like a different-colored icon.
+        let mut muted_pixels = normal_pixels.clone();
+        fade_alpha(&mut muted_pixels);
+
+        let normal = Icon::from_rgba(normal_pixels, width, height).map_err(|e| {
+            eprintln!("❌ Failed to create tray icon from embedded data: {}", e);
+            e
+        })?;
+        let muted = Icon::from_rgba(muted_pixels, width, height).map_err(|e| {
+            eprintln!("❌ Failed to create muted tray icon: {}", e);
+            e
+        })?;
+
+        println!("✅ Loaded embedded tray icon ({}x{}, normal + muted)", width, height);
+        Ok(Self { normal, muted })
+    }
+
+    /// The variant matching the current sound state.
+    fn for_sound_enabled(&self, enabled: bool) -> Icon {
+        if enabled { self.normal.clone() } else { self.muted.clone() }
+    }
+}
+
 pub struct TrayManager {
     tray_icon: TrayIcon,
+    /// Kept alive past menu construction so the checkmark can be toggled in
+    /// place. Rebuilding the whole menu to change one item made the label flip
+    /// between "Mute"/"Unmute"; holding the item lets the label stay fixed and
+    /// the state show as a checkmark instead.
+    mute_item: CheckMenuItem,
+    icons: TrayIcons,
 }
 
 impl TrayManager {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // Load current config to determine sound state
         let config = crate::state::config::AppConfig::load();
-        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" };
+        // `enable_sound` is the positive flag, so muted is its inverse. The
+        // menu item is checked when muted.
+        let muted = !config.enable_sound;
 
         // Create the tray menu with specific IDs
         let show_item = MenuItem::with_id(
@@ -43,8 +121,14 @@ impl TrayManager {
         );
         let separator1 = PredefinedMenuItem::separator();
 
-        // Sound control section
-        let mute_item = MenuItem::with_id(MenuId::new("toggle_mute"), mute_text, true, None);
+        // Sound control section. Fixed label; the checkmark carries the state.
+        let mute_item = CheckMenuItem::with_id(
+            MenuId::new("toggle_mute"),
+            "Mute sounds",
+            true,
+            muted,
+            None
+        );
         let separator2 = PredefinedMenuItem::separator();
 
         // External links section
@@ -80,96 +164,40 @@ impl TrayManager {
             ]
         )?;
 
-        // Load the icon from embedded bytes for cross-platform reliability
-        let icon = match image::load_from_memory_with_format(EMBEDDED_ICON, image::ImageFormat::Ico) {
-            Ok(img) => {
-                let rgba = img.to_rgba8();
-                let (width, height) = rgba.dimensions();
-                match Icon::from_rgba(rgba.into_raw(), width, height) {
-                    Ok(icon) => {
-                        println!("✅ Loaded embedded tray icon ({}x{})", width, height);
-                        icon
-                    }
-                    Err(e) => {
-                        eprintln!("❌ Failed to create tray icon from embedded data: {}", e);
-                        return Err(Box::new(e));
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to load embedded tray icon data: {}", e);
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("Failed to load embedded icon: {}", e)
-                )));
-            }
-        };
+        // Decode both icon variants once; muting only swaps between them.
+        let icons = TrayIcons::load()?;
 
-        // Build the tray icon
+        // Build the tray icon already showing the persisted state, so a config
+        // that was muted before launch comes up dimmed rather than flashing the
+        // normal icon until the first toggle.
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
             .with_tooltip(APP_NAME)
-            .with_icon(icon)
+            .with_icon(icons.for_sound_enabled(!muted))
             .build()?;
+
         Ok(TrayManager {
-            tray_icon: tray_icon,
+            tray_icon,
+            mute_item,
+            icons,
         })
     }
 
+    /// Syncs the tray checkmark and icon with the persisted sound state.
+    ///
+    /// Called after every path that can flip `enable_sound` (tray item, the
+    /// Settings toggle, Reset to Defaults, and the Ctrl+Alt+M hotkey), so the
+    /// config on disk stays the single source of truth for what the tray shows.
     pub fn update_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Load current config to determine sound state
         let config = crate::state::config::AppConfig::load();
-        let mute_text = if config.enable_sound { "Mute sounds" } else { "Unmute sounds" };
+        let enabled = config.enable_sound;
 
-        // Create new menu with updated text
-        let show_item = MenuItem::with_id(
-            MenuId::new("show"),
-            &format!("Show {}", APP_NAME),
-            true,
-            None
-        );
-        let separator1 = PredefinedMenuItem::separator();
+        // Mutate the existing item instead of rebuilding the menu: the label is
+        // fixed, only the checkmark moves.
+        self.mute_item.set_checked(!enabled);
+        self.tray_icon.set_icon(Some(self.icons.for_sound_enabled(enabled)))?;
 
-        // Sound control section with updated text
-        let mute_item = MenuItem::with_id(MenuId::new("toggle_mute"), mute_text, true, None);
-        let separator2 = PredefinedMenuItem::separator();
-
-        // External links section
-        let github_item = MenuItem::with_id(MenuId::new("github"), "GitHub Repository", true, None);
-        let discord_item = MenuItem::with_id(
-            MenuId::new("discord"),
-            "Discord Community",
-            true,
-            None
-        );
-        let website_item = MenuItem::with_id(
-            MenuId::new("website"),
-            "Official Website",
-            true,
-            None
-        );
-        let separator = PredefinedMenuItem::separator();
-
-        let exit_item = MenuItem::with_id(MenuId::new("exit"), "Exit", true, None);
-
-        // Create the new menu
-        let menu = Menu::with_items(
-            &[
-                &show_item,
-                &separator1,
-                &mute_item,
-                &separator2,
-                &github_item,
-                &discord_item,
-                &website_item,
-                &separator,
-                &exit_item,
-            ]
-        )?;
-
-        // Update the tray icon with new menu
-        self.tray_icon.set_menu(Some(Box::new(menu)));
-        println!("🔄 Tray menu updated with text: {}", mute_text);
+        println!("🔄 Tray updated: sounds {}", if enabled { "on" } else { "muted" });
 
         Ok(())
     }
@@ -248,4 +276,43 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fading_dims_alpha_and_leaves_color_channels_intact() {
+        // Opaque red, then half-alpha green.
+        let mut pixels = vec![255, 0, 0, 255, 0, 255, 0, 128];
+        fade_alpha(&mut pixels);
+
+        // RGB untouched: a dimmed icon must keep its colors, only its opacity
+        // changes. Darkening RGB instead would look like a recolored icon.
+        assert_eq!([pixels[0], pixels[1], pixels[2]], [255, 0, 0]);
+        assert_eq!([pixels[4], pixels[5], pixels[6]], [0, 255, 0]);
+
+        assert_eq!(pixels[3], (255.0 * MUTED_ICON_ALPHA).round() as u8);
+        assert_eq!(pixels[7], (128.0 * MUTED_ICON_ALPHA).round() as u8);
+    }
+
+    #[test]
+    fn fading_keeps_transparent_pixels_transparent() {
+        // A transparent pixel gaining alpha would thicken the silhouette.
+        let mut pixels = vec![0, 0, 0, 0];
+        fade_alpha(&mut pixels);
+        assert_eq!(pixels[3], 0);
+    }
+
+    #[test]
+    fn fading_actually_reduces_opacity() {
+        // Guards against the multiplier being set to 1.0 (or above), which
+        // would make the muted icon indistinguishable from the normal one.
+        assert!(MUTED_ICON_ALPHA > 0.0 && MUTED_ICON_ALPHA < 1.0);
+
+        let mut pixels = vec![10, 20, 30, 255];
+        fade_alpha(&mut pixels);
+        assert!(pixels[3] < 255);
+    }
 }
