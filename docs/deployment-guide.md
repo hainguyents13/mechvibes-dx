@@ -93,6 +93,8 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    Click "Publish release" on the draft. The in-app auto-updater (`src/utils/auto_updater.rs`) reads published (non-draft) releases from the GitHub API, so existing installs will detect the update after this step - not before.
 
+   Publishing also triggers `.github/workflows/announce-release.yml`, which posts an embed with the release notes to the Mechvibes Discord's release channel. One-time setup: create a webhook in that channel (Channel settings → Integrations → Webhooks), then store its URL as the `DISCORD_RELEASE_WEBHOOK` repo secret (`gh secret set DISCORD_RELEASE_WEBHOOK`). No bot or bot token is involved — a webhook URL is a write-only mailbox for that one channel. If the secret is missing the job skips with a notice instead of failing.
+
 ## Why a draft first?
 
 Draft releases don't appear in the public `GET /releases` API response that the app's auto-updater polls, so a bad build never reaches existing users automatically. Publishing is a deliberate, separate action.

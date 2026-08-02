@@ -1,0 +1,52 @@
+name: Announce release
+
+# Fires when a release is PUBLISHED - not when the CI creates the draft.
+# Publishing is the human approval step, so the announcement can never get
+# ahead of a build the maintainer hasn't signed off on.
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  discord:
+    name: Post to Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send release embed
+        env:
+          # One-time setup: Discord channel -> Integrations -> Webhooks ->
+          # New Webhook -> copy URL, then `gh secret set DISCORD_RELEASE_WEBHOOK`.
+          # A webhook URL is all this needs - no bot, no bot token.
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          # Passed via env on purpose: release notes contain quotes/newlines/
+          # markdown, and interpolating ${{ }} straight into the script would
+          # be a shell-injection hazard. jq below handles all escaping.
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WEBHOOK" ]; then
+            echo "::notice::DISCORD_RELEASE_WEBHOOK secret not set - skipping announcement"
+            exit 0
+          fi
+
+          # Discord embed description caps at 4096 chars; truncate with a
+          # pointer to the full notes rather than failing the whole post.
+          payload=$(jq -n \
+            --arg title "MechvibesDX $RELEASE_NAME is out" \
+            --arg url "$RELEASE_URL" \
+            --arg body "$RELEASE_BODY" \
+            '{
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: ($body | if length > 3500 then .[:3500] + "\n\n[Full notes on GitHub](\($url))" else . end),
+                color: 5763719
+              }]
+            }')
+
+          curl -fsS -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
+          echo "Announced $RELEASE_NAME to Discord"
