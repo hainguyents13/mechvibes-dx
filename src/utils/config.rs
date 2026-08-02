@@ -1,3 +1,4 @@
+use crate::debug_print;
 use crate::state::config::AppConfig;
 use dioxus::prelude::*;
 use std::cell::RefCell;
@@ -17,29 +18,38 @@ pub fn create_config_updater(
 ) -> Rc<dyn Fn(Box<dyn FnOnce(&mut AppConfig)>)> {
     let signal_ref = Rc::new(RefCell::new(config_signal));
     Rc::new(move |updater: Box<dyn FnOnce(&mut AppConfig)>| {
-        let old_config = AppConfig::load(); // Load current config
-        let mut new_config = old_config.clone(); // Clone for modification
+        // Always re-read from disk immediately before mutating: `save()`
+        // rewrites the entire struct, so applying an edit to a copy captured
+        // earlier would silently revert whatever another path wrote in between.
+        let old_config = AppConfig::load();
+        let mut new_config = old_config.clone();
 
         updater(&mut new_config);
 
-        // Only update timestamp and save if config data actually changed (excluding metadata)
-        if !new_config.data_equals(&old_config) {
+        let changed = !new_config.data_equals(&old_config);
+
+        // Only write to disk when something actually changed - callers include
+        // mount effects that re-assert the value they already hold, and saving
+        // those unconditionally rewrote the config continuously.
+        if changed {
             new_config.last_updated = chrono::Utc::now();
             match new_config.save() {
-                Ok(_) => {
-                    println!("✅ [config_utils] Config saved successfully");
-                    println!("   keyboard_soundpack: {}", new_config.keyboard_soundpack);
-                    println!("   mouse_soundpack: {}", new_config.mouse_soundpack);
-                }
-                Err(e) => {
-                    eprintln!("❌ [config_utils] Failed to save config: {}", e);
-                }
+                Ok(_) => debug_print!("✅ [config_utils] Config saved successfully"),
+                Err(e) => eprintln!("❌ [config_utils] Failed to save config: {}", e),
             }
+        }
 
-            // Update the signal through RefCell
+        // Publish to the signal regardless of whether *this* call changed
+        // anything. The value on disk may already differ from the signal
+        // because another path (e.g. `AudioContext::set_*`, which persists on
+        // its own) just wrote it; skipping the update here would leave the UI
+        // rendering a stale value - that is what made the mute button appear
+        // to do nothing after its state had already been applied.
+        // Compared with `data_equals` (ignores `last_updated`) so a timestamp
+        // bump alone can't trigger a pointless re-render.
+        let signal_is_stale = !signal_ref.borrow().peek().data_equals(&new_config);
+        if signal_is_stale {
             signal_ref.borrow_mut().set(new_config);
-        } else {
-            println!("[config_utils] Config unchanged, skipping save");
         }
     })
 }

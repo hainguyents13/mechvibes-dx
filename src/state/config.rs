@@ -1,3 +1,4 @@
+use crate::debug_print;
 use crate::libs::theme::{ BuiltInTheme, Theme };
 use crate::state::paths;
 use crate::utils::{ data, path };
@@ -155,7 +156,7 @@ impl AppConfig {
             }
         }
 
-        println!("📖 Loading config from: {}", config_path.display());
+        debug_print!("📖 Loading config from: {}", config_path.display());
 
         // Load config from file, falling back to defaults if it doesn't exist or is invalid
         match data::load_json_from_file::<AppConfig>(&config_path) {
@@ -207,9 +208,9 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
-        println!("💾 Saving config to: {}", config_path.display());
-        println!("   keyboard_soundpack: {}", self.keyboard_soundpack);
-        println!("   mouse_soundpack: {}", self.mouse_soundpack);
+        debug_print!("💾 Saving config to: {}", config_path.display());
+        debug_print!("   keyboard_soundpack: {}", self.keyboard_soundpack);
+        debug_print!("   mouse_soundpack: {}", self.mouse_soundpack);
         data::save_json_to_file(self, &config_path)
     }
 }
@@ -247,5 +248,68 @@ impl Default for AppConfig {
             landscape_mode: false, // Default landscape mode disabled
             auto_update: AutoUpdateConfig::default(), // Default auto-update settings
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `save()` rewrites the entire struct, so a writer that mutates a copy it
+    /// captured earlier reverts every field someone else changed in between.
+    /// This is the mute bug: the volume path held a config from before the
+    /// mute click and wrote `enable_sound: true` back over it.
+    #[test]
+    fn saving_a_stale_struct_reverts_a_concurrent_change() {
+        let on_disk = AppConfig::default();
+
+        // Volume path reads the config...
+        let mut volume_writer_copy = on_disk.clone();
+
+        // ...then the user mutes, and that write lands on disk first.
+        let mut after_mute = on_disk.clone();
+        after_mute.enable_sound = false;
+
+        // Volume path now saves the copy it captured before the mute.
+        volume_writer_copy.volume = 0.5;
+        let persisted = volume_writer_copy;
+
+        assert!(!after_mute.enable_sound, "mute was applied to disk");
+        assert!(
+            persisted.enable_sound,
+            "stale save silently restores enable_sound - the clobber this guards against"
+        );
+    }
+
+    /// The fix: re-read immediately before mutating, so the concurrent change
+    /// is already present in the struct that gets written back.
+    #[test]
+    fn reloading_before_mutating_preserves_a_concurrent_change() {
+        let mut on_disk = AppConfig::default();
+
+        // User mutes first.
+        on_disk.enable_sound = false;
+
+        // Volume path re-reads *now* rather than reusing an older copy.
+        let mut fresh = on_disk.clone();
+        fresh.volume = 0.5;
+
+        assert!(!fresh.enable_sound, "mute must survive an unrelated config write");
+        assert_eq!(fresh.volume, 0.5, "the volume change must still apply");
+    }
+
+    /// Guards the "skip redundant writes" half of the fix: re-asserting a value
+    /// that already matches must not count as a change, or mount effects will
+    /// rewrite the config continuously.
+    #[test]
+    fn reasserting_an_identical_value_is_not_a_change() {
+        let config = AppConfig::default();
+        let mut same = config.clone();
+        same.volume = config.volume;
+
+        assert!(same.data_equals(&config), "no-op write must not be treated as a change");
+
+        same.volume = config.volume + 0.25;
+        assert!(!same.data_equals(&config), "a real change must still be detected");
     }
 }

@@ -1,14 +1,20 @@
 use crate::libs::tray::{ handle_tray_events, TrayManager, TrayMessage };
 use crate::libs::tray_service::TRAY_UPDATE_SERVICE;
 use crate::libs::window_manager::{ WindowAction, WINDOW_MANAGER };
+use crate::libs::AudioContext;
 use crate::{ debug_print, always_eprint };
 use dioxus::desktop::use_window;
 use dioxus::prelude::*;
 use std::sync::mpsc;
+use std::sync::Arc;
 
 #[component]
 pub fn WindowController() -> Element {
     let window = use_window();
+
+    // The tray's mute item toggles the same engine-cached flag the UI does,
+    // so it has to notify the engine rather than only rewriting the config.
+    let audio_ctx = use_context::<Arc<AudioContext>>();
 
     // Create a static receiver for window actions
     let mut window_action_receiver = use_signal(|| None::<mpsc::Receiver<WindowAction>>); // Create a signal to hold the tray manager
@@ -38,6 +44,7 @@ pub fn WindowController() -> Element {
     use_effect(move || {
         let window_clone = window.clone();
         let mut tray_manager_clone = tray_manager.clone();
+        let audio_ctx = audio_ctx.clone();
 
         spawn(async move {
             loop {
@@ -82,31 +89,24 @@ pub fn WindowController() -> Element {
                             debug_print!("🔼 Window shown from tray");
                         }
                         TrayMessage::ToggleMute => {
-                            // Toggle the global sound enable flag
-                            let mut config = crate::state::config::AppConfig::load();
-                            config.enable_sound = !config.enable_sound;
-                            // Update timestamp to trigger UI refresh
-                            config.last_updated = chrono::Utc::now();
-                            match config.save() {
-                                Ok(_) => {
-                                    let status = if config.enable_sound {
-                                        "enabled"
-                                    } else {
-                                        "disabled"
-                                    };
-                                    debug_print!("🔇 Sounds {} via tray menu", status); // Update tray menu to reflect new state
-                                    tray_manager_clone.with_mut(|tray_opt| {
-                                        if let Some(tray) = tray_opt {
-                                            if let Err(e) = tray.update_menu() {
-                                                always_eprint!("❌ Failed to update tray menu: {}", e);
-                                            }
-                                        }
-                                    });
+                            // Toggle the global sound enable flag. This goes
+                            // through the audio context (not a bare config
+                            // write) so the engine thread, which caches this
+                            // flag in its own state, actually stops playing.
+                            let enabled = !audio_ctx.is_sound_enabled();
+                            audio_ctx.set_sound_enabled(enabled);
+                            debug_print!(
+                                "🔇 Sounds {} via tray menu",
+                                if enabled { "enabled" } else { "disabled" }
+                            );
+                            // Update tray menu to reflect new state
+                            tray_manager_clone.with_mut(|tray_opt| {
+                                if let Some(tray) = tray_opt {
+                                    if let Err(e) = tray.update_menu() {
+                                        always_eprint!("❌ Failed to update tray menu: {}", e);
+                                    }
                                 }
-                                Err(e) => {
-                                    always_eprint!("❌ Failed to save config after mute toggle: {}", e);
-                                }
-                            }
+                            });
                         }
                         TrayMessage::OpenGitHub => {
                             let url = "https://github.com/hainguyents13/mechvibes-dx";

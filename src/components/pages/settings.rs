@@ -1,5 +1,6 @@
 use crate::components::ui::{ Collapse, PageHeader, Toggler };
 use crate::components::device_selector::AudioOutputSelector;
+use crate::libs::AudioContext;
 use crate::libs::theme::{ use_theme, BuiltInTheme, Theme };
 use crate::libs::tray_service::request_tray_update;
 use crate::utils::config::use_config;
@@ -9,11 +10,16 @@ use crate::state::app::use_update_info_setter;
 use crate::utils::time::format_relative_time;
 use dioxus::prelude::*;
 use lucide_dioxus::{ PartyPopper, Settings };
+use std::sync::Arc;
 
 #[component]
 pub fn SettingsPage() -> Element {
     // Use shared config hook
     let (config, update_config) = use_config();
+
+    // Mute/volume changes must reach the audio engine thread, which caches
+    // these flags in its own state - a config write alone does not move them.
+    let audio_ctx = use_context::<Arc<AudioContext>>();
 
     // Use computed signals that always reflect current config state
     let enable_sound = use_memo(move || config().enable_sound);
@@ -67,7 +73,12 @@ pub fn SettingsPage() -> Element {
                   checked: enable_sound(),
                   on_change: {
                       let update_config = update_config.clone();
+                      let audio_ctx = audio_ctx.clone();
                       move |new_value: bool| {
+                          // The engine caches this flag; a config write alone
+                          // would leave it playing until restart. Go through
+                          // the audio context so the engine is notified too.
+                          audio_ctx.set_sound_enabled(new_value);
                           update_config(
                               Box::new(move |config| {
                                   config.enable_sound = new_value;
@@ -354,8 +365,15 @@ pub fn SettingsPage() -> Element {
                   class: "btn btn-error btn-soft btn-sm",
                   onclick: {
                       let update_config = update_config.clone();
+                      let audio_ctx = audio_ctx.clone();
                       move |_| {
                           theme.set(Theme::BuiltIn(BuiltInTheme::System));
+                          // Push the audio-affecting defaults through the
+                          // engine as well, otherwise a reset would restore
+                          // the config but leave the running engine muted /
+                          // at the old volume until the next restart.
+                          audio_ctx.set_sound_enabled(true);
+                          audio_ctx.set_volume(1.0);
                           update_config(
                               Box::new(|config| {
                                   config.volume = 1.0;
@@ -365,6 +383,7 @@ pub fn SettingsPage() -> Element {
                                   config.theme = Theme::BuiltIn(BuiltInTheme::System);
                               }),
                           );
+                          request_tray_update();
                       }
                   },
                   "Reset to Defaults"

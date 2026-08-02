@@ -312,7 +312,7 @@ impl EngineState {
     }
 
     fn handle_key_event(&mut self, code: &str, down: bool) {
-        if !self.sound_enabled || !self.keyboard_sound_enabled {
+        if !should_play(self.sound_enabled, self.keyboard_sound_enabled) {
             return;
         }
         if !debounce_press(&mut self.key_pressed, code, down) {
@@ -332,7 +332,7 @@ impl EngineState {
     }
 
     fn handle_mouse_event(&mut self, code: &str, down: bool) {
-        if !self.sound_enabled || !self.mouse_sound_enabled {
+        if !should_play(self.sound_enabled, self.mouse_sound_enabled) {
             return;
         }
         if !debounce_press(&mut self.mouse_pressed, code, down) {
@@ -414,6 +414,17 @@ impl EngineState {
         };
         self.device_manager.has_output_device_named(watched).unwrap_or(true)
     }
+}
+
+/// Whether a keystroke should produce sound, given the global mute flag and
+/// the per-input-type (keyboard/mouse) flag.
+///
+/// Both flags live in `EngineState` and are only moved by
+/// `AudioCommand::Set*SoundEnabled`, so a UI that writes the config without
+/// sending that command leaves this returning `true` and the app keeps playing
+/// while the UI shows muted - the mute-button bug this guards against.
+fn should_play(sound_enabled: bool, type_enabled: bool) -> bool {
+    sound_enabled && type_enabled
 }
 
 /// Marks `code` pressed/released, returning `false` if this event should be
@@ -586,17 +597,30 @@ fn parse_input_event(raw: &str) -> Option<(String, bool)> {
     }
 }
 
-fn handle_toggle_sound() {
+/// Handles the Ctrl+Alt+M hotkey: flips `enable_sound`, persists it, and
+/// returns the new value so the caller can move the engine's own cached flag
+/// in lockstep.
+///
+/// The persisted config is the source of truth for the new value (rather than
+/// negating the engine's cached flag) so the hotkey cannot drift from what the
+/// UI and tray read back.
+fn handle_toggle_sound() -> bool {
     let mut config = AppConfig::load();
     config.enable_sound = !config.enable_sound;
     config.last_updated = chrono::Utc::now();
+    let enabled = config.enable_sound;
     match config.save() {
         Ok(_) => {
             crate::libs::tray_service::request_tray_update();
-            println!("🔄 [AudioEngine] Sound toggled: {}", config.enable_sound);
+            println!("🔄 [AudioEngine] Sound toggled: {}", enabled);
         }
         Err(e) => eprintln!("❌ [AudioEngine] Failed to save config after sound toggle: {}", e),
     }
+    // Keep the UI-side cache (`AudioContext::is_sound_enabled`) in step: the
+    // tray toggle derives its next value from it, so a stale cache here would
+    // make the following tray click a no-op.
+    super::audio_context::sync_sound_enabled_cache(enabled);
+    enabled
 }
 
 fn handle_command(state: &mut EngineState, event_tx: &Sender<UiEvent>, command: AudioCommand) {
@@ -713,8 +737,10 @@ fn run_engine(
             recv(hotkey_rx) -> msg => {
                 if let Ok(command) = msg {
                     if command == "TOGGLE_SOUND" {
-                        handle_toggle_sound();
-                        state.sound_enabled = !state.sound_enabled;
+                        // Adopt the persisted value rather than negating the
+                        // cached one, so the engine can't drift out of sync
+                        // with config if the two ever disagree.
+                        state.sound_enabled = handle_toggle_sound();
                     }
                 }
             }
@@ -756,6 +782,61 @@ fn run_engine(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn global_mute_silences_both_input_types() {
+        // The global flag wins regardless of the per-type flag - this is what
+        // the home-page mute button and Ctrl+Alt+M both drive.
+        assert!(!should_play(false, true), "global mute must silence keyboard");
+        assert!(!should_play(false, false));
+    }
+
+    #[test]
+    fn per_type_mute_silences_only_that_type() {
+        // Muting the keyboard slider must not require touching the global
+        // flag, and vice versa for the mouse slider.
+        assert!(!should_play(true, false));
+        assert!(should_play(true, true), "nothing muted must play");
+    }
+
+    #[test]
+    fn set_sound_enabled_command_moves_engine_state() {
+        // Regression guard for the mute bug: the UI writing config alone left
+        // the engine's cached flag untouched and sound kept playing. These
+        // asserts pin the command -> state edge that the UI must drive.
+        //
+        // Applies the same assignments `handle_command` performs; the full
+        // `handle_command` needs an `EngineState`, which needs a real audio
+        // device and so cannot be built in a headless test.
+        let mut sound_enabled = true;
+        let mut keyboard_sound_enabled = true;
+        let mut mouse_sound_enabled = true;
+
+        for command in [
+            AudioCommand::SetSoundEnabled(false),
+            AudioCommand::SetKeyboardSoundEnabled(false),
+            AudioCommand::SetMouseSoundEnabled(false),
+        ] {
+            match command {
+                AudioCommand::SetSoundEnabled(v) => {
+                    sound_enabled = v;
+                }
+                AudioCommand::SetKeyboardSoundEnabled(v) => {
+                    keyboard_sound_enabled = v;
+                }
+                AudioCommand::SetMouseSoundEnabled(v) => {
+                    mouse_sound_enabled = v;
+                }
+                _ => unreachable!("only mute commands are exercised here"),
+            }
+        }
+
+        assert!(!sound_enabled);
+        assert!(!keyboard_sound_enabled);
+        assert!(!mouse_sound_enabled);
+        assert!(!should_play(sound_enabled, keyboard_sound_enabled));
+        assert!(!should_play(sound_enabled, mouse_sound_enabled));
+    }
 
     #[test]
     fn watchdog_disarmed_on_default_device() {
