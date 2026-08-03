@@ -148,11 +148,16 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     debug_print!("🔍 Command line args: {:?}", args);
 
-    // Check if we should start minimized (from auto-startup)
+    // Check if we should start minimized (from auto-startup).
+    //
+    // This is the first read of the config, so it is what loads the file into
+    // the writer's authority (parsing it, applying migrations and syncing
+    // `auto_start` against the registry) - every later read and write in the
+    // process goes to that same in-memory state rather than re-parsing.
+    let startup_config = state::config_writer::current();
     let should_start_minimized =
         args.contains(&"--minimized".to_string()) ||
-        (state::config::AppConfig::load().auto_start &&
-            state::config::AppConfig::load().start_minimized);
+        (startup_config.auto_start && startup_config.start_minimized);
 
     // Register protocol on first run
     // if let Err(e) = protocol::register_protocol() {
@@ -176,7 +181,7 @@ fn main() {
     // engine and the input worker start and never touches either. The input
     // worker process returned long before this line, and so did a duplicate
     // instance, so neither is ever counted as a launch.
-    utils::telemetry::report_app_started(state::config::AppConfig::load().enable_telemetry);
+    utils::telemetry::report_app_started(state::config_writer::current().enable_telemetry);
 
     // Initialize ambiance player
     state::ambiance::initialize_global_ambiance_player();

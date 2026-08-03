@@ -86,7 +86,7 @@ fn SoundSelectionPanel(
             onclick: move |_| {
                 update_global_ambiance_player_state(|player| {
                     player.toggle_mute();
-                    let _ = player.save_config();
+                    player.save_config();
                 });
                 if let Some(current_state) = get_global_ambiance_player_state_copy() {
                     let _ = set_global_ambiance_mute(current_state.is_muted);
@@ -110,7 +110,7 @@ fn SoundSelectionPanel(
                 if let Ok(val) = evt.value().parse::<f32>() {
                     update_global_ambiance_player_state(|player| {
                         player.set_global_volume(val / 100.0);
-                        let _ = player.save_config();
+                        player.save_config();
                     });
                     let _ = set_global_ambiance_volume(val / 100.0);
                     refresh_trigger.set(refresh_trigger() + 1);
@@ -201,7 +201,7 @@ fn SoundSelectionPanel(
                             };
                             update_global_ambiance_player_state(|player| {
                                 player.toggle_sound(sound_id.clone());
-                                let _ = player.save_config();
+                                player.save_config();
                             });
                             if let Some(current_state) = get_global_ambiance_player_state_copy() {
                                 if current_state.is_sound_active(&sound_id) && !is_currently_active {
@@ -246,7 +246,7 @@ fn SoundSelectionPanel(
                                 let volume = val / 100.0;
                                 update_global_ambiance_player_state(|player| {
                                     player.set_sound_volume(sound_id.clone(), volume);
-                                    let _ = player.save_config();
+                                    player.save_config();
                                 });
                                 let _ = set_ambiance_sound_volume(&sound_id, volume);
                                 refresh_trigger.set(refresh_trigger() + 1);

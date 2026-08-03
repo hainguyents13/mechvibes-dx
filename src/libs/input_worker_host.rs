@@ -21,7 +21,6 @@ use std::sync::Mutex;
 use std::time::{ Duration, Instant };
 
 use crate::libs::input_worker::WORKER_ARG;
-use crate::state::config::AppConfig;
 
 /// `CREATE_NO_WINDOW` - keeps the worker from flashing a console window.
 /// Not exposed by the winapi features this crate enables, and it is a stable
@@ -41,17 +40,17 @@ const HEALTHY_UPTIME: Duration = Duration::from_secs(30);
 static CONFIG_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// The lists themselves, published alongside the generation so the reader
-/// thread never has to touch the config file. `AppConfig::load()` parses
-/// JSON, reads the registry for the auto-start state and can rewrite the
-/// file - none of which belongs on the thread draining the worker's pipe,
-/// because stalling that reader back-pressures the pipe and, through it,
-/// the worker's WndProc.
+/// thread never has to go looking for them. Reading them from the config
+/// authority costs a clone; the `AppConfig::load()` this replaced parsed JSON,
+/// read the registry for the auto-start state and could rewrite the file - none
+/// of which belongs on the thread draining the worker's pipe, because stalling
+/// that reader back-pressures the pipe and, through it, the worker's WndProc.
 static ENABLED_DEVICES: Mutex<Option<(Vec<String>, Vec<String>)>> = Mutex::new(None);
 
 /// Call after `AppConfig`'s enabled-device lists change (from
 /// `device_selector.rs`) to make filtering take effect immediately.
 pub fn notify_config_changed() {
-    let config = AppConfig::load();
+    let config = crate::state::config_writer::current();
     *ENABLED_DEVICES.lock().unwrap() = Some((config.enabled_keyboards, config.enabled_mice));
     // Published after the lists, so a reader that sees the new generation is
     // guaranteed to find the new lists behind it.
@@ -76,7 +75,7 @@ impl DeviceFilter {
             .unwrap()
             .clone()
             .unwrap_or_else(|| {
-                let config = AppConfig::load();
+                let config = crate::state::config_writer::current();
                 (config.enabled_keyboards, config.enabled_mice)
             });
         Self { generation, enabled_keyboards, enabled_mice }

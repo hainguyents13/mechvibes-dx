@@ -1,5 +1,6 @@
 use crate::debug_print;
 use crate::state::config::AppConfig;
+use crate::state::config_writer;
 use dioxus::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,44 +13,34 @@ pub fn use_fresh_config() -> Signal<AppConfig> {
     use_context::<Signal<AppConfig>>()
 }
 
-/// Creates a config updater function that loads fresh config, applies changes, and saves
+/// Creates a config updater function that submits a mutation to the single
+/// writer and republishes the result to this scope's config signal.
+///
+/// The mutation is applied by `config_writer::apply` to the authoritative
+/// state, so a field another subsystem changed in the meantime is already
+/// present and survives. Nothing here holds an `AppConfig` across the call.
 pub fn create_config_updater(
     config_signal: Signal<AppConfig>,
 ) -> Rc<dyn Fn(Box<dyn FnOnce(&mut AppConfig)>)> {
     let signal_ref = Rc::new(RefCell::new(config_signal));
     Rc::new(move |updater: Box<dyn FnOnce(&mut AppConfig)>| {
-        // Always re-read from disk immediately before mutating: `save()`
-        // rewrites the entire struct, so applying an edit to a copy captured
-        // earlier would silently revert whatever another path wrote in between.
-        let old_config = AppConfig::load();
-        let mut new_config = old_config.clone();
-
-        updater(&mut new_config);
-
-        let changed = !new_config.data_equals(&old_config);
-
-        // Only write to disk when something actually changed - callers include
-        // mount effects that re-assert the value they already hold, and saving
-        // those unconditionally rewrote the config continuously.
-        if changed {
-            new_config.last_updated = chrono::Utc::now();
-            match new_config.save() {
-                Ok(_) => debug_print!("✅ [config_utils] Config saved successfully"),
-                Err(e) => eprintln!("❌ [config_utils] Failed to save config: {}", e),
-            }
+        if config_writer::apply(updater) {
+            debug_print!("✅ [config_utils] Config saved successfully");
         }
 
-        // Publish to the signal regardless of whether *this* call changed
-        // anything. The value on disk may already differ from the signal
-        // because another path (e.g. `AudioContext::set_*`, which persists on
-        // its own) just wrote it; skipping the update here would leave the UI
-        // rendering a stale value - that is what made the mute button appear
-        // to do nothing after its state had already been applied.
-        // Compared with `data_equals` (ignores `last_updated`) so a timestamp
-        // bump alone can't trigger a pointless re-render.
-        let signal_is_stale = !signal_ref.borrow().peek().data_equals(&new_config);
+        // Publish regardless of whether *this* call changed anything. The
+        // authority may already differ from this signal because another path
+        // wrote it (the tray mute, or the engine's Ctrl+Alt+M); skipping the
+        // update here would leave the UI rendering a stale value - that is what
+        // made the mute button appear to do nothing after its state had already
+        // been applied.
+        //
+        // Compared with `data_equals` (which ignores `last_updated`) so a
+        // timestamp bump alone can't trigger a pointless re-render.
+        let latest = config_writer::current();
+        let signal_is_stale = !signal_ref.borrow().peek().data_equals(&latest);
         if signal_is_stale {
-            signal_ref.borrow_mut().set(new_config);
+            signal_ref.borrow_mut().set(latest);
         }
     })
 }
@@ -72,70 +63,78 @@ pub fn use_config() -> (
 mod tests {
     use super::*;
 
-    /// Stands in for the config file plus the shared `Signal<AppConfig>` that
-    /// every page reads. The real `create_config_updater` needs a Dioxus
-    /// runtime, so the two pieces of state it coordinates are modelled
-    /// directly: `disk` is what `AppConfig::load()`/`save()` see, `signal` is
-    /// the context value components render from.
+    /// Stands in for the single writer's authoritative config plus the shared
+    /// `Signal<AppConfig>` that every page renders from. The real
+    /// `create_config_updater` needs a Dioxus runtime, so the two pieces of
+    /// state it coordinates are modelled directly: `authority` is what
+    /// `config_writer` owns and persists, `signal` is the context value.
     struct Shared {
-        disk: AppConfig,
+        authority: AppConfig,
         signal: AppConfig,
     }
 
     impl Shared {
         fn new() -> Self {
             let config = AppConfig::default();
-            Self { disk: config.clone(), signal: config }
+            Self { authority: config.clone(), signal: config }
         }
 
-        /// Mirrors `create_config_updater`: re-read disk, mutate, save if the
-        /// data changed, then publish to the signal.
+        /// Mirrors `config_writer::apply`: mutate the authoritative state,
+        /// persist only a real change.
+        fn apply(&mut self, mutate: impl FnOnce(&mut AppConfig)) {
+            let before = self.authority.clone();
+            mutate(&mut self.authority);
+            if self.authority.data_equals(&before) {
+                self.authority = before;
+            }
+        }
+
+        /// Mirrors `create_config_updater`: submit the mutation to the writer,
+        /// then republish the writer's state to this scope's signal.
         fn update_config(&mut self, mutate: impl FnOnce(&mut AppConfig)) {
-            let old = self.disk.clone();
-            let mut new = old.clone();
-            mutate(&mut new);
-            if !new.data_equals(&old) {
-                self.disk = new.clone();
-            }
-            self.signal = new;
+            self.apply(mutate);
+            self.signal = self.authority.clone();
         }
 
-        /// Mirrors `AudioContext::set_volume` -> `persist_if_changed`: writes
-        /// straight to disk and deliberately does not touch the signal.
+        /// Mirrors `AudioContext::set_volume`: submits a mutation and
+        /// deliberately does not touch the signal itself.
         fn audio_set_volume(&mut self, volume: f32) {
-            if self.disk.volume != volume {
-                self.disk.volume = volume;
-            }
+            self.apply(|config| {
+                config.volume = volume;
+            });
         }
 
-        /// Mirrors `AudioContext::set_sound_enabled`: same disk-only write.
+        /// Mirrors `AudioContext::set_sound_enabled`: same, without publishing.
         fn audio_set_sound_enabled(&mut self, enabled: bool) {
-            if self.disk.enable_sound != enabled {
-                self.disk.enable_sound = enabled;
+            self.apply(|config| {
+                config.enable_sound = enabled;
+            });
+        }
+
+        /// Mirrors the poll loop in `libs/ui.rs`, which republishes whenever the
+        /// writer reports a change - the path by which an off-thread write (the
+        /// Ctrl+Alt+M hotkey, the update checker) reaches the window.
+        fn poll_for_config_changes(&mut self) {
+            if !self.signal.data_equals(&self.authority) {
+                self.signal = self.authority.clone();
             }
         }
     }
 
-    /// Mirrors the startup update check, which loads the config *before* a
-    /// network round trip and saves it *after*. Any field the user changed
-    /// while the request was in flight is inside the stale struct and gets
-    /// rewritten to its old value.
-    struct StartupUpdateCheck {
-        config_read_before_the_request: AppConfig,
-    }
+    /// Mirrors the startup update check: it begins before a network round trip
+    /// and records its result after. It carries no config across that gap -
+    /// only the value it intends to write - which is what makes it harmless.
+    struct StartupUpdateCheck;
 
     impl StartupUpdateCheck {
-        fn begin(shared: &Shared) -> Self {
-            Self { config_read_before_the_request: shared.disk.clone() }
+        fn begin(_shared: &Shared) -> Self {
+            Self
         }
 
         fn finish_and_save(self, shared: &mut Shared, last_check: u64) {
-            // The fix: discard the pre-request copy and re-read, so only this
-            // path's own field is carried into the write.
-            drop(self.config_read_before_the_request);
-            let mut config = shared.disk.clone();
-            config.auto_update.last_check = Some(last_check);
-            shared.disk = config;
+            shared.apply(|config| {
+                config.auto_update.last_check = Some(last_check);
+            });
         }
     }
 
@@ -169,7 +168,7 @@ mod tests {
     #[test]
     fn a_setting_changed_during_the_startup_update_check_is_not_reverted() {
         let mut shared = Shared::new();
-        let original_volume = shared.disk.volume;
+        let original_volume = shared.authority.volume;
         let new_volume = 0.35;
         assert_ne!(original_volume, new_volume, "the test must actually move the slider");
 
@@ -196,17 +195,17 @@ mod tests {
         check.finish_and_save(&mut shared, 1_700_000_000);
 
         assert_eq!(
-            shared.disk.volume,
+            shared.authority.volume,
             new_volume,
             "the volume changed during the update check must survive it"
         );
         assert_eq!(
-            shared.disk.theme,
+            shared.authority.theme,
             crate::libs::theme::Theme::BuiltIn(crate::libs::theme::BuiltInTheme::Dark),
             "and so must the theme"
         );
         assert_eq!(
-            shared.disk.auto_update.last_check,
+            shared.authority.auto_update.last_check,
             Some(1_700_000_000),
             "while the update check still records its own result"
         );
@@ -235,7 +234,7 @@ mod tests {
             config.enable_sound = false;
         });
 
-        assert!(!shared.disk.enable_sound, "the mute reached disk");
+        assert!(!shared.authority.enable_sound, "the mute reached disk");
         assert!(
             !shared.signal.enable_sound,
             "the window must re-render muted rather than wait for another writer"
@@ -261,7 +260,7 @@ mod tests {
 
         // The debounced task is now cancelled by the tab switch.
 
-        assert_eq!(shared.disk.volume, 0.2, "the audio path persisted the new volume");
+        assert_eq!(shared.authority.volume, 0.2, "the audio path persisted the new volume");
         assert_eq!(
             shared.signal.volume,
             0.2,
@@ -271,6 +270,56 @@ mod tests {
             mount_home_page(&mut shared),
             0.2,
             "so a remount re-seeds the slider with the value the user chose"
+        );
+    }
+
+    /// Ctrl+Alt+M is handled on the audio engine thread, which cannot touch the
+    /// shared signal - it uses Dioxus's default non-`Send` storage. The write
+    /// therefore reaches the window only through the UI's poll of the writer's
+    /// change counter. Until that poll existed, the app muted while the window
+    /// kept rendering the unmuted icon.
+    #[test]
+    fn a_write_from_the_engine_thread_reaches_the_window() {
+        let mut shared = Shared::new();
+        assert!(shared.signal.enable_sound, "sound starts enabled");
+
+        // The hotkey handler flips the flag inside the mutation, so the value
+        // it negates is the writer's, not a copy read earlier.
+        shared.apply(|config| {
+            config.enable_sound = !config.enable_sound;
+        });
+
+        assert!(!shared.authority.enable_sound, "the hotkey muted the app");
+        assert!(
+            shared.signal.enable_sound,
+            "the engine thread cannot publish, so the signal is briefly behind"
+        );
+
+        shared.poll_for_config_changes();
+
+        assert!(
+            !shared.signal.enable_sound,
+            "the UI poll must republish, or the window renders the wrong mute icon"
+        );
+    }
+
+    /// The poll must not republish when the value it would push is the one
+    /// already rendered - a UI-originated write publishes synchronously, and a
+    /// second push would re-render the whole tree for no visible difference.
+    #[test]
+    fn the_poll_does_not_republish_a_ui_write_that_already_published() {
+        let mut shared = Shared::new();
+
+        shared.update_config(|config| {
+            config.volume = 0.42;
+        });
+        let published = shared.signal.clone();
+
+        shared.poll_for_config_changes();
+
+        assert!(
+            shared.signal.data_equals(&published),
+            "the poll must find nothing to do after a UI write"
         );
     }
 }

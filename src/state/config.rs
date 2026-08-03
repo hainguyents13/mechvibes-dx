@@ -370,12 +370,20 @@ impl AppConfig {
         }
     }
 
-    pub fn save(&self) -> Result<(), String> {
+    /// Write this struct over `config.json`, replacing every field.
+    ///
+    /// Deliberately **not** public. Reaching this from a subsystem means
+    /// holding an `AppConfig` across time and writing it back, which reverts
+    /// whatever another subsystem changed in between - the defect that shipped
+    /// three times from three unrelated call sites. `config_writer::apply` is
+    /// the only caller outside this module's own load path, and it always
+    /// writes state it owns and has just mutated.
+    pub(in crate::state) fn save(&self) -> Result<(), String> {
         let config_path = paths::data::config_json();
         debug_print!("💾 Saving config to: {}", config_path.display());
         debug_print!("   keyboard_soundpack: {}", self.keyboard_soundpack);
         debug_print!("   mouse_soundpack: {}", self.mouse_soundpack);
-        data::save_json_to_file(self, &config_path)
+        data::save_json_to_file_atomically(self, &config_path)
     }
 }
 
@@ -420,12 +428,18 @@ impl Default for AppConfig {
 mod tests {
     use super::*;
 
+    /// Why `save()` is `pub(in crate::state)` and `config_writer::apply` is the
+    /// only public way to write.
+    ///
     /// `save()` rewrites the entire struct, so a writer that mutates a copy it
     /// captured earlier reverts every field someone else changed in between.
-    /// This is the mute bug: the volume path held a config from before the
-    /// mute click and wrote `enable_sound: true` back over it.
+    /// This is the mute bug: the volume path held a config from before the mute
+    /// click and wrote `enable_sound: true` back over it. The shape is
+    /// reproduced here on plain structs because it can no longer be expressed
+    /// against the real API - there is no public function that accepts an
+    /// `AppConfig` to persist, so a caller has nothing to hold and write back.
     #[test]
-    fn saving_a_stale_struct_reverts_a_concurrent_change() {
+    fn holding_a_struct_and_writing_it_back_is_what_reverts_a_concurrent_change() {
         let on_disk = AppConfig::default();
 
         // Volume path reads the config...
@@ -442,7 +456,8 @@ mod tests {
         assert!(!after_mute.enable_sound, "mute was applied to disk");
         assert!(
             persisted.enable_sound,
-            "stale save silently restores enable_sound - the clobber this guards against"
+            "stale save silently restores enable_sound - which is why no public \
+             API accepts a config to write"
         );
     }
 

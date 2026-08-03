@@ -1,5 +1,4 @@
 use serde::{ Deserialize, Serialize };
-use crate::state::config::AppConfig;
 use std::collections::HashMap;
 use std::sync::{ Arc, Mutex };
 use std::sync::mpsc;
@@ -133,7 +132,7 @@ pub fn initialize_global_ambiance_player() {
     // OutputStream (via cpal::Stream) is not Send, so it must be created on
     // and never leave this thread; SwitchDevice rebuilds it in place here.
     thread::spawn(move || {
-        let initial_device = AppConfig::load().selected_audio_device;
+        let initial_device = crate::state::config_writer::current().selected_audio_device;
         let (mut stream, mut stream_handle) = match open_stream(initial_device.as_deref()) {
             Ok(pair) => pair,
             Err(e) => {
@@ -344,7 +343,7 @@ impl AmbiancePlayerState {
 
     /// Initialize from config
     pub fn initialize() -> Self {
-        let config = AppConfig::load();
+        let config = crate::state::config_writer::current();
 
         Self {
             sounds: Self::get_builtin_sounds(),
@@ -355,14 +354,21 @@ impl AmbiancePlayerState {
         }
     }
 
-    /// Save current state to config
-    pub fn save_config(&self) -> Result<(), String> {
-        let mut config = AppConfig::load();
-        config.ambiance_active_sounds = self.active_sounds.clone();
-        config.ambiance_global_volume = self.global_volume;
-        config.ambiance_is_muted = self.is_muted;
-        // Don't save is_playing - always start paused
-        config.save()
+    /// Save current state to config.
+    ///
+    /// Returns nothing: the write goes through `config_writer`, which reports a
+    /// failure to persist on stderr itself. Every caller already discarded the
+    /// old `Result`, so surfacing one here only invited `let _ =`.
+    pub fn save_config(&self) {
+        let active_sounds = self.active_sounds.clone();
+        let global_volume = self.global_volume;
+        let is_muted = self.is_muted;
+        crate::state::config_writer::apply(move |config| {
+            config.ambiance_active_sounds = active_sounds;
+            config.ambiance_global_volume = global_volume;
+            config.ambiance_is_muted = is_muted;
+            // Don't save is_playing - always start paused
+        });
     }
 
     /// Get built-in ambiance sounds (using local assets)
@@ -476,7 +482,7 @@ impl AmbiancePlayerState {
                 }
             }
         }
-        let _ = self.save_config();
+        self.save_config();
     }
 
     /// Set volume for a specific sound
@@ -491,7 +497,7 @@ impl AmbiancePlayerState {
                 let _ = set_ambiance_sound_volume(&sound_id, effective_volume);
             }
 
-            let _ = self.save_config();
+            self.save_config();
         }
     }
     /// Set global volume (0.0 to 1.0) - affects all active sounds
@@ -501,7 +507,7 @@ impl AmbiancePlayerState {
         // Update audio player global volume
         let _ = set_global_ambiance_volume(self.global_volume);
 
-        let _ = self.save_config();
+        self.save_config();
     }
 
     /// Toggle global mute
@@ -511,7 +517,7 @@ impl AmbiancePlayerState {
         // Update audio player mute state
         let _ = set_global_ambiance_mute(self.is_muted);
 
-        let _ = self.save_config();
+        self.save_config();
     }
 
     /// Toggle global play/pause state

@@ -1,4 +1,3 @@
-use crate::state::config::AppConfig;
 use crate::state::paths;
 use crate::state::soundpack::SoundPack;
 use crate::state::soundpack::{ SoundpackCache, SoundpackMetadata };
@@ -25,7 +24,7 @@ fn determine_soundpack_type(soundpack_id: &str) -> crate::state::soundpack::Soun
 /// rather than this function's return value, which only reflects whether
 /// the request was sent.
 pub fn load_soundpack(context: &AudioContext) -> Result<(), String> {
-    let config = AppConfig::load();
+    let config = crate::state::config_writer::current();
     load_keyboard_soundpack(context, &config.keyboard_soundpack)?;
     load_mouse_soundpack(context, &config.mouse_soundpack)?;
     Ok(())

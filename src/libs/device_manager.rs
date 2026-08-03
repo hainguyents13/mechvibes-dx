@@ -326,7 +326,7 @@ impl DeviceManager {
     /// make rodio's realtime resampler run on top of ours, which is worse
     /// than not resampling at all.
     pub fn get_current_output_sample_rate(&self) -> Option<u32> {
-        let config = crate::state::config::AppConfig::load();
+        let config = crate::state::config_writer::current();
 
         let device = match &config.selected_audio_device {
             Some(device_id) =>

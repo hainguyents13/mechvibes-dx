@@ -11,27 +11,16 @@ static ENABLE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new
 static ENABLE_KEYBOARD_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
 static ENABLE_MOUSE_SOUND: std::sync::OnceLock<Mutex<bool>> = std::sync::OnceLock::new();
 
-/// Loads the newest config from disk, applies `mutate`, and saves only if
-/// `mutate` reports an actual change.
+/// Submits a field-level mutation to the single config writer.
 ///
-/// Two invariants this exists to hold:
-///
-/// 1. **Never persist a stale struct.** The whole `AppConfig` is rewritten on
-///    every save, so mutating a copy that was read earlier silently reverts any
-///    field another path changed in between. Loading immediately before the
-///    write keeps that window as small as possible.
-/// 2. **Never save when nothing changed.** UI mount effects re-assert their
-///    current value on render, and unconditional saves turned that into a
-///    continuous rewrite loop that raced the mute flag.
-fn persist_if_changed(mutate: impl FnOnce(&mut AppConfig) -> bool) {
-    let mut config = AppConfig::load();
-    if !mutate(&mut config) {
-        return;
-    }
-    config.last_updated = chrono::Utc::now();
-    if let Err(e) = config.save() {
-        eprintln!("❌ [AudioContext] Failed to save config: {}", e);
-    }
+/// Both invariants this used to hold by hand now come from
+/// `config_writer::apply` itself: the mutation runs against the authoritative
+/// state (so it can never revert a field another subsystem just changed), and a
+/// mutation that changes nothing is not written (UI mount effects re-assert
+/// their current value on every render, and unconditional saves turned that
+/// into a continuous rewrite loop that raced the mute flag).
+fn persist(mutate: impl FnOnce(&mut AppConfig)) {
+    crate::state::config_writer::apply(mutate);
 }
 
 /// Updates the cached `enable_sound` flag without persisting or notifying the
@@ -76,7 +65,7 @@ impl AudioContext {
     /// `spawn_engine()` hasn't run yet (it must run in `main()` before the
     /// Dioxus UI is built).
     pub fn new() -> Self {
-        let config = AppConfig::load();
+        let config = crate::state::config_writer::current();
         AUDIO_VOLUME.get_or_init(|| Mutex::new(config.volume));
         MOUSE_AUDIO_VOLUME.get_or_init(|| Mutex::new(config.mouse_volume));
         ENABLE_SOUND.get_or_init(|| Mutex::new(config.enable_sound));
@@ -94,17 +83,12 @@ impl AudioContext {
         if let Some(global) = AUDIO_VOLUME.get() {
             *global.lock().unwrap() = volume;
         }
-        // Always tell the engine (cheap, and makes the call idempotent), but
-        // only touch the config file when the value actually changed. Mount
-        // effects re-assert the current volume on every navigation/render, and
-        // an unconditional save turned that into a steady rewrite of the whole
-        // config struct - which is what raced the mute flag.
-        persist_if_changed(|config| {
-            if config.volume == volume {
-                return false;
-            }
+        // Always tell the engine (cheap, and makes the call idempotent). The
+        // writer only touches the file when the value actually moved, which
+        // matters because mount effects re-assert the current volume on every
+        // navigation.
+        persist(|config| {
             config.volume = volume;
-            true
         });
         self.send(AudioCommand::SetVolume(volume));
     }
@@ -120,12 +104,8 @@ impl AudioContext {
         if let Some(global) = MOUSE_AUDIO_VOLUME.get() {
             *global.lock().unwrap() = volume;
         }
-        persist_if_changed(|config| {
-            if config.mouse_volume == volume {
-                return false;
-            }
+        persist(|config| {
             config.mouse_volume = volume;
-            true
         });
         self.send(AudioCommand::SetMouseVolume(volume));
     }
@@ -163,12 +143,8 @@ impl AudioContext {
         if let Some(global) = ENABLE_SOUND.get() {
             *global.lock().unwrap() = enabled;
         }
-        persist_if_changed(|config| {
-            if config.enable_sound == enabled {
-                return false;
-            }
+        persist(|config| {
             config.enable_sound = enabled;
-            true
         });
         self.send(AudioCommand::SetSoundEnabled(enabled));
     }
@@ -177,12 +153,8 @@ impl AudioContext {
         if let Some(global) = ENABLE_KEYBOARD_SOUND.get() {
             *global.lock().unwrap() = enabled;
         }
-        persist_if_changed(|config| {
-            if config.enable_keyboard_sound == enabled {
-                return false;
-            }
+        persist(|config| {
             config.enable_keyboard_sound = enabled;
-            true
         });
         self.send(AudioCommand::SetKeyboardSoundEnabled(enabled));
     }
@@ -191,12 +163,8 @@ impl AudioContext {
         if let Some(global) = ENABLE_MOUSE_SOUND.get() {
             *global.lock().unwrap() = enabled;
         }
-        persist_if_changed(|config| {
-            if config.enable_mouse_sound == enabled {
-                return false;
-            }
+        persist(|config| {
             config.enable_mouse_sound = enabled;
-            true
         });
         self.send(AudioCommand::SetMouseSoundEnabled(enabled));
     }

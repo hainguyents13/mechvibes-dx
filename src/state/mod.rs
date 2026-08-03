@@ -1,6 +1,7 @@
 pub mod ambiance;
 pub mod app;
 pub mod config;
+pub mod config_writer;
 pub mod keyboard;
 pub mod manifest;
 pub mod paths;

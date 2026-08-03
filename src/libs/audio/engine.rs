@@ -6,7 +6,6 @@ use std::sync::{ Arc, OnceLock };
 use std::time::Duration;
 
 use crate::libs::device_manager::DeviceManager;
-use crate::state::config::AppConfig;
 
 const FADE_IN_MS: f32 = 2.0;
 const FADE_OUT_MS: f32 = 5.0;
@@ -180,7 +179,7 @@ fn open_stream(
 impl EngineState {
     fn new() -> Self {
         let device_manager = DeviceManager::new();
-        let config = AppConfig::load();
+        let config = crate::state::config_writer::current();
 
         let (stream, stream_handle, opened_device_id) = open_stream(
             &device_manager,
@@ -480,19 +479,23 @@ fn parse_input_event(raw: &str) -> Option<(String, bool)> {
 ///
 /// The persisted config is the source of truth for the new value (rather than
 /// negating the engine's cached flag) so the hotkey cannot drift from what the
-/// UI and tray read back.
+/// UI and tray read back. The flip happens *inside* the mutation, so the value
+/// being negated is the authority's, not a copy read a moment earlier.
+///
+/// This runs on the engine thread, which has no access to the Dioxus signal.
+/// The window still re-renders because `config_writer` notifies its subscribers
+/// after every write, and the UI installs one at startup - before that existed,
+/// the hotkey muted the app while the window kept showing the unmuted icon.
 fn handle_toggle_sound() -> bool {
-    let mut config = AppConfig::load();
-    config.enable_sound = !config.enable_sound;
-    config.last_updated = chrono::Utc::now();
-    let enabled = config.enable_sound;
-    match config.save() {
-        Ok(_) => {
-            crate::libs::tray_service::request_tray_update();
-            println!("🔄 [AudioEngine] Sound toggled: {}", enabled);
-        }
-        Err(e) => eprintln!("❌ [AudioEngine] Failed to save config after sound toggle: {}", e),
-    }
+    let mut enabled = false;
+    crate::state::config_writer::apply(|config| {
+        config.enable_sound = !config.enable_sound;
+        enabled = config.enable_sound;
+    });
+
+    crate::libs::tray_service::request_tray_update();
+    println!("🔄 [AudioEngine] Sound toggled: {}", enabled);
+
     // Keep the UI-side cache (`AudioContext::is_sound_enabled`) in step: the
     // tray toggle derives its next value from it, so a stale cache here would
     // make the following tray click a no-op.
@@ -590,7 +593,7 @@ fn run_engine(
     let mut state = EngineState::new();
 
     // Load the configured soundpacks once at startup.
-    let config = AppConfig::load();
+    let config = crate::state::config_writer::current();
     if !config.keyboard_soundpack.is_empty() {
         let result = super::soundpack_loader::load_keyboard_pack_into_engine(
             &mut state,

@@ -85,7 +85,7 @@ pub fn use_state_trigger() -> Callback<()> {
 
 // Reload the current soundpacks from configuration
 pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
-    let config = crate::state::config::AppConfig::load();
+    let config = crate::state::config_writer::current();
 
     // Track if we need to update config (only for truly missing soundpacks)
     // Don't clear config for temporary loading failures to prevent infinite loops

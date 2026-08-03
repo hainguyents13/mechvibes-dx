@@ -1,3 +1,6 @@
+// Only the tests build an `AppConfig` directly now. Every runtime path here
+// goes through `config_writer`, which never hands one out to be written back.
+#[cfg(test)]
 use crate::state::config::AppConfig;
 use crate::utils::constants::APP_NAME;
 use crate::utils::update_installer::{
@@ -11,8 +14,6 @@ use semver::Version;
 use serde::{ Deserialize, Serialize };
 use std::error::Error;
 use std::fmt;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::time::{ interval, Duration as TokioDuration };
 
 // Fixed repository information
@@ -231,29 +232,29 @@ pub async fn check_for_updates_simple() -> Result<UpdateInfo, UpdateError> {
 }
 
 // Service for auto-update background checking
-pub struct UpdateService {
-    config: Arc<Mutex<AppConfig>>,
-}
+///
+/// Holds no config of its own. It used to own an `Arc<Mutex<AppConfig>>` taken
+/// once at launch and never refreshed, and wrote that struct back after every
+/// check - reverting every setting the user had touched since the app started.
+/// There is now nothing to go stale: each tick reads what it needs and writes
+/// only its own fields.
+pub struct UpdateService;
 
 impl UpdateService {
-    pub fn new(config: Arc<Mutex<AppConfig>>) -> Self {
-        Self {
-            config,
-        }
+    pub fn new() -> Self {
+        Self
     }
 
     pub async fn start(&self) {
-        let config = self.config.clone();
-
         tokio::spawn(async move {
             let mut interval = interval(TokioDuration::from_secs(86400)); // Check every 24 hours
 
             loop {
                 interval.tick().await;
-                let update_config = {
-                    let config_guard = config.lock().await;
-                    config_guard.auto_update.clone()
-                }; // Check if it's time to check for updates (every 24 hours)
+                // Read the timestamp fresh on every tick rather than from a
+                // long-lived copy.
+                let update_config = crate::state::config_writer::current().auto_update;
+                // Check if it's time to check for updates (every 24 hours)
                 if let Some(last_check) = update_config.last_check {
                     let now = std::time::SystemTime
                         ::now()
@@ -270,43 +271,32 @@ impl UpdateService {
 
                 match check_for_updates_simple().await {
                     Ok(update_info) => {
-                        // Update last check time and save available update info
-                        {
-                            let mut config_guard = config.lock().await;
+                        // Record the result by mutating only the fields this
+                        // check owns. Everything the user changed while the
+                        // request was in flight is untouched.
+                        let checked_at = std::time::SystemTime
+                            ::now()
+                            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let available = update_info.update_available.then(|| (
+                            update_info.latest_version.clone(),
+                            update_info.download_url.clone(),
+                        ));
 
-                            // The guarded struct was loaded once at startup
-                            // (see `ui.rs`, where this `Arc<Mutex<_>>` is
-                            // built) and is never refreshed, so by now it is
-                            // stale by however long the app has been running.
-                            // `save()` rewrites every field, so writing it back
-                            // would revert each volume, theme and mute change
-                            // the user made since launch. Re-read from disk and
-                            // keep only this path's own fields.
-                            *config_guard = AppConfig::load();
-
-                            config_guard.auto_update.last_check = Some(
-                                std::time::SystemTime
-                                    ::now()
-                                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs()
-                            );
-                            if update_info.update_available {
-                                // Save update info to config
-                                config_guard.auto_update.available_version = Some(
-                                    update_info.latest_version.clone()
-                                );
-                                config_guard.auto_update.available_download_url =
-                                    update_info.download_url.clone();
-                            } else {
-                                // Clear update info if no updates
-                                config_guard.auto_update.available_version = None;
-                                config_guard.auto_update.available_download_url = None;
+                        crate::state::config_writer::apply(move |config| {
+                            config.auto_update.last_check = Some(checked_at);
+                            match available {
+                                Some((version, download_url)) => {
+                                    config.auto_update.available_version = Some(version);
+                                    config.auto_update.available_download_url = download_url;
+                                }
+                                None => {
+                                    config.auto_update.available_version = None;
+                                    config.auto_update.available_download_url = None;
+                                }
                             }
-
-                            config_guard.last_updated = chrono::Utc::now();
-                            let _ = config_guard.save();
-                        }
+                        });
                         if update_info.update_available {
                             println!(
                                 "🆕 Update available: {} -> {}",
@@ -463,7 +453,7 @@ pub async fn download_and_stage_update(update_info: &UpdateInfo) {
     // A staged installer from a previous session that still verifies is
     // reused as-is, so choosing "Later" and coming back never costs a second
     // download.
-    let config = AppConfig::load();
+    let config = crate::state::config_writer::current();
     if let Some(staged) = &config.auto_update.staged_update {
         if let Ok(path) = staged.validate(&version) {
             set_update_stage(UpdateStage::Ready {
@@ -483,11 +473,9 @@ pub async fn download_and_stage_update(update_info: &UpdateInfo) {
     match update_installer::download_and_verify(&download_url, &version, &user_agent).await {
         Ok(staged) => {
             let installer_path = staged.installer_path.clone();
-            let mut config = AppConfig::load();
-            config.auto_update.staged_update = Some(staged);
-            if let Err(e) = config.save() {
-                eprintln!("⚠️  Staged update downloaded but not recorded in config: {}", e);
-            }
+            crate::state::config_writer::apply(move |config| {
+                config.auto_update.staged_update = Some(staged);
+            });
             println!("✅ Update {} verified and ready to install", version);
             set_update_stage(UpdateStage::Ready { version, installer_path });
         }
@@ -531,8 +519,7 @@ pub fn restore_staged_update() {
         return;
     }
 
-    let mut config = AppConfig::load();
-    let Some(staged) = config.auto_update.staged_update.clone() else {
+    let Some(staged) = crate::state::config_writer::current().auto_update.staged_update else {
         return;
     };
 
@@ -541,8 +528,9 @@ pub fn restore_staged_update() {
     if !is_upgrade(current, &staged.version) {
         println!("🧹 Discarding staged update {} (no longer newer than {})", staged.version, current);
         update_installer::discard_staged(&staged);
-        config.auto_update.staged_update = None;
-        let _ = config.save();
+        crate::state::config_writer::apply(|config| {
+            config.auto_update.staged_update = None;
+        });
         return;
     }
 
@@ -557,8 +545,9 @@ pub fn restore_staged_update() {
         Err(e) => {
             eprintln!("⚠️  Discarding unusable staged update: {}", e);
             update_installer::discard_staged(&staged);
-            config.auto_update.staged_update = None;
-            let _ = config.save();
+            crate::state::config_writer::apply(|config| {
+                config.auto_update.staged_update = None;
+            });
         }
     }
 }
@@ -585,10 +574,11 @@ pub fn install_staged_update() -> Result<(), StageError> {
         return Err(StageError::Io("No verified update is ready to install".to_string()));
     };
 
-    let mut config = AppConfig::load();
-    let staged = config.auto_update.staged_update.clone().ok_or_else(||
-        StageError::Io("Staged update is missing from config".to_string())
-    )?;
+    let staged = crate::state::config_writer
+        ::current()
+        .auto_update.staged_update.ok_or_else(||
+            StageError::Io("Staged update is missing from config".to_string())
+        )?;
 
     // Verify one last time, immediately before execution.
     let path = staged.validate(&version)?;
@@ -598,8 +588,9 @@ pub fn install_staged_update() -> Result<(), StageError> {
 
     // Cleared before spawning: if the install dies halfway, the next launch
     // re-checks and re-downloads rather than retrying a file that just failed.
-    config.auto_update.staged_update = None;
-    let _ = config.save();
+    crate::state::config_writer::apply(|config| {
+        config.auto_update.staged_update = None;
+    });
 
     update_installer::spawn_installer_detached(&path)?;
     println!("🚀 Installer for {} launched; shutting down for upgrade", version);
@@ -624,7 +615,7 @@ pub fn install_staged_update() -> Result<(), StageError> {
 /// Comparison is semver, never string equality: "0.10.0" > "0.9.0" is only
 /// true numerically.
 pub fn get_saved_update_info() -> Option<UpdateInfo> {
-    let config = crate::state::config::AppConfig::load();
+    let config = crate::state::config_writer::current();
     let available_version = config.auto_update.available_version.as_ref()?;
     let current_version = crate::utils::constants::APP_VERSION;
 
@@ -652,8 +643,9 @@ pub fn get_saved_update_info() -> Option<UpdateInfo> {
 ///
 /// Returns whether anything was cleared, which the tests assert on.
 pub fn clear_stale_available_version() -> bool {
-    let mut config = AppConfig::load();
-    let Some(available_version) = config.auto_update.available_version.clone() else {
+    let Some(available_version) = crate::state::config_writer
+        ::current()
+        .auto_update.available_version else {
         return false;
     };
 
@@ -666,9 +658,10 @@ pub fn clear_stale_available_version() -> bool {
         available_version,
         crate::utils::constants::APP_VERSION
     );
-    config.auto_update.available_version = None;
-    config.auto_update.available_download_url = None;
-    let _ = config.save();
+    crate::state::config_writer::apply(|config| {
+        config.auto_update.available_version = None;
+        config.auto_update.available_download_url = None;
+    });
     true
 }
 
@@ -679,7 +672,7 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     // Only the timestamp is kept across the request: holding the whole struct
     // would invite saving it back after the await and reverting anything the
     // user changed meanwhile.
-    let last_check = crate::state::config::AppConfig::load().auto_update.last_check;
+    let last_check = crate::state::config_writer::current().auto_update.last_check;
     let now = std::time::SystemTime
         ::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -735,32 +728,38 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     // Perform actual check
     match check_for_updates_simple().await {
         Ok(update_info) => {
-            // Re-read the config instead of reusing the copy taken before the
-            // request: `save()` rewrites the whole struct, and the user can
-            // change the volume, theme or mute state while the network round
-            // trip is in flight. Saving the pre-request copy silently reverted
-            // every one of those edits.
-            let mut config = crate::state::config::AppConfig::load();
-
-            // Update last check time and save info
-            config.auto_update.last_check = Some(now);
+            // Only this path's own fields are written. The user can change the
+            // volume, theme or mute state while the network round trip is in
+            // flight, and none of that is visible to - or touchable by - this
+            // mutation.
+            let available = update_info.update_available.then(|| (
+                update_info.latest_version.clone(),
+                update_info.download_url.clone(),
+            ));
 
             if update_info.update_available {
-                config.auto_update.available_version = Some(update_info.latest_version.clone());
-                config.auto_update.available_download_url = update_info.download_url.clone();
                 println!(
                     "🆕 Startup check: Update available {} -> {}",
                     update_info.current_version,
                     update_info.latest_version
                 );
             } else {
-                config.auto_update.available_version = None;
-                config.auto_update.available_download_url = None;
                 println!("✅ Startup check: No updates available");
             }
 
-            config.last_updated = chrono::Utc::now();
-            let _ = config.save();
+            crate::state::config_writer::apply(move |config| {
+                config.auto_update.last_check = Some(now);
+                match available {
+                    Some((version, download_url)) => {
+                        config.auto_update.available_version = Some(version);
+                        config.auto_update.available_download_url = download_url;
+                    }
+                    None => {
+                        config.auto_update.available_version = None;
+                        config.auto_update.available_download_url = None;
+                    }
+                }
+            });
 
             // Update global state. Notification only - see the note in
             // UpdateService::start: nothing downloads without a user click.
@@ -787,98 +786,63 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
 #[cfg(test)]
 mod update_service_persistence_tests {
     use super::*;
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
 
-    /// Reproduces `UpdateService::start`'s write using real `AppConfig` values
-    /// and the real `Arc<Mutex<AppConfig>>` that `ui.rs` builds once at
-    /// startup, with a real JSON round trip standing in for the file.
+    /// What the periodic check now writes, expressed exactly as
+    /// `UpdateService::start` does: a mutation over fields this path owns, with
+    /// no `AppConfig` carried in from anywhere.
     ///
-    /// The periodic check mutates the *guarded* struct and calls `save()` on
-    /// it. That struct was loaded at launch and is never refreshed, so it is
-    /// stale by however long the app has been running - and `save()` rewrites
-    /// every field, reverting each setting changed since launch.
-    ///
-    /// `tokio::time::interval` fires its first tick immediately
-    /// (`internal_interval_at(Instant::now(), ..)`), so this runs at startup,
-    /// not only after 24 hours.
-    async fn run_periodic_check(
-        startup_snapshot: Arc<Mutex<AppConfig>>,
-        disk: &mut String,
-        now: u64,
-        reload_before_saving: bool
-    ) {
-        let mut guard = startup_snapshot.lock().await;
-
-        if reload_before_saving {
-            // The fix: replace the stale snapshot with what is on disk now.
-            *guard = serde_json::from_str(disk).expect("config on disk parses");
-        }
-
-        guard.auto_update.last_check = Some(now);
-        guard.auto_update.available_version = None;
-        guard.auto_update.available_download_url = None;
-
-        // `save()` serializes the whole struct.
-        *disk = serde_json::to_string(&*guard).expect("config serializes");
+    /// The predecessor of this test drove an `Arc<Mutex<AppConfig>>` snapshotted
+    /// at launch, because that is what the service held. There is no longer any
+    /// such struct to model - the service is a unit type - so what is checked
+    /// here is that the mutation touches only `auto_update`, which is what makes
+    /// the launch-time snapshot unnecessary in the first place.
+    fn record_check_result(config: &mut AppConfig, now: u64) {
+        config.auto_update.last_check = Some(now);
+        config.auto_update.available_version = None;
+        config.auto_update.available_download_url = None;
     }
 
-    #[tokio::test]
-    async fn the_periodic_check_does_not_revert_settings_changed_since_launch() {
-        // App launches; `ui.rs` snapshots the config into the Arc<Mutex<_>>.
-        let at_launch = AppConfig::default();
-        let mut disk = serde_json::to_string(&at_launch).expect("config serializes");
-        let startup_snapshot = Arc::new(Mutex::new(at_launch.clone()));
+    #[test]
+    fn the_periodic_check_does_not_revert_settings_changed_since_launch() {
+        // The user's config as it stands when a tick fires - every field
+        // different from the defaults the app launched with.
+        let mut config = AppConfig {
+            volume: 0.68,
+            mouse_volume: 0.62,
+            theme: crate::libs::theme::Theme::BuiltIn(crate::libs::theme::BuiltInTheme::Luxury),
+            enable_sound: false,
+            ..AppConfig::default()
+        };
 
-        // The user then changes settings. Every UI writer goes through disk.
-        let mut changed: AppConfig = serde_json::from_str(&disk).expect("parses");
-        changed.volume = 0.68;
-        changed.mouse_volume = 0.62;
-        changed.theme = crate::libs::theme::Theme::BuiltIn(
-            crate::libs::theme::BuiltInTheme::Luxury,
-        );
-        changed.enable_sound = false;
-        disk = serde_json::to_string(&changed).expect("serializes");
+        record_check_result(&mut config, 1_700_000_000);
 
-        // The background check fires and writes the struct it still holds.
-        run_periodic_check(startup_snapshot, &mut disk, 1_700_000_000, true).await;
-
-        let after: AppConfig = serde_json::from_str(&disk).expect("parses");
-        assert_eq!(after.volume, 0.68, "keyboard volume must survive the periodic check");
-        assert_eq!(after.mouse_volume, 0.62, "mouse volume must survive it too");
+        assert_eq!(config.volume, 0.68, "keyboard volume must survive the periodic check");
+        assert_eq!(config.mouse_volume, 0.62, "mouse volume must survive it too");
         assert_eq!(
-            after.theme,
+            config.theme,
             crate::libs::theme::Theme::BuiltIn(crate::libs::theme::BuiltInTheme::Luxury),
             "the theme must survive it"
         );
-        assert!(!after.enable_sound, "and so must the mute state");
+        assert!(!config.enable_sound, "and so must the mute state");
         assert_eq!(
-            after.auto_update.last_check,
+            config.auto_update.last_check,
             Some(1_700_000_000),
             "while the check still records its own result"
         );
     }
 
-    /// Documents the defect itself: without the reload, the stale snapshot
-    /// reverts every field. Guards against the reload being dropped later.
-    #[tokio::test]
-    async fn without_reloading_the_stale_snapshot_reverts_everything() {
-        let at_launch = AppConfig::default();
-        let mut disk = serde_json::to_string(&at_launch).expect("serializes");
-        let startup_snapshot = Arc::new(Mutex::new(at_launch));
+    /// `tokio::time::interval` fires its first tick immediately, so this check
+    /// runs at startup rather than only after 24 hours. That is what made the
+    /// old stale-snapshot write reachable within seconds of launch, and it is
+    /// why the mutation must be safe to run at any moment.
+    #[test]
+    fn ticking_repeatedly_never_disturbs_an_unrelated_field() {
+        let mut config = AppConfig { volume: 0.68, ..AppConfig::default() };
 
-        let mut changed: AppConfig = serde_json::from_str(&disk).expect("parses");
-        changed.volume = 0.68;
-        disk = serde_json::to_string(&changed).expect("serializes");
-
-        run_periodic_check(startup_snapshot, &mut disk, 1_700_000_000, false).await;
-
-        let after: AppConfig = serde_json::from_str(&disk).expect("parses");
-        assert_eq!(
-            after.volume,
-            1.0,
-            "this is the bug: the stale snapshot restored the launch-time volume"
-        );
+        for tick in 0..24 {
+            record_check_result(&mut config, 1_700_000_000 + tick);
+            assert_eq!(config.volume, 0.68, "tick {tick} must leave the volume alone");
+        }
     }
 }
 

@@ -30,12 +30,15 @@ pub fn app() -> Element {
     let update_signal = use_signal(|| 0u32);
     use_context_provider(|| update_signal);
 
-    // Create global config state - load once and share across all pages
+    // Create global config state - shared across all pages. The value comes
+    // from the single writer, which owns the authoritative struct; this signal
+    // is a render-side mirror of it, never a second source of truth.
     let global_config = use_signal(|| {
         println!("🌍 Initializing global config context");
-        crate::state::config::AppConfig::load()
+        crate::state::config_writer::current()
     });
     use_context_provider(|| global_config);
+
 
     // Create global keyboard state using signals
     let keyboard_state = use_signal(|| KeyboardState::new());
@@ -102,13 +105,34 @@ pub fn app() -> Element {
     // plays sound itself (see engine.rs) - this loop no longer drives
     // playback, it only mirrors key state for the UI and surfaces
     // device-switch/pack-load results.
+    //
+    // The same loop republishes the config whenever the single writer reports a
+    // change, which is what lets a write made off this thread re-render the
+    // window: the Ctrl+Alt+M hotkey runs on the audio engine thread and the
+    // update checker in a tokio task, and neither can touch a `Signal` (the
+    // shared one uses Dioxus's default non-`Send` storage). Polling a counter
+    // works from anywhere and costs one atomic load per tick.
     {
         let mut keyboard_state = keyboard_state;
+        let mut global_config = global_config;
+        let mut seen_config_generation = crate::state::config_writer::generation();
 
         use_future(move || async move {
             let event_rx = crate::libs::audio::ui_event_receiver();
 
             loop {
+                let generation = crate::state::config_writer::generation();
+                if generation != seen_config_generation {
+                    seen_config_generation = generation;
+                    let latest = crate::state::config_writer::current();
+                    // Writes that originated in the UI have already published
+                    // through `update_config`; skipping an identical value
+                    // keeps those from costing a second render.
+                    if !global_config.peek().data_equals(&latest) {
+                        global_config.set(latest);
+                    }
+                }
+
                 // The state of the last key event seen this tick.
                 //
                 // Nothing is scheduled or held back: whatever the newest event
@@ -187,14 +211,12 @@ pub fn app() -> Element {
     #[cfg(feature = "auto-update")]
     {
         use crate::utils::auto_updater::UpdateService;
-        use std::sync::Arc;
-        use tokio::sync::Mutex;
         use_future(move || async move {
-            let config = Arc::new(Mutex::new(crate::state::config::AppConfig::load()));
-            let update_service = UpdateService::new(config);
-
-            // Start background update checking
-            update_service.start().await;
+            // No config is handed over: the service reads what it needs per
+            // tick and writes only its own fields. It used to be given an
+            // `Arc<Mutex<AppConfig>>` snapshotted here at launch, which it then
+            // saved back over every setting changed since.
+            UpdateService::new().start().await;
         });
     } // Set up asset handler for serving soundpack images
     use_asset_handler("soundpack-images", |request, response| {

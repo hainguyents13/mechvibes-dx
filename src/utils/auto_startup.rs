@@ -17,8 +17,10 @@ pub fn enable_auto_startup() -> Result<(), String> {
     let exe_path = get_exe_path()?;
     let exe_path_str = exe_path.to_str().ok_or("Failed to convert executable path to string")?;
 
-    // Check if we should start minimized
-    let config = crate::state::config::AppConfig::load();
+    // Check if we should start minimized. Read from the config authority, not
+    // the file: the Settings toggle calls this immediately after writing
+    // `start_minimized`, and a re-parse could race that write.
+    let config = crate::state::config_writer::current();
     let command = if config.start_minimized {
         format!("\"{}\" --minimized", exe_path_str)
     } else {

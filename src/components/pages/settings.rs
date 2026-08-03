@@ -158,7 +158,7 @@ pub fn SettingsPage() -> Element {
                                 }),
                             );
                             spawn(async move {
-                                if crate::state::config::AppConfig::load().auto_start {
+                                if crate::state::config_writer::current().auto_start {
                                     match crate::utils::auto_startup::set_auto_startup(true) {
                                         Ok(_) => {
                                             let status = if new_value {
@@ -227,25 +227,32 @@ pub fn SettingsPage() -> Element {
                             match check_for_updates_simple().await {
                                 Ok(info) => {
                                     update_info.set(Some(info.clone()));
-                                    let mut app_config = crate::state::config::AppConfig::load();
-                                    if info.update_available {
-                                        app_config.auto_update.available_version = Some(
-                                            info.latest_version.clone(),
-                                        );
-                                        app_config.auto_update.available_download_url = info
-                                            .download_url
-                                            .clone();
-                                    } else {
-                                        app_config.auto_update.available_version = None;
-                                        app_config.auto_update.available_download_url = None;
-                                    }
-                                    app_config.auto_update.last_check = Some(
-                                        std::time::SystemTime::now()
-                                            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_secs(),
-                                    );
-                                    let _ = app_config.save();
+                                    // Only this check's own fields are written.
+                                    // The network round trip above gave the
+                                    // user time to change anything else, and a
+                                    // mutation cannot carry a config across it.
+                                    let available = info.update_available.then(|| (
+                                        info.latest_version.clone(),
+                                        info.download_url.clone(),
+                                    ));
+                                    let checked_at = std::time::SystemTime::now()
+                                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_secs();
+                                    crate::state::config_writer::apply(move |config| {
+                                        config.auto_update.last_check = Some(checked_at);
+                                        match available {
+                                            Some((version, download_url)) => {
+                                                config.auto_update.available_version = Some(version);
+                                                config.auto_update.available_download_url =
+                                                    download_url;
+                                            }
+                                            None => {
+                                                config.auto_update.available_version = None;
+                                                config.auto_update.available_download_url = None;
+                                            }
+                                        }
+                                    });
                                     if info.update_available {
                                         update_info_setter.call(Some(info));
                                     } else {

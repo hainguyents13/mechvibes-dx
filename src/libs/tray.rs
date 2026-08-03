@@ -107,7 +107,7 @@ pub struct TrayManager {
 impl TrayManager {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // Load current config to determine sound state
-        let config = crate::state::config::AppConfig::load();
+        let config = crate::state::config_writer::current();
         // `enable_sound` is the positive flag, so muted is its inverse. The
         // menu item is checked when muted.
         let muted = !config.enable_sound;
@@ -189,7 +189,7 @@ impl TrayManager {
     /// Settings toggle, Reset to Defaults, and the Ctrl+Alt+M hotkey), so the
     /// config on disk stays the single source of truth for what the tray shows.
     pub fn update_menu(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let config = crate::state::config::AppConfig::load();
+        let config = crate::state::config_writer::current();
         let enabled = config.enable_sound;
 
         // Mutate the existing item instead of rebuilding the menu: the label is
