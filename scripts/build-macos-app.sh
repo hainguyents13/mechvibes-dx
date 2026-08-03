@@ -54,12 +54,33 @@ cp README-macos.txt "$BUNDLE/Contents/Resources/"
 
 # The failure mode this job already shipped once: an archive whose Resources
 # were silently empty. Assert instead of trusting the copy.
-packs=$(find "$BUNDLE/Contents/Resources/soundpacks" -name "*.ogg" | wc -l | tr -d ' ')
+#
+# Compared against the source tree rather than a hardcoded number, and counting
+# every audio extension - the mouse packs are .mp3, so an .ogg-only check would
+# pass while silently dropping all four of them. A count mismatch means the
+# copy lost files.
+count_audio() { find "$1" \( -name "*.ogg" -o -name "*.mp3" -o -name "*.wav" \) | wc -l | tr -d ' '; }
+expected=$(count_audio soundpacks)
+packs=$(count_audio "$BUNDLE/Contents/Resources/soundpacks")
 if [ "$packs" -eq 0 ]; then
   echo "::error::No soundpacks in the bundle - refusing to ship a silent app"
   exit 1
 fi
-echo "Bundled $packs soundpack audio files"
+if [ "$packs" -ne "$expected" ]; then
+  echo "::error::Bundled $packs soundpack audio files but the source tree has $expected"
+  exit 1
+fi
+echo "Bundled $packs soundpack audio files (matches source tree)"
+
+# Every built-in pack listed in src/state/paths.rs must have its config.json,
+# or that pack silently fails to load at runtime.
+configs=$(find "$BUNDLE/Contents/Resources/soundpacks" -name "config.json" | wc -l | tr -d ' ')
+expected_configs=$(find soundpacks -name "config.json" | wc -l | tr -d ' ')
+if [ "$configs" -ne "$expected_configs" ]; then
+  echo "::error::Bundled $configs soundpack config.json files, expected $expected_configs"
+  exit 1
+fi
+echo "Bundled $configs soundpack config.json files"
 
 if [ ! -d "$BUNDLE/Contents/Resources/assets/fonts" ]; then
   echo "::error::assets/fonts missing from Resources - asset!() lookups would fail"
