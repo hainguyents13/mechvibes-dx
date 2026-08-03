@@ -273,6 +273,17 @@ impl UpdateService {
                         // Update last check time and save available update info
                         {
                             let mut config_guard = config.lock().await;
+
+                            // The guarded struct was loaded once at startup
+                            // (see `ui.rs`, where this `Arc<Mutex<_>>` is
+                            // built) and is never refreshed, so by now it is
+                            // stale by however long the app has been running.
+                            // `save()` rewrites every field, so writing it back
+                            // would revert each volume, theme and mute change
+                            // the user made since launch. Re-read from disk and
+                            // keep only this path's own fields.
+                            *config_guard = AppConfig::load();
+
                             config_guard.auto_update.last_check = Some(
                                 std::time::SystemTime
                                     ::now()
@@ -293,6 +304,7 @@ impl UpdateService {
                                 config_guard.auto_update.available_download_url = None;
                             }
 
+                            config_guard.last_updated = chrono::Utc::now();
                             let _ = config_guard.save();
                         }
                         if update_info.update_available {
@@ -769,6 +781,104 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
                 Err(e)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod update_service_persistence_tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    /// Reproduces `UpdateService::start`'s write using real `AppConfig` values
+    /// and the real `Arc<Mutex<AppConfig>>` that `ui.rs` builds once at
+    /// startup, with a real JSON round trip standing in for the file.
+    ///
+    /// The periodic check mutates the *guarded* struct and calls `save()` on
+    /// it. That struct was loaded at launch and is never refreshed, so it is
+    /// stale by however long the app has been running - and `save()` rewrites
+    /// every field, reverting each setting changed since launch.
+    ///
+    /// `tokio::time::interval` fires its first tick immediately
+    /// (`internal_interval_at(Instant::now(), ..)`), so this runs at startup,
+    /// not only after 24 hours.
+    async fn run_periodic_check(
+        startup_snapshot: Arc<Mutex<AppConfig>>,
+        disk: &mut String,
+        now: u64,
+        reload_before_saving: bool
+    ) {
+        let mut guard = startup_snapshot.lock().await;
+
+        if reload_before_saving {
+            // The fix: replace the stale snapshot with what is on disk now.
+            *guard = serde_json::from_str(disk).expect("config on disk parses");
+        }
+
+        guard.auto_update.last_check = Some(now);
+        guard.auto_update.available_version = None;
+        guard.auto_update.available_download_url = None;
+
+        // `save()` serializes the whole struct.
+        *disk = serde_json::to_string(&*guard).expect("config serializes");
+    }
+
+    #[tokio::test]
+    async fn the_periodic_check_does_not_revert_settings_changed_since_launch() {
+        // App launches; `ui.rs` snapshots the config into the Arc<Mutex<_>>.
+        let at_launch = AppConfig::default();
+        let mut disk = serde_json::to_string(&at_launch).expect("config serializes");
+        let startup_snapshot = Arc::new(Mutex::new(at_launch.clone()));
+
+        // The user then changes settings. Every UI writer goes through disk.
+        let mut changed: AppConfig = serde_json::from_str(&disk).expect("parses");
+        changed.volume = 0.68;
+        changed.mouse_volume = 0.62;
+        changed.theme = crate::libs::theme::Theme::BuiltIn(
+            crate::libs::theme::BuiltInTheme::Luxury,
+        );
+        changed.enable_sound = false;
+        disk = serde_json::to_string(&changed).expect("serializes");
+
+        // The background check fires and writes the struct it still holds.
+        run_periodic_check(startup_snapshot, &mut disk, 1_700_000_000, true).await;
+
+        let after: AppConfig = serde_json::from_str(&disk).expect("parses");
+        assert_eq!(after.volume, 0.68, "keyboard volume must survive the periodic check");
+        assert_eq!(after.mouse_volume, 0.62, "mouse volume must survive it too");
+        assert_eq!(
+            after.theme,
+            crate::libs::theme::Theme::BuiltIn(crate::libs::theme::BuiltInTheme::Luxury),
+            "the theme must survive it"
+        );
+        assert!(!after.enable_sound, "and so must the mute state");
+        assert_eq!(
+            after.auto_update.last_check,
+            Some(1_700_000_000),
+            "while the check still records its own result"
+        );
+    }
+
+    /// Documents the defect itself: without the reload, the stale snapshot
+    /// reverts every field. Guards against the reload being dropped later.
+    #[tokio::test]
+    async fn without_reloading_the_stale_snapshot_reverts_everything() {
+        let at_launch = AppConfig::default();
+        let mut disk = serde_json::to_string(&at_launch).expect("serializes");
+        let startup_snapshot = Arc::new(Mutex::new(at_launch));
+
+        let mut changed: AppConfig = serde_json::from_str(&disk).expect("parses");
+        changed.volume = 0.68;
+        disk = serde_json::to_string(&changed).expect("serializes");
+
+        run_periodic_check(startup_snapshot, &mut disk, 1_700_000_000, false).await;
+
+        let after: AppConfig = serde_json::from_str(&disk).expect("parses");
+        assert_eq!(
+            after.volume,
+            1.0,
+            "this is the bug: the stale snapshot restored the launch-time volume"
+        );
     }
 }
 
