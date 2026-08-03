@@ -127,6 +127,11 @@ fn VolumeSliderBase(
                   let update_config = update_config.clone();
                   let audio_ctx = audio_ctx.clone();
                   move |_| {
+                      // Tell the engine first so the mute takes effect on the
+                      // very next keystroke; `set_*_sound_enabled` also
+                      // persists the flag. `update_config` then re-reads that
+                      // saved config into the shared signal so the icon and
+                      // the disabled slider re-render.
                       match volume_type {
                           VolumeType::Keyboard => {
                               let new_enable_keyboard = !config().enable_keyboard_sound;
