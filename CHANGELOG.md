@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.2] - 2026-08-03
+
+### Added
+
+- **macOS DMG (experimental)**: the macOS build now ships as a proper `.dmg` with a drag-to-Applications app bundle instead of a bare-binary archive. Still unsigned and not notarized: right-click the app and choose Open the first time. Settings are stored in `~/Library/Application Support/Mechvibes`. Untested on real hardware; reports welcome.
+
+### Fixed
+
+- **Settings really stop reverting now.** The 0.7.1 fix covered one path but missed the main one: a background service kept a copy of your settings from the moment the app started and wrote it back seconds later (and again every 24 hours), undoing whatever you had changed in between. Whichever setting you touched first after opening the app was the one you would see reset, which is why reports about "which setting resets" never agreed. Verified against the running app this time, not only in tests.
+
 ## [0.7.1] - 2026-08-03
 
 ### Added
@@ -105,6 +115,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
 
 
