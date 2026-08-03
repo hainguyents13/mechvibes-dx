@@ -47,7 +47,7 @@ pub fn ThemeToggler() -> Element {
                           move |_| {
                               theme.set(Theme::BuiltIn(builtin_theme.clone()));
 
-                              // Fix: Immediately set data-theme on HTML element
+                              
                               let daisy_name = builtin_theme.to_daisy_theme();
                               eval(&format!("document.documentElement.setAttribute('data-theme', '{}')", daisy_name));
 
@@ -102,7 +102,7 @@ pub fn ThemeToggler() -> Element {
                             move |_| {
                                 theme.set(Theme::Custom(theme_id.clone()));
 
-                                // FIX: Apply custom theme ID to document root!
+                                
                                 eval(&format!("document.documentElement.setAttribute('data-theme', '{}')", theme_id));
 
                                 update_fn(
