@@ -1,0 +1,86 @@
+# TEMPORARY - delete before merging feat/macos-dmg.
+#
+# Exists only to iterate on the macOS .app/.dmg assembly without pushing tags
+# or creating release drafts. workflow_dispatch only: it can never fire on a
+# tag or a push.
+name: macOS DMG test (temporary)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  macos-dmg:
+    name: macOS DMG (experimental)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Assemble .app and DMG
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "Version from Cargo.toml: $VERSION"
+          chmod +x scripts/build-macos-app.sh
+          ./scripts/build-macos-app.sh "$VERSION"
+
+      # The run log itself is the evidence: mount the finished DMG and walk the
+      # bundle, so a green check is backed by an actual file listing.
+      - name: Inspect the produced DMG
+        run: |
+          set -euo pipefail
+          DMG=$(ls dist/*.dmg)
+          echo "=== DMG: $DMG ($(du -h "$DMG" | cut -f1)) ==="
+          hdiutil attach "$DMG" -mountpoint /tmp/mvdmg -nobrowse -readonly
+
+          echo "=== DMG root ==="
+          ls -la /tmp/mvdmg/
+
+          echo "=== Bundle tree (depth 3) ==="
+          find /tmp/mvdmg/MechvibesDX.app -maxdepth 3 | sort
+
+          echo "=== Info.plist ==="
+          cat /tmp/mvdmg/MechvibesDX.app/Contents/Info.plist
+
+          echo "=== Binary ==="
+          ls -la /tmp/mvdmg/MechvibesDX.app/Contents/MacOS/
+          file /tmp/mvdmg/MechvibesDX.app/Contents/MacOS/mechvibes-dx
+
+          echo "=== Resources ==="
+          ls -la /tmp/mvdmg/MechvibesDX.app/Contents/Resources/
+          echo "soundpack .ogg count: $(find /tmp/mvdmg/MechvibesDX.app/Contents/Resources/soundpacks -name '*.ogg' | wc -l)"
+
+          echo "=== codesign on the mounted copy ==="
+          codesign --verify --deep --strict --verbose=2 /tmp/mvdmg/MechvibesDX.app
+
+          hdiutil detach /tmp/mvdmg
+
+      - name: Verify asset names cannot hijack the Windows auto-updater
+        run: |
+          set -euo pipefail
+          status=0
+          for f in dist/*; do
+            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
+            case "$name" in
+              *x64*.exe)
+                echo "::error::macOS asset '$name' matches the Windows auto-updater filter"
+                status=1
+                ;;
+            esac
+          done
+          exit $status
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg-test
+          path: dist/*
+          if-no-files-found: error
