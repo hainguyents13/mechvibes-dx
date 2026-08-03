@@ -7,7 +7,7 @@ use std::sync::Arc;
 #[derive(Clone, PartialEq, Copy)]
 pub enum VolumeType {
     Keyboard, // Controls enable_keyboard_sound
-    Mouse, // Controls enable_mouse_sound
+    Mouse,    // Controls enable_mouse_sound
 }
 
 #[component]
@@ -21,9 +21,7 @@ fn VolumeSliderBase(
     let (config, update_config) = use_config();
 
     // The engine thread caches the enable flags in its own state and only
-    // updates them on `AudioCommand::Set*SoundEnabled`. Writing the config
-    // alone leaves the engine playing, so the mute button has to go through
-    // the audio context (which persists config *and* notifies the engine).
+    // updates them on `AudioCommand::Set*SoundEnabled`.
     let audio_ctx = use_context::<Arc<AudioContext>>();
 
     // Get the appropriate enable state based on volume type
@@ -82,11 +80,37 @@ fn VolumeSliderBase(
             id: "{id}",
             value: volume(),
             disabled: !enable_sound(),
-            oninput: move |evt| {
-                if let Ok(val) = evt.value().parse::<f32>() {
-                    volume.set(val);
-                    if let Some(handler) = on_change {
-                        handler.call(val);
+            oninput: {
+                let update_config = update_config.clone();
+                let audio_ctx = audio_ctx.clone();
+                move |evt| {
+                    if let Ok(val) = evt.value().parse::<f32>() {
+                        // 1. Update local signal for smooth UI slider response
+                        volume.set(val);
+
+                        // 2. Tell the audio engine the new volume immediately
+                        match volume_type {
+                            VolumeType::Keyboard => {
+                                audio_ctx.set_volume(val);
+                            }
+                            VolumeType::Mouse => {
+                                audio_ctx.set_mouse_volume(val);
+                            }
+                        }
+
+                        // 3. PERSIST TO CONFIG so switching tabs doesn't reset it!
+                        let vt = volume_type;
+                        update_config(Box::new(move |cfg| {
+                            match vt {
+                                VolumeType::Keyboard => cfg.volume = val,
+                                VolumeType::Mouse => cfg.mouse_volume = val,
+                            }
+                        }));
+
+                        // 4. Fire any external change handler if present
+                        if let Some(handler) = on_change {
+                            handler.call(val);
+                        }
                     }
                 }
             },
@@ -103,11 +127,6 @@ fn VolumeSliderBase(
                   let update_config = update_config.clone();
                   let audio_ctx = audio_ctx.clone();
                   move |_| {
-                      // Tell the engine first so the mute takes effect on the
-                      // very next keystroke; `set_*_sound_enabled` also
-                      // persists the flag. `update_config` then re-reads that
-                      // saved config into the shared signal so the icon and
-                      // the disabled slider re-render.
                       match volume_type {
                           VolumeType::Keyboard => {
                               let new_enable_keyboard = !config().enable_keyboard_sound;
