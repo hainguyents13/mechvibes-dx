@@ -835,7 +835,7 @@ mod tests {
         vec![
             asset("MechvibesDX-0.7.0-Setup-x64.exe"),
             asset("SHA256SUMS.txt"),
-            asset("mechvibes-dx-0.7.0-macos-arm64-experimental.tar.gz"),
+            asset("mechvibes-dx-0.7.0-macos-arm64-experimental.dmg"),
             asset("mechvibes-dx_0.7.0_amd64.deb")
         ]
     }
@@ -850,7 +850,7 @@ mod tests {
         #[cfg(target_os = "macos")]
         assert_eq!(
             url.as_deref(),
-            Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64-experimental.tar.gz")
+            Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64-experimental.dmg")
         );
 
         #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
@@ -866,6 +866,38 @@ mod tests {
         if !cfg!(target_os = "windows") {
             assert!(!url.ends_with(".exe"), "non-Windows build was offered {}", url);
         }
+    }
+
+    /// The Windows filter is "contains x64 AND ends in .exe". The macOS and
+    /// Linux asset names must never satisfy it, or a Windows user could be
+    /// handed an unrunnable file as an "update". Checked here as well as in
+    /// release.yml, because the CI assertion only runs at release time while
+    /// this one runs on every commit.
+    ///
+    /// Note "arm64" does NOT contain the substring "x64" (a-r-m-6-4), which is
+    /// what makes the DMG name safe; asserted rather than reasoned about.
+    #[test]
+    fn no_non_windows_asset_can_satisfy_the_windows_installer_filter() {
+        let windows_filter =
+            |name: &str| name.ends_with(".exe") && name.contains("x64");
+
+        for name in [
+            "mechvibes-dx-0.7.0-macos-arm64-experimental.dmg",
+            "mechvibes-dx-0.7.0-macos-x86_64-experimental.dmg",
+            "mechvibes-dx_0.7.0_amd64.deb",
+            "README-macos-0.7.0.txt",
+            "SHA256SUMS.txt",
+        ] {
+            assert!(
+                !windows_filter(&name.to_lowercase()),
+                "'{}' would be served to Windows users as an installer",
+                name
+            );
+        }
+
+        // The real installer must still match, otherwise the filter is simply
+        // broken in the other direction.
+        assert!(windows_filter(&"MechvibesDX-0.7.0-Setup-x64.exe".to_lowercase()));
     }
 
     /// A release with no asset for this platform must yield None so the UI
