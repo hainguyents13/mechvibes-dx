@@ -16,6 +16,11 @@ pub fn WindowController() -> Element {
     // so it has to notify the engine rather than only rewriting the config.
     let audio_ctx = use_context::<Arc<AudioContext>>();
 
+    // `set_sound_enabled` persists the flag but does not publish it to the
+    // shared config signal, so the UI would keep rendering the pre-toggle mute
+    // state until some unrelated write happened to republish it.
+    let (_config, update_config) = crate::utils::config::use_config();
+
     // Create a static receiver for window actions
     let mut window_action_receiver = use_signal(|| None::<mpsc::Receiver<WindowAction>>); // Create a signal to hold the tray manager
     let mut tray_manager = use_signal(|| None::<TrayManager>);
@@ -45,6 +50,7 @@ pub fn WindowController() -> Element {
         let window_clone = window.clone();
         let mut tray_manager_clone = tray_manager.clone();
         let audio_ctx = audio_ctx.clone();
+        let update_config = update_config.clone();
 
         spawn(async move {
             loop {
@@ -95,6 +101,14 @@ pub fn WindowController() -> Element {
                             // flag in its own state, actually stops playing.
                             let enabled = !audio_ctx.is_sound_enabled();
                             audio_ctx.set_sound_enabled(enabled);
+                            // Publish the new flag so the mute button and the
+                            // disabled sliders re-render; the audio context
+                            // only writes the file.
+                            update_config(
+                                Box::new(move |config| {
+                                    config.enable_sound = enabled;
+                                })
+                            );
                             debug_print!(
                                 "🔇 Sounds {} via tray menu",
                                 if enabled { "enabled" } else { "disabled" }

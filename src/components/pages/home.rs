@@ -39,7 +39,14 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         ctx.set_mouse_volume(mouse_volume());
     });
 
-    // Debounce effect for saving keyboard volume config changes
+    // Debounce effect for saving keyboard volume config changes.
+    //
+    // The debounce only defers the *disk* write. `spawn` registers the task in
+    // this scope's `spawned_tasks`, and navigating to another tab unmounts
+    // HomePage, so `Runtime::remove_scope` cancels the task mid-`Delay` and the
+    // deferred write never happens. Publishing to the shared config signal
+    // therefore has to be synchronous - otherwise the signal keeps the
+    // pre-drag volume and re-seeds the slider with it when Home remounts.
     {
         let update_config = update_config.clone();
         use_effect(move || {
@@ -50,6 +57,14 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
 
             let update_config = update_config.clone();
             let save_counter_clone = save_counter();
+
+            // Publish immediately so the value survives an unmount; the write
+            // itself is deduplicated by `update_config` when nothing changed.
+            update_config(
+                Box::new(move |config| {
+                    config.volume = current_volume;
+                })
+            );
 
             spawn(async move {
                 // Wait for 500ms
@@ -69,7 +84,8 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
         });
     }
 
-    // Debounce effect for saving mouse volume config changes
+    // Debounce effect for saving mouse volume config changes. Same reasoning as
+    // the keyboard volume above.
     {
         let update_config = update_config.clone();
         use_effect(move || {
@@ -80,6 +96,12 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
 
             let update_config = update_config.clone();
             let mouse_save_counter_clone = mouse_save_counter();
+
+            update_config(
+                Box::new(move |config| {
+                    config.mouse_volume = current_mouse_volume;
+                })
+            );
 
             spawn(async move {
                 // Wait for 500ms

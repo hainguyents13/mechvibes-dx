@@ -664,7 +664,10 @@ pub fn clear_stale_available_version() -> bool {
 pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     println!("🔄 Checking for updates on startup...");
 
-    let mut config = crate::state::config::AppConfig::load();
+    // Only the timestamp is kept across the request: holding the whole struct
+    // would invite saving it back after the await and reverting anything the
+    // user changed meanwhile.
+    let last_check = crate::state::config::AppConfig::load().auto_update.last_check;
     let now = std::time::SystemTime
         ::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -675,7 +678,7 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     // Only check if:
     // 1. Never checked before (last_check is None), OR
     // 2. Last check was more than 1 hour ago (to avoid spam on frequent restarts)
-    let should_check = match config.auto_update.last_check {
+    let should_check = match last_check {
         None => {
             println!("📅 First time checking for updates");
             true
@@ -720,6 +723,13 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     // Perform actual check
     match check_for_updates_simple().await {
         Ok(update_info) => {
+            // Re-read the config instead of reusing the copy taken before the
+            // request: `save()` rewrites the whole struct, and the user can
+            // change the volume, theme or mute state while the network round
+            // trip is in flight. Saving the pre-request copy silently reverted
+            // every one of those edits.
+            let mut config = crate::state::config::AppConfig::load();
+
             // Update last check time and save info
             config.auto_update.last_check = Some(now);
 
@@ -737,6 +747,7 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
                 println!("✅ Startup check: No updates available");
             }
 
+            config.last_updated = chrono::Utc::now();
             let _ = config.save();
 
             // Update global state. Notification only - see the note in
