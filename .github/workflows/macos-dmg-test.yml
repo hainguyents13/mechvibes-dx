@@ -1,12 +1,20 @@
 # TEMPORARY - delete before merging feat/macos-dmg.
 #
 # Exists only to iterate on the macOS .app/.dmg assembly without pushing tags
-# or creating release drafts. workflow_dispatch only: it can never fire on a
-# tag or a push.
+# or creating release drafts. It creates no release and writes nothing to the
+# repo - it only uploads an artifact.
+#
+# The push trigger is pinned to this one branch because GitHub can only
+# dispatch a workflow_dispatch workflow that already exists on the DEFAULT
+# branch, and polluting main to test a branch is exactly what this work is
+# supposed to avoid. Deleted along with this file before merge.
 name: macOS DMG test (temporary)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/macos-dmg
 
 jobs:
   macos-dmg:
