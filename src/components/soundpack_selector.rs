@@ -2,9 +2,13 @@ use crate::libs::audio::AudioContext;
 use crate::utils::config::use_config;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::{ Check, ChevronDown, Keyboard, Mouse, Music, Search };
+use lucide_dioxus::{ Check, ChevronDown, Keyboard, Mouse, Music, Search, VolumeX };
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Dioxus list key for the "None" row. It shares the list with real packs, so
+/// it needs a key that no soundpack folder path can collide with.
+const NO_SOUNDPACK_KEY: &str = "__none__";
 
 #[derive(Clone, PartialEq, Copy, Debug)]
 pub enum SelectorType {
@@ -181,6 +185,20 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
                     }
                   }
                 }
+              } else if current().is_empty() {
+                // Deliberately cleared, which is not the same as "nothing
+                // picked yet" - say so rather than showing the placeholder.
+                div { class: "flex items-center gap-3",
+                  div { class: "flex-shrink-0 w-11 h-11 bg-base-200 rounded-box flex items-center justify-center",
+                    VolumeX { class: "w-5 h-5 text-base-content/50" }
+                  }
+                  div { class: "flex-1 min-w-0 text-left",
+                    div { class: "font-medium line-clamp-1 text-base-content text-sm", "None" }
+                    div { class: "text-xs font-normal truncate text-base-content/50",
+                      "No sound for this input"
+                    }
+                  }
+                }
               } else {
                 div { class: "text-base-content/50 text-sm", "{placeholder_text}" }
               }
@@ -218,7 +236,76 @@ fn SoundpackDropdown(soundpack_type: SelectorType) -> Element {
               // Soundpack list
               div { class: "overflow-y-auto max-h-50",
                 style: "background-color: var(--color-base-200) !important;",
-                if filtered_soundpacks.read().is_empty() {
+                // Turning sound off for this slot is a choice like any pack,
+                // so it lives in the same list. Only shown when nothing is
+                // being searched for, since it matches no query.
+                if search_query().is_empty() {
+                  button {
+                    key: "{NO_SOUNDPACK_KEY}",
+                    class: format!(
+                        "w-full px-4 rounded-none py-2 text-left btn btn-lg justify-start gap-4 border-b border-base-300 h-auto {}",
+                        if current().is_empty() { "btn-disabled" } else { "btn-ghost" },
+                    ),
+                    disabled: current().is_empty(),
+                    onclick: {
+                        let mut error = error;
+                        let mut is_open = is_open;
+                        let mut search_query = search_query;
+                        let audio_ctx = audio_ctx.clone();
+                        let update_config = update_config.clone();
+                        let soundpack_type_click = soundpack_type;
+                        move |_| {
+                            is_open.set(false);
+                            search_query.set(String::new());
+                            error.set(String::new());
+                            update_config(
+                                Box::new(move |config| {
+                                    match soundpack_type_click {
+                                        SelectorType::Keyboard => {
+                                            config.keyboard_soundpack = String::new();
+                                        }
+                                        SelectorType::Mouse => {
+                                            config.mouse_soundpack = String::new();
+                                        }
+                                    }
+                                }),
+                            );
+                            // Tell the engine as well, or the pack already in
+                            // memory keeps playing until the next restart.
+                            let result = match soundpack_type_click {
+                                SelectorType::Keyboard => {
+                                    crate::libs::audio::load_keyboard_soundpack(&audio_ctx, "")
+                                }
+                                SelectorType::Mouse => {
+                                    crate::libs::audio::load_mouse_soundpack(&audio_ctx, "")
+                                }
+                            };
+                            if let Err(e) = result {
+                                error.set(format!("Failed to clear soundpack: {}", e));
+                            }
+                        }
+                    },
+                    div { class: "flex items-center justify-between gap-3",
+                      div { class: "flex-shrink-0 w-8 h-8 rounded-box flex items-center justify-center bg-base-100 overflow-hidden relative",
+                        VolumeX { class: "w-4 h-4 text-primary/50 bg-base-100" }
+                        if current().is_empty() {
+                          div { class: "absolute inset-0 bg-base-300/70 flex items-center justify-center",
+                            Check { class: "text-white w-6 h-6" }
+                          }
+                        }
+                      }
+                      div { class: "flex-1 min-w-0",
+                        div { class: "text-xs font-medium line-clamp-1 text-base-content",
+                          "None"
+                        }
+                        div { class: "text-xs font-normal line-clamp-1 text-base-content/50",
+                          "No sound for this input"
+                        }
+                      }
+                    }
+                  }
+                }
+                if filtered_soundpacks.read().is_empty() && !search_query().is_empty() {
                   div { class: "p-4 text-center text-base-content/50",
                     "{not_found_text}"
                   }

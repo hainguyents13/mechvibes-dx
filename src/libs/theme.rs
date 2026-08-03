@@ -8,10 +8,24 @@ pub enum Theme {
     Custom(String), // Custom theme with name
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumIter)]
+/// Defaults to following the OS, matching what a fresh `AppConfig` picks.
+/// Having a `Default` lets a damaged `theme` entry in a hand-edited config
+/// fall back to this one setting instead of failing the whole document.
+///
+/// Written out rather than derived: `#[default]` only applies to unit
+/// variants, and the default here carries a `BuiltInTheme` payload.
+impl Default for Theme {
+    fn default() -> Self {
+        Theme::BuiltIn(BuiltInTheme::default())
+    }
+}
+
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumIter, Default)]
 pub enum BuiltInTheme {
     Light,
     Dark,
+    #[default]
     System,
     // DaisyUI themes
     Cupcake,

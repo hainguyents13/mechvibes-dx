@@ -76,7 +76,17 @@ impl Default for BackgroundCustomization {
     }
 }
 
+/// Every field defaults independently, so one bad or absent entry costs the
+/// user that single setting instead of the whole document. Without this a
+/// hand-edited `"volume": "loud"` fails the entire parse, and the load path
+/// then writes defaults over the file - theme, customizations and device
+/// choices included.
+///
+/// `deserialize_lenient` additionally absorbs a wrong-typed *value* (`null`,
+/// `[]`, a string where a number belongs), which a bare `#[serde(default)]`
+/// does not: `default` covers a missing key, not a present-but-invalid one.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct AppConfig {
     // Metadata
     pub version: String,
@@ -114,9 +124,8 @@ pub struct AppConfig {
     pub landscape_mode: bool, // Enable/disable landscape mode layout
     pub auto_update: AutoUpdateConfig, // Auto-update settings
     /// Send one anonymous launch event (OS + app version) per start.
-    /// `serde(default = ...)` so configs written before this field existed
-    /// still deserialize instead of resetting every other setting, and so the
-    /// opt-out default matches `Default` rather than `false`.
+    /// Opt-out, so an absent field must land on `true` - `bool::default()`
+    /// would silently opt the user out on upgrade from a config predating it.
     #[serde(default = "default_true")]
     pub enable_telemetry: bool,
 }
@@ -125,6 +134,110 @@ pub struct AppConfig {
 /// equivalent since `bool::default()` is `false`.
 fn default_true() -> bool {
     true
+}
+
+/// Parse a config document, discarding only the entries that cannot be read.
+///
+/// Each key is tried on its own against a default document; one that fails to
+/// deserialize is dropped, and `#[serde(default)]` on the struct then fills
+/// that field from `AppConfig::default()`. This matters over a per-field
+/// `unwrap_or_default()`: the fallback for a damaged `volume` has to be the
+/// config's 1.0, not `f32::default()`, which would silently leave the app
+/// inaudible.
+///
+/// Only a document that is not a JSON object at all - truncated, or not JSON -
+/// still fails here, which is what routes the caller to the preserve path.
+pub fn parse_lenient(contents: &str) -> Result<AppConfig, String> {
+    let value: serde_json::Value = serde_json
+        ::from_str(contents)
+        .map_err(|e| format!("not valid JSON: {}", e))?;
+
+    let Some(object) = value.as_object() else {
+        return Err("config is not a JSON object".to_string());
+    };
+
+    // Probe each entry against an otherwise-default document, so a key is
+    // judged only on its own merits and cannot be failed by a bad neighbour.
+    let mut accepted = serde_json::Map::new();
+    for (key, entry) in object {
+        // A null soundpack reads as "no pack" rather than as a damaged entry:
+        // "" is the engine's supported no-sound state, so honouring the user's
+        // null is closer to their intent than restoring the default pack.
+        let entry = if
+            entry.is_null() &&
+            matches!(key.as_str(), "keyboard_soundpack" | "mouse_soundpack")
+        {
+            serde_json::Value::String(String::new())
+        } else {
+            entry.clone()
+        };
+
+        let mut probe = serde_json::Map::new();
+        probe.insert(key.clone(), entry.clone());
+
+        if serde_json::from_value::<AppConfig>(serde_json::Value::Object(probe)).is_ok() {
+            accepted.insert(key.clone(), entry);
+        } else {
+            eprintln!("⚠️  Ignoring unusable config entry '{}', using its default", key);
+        }
+    }
+
+    serde_json
+        ::from_value(serde_json::Value::Object(accepted))
+        .map_err(|e| format!("config could not be rebuilt: {}", e))
+}
+
+/// Outcome of trying to move an unparseable config out of the way.
+enum Preserved {
+    /// There was no file to preserve - a first run, or it was deleted.
+    Nothing,
+    /// The user's bytes now live at this path and are safe to overwrite from.
+    MovedTo(std::path::PathBuf),
+    /// The file is still in place and must not be written over.
+    Failed(String),
+}
+
+/// Move an unparseable config aside so its bytes survive, returning where it
+/// went.
+///
+/// Renaming rather than copying means the original path is free for a fresh
+/// default file without a window where both are half-written. An existing
+/// `.corrupt` from an earlier failure is never clobbered - the first failure
+/// usually holds the settings worth recovering, so later ones get a numbered
+/// suffix instead.
+fn preserve_corrupt_config(config_path: &std::path::Path) -> Preserved {
+    if !config_path.exists() {
+        return Preserved::Nothing;
+    }
+
+    let base = {
+        let mut name = config_path.as_os_str().to_os_string();
+        name.push(".corrupt");
+        std::path::PathBuf::from(name)
+    };
+
+    // First failure gets the plain `.corrupt` name; later ones are numbered so
+    // no earlier rescue is overwritten.
+    let mut target = base.clone();
+    let mut attempt = 1;
+    while target.exists() {
+        let mut name = base.as_os_str().to_os_string();
+        name.push(format!(".{}", attempt));
+        target = std::path::PathBuf::from(name);
+        attempt += 1;
+
+        // Refuse to spin forever if something is generating these.
+        if attempt > 100 {
+            return Preserved::Failed(
+                "too many saved copies of a damaged config already exist".to_string()
+            );
+        }
+    }
+
+    match std::fs::rename(config_path, &target) {
+        Ok(()) => Preserved::MovedTo(target),
+        Err(e) => Preserved::Failed(e.to_string()),
+    }
 }
 
 impl AppConfig {
@@ -171,8 +284,15 @@ impl AppConfig {
 
         debug_print!("📖 Loading config from: {}", config_path.display());
 
-        // Load config from file, falling back to defaults if it doesn't exist or is invalid
-        match data::load_json_from_file::<AppConfig>(&config_path) {
+        // Read and parse separately: a read failure (first run) and a parse
+        // failure (damaged document) need different handling, and only the
+        // latter has bytes worth preserving.
+        let parsed = std::fs
+            ::read_to_string(&config_path)
+            .map_err(|e| format!("could not read '{}': {}", config_path.display(), e))
+            .and_then(|contents| parse_lenient(&contents));
+
+        match parsed {
             Ok(mut config) => {
                 let mut config_updated = false;
 
@@ -209,12 +329,43 @@ impl AppConfig {
                 config
             }
             Err(e) => {
-                eprintln!("❌ Failed to load config file: {}. Using defaults.", e);
+                // Per-field tolerance above means reaching here needs the
+                // document itself to be unreadable (truncated, not JSON, or
+                // unreadable from disk) - not merely one bad setting.
+                eprintln!("❌ Failed to load config file: {}", e);
                 eprintln!("   Config path: {}", config_path.display());
-                eprintln!("   This will reset all settings to defaults!");
-                let default_config = Self::default();
-                let _ = default_config.save();
-                default_config
+
+                // Never overwrite the user's file in place: it is the only
+                // copy of their theme, customizations and device choices, and
+                // a hand-editing slip is recoverable only while those bytes
+                // still exist. Move it aside first, and if it cannot be moved,
+                // do not write defaults over it at all.
+                match preserve_corrupt_config(&config_path) {
+                    Preserved::Nothing => {
+                        // No file to lose (first run, or it was deleted).
+                        let default_config = Self::default();
+                        let _ = default_config.save();
+                        default_config
+                    }
+                    Preserved::MovedTo(backup) => {
+                        eprintln!(
+                            "   Your previous config was kept at: {}",
+                            backup.display()
+                        );
+                        eprintln!("   Defaults are in use for this session.");
+                        let default_config = Self::default();
+                        let _ = default_config.save();
+                        default_config
+                    }
+                    Preserved::Failed(err) => {
+                        eprintln!("   Could not set the damaged config aside: {}", err);
+                        eprintln!(
+                            "   Leaving it untouched and running on defaults; \
+                             settings changed now will not be saved over it."
+                        );
+                        Self::default()
+                    }
+                }
             }
         }
     }
@@ -344,6 +495,199 @@ mod tests {
 
         assert!(!fresh.enable_sound, "mute must survive an unrelated config write");
         assert_eq!(fresh.volume, 0.5, "the volume change must still apply");
+    }
+
+    /// Build a config document from the defaults, then apply edits, the way a
+    /// user hand-editing `config.json` would.
+    fn config_json_with(edits: &[(&str, serde_json::Value)]) -> String {
+        let mut value = serde_json::to_value(AppConfig::default()).expect("config serializes");
+        let object = value.as_object_mut().expect("config is a json object");
+        for (key, entry) in edits {
+            object.insert((*key).to_string(), entry.clone());
+        }
+        value.to_string()
+    }
+
+    /// A null where a string belongs used to fail the whole document, which
+    /// sent the load path down the arm that wrote defaults over the file.
+    /// It must now cost only that one field.
+    #[test]
+    fn a_null_soundpack_costs_only_that_field() {
+        let document = config_json_with(
+            &[
+                ("keyboard_soundpack", serde_json::Value::Null),
+                ("volume", serde_json::json!(0.42)),
+                ("custom_css", serde_json::json!("body { color: red; }")),
+            ]
+        );
+
+        assert!(
+            serde_json::from_str::<AppConfig>(&document).is_err(),
+            "a null in a non-optional field must really break a strict parse, \
+             or this test is not exercising the bug"
+        );
+
+        let restored = parse_lenient(&document).expect("a null field must not fail the document");
+
+        assert_eq!(restored.keyboard_soundpack, "", "null must read as the no-pack state");
+        assert_eq!(restored.volume, 0.42, "every other setting must survive intact");
+        assert_eq!(restored.custom_css, "body { color: red; }", "and so must the rest");
+    }
+
+    /// The other shapes a hand-edit produces: an array or a string where a
+    /// number belongs, and an outright unknown key. None may cost more than
+    /// the field it appears on - and a dropped field must fall back to the
+    /// config's own default, not the type's.
+    #[test]
+    fn wrong_typed_and_unknown_fields_do_not_fail_the_document() {
+        let document = config_json_with(
+            &[
+                ("mouse_soundpack", serde_json::json!([])),
+                ("volume", serde_json::json!("loud")),
+                ("landscape_mode", serde_json::json!(true)),
+                ("a_key_from_a_future_build", serde_json::json!({ "x": 1 })),
+            ]
+        );
+
+        let restored = parse_lenient(&document).expect(
+            "wrong-typed fields must not fail the document"
+        );
+
+        assert_eq!(
+            restored.mouse_soundpack,
+            AppConfig::default().mouse_soundpack,
+            "an array is damaged rather than intentional, so it falls back to the default pack"
+        );
+        assert_eq!(
+            restored.volume,
+            AppConfig::default().volume,
+            "a damaged volume must fall back to the audible config default, not 0.0"
+        );
+        assert!(restored.landscape_mode, "a valid neighbouring setting must survive");
+    }
+
+    /// A missing field is the upgrade case: an older config lacking a newer
+    /// key must load with that key defaulted, not reset everything.
+    #[test]
+    fn a_missing_field_defaults_without_losing_the_rest() {
+        let mut value = serde_json::to_value(AppConfig::default()).expect("config serializes");
+        let object = value.as_object_mut().expect("config is a json object");
+        object.remove("landscape_mode");
+        object.insert("custom_css".to_string(), serde_json::json!("body { color: red; }"));
+
+        let restored = parse_lenient(&value.to_string()).expect(
+            "a missing field must default rather than fail"
+        );
+
+        assert!(!restored.landscape_mode, "the absent field takes its default");
+        assert_eq!(
+            restored.custom_css,
+            "body { color: red; }",
+            "the user's other settings must be untouched"
+        );
+    }
+
+    /// An empty array in place of the whole document, and other non-object
+    /// shapes, cannot be salvaged field-by-field - they must be reported as a
+    /// parse failure so the caller preserves the file rather than parsing it
+    /// into silent defaults.
+    #[test]
+    fn a_non_object_document_is_a_parse_failure() {
+        assert!(parse_lenient("[]").is_err(), "a bare array is not a config");
+        assert!(parse_lenient("\"hello\"").is_err(), "a bare string is not a config");
+        assert!(parse_lenient("{\"volume\": 0.5").is_err(), "a truncated document must fail");
+    }
+
+    /// The opt-out flag must land on `true` when its stored value is damaged,
+    /// exactly as when the key is absent - a fallback to `bool::default()`
+    /// would silently opt the user out.
+    #[test]
+    fn a_damaged_telemetry_flag_stays_opted_in() {
+        let document = config_json_with(&[("enable_telemetry", serde_json::json!("yes"))]);
+        let restored = parse_lenient(&document).expect("a damaged flag must not fail the document");
+
+        assert!(restored.enable_telemetry, "the opt-out default must survive a damaged value");
+    }
+
+    /// The destructive case the fix targets: a document too damaged to parse
+    /// at all. The user's bytes must end up in `.corrupt`, and the original
+    /// path must not still hold them - it is replaced by a fresh default.
+    #[test]
+    fn a_truncated_config_is_preserved_rather_than_overwritten() {
+        let dir = std::env::temp_dir().join(format!("mechvibes-corrupt-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let config_path = dir.join("config.json");
+
+        let original = br#"{"volume": 0.7, "theme": "#.to_vec();
+        std::fs::write(&config_path, &original).expect("write truncated config");
+
+        assert!(
+            serde_json::from_slice::<AppConfig>(&original).is_err(),
+            "this fixture must really be unparseable, or the test proves nothing"
+        );
+
+        let preserved = preserve_corrupt_config(&config_path);
+        let backup = match preserved {
+            Preserved::MovedTo(path) => path,
+            _ => panic!("an existing damaged config must be preserved"),
+        };
+
+        assert_eq!(
+            std::fs::read(&backup).expect("backup readable"),
+            original,
+            "the user's original bytes must survive verbatim"
+        );
+        assert!(!config_path.exists(), "the damaged file is moved, not copied");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A second failure must not erase the first rescue, which is usually the
+    /// one still holding the user's real settings.
+    #[test]
+    fn a_second_failure_does_not_clobber_the_first_rescue() {
+        let dir = std::env::temp_dir().join(
+            format!("mechvibes-corrupt-twice-{}", std::process::id())
+        );
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let config_path = dir.join("config.json");
+
+        std::fs::write(&config_path, b"first damaged config").expect("write");
+        let first = match preserve_corrupt_config(&config_path) {
+            Preserved::MovedTo(path) => path,
+            _ => panic!("first preservation must succeed"),
+        };
+
+        std::fs::write(&config_path, b"second damaged config").expect("write");
+        let second = match preserve_corrupt_config(&config_path) {
+            Preserved::MovedTo(path) => path,
+            _ => panic!("second preservation must succeed"),
+        };
+
+        assert_ne!(first, second, "the second rescue must take a distinct path");
+        assert_eq!(
+            std::fs::read(&first).expect("first backup readable"),
+            b"first damaged config",
+            "the earlier rescue must still hold its original bytes"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Nothing on disk means nothing to rescue - writing defaults there is
+    /// correct and must not be mistaken for a failure.
+    #[test]
+    fn a_missing_config_file_is_not_treated_as_a_rescue() {
+        let dir = std::env::temp_dir().join(format!("mechvibes-absent-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        let preserved = preserve_corrupt_config(&dir.join("config.json"));
+        assert!(
+            matches!(preserved, Preserved::Nothing),
+            "an absent config is a first run, not a rescue"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     /// Guards the "skip redundant writes" half of the fix: re-asserting a value

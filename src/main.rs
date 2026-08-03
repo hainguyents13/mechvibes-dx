@@ -105,10 +105,24 @@ fn main() {
     let _instance_guard = match libs::single_instance::acquire() {
         Some(guard) => guard,
         None => {
-            always_eprint!("⚠️ {} is already running - exiting this instance", APP_NAME);
+            // Surface the window of the copy that is already running before
+            // giving up. Launching the app a second time is how people ask to
+            // see it again, and this process is about to exit invisibly -
+            // `#![windows_subsystem = "windows"]` means the message below
+            // reaches no console.
+            libs::single_instance::signal_running_instance();
+            always_eprint!("⚠️ {} is already running - raising its window instead", APP_NAME);
             return;
         }
     };
+
+    // Answer those requests for the rest of this process's life. Routed
+    // through the same WindowAction::Show the tray's "Show" item uses, so a
+    // second launch and the tray converge on one show/focus path.
+    #[cfg(target_os = "windows")]
+    libs::single_instance::listen_for_wake_requests(|| {
+        WINDOW_MANAGER.request_show();
+    });
 
     // Initialize debug logging first
     utils::logger::init_debug_logging();

@@ -1,7 +1,7 @@
 use super::path;
 use serde_json::{ Map, Value };
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{ Path, PathBuf };
 
 /// Get the duration of an audio file in milliseconds using Symphonia
 fn get_audio_duration_ms(file_path: &str) -> Result<f64, Box<dyn std::error::Error>> {
@@ -549,6 +549,48 @@ pub fn convert_v2_multi_to_single(
     Ok(())
 }
 
+/// Move an existing file aside before something overwrites it, returning
+/// where it went (or `None` if there was nothing there).
+///
+/// Conversion writes `concatenated_audio.wav` into the soundpack folder under
+/// a fixed name. If the pack already ships a file by that name it is the
+/// author's own audio, and a re-run would destroy it with no way back. An
+/// existing `.bak` is not clobbered either - the first one is the pristine
+/// original, later ones are already-generated output.
+pub fn back_up_existing_file(path: &Path) -> Result<Option<PathBuf>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let base = {
+        let mut name = path.as_os_str().to_os_string();
+        name.push(".bak");
+        PathBuf::from(name)
+    };
+
+    let mut target = base.clone();
+    let mut attempt = 1;
+    while target.exists() {
+        let mut name = base.as_os_str().to_os_string();
+        name.push(format!(".{}", attempt));
+        target = PathBuf::from(name);
+        attempt += 1;
+
+        if attempt > 100 {
+            return Err(format!("too many backups already exist next to {}", path.display()));
+        }
+    }
+
+    // Copy rather than rename: the file being backed up may still be needed as
+    // an input, and a rename would pull it out from under the conversion.
+    std::fs
+        ::copy(path, &target)
+        .map_err(|e| format!("failed to back up {} to {}: {}", path.display(), target.display(), e))?;
+
+    println!("🗄️  Backed up existing {} to {}", path.display(), target.display());
+    Ok(Some(target))
+}
+
 /// Concatenate multiple audio files and return timing information
 /// Returns HashMap with (filename -> (offset_ms, duration_ms))
 fn concatenate_audio_files_with_timing(
@@ -650,8 +692,11 @@ fn concatenate_audio_files_with_timing(
         return Err("No audio samples were loaded".into());
     }
 
-    // Save concatenated audio file
+    // Save concatenated audio file. Anything already sitting at this name is
+    // the pack author's own audio; preserve it before overwriting, and abort
+    // rather than destroy it if that cannot be done.
     let output_path = format!("{}/{}", soundpack_dir, output_filename);
+    back_up_existing_file(Path::new(&output_path))?;
     save_audio_file(&all_samples, channels, sample_rate, &output_path)?;
 
     let final_duration_ms =
@@ -1046,4 +1091,78 @@ fn create_iohook_to_web_key_mapping() -> HashMap<u32, String> {
     mapping.insert(65406, "Find".to_string()); // VC_SUN_FIND = 0xFF7E
 
     mapping
+}
+
+#[cfg(test)]
+mod tests {
+    use super::back_up_existing_file;
+
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir = std::env
+            ::temp_dir()
+            .join(format!("mechvibes-converter-{}-{}", tag, std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    /// The destructive case: a pack that already ships its own
+    /// `concatenated_audio.wav`. Conversion overwrites that name, so the
+    /// author's audio has to survive somewhere before the write happens.
+    #[test]
+    fn an_existing_audio_file_is_preserved_before_being_overwritten() {
+        let dir = temp_dir("backup");
+        let audio = dir.join("concatenated_audio.wav");
+        std::fs::write(&audio, b"the pack author's own audio").expect("write");
+
+        let backup = back_up_existing_file(&audio)
+            .expect("backing up an existing file must succeed")
+            .expect("an existing file must produce a backup");
+
+        assert_eq!(
+            std::fs::read(&backup).expect("backup readable"),
+            b"the pack author's own audio",
+            "the original bytes must survive verbatim"
+        );
+        assert!(audio.exists(), "the original stays in place as conversion input");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Re-running a conversion must not let the second run's backup overwrite
+    /// the first - that first `.bak` is the pristine original, and the later
+    /// one is merely previously generated output.
+    #[test]
+    fn a_second_backup_does_not_clobber_the_first() {
+        let dir = temp_dir("backup-twice");
+        let audio = dir.join("concatenated_audio.wav");
+
+        std::fs::write(&audio, b"pristine original").expect("write");
+        let first = back_up_existing_file(&audio).expect("first backup").expect("first backup");
+
+        std::fs::write(&audio, b"generated output").expect("write");
+        let second = back_up_existing_file(&audio).expect("second backup").expect("second backup");
+
+        assert_ne!(first, second, "the second backup must take a distinct path");
+        assert_eq!(
+            std::fs::read(&first).expect("first backup readable"),
+            b"pristine original",
+            "the pristine original must not be overwritten by a later run"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The common case - a pack with no such file yet - must not be reported
+    /// as a backup, or callers would log a rescue that never happened.
+    #[test]
+    fn a_missing_file_needs_no_backup() {
+        let dir = temp_dir("backup-absent");
+
+        let result = back_up_existing_file(&dir.join("concatenated_audio.wav")).expect(
+            "an absent file is not an error"
+        );
+        assert!(result.is_none(), "nothing to back up means no backup path");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

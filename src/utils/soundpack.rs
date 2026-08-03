@@ -7,7 +7,12 @@ use std::fs;
 /// Load soundpack metadata from config.json
 pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, String> {
     let config_path = paths::soundpacks::config_json(soundpack_id);
-    let mut last_error: Option<String> = None; // Validate the soundpack configuration first
+    // Reaching the end of this function means metadata loaded, so there is no
+    // error left to report. Conversion problems return early instead of being
+    // recorded here - a pack whose conversion failed has no usable metadata.
+    let last_error: Option<String> = None;
+
+    // Validate the soundpack configuration first
     let validation_result = validate_soundpack_config(&config_path);
 
     // If it's a V1 config that can be converted, auto-convert it
@@ -15,12 +20,25 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
         validation_result.status == SoundpackValidationStatus::VersionOneNeedsConversion &&
         validation_result.can_be_converted
     {
-        // Create backup of original config
+        // Back up the original config before converting in place. The
+        // conversion overwrites `config_path` itself, so without this backup a
+        // failure part-way through leaves the pack with neither the original
+        // nor a working config. A backup that cannot be written means the
+        // conversion is unrecoverable, so refuse to start it rather than
+        // convert without a safety net.
         let backup_path = format!("{}.v1.backup", config_path);
         if let Err(e) = fs::copy(&config_path, &backup_path) {
-            let error_msg = format!("Failed to create backup for {}: {}", soundpack_id, e);
-            last_error = Some(error_msg);
-        } // Convert V1 to V2
+            return Err(
+                format!(
+                    "Refusing to convert {}: could not back up its config to {}: {}",
+                    soundpack_id,
+                    backup_path,
+                    e
+                )
+            );
+        }
+
+        // Convert V1 to V2
         match config_converter::convert_v1_to_v2(&config_path, &config_path, None) {
             Ok(()) => {
                 // Successfully converted

@@ -43,8 +43,12 @@ pub fn load_keyboard_soundpack_with_cache_control(
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
+    // No pack selected. This is a real state the user can choose ("None"), not
+    // an error, and it has to reach the engine: simply not loading would leave
+    // whatever was loaded before still playing.
     if soundpack_id.is_empty() {
-        println!("⚠️ Skipping keyboard soundpack loading: empty soundpack ID");
+        println!("🎹 No keyboard soundpack selected - unloading");
+        context.send(AudioCommand::UnloadKeyboardPack);
         return Ok(());
     }
 
@@ -68,7 +72,8 @@ pub fn load_mouse_soundpack_with_cache_control(
     update_cache_on_error: bool
 ) -> Result<(), String> {
     if soundpack_id.is_empty() {
-        println!("⚠️ Skipping mouse soundpack loading: empty soundpack ID");
+        println!("🖱️ No mouse soundpack selected - unloading");
+        context.send(AudioCommand::UnloadMousePack);
         return Ok(());
     }
 

@@ -39,6 +39,11 @@ pub enum AudioCommand {
         soundpack_id: String,
         update_cache_on_error: bool,
     },
+    /// Drop the loaded pack so nothing plays. Selecting "None" has to reach
+    /// the engine: leaving the samples in place would keep the old pack
+    /// audible until the next restart, even though the config says no pack.
+    UnloadKeyboardPack,
+    UnloadMousePack,
     SwitchDevice(Option<String>), // None = system default
 }
 
@@ -541,6 +546,23 @@ fn handle_command(state: &mut EngineState, event_tx: &Sender<UiEvent>, command: 
                 )
             );
             let _ = event_tx.send(UiEvent::PackLoaded { is_keyboard: false, result });
+        }
+        AudioCommand::UnloadKeyboardPack => {
+            // Drop the samples and the key map together: playback looks up the
+            // map first, so an emptied map alone would already silence it, but
+            // holding several MB of samples for a pack the user turned off is
+            // pure waste. Sinks already playing are left to finish rather than
+            // cut off mid-keystroke.
+            state.keyboard_samples = None;
+            state.keyboard_samples_original = None;
+            state.key_map.clear();
+            println!("🎹 Keyboard soundpack unloaded");
+        }
+        AudioCommand::UnloadMousePack => {
+            state.mouse_samples = None;
+            state.mouse_samples_original = None;
+            state.mouse_map.clear();
+            println!("🖱️ Mouse soundpack unloaded");
         }
         AudioCommand::SwitchDevice(device_id) => {
             // User-initiated switch: on failure, keep the previous device
