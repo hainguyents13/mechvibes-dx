@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.1] - 2026-08-03
+
+### Added
+
+- **Anonymous usage statistics**: the app now sends one anonymous ping per launch (OS and app version, nothing else) so we can tell how many people use MechvibesDX daily. No keystrokes, no personal data, no persistent identifiers. You can turn it off in Settings, Privacy section; details in the README.
+
+### Fixed
+
+- **Settings no longer revert on their own shortly after starting the app.** The background update check kept a copy of your settings from launch time and wrote it back after checking for updates, silently undoing anything you changed in between (volume, theme, toggles). This mostly hit people on slower connections who start the app once a day, which is why it was hard to reproduce.
+- **Volume changes on the Home page could be lost when switching tabs quickly.** The change is now applied immediately; only the disk write is delayed.
+- **Muting from the tray menu now updates the window immediately** instead of showing a stale icon until something else changed.
+
 ## [0.7.0] - 2026-08-03
 
 ### Fixed
@@ -93,6 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
 
 

@@ -401,6 +401,15 @@ Keyboard events with NULL source device (`hDevice`) are dropped before transmiss
 
 **Mouse events:** Unaffected; they pass through regardless of device presence.
 
+## Telemetry (v0.7.1)
+
+`src/utils/telemetry.rs` sends a single anonymous `app_started` event per launch to Aptabase (`POST {region-host}/api/v0/events`, region derived from the app-key prefix). Payload: OS name/version, app version, locale. No keystrokes, no personal data, no persistent identifiers (session id is generated per launch, never stored).
+
+- Gated by `AppConfig::enable_telemetry` (default `true`; toggle in Settings, Privacy section). Off means zero outbound requests.
+- Fire-and-forget on a background thread with a short timeout; network errors are swallowed. Never touches the engine loop, input worker, or UI poll loop.
+- A placeholder app key makes the module inert, so forks without their own Aptabase app send nothing.
+- Config-race warning: the sender must never hold a loaded `AppConfig` across an await and save it back (see Common Pitfalls).
+
 ## Dependency Overview
 
 **Key crates (from `Cargo.toml`):**
@@ -503,6 +512,7 @@ cargo clippy               # Lint (baseline ~180 warnings pre-existing)
 | Sound stops after unplug | No automatic device polling (Phase 7 design) | User manually selects device in Settings or restarts. |
 | IME corrections trigger sounds | Injected keystrokes (Phase 7) | Filter drops NULL-device events (Vietnamese Telex, etc.); built-in. |
 | Config not persisting | JSON write fails silently | Check `utils/config.rs` error handling; add logging. |
+| Settings silently revert | A writer held a loaded `AppConfig` across an await (or a long gap) and saved the whole struct back, clobbering concurrent edits | Never hold a config across an await: re-read after the await and mutate only your own fields (fixed in `auto_updater.rs`, v0.7.1). UI writers must publish through `update_config` immediately; debounce only the disk write. |
 | Linux: no input detected | User not in `input` group | Instructions in README.md + app prompts user. |
 
 ## Future Enhancements
