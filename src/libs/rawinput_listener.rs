@@ -319,18 +319,27 @@ fn handle_keyboard(raw: &RAWINPUT) {
             return;
         };
 
-        // Key-repeat: Raw Input resends WM_INPUT for held keys. Only the
-        // first down (and the eventual up) should go over the pipe, same
-        // as rdev's pressed_keys tracking in input_listener.rs.
-        if is_up {
-            state.pressed_keys.remove(&code);
-        } else {
-            if !state.pressed_keys.insert(code.clone()) {
-                return;
-            }
-        }
+        let Some(transition) = classify_key_transition(&mut state.pressed_keys, &code, is_up) else {
+            return;
+        };
 
         let device_id = state.device_id(raw.header.hDevice);
+
+        // Emitted before the up below so downstream sees a well-formed
+        // down-then-up pair. Both carry the real `device_id`, so the
+        // per-device filter (`input_worker_host.rs`) and the injected-input
+        // filter (`input_worker.rs`) judge the synthesized down by exactly
+        // the same rules as a real one - a claimed key on a disabled or
+        // injected source stays silent.
+        if transition == KeyTransition::OrphanUp {
+            (state.sink)(RawInputEvent {
+                kind: EventKind::Keyboard,
+                device_id: device_id.clone(),
+                code: &code,
+                is_down: true,
+            });
+        }
+
         (state.sink)(RawInputEvent {
             kind: EventKind::Keyboard,
             device_id,
@@ -338,6 +347,70 @@ fn handle_keyboard(raw: &RAWINPUT) {
             is_down: !is_up,
         });
     });
+}
+
+/// What one keyboard transition means once `pressed_keys` has been consulted.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum KeyTransition {
+    /// First down of a press. Emit a down.
+    Down,
+    /// Release of a key whose down we saw. Emit an up.
+    Up,
+    /// Release of a key whose down we never saw, because another process
+    /// claimed it with `RegisterHotKey`. Emit a synthesized down, then the up.
+    OrphanUp,
+}
+
+/// Applies one raw key transition to `pressed_keys` and says what to emit.
+/// `None` means the event is a key-repeat and should be dropped.
+///
+/// ## Why an orphan up implies a swallowed down
+///
+/// When another process registers a no-modifier hotkey (Rainmeter binding
+/// F1-F3 is the reported case), Windows routes the KEY-DOWN to that process
+/// as a `WM_HOTKEY` and never delivers it to Raw Input, but still delivers
+/// the KEY-UP. Since every sound downstream is played on the down
+/// transition, such a key was completely silent. An up with no recorded
+/// down is therefore evidence that the down was swallowed, and synthesizing
+/// it is what restores the sound.
+///
+/// ## Why this cannot double-fire on legitimately filtered input
+///
+/// This runs in the worker process at the very top of the pipeline, before
+/// either filter that can drop a down:
+///
+/// 1. `pressed_keys` (here) - sees every raw event, filters nothing.
+/// 2. `input_worker.rs::is_physical_keyboard_event` - drops NULL-hDevice
+///    (injected/IME) events on their way to the pipe.
+/// 3. `input_worker_host.rs::wire_for_event` - drops events from devices the
+///    user disabled in Settings.
+///
+/// Because both filters sit *downstream*, a down they drop was still
+/// recorded here first. Its matching up therefore finds the code present and
+/// classifies as a plain `Up`, never `OrphanUp` - so a filtered source emits
+/// no synthesized down. Only a down that never reached this layer at all,
+/// which is exactly the hotkey case, produces one.
+///
+/// ## Auto-repeat
+///
+/// Holding a claimed key makes Windows swallow every repeated down and send
+/// a single up at the end, so the user hears one sound per press-release
+/// cycle rather than a repeat stream. Accepted: one sound is the fix's whole
+/// point, and a claimed key held down is rare.
+fn classify_key_transition(
+    pressed_keys: &mut HashSet<String>,
+    code: &str,
+    is_up: bool
+) -> Option<KeyTransition> {
+    if is_up {
+        return Some(if pressed_keys.remove(code) {
+            KeyTransition::Up
+        } else {
+            KeyTransition::OrphanUp
+        });
+    }
+
+    if pressed_keys.insert(code.to_string()) { Some(KeyTransition::Down) } else { None }
 }
 
 fn handle_mouse(raw: &RAWINPUT) {
@@ -574,3 +647,141 @@ fn map_vkey_to_code(vkey: u16, scancode: u16, is_e0: bool) -> Option<String> {
 
     Some(code.to_string())
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Replays a sequence of `(code, is_up)` transitions and returns what the
+    /// sink would emit, as `(code, is_down)` pairs - the same order and
+    /// pairing `handle_keyboard` produces.
+    fn emitted(events: &[(&str, bool)]) -> Vec<(String, bool)> {
+        let mut pressed = HashSet::new();
+        let mut out = Vec::new();
+        for (code, is_up) in events {
+            let Some(transition) = classify_key_transition(&mut pressed, code, *is_up) else {
+                continue;
+            };
+            if transition == KeyTransition::OrphanUp {
+                out.push(((*code).to_string(), true));
+            }
+            out.push(((*code).to_string(), !*is_up));
+        }
+        out
+    }
+
+    #[test]
+    fn orphan_up_synthesizes_a_down_so_hotkey_claimed_keys_make_sound() {
+        // Another process holds a no-modifier RegisterHotKey on F1, so
+        // Windows swallows the down and Raw Input only ever sees the up.
+        // Without a synthesized down this emits nothing playable and the key
+        // is silent - the reported bug.
+        assert_eq!(
+            emitted(&[("F1", true)]),
+            vec![("F1".to_string(), true), ("F1".to_string(), false)],
+            "a swallowed down must be reconstructed, down first, then the real up"
+        );
+    }
+
+    #[test]
+    fn normal_press_release_is_unchanged() {
+        assert_eq!(
+            emitted(&[("KeyA", false), ("KeyA", true)]),
+            vec![("KeyA".to_string(), true), ("KeyA".to_string(), false)],
+            "an ordinary key must emit exactly one down and one up"
+        );
+    }
+
+    #[test]
+    fn auto_repeat_downs_still_collapse_to_one_sound() {
+        // Raw Input resends the down for a held key; only the first crosses.
+        assert_eq!(
+            emitted(&[("KeyA", false), ("KeyA", false), ("KeyA", false), ("KeyA", true)]),
+            vec![("KeyA".to_string(), true), ("KeyA".to_string(), false)]
+        );
+    }
+
+    #[test]
+    fn a_claimed_key_held_down_yields_one_sound_per_cycle() {
+        // Windows swallows every repeated down of a hotkey-claimed key and
+        // delivers only the final up, so the whole hold collapses to a single
+        // press-release pair. Documented trade-off, not a defect.
+        assert_eq!(
+            emitted(&[("F1", true), ("F1", true)]),
+            vec![
+                ("F1".to_string(), true),
+                ("F1".to_string(), false),
+                ("F1".to_string(), true),
+                ("F1".to_string(), false),
+            ],
+            "each swallowed press-release cycle produces its own single sound"
+        );
+    }
+
+    #[test]
+    fn a_normal_key_never_produces_a_synthesized_down() {
+        // The regression this guards: if a real down failed to register in
+        // pressed_keys, its up would look like an orphan and every keystroke
+        // would fire twice.
+        let mut pressed = HashSet::new();
+        assert_eq!(classify_key_transition(&mut pressed, "KeyA", false), Some(KeyTransition::Down));
+        assert_eq!(
+            classify_key_transition(&mut pressed, "KeyA", true),
+            Some(KeyTransition::Up),
+            "a down we recorded must classify its up as a plain Up"
+        );
+    }
+
+    #[test]
+    fn a_down_dropped_by_a_downstream_filter_leaves_no_orphan() {
+        // Both the injected-input filter (input_worker.rs) and the per-device
+        // filter (input_worker_host.rs) sit downstream of this bookkeeping,
+        // so a down they drop was still recorded here. Its up must therefore
+        // be a plain Up - no synthesized down, which would otherwise let a
+        // disabled keyboard or an IME correction burst make sound.
+        let mut pressed = HashSet::new();
+
+        // The down happens here and is recorded, whatever a later layer does
+        // with the event.
+        classify_key_transition(&mut pressed, "KeyD", false);
+
+        assert_eq!(
+            classify_key_transition(&mut pressed, "KeyD", true),
+            Some(KeyTransition::Up),
+            "a filtered source must stay silent - synthesizing here would \
+             resurrect a down that a downstream filter deliberately dropped"
+        );
+    }
+
+    #[test]
+    fn separate_keys_track_independently() {
+        // An orphan up for one key must not disturb another key's held state.
+        let mut pressed = HashSet::new();
+        classify_key_transition(&mut pressed, "KeyA", false);
+        assert_eq!(
+            classify_key_transition(&mut pressed, "F1", true),
+            Some(KeyTransition::OrphanUp)
+        );
+        assert_eq!(
+            classify_key_transition(&mut pressed, "KeyA", true),
+            Some(KeyTransition::Up),
+            "the still-held key must be unaffected by the other key's orphan up"
+        );
+    }
+
+    #[test]
+    fn key_up_sounds_still_receive_a_real_up_event() {
+        // Soundpacks with distinct key-up sounds depend on the up arriving as
+        // normal. The synthesized down is added before it, never instead of
+        // it, for both the orphan and the ordinary path.
+        for events in [vec![("F1", true)], vec![("F1", false), ("F1", true)]] {
+            let out = emitted(&events);
+            assert_eq!(
+                out.last(),
+                Some(&("F1".to_string(), false)),
+                "the real up must always be the final emission"
+            );
+            assert_eq!(out.iter().filter(|(_, is_down)| !*is_down).count(), 1);
+        }
+    }
+}
+
