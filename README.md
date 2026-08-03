@@ -151,11 +151,17 @@ macOS:
 # Build release binary
 cargo build --release
 
-# Bundle app (requires Dioxus CLI)
-dx bundle --release
+# Assemble MechvibesDX.app and package it as a DMG
+# (`dx bundle` is not used - it currently ships an empty Contents/Resources,
+#  see DioxusLabs/dioxus#5723)
+./scripts/build-macos-app.sh 0.7.1
 
-# Output: target/dx/mechvibes-dx/release/macos/MechvibesDX.app
+# Output: dist/mechvibes-dx-0.7.1-macos-arm64-experimental.dmg
 ```
+
+macOS builds are **experimental**: ad-hoc signed, not notarized, and untested on
+real hardware. On first launch, right-click the app and choose "Open" to get
+past Gatekeeper. See `README-macos.txt` for details.
 
 ## Use cases
 

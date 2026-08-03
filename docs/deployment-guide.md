@@ -60,7 +60,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    - **`windows-build`** — validates the tag matches `Cargo.toml`'s version, extracts the CHANGELOG section as release notes, runs `cargo test --release` + `cargo check --release` as a smoke test, builds the release binary, and builds the installer via `scripts/build-windows-installer.ps1` (the same script used locally).
    - **`linux-build`** — builds the release binary on `ubuntu-latest` and packages a `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`) plus a portable `.tar.gz`.
-   - **`macos-build`** — first attempts `dx bundle`; if that fails, falls back to a plain `cargo build --release` tarball. Marked `continue-on-error`, so a red macOS job never blocks the release.
+   - **`macos-build`** — builds the release binary, then hand-assembles `MechvibesDX.app` and packages it as a DMG via `scripts/build-macos-app.sh`. Marked `continue-on-error`, so a red macOS job never blocks the release.
    - **`release`** — downloads all three jobs' artifacts and creates one **draft** release with everything attached.
 
    The build jobs run in parallel and each uploads artifacts; only the final `release` job writes to GitHub Releases. That single-writer design is deliberate — having each job call `action-gh-release` against the same tag races, and the last writer can drop the others' assets.
@@ -75,8 +75,8 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    |---|---|---|
    | `MechvibesDX-<version>-Setup-x64.exe` | Windows | The installer. **The only asset the auto-updater consumes** — its name must keep containing `x64` and ending in `.exe`. |
    | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
-   | `mechvibes-dx-<version>-macos-<arch>-experimental.*` | macOS | **Experimental, unsigned, untested.** |
-   | `README-macos-<version>.txt` | macOS | Gatekeeper and Accessibility instructions. |
+   | `mechvibes-dx-<version>-macos-<arch>-experimental.dmg` | macOS | **Experimental, ad-hoc signed, not notarized, untested.** Contains `MechvibesDX.app` and an `/Applications` symlink. |
+   | `README-macos-<version>.txt` | macOS | DMG install, Gatekeeper and Accessibility instructions. |
    | `SHA256SUMS.txt` | all | Digests of every other asset. **The in-app auto-updater refuses to run an installer that is not listed here with a matching hash**, so a release missing this file silently degrades every Windows user to a manual download. |
 
    Download and install the Windows installer on a real machine if this is a release you're not fully confident in.
@@ -87,7 +87,13 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803 — the `.deb` is the only Linux artifact; non-Debian users build from source.)
 
-   **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac, is not signed, and is not notarized. Gatekeeper will block it. The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
+   **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac and is **not notarized**, so Gatekeeper still blocks a plain double-click (right-click → Open clears it, once). The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
+
+   **The macOS asset is a DMG containing a hand-assembled `.app`.** `dx bundle` is not used — DioxusLabs/dioxus#5723 makes the 0.7.x resource copier fail on every directory in `Dioxus.toml`'s `resources`, and it exits non-zero having already written a `.app` with an *empty* `Contents/Resources`, so "use the .app if one exists" would ship a silent app. `scripts/build-macos-app.sh` assembles the bundle explicitly (`Info.plist`, binary, `Resources/` with soundpacks + assets + a generated `.icns`), ad-hoc signs it (`codesign --force --deep -s -`), and packages it with `hdiutil`. Revisit once the upstream fix ships (present in 0.8.0-alpha.1).
+
+   The job asserts the bundled soundpack audio and `config.json` counts **match the source tree** rather than merely being non-zero — the mouse packs are `.mp3`, so an `.ogg`-only check would pass while silently dropping all four. `spctl` is run for information but deliberately **not** gated on: it fails without notarization, which is the expected state.
+
+   **Two path rules the bundle depends on** (`src/state/paths.rs`): resources resolve to `Contents/Resources` when the executable sits in `<name>.app/Contents/MacOS/`, which is also where `dioxus-asset-resolver` hardcodes the asset root on macOS — hence `assets/` is copied into `Resources/` alongside `soundpacks/`, or every `asset!()` font 404s. And writable state (`config.json`, `themes.json`, the cache) moves to `~/Library/Application Support/Mechvibes/data` inside a bundle, because an app in `/Applications` is not user-writable and settings would otherwise silently never persist.
 
 7. **Publish**
 
@@ -157,4 +163,4 @@ Two details in `installer/windows/mechvibes-dx-setup.iss` that the update flow d
 
 Everything in this flow fails soft. A network error, a missing `SHA256SUMS.txt`, a hash mismatch, or a blocked installer all leave the app running; the button shows a short reason and an "Open download page" link, which is the pre-Phase-6 behavior.
 
-macOS is experimental: unsigned, unnotarized, and never run on real hardware by the maintainer. It ships so users can try it and report back.
+macOS is experimental: ad-hoc signed but not notarized, and never run on real hardware by the maintainer. It ships as a `.dmg` so users can drag-install and report back.
