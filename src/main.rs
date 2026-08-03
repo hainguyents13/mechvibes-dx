@@ -157,6 +157,13 @@ fn main() {
     // updated some other way.
     utils::auto_updater::restore_staged_update();
 
+    // Report this launch, if the user has not opted out. Returns immediately
+    // and does its work on a detached thread, so it runs before the audio
+    // engine and the input worker start and never touches either. The input
+    // worker process returned long before this line, and so did a duplicate
+    // instance, so neither is ever counted as a launch.
+    utils::telemetry::report_app_started(state::config::AppConfig::load().enable_telemetry);
+
     // Initialize ambiance player
     state::ambiance::initialize_global_ambiance_player();
     debug_print!("🎵 Ambiance player initialized");

@@ -194,6 +194,18 @@ Piano pack/
 - Verify with: `groups $USER` (should include `input`)
 - Check device permissions: `ls -la /dev/input/event*` (should show `crw-rw---- root input`)
 
+## Telemetry
+
+MechvibesDX sends one anonymous ping when the app starts, so I can see roughly how many people use it and on which operating systems. That is the entire scope.
+
+**What is sent:** a single `app_started` event containing your OS name and version, the app version, your language locale, and a random session number that is generated fresh on every launch and never stored.
+
+**What is never sent:** your keystrokes, your mouse activity, which soundpacks you use, file paths, your name, your email, your IP-derived identity, or any other personal data. There is no account, no persistent identifier, and no way to link two launches back to the same person.
+
+Analytics are handled by [Aptabase](https://aptabase.com), an open source privacy-first service.
+
+**How to turn it off:** open Settings, expand the "Privacy" section, and switch off "Share anonymous usage stats". Once it is off, the app makes no telemetry requests at all.
+
 ## License
 
 MIT License - do whatever you want with it.

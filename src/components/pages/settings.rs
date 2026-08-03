@@ -26,6 +26,7 @@ pub fn SettingsPage() -> Element {
     let enable_volume_boost = use_memo(move || config().enable_volume_boost);
     let auto_start = use_memo(move || config().auto_start);
     let start_minimized = use_memo(move || config().start_minimized);
+    let enable_telemetry = use_memo(move || config().enable_telemetry);
     let auto_update_config = use_memo(move || config().auto_update.clone());
 
     // Update states
@@ -336,6 +337,34 @@ pub fn SettingsPage() -> Element {
                       }
                     }
                   }
+                }
+              }
+            },
+          }
+          // Privacy Section
+          Collapse {
+            title: "Privacy".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            children: rsx! {
+              div { class: "{crate::utils::spacing::SECTION_SPACING_LG}",
+                Toggler {
+                  title: "Share anonymous usage stats".to_string(),
+                  description: Some(
+                      "Sends one anonymous ping when the app starts, containing only your OS and app version. Never your keystrokes or any personal data."
+                          .to_string(),
+                  ),
+                  checked: enable_telemetry(),
+                  on_change: {
+                      let update_config = update_config.clone();
+                      move |new_value: bool| {
+                          update_config(
+                              Box::new(move |config| {
+                                  config.enable_telemetry = new_value;
+                              }),
+                          );
+                      }
+                  },
                 }
               }
             },

@@ -113,6 +113,18 @@ pub struct AppConfig {
     pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
     pub landscape_mode: bool, // Enable/disable landscape mode layout
     pub auto_update: AutoUpdateConfig, // Auto-update settings
+    /// Send one anonymous launch event (OS + app version) per start.
+    /// `serde(default = ...)` so configs written before this field existed
+    /// still deserialize instead of resetting every other setting, and so the
+    /// opt-out default matches `Default` rather than `false`.
+    #[serde(default = "default_true")]
+    pub enable_telemetry: bool,
+}
+
+/// serde default for opt-out booleans, which have no `#[derive(Default)]`
+/// equivalent since `bool::default()` is `false`.
+fn default_true() -> bool {
+    true
 }
 
 impl AppConfig {
@@ -144,6 +156,7 @@ impl AppConfig {
             && self.start_minimized == other.start_minimized
             && self.landscape_mode == other.landscape_mode
             && self.auto_update == other.auto_update
+            && self.enable_telemetry == other.enable_telemetry
     }
 
     pub fn load() -> Self {
@@ -247,6 +260,7 @@ impl Default for AppConfig {
             start_minimized: false, // Default to not starting minimized
             landscape_mode: false, // Default landscape mode disabled
             auto_update: AutoUpdateConfig::default(), // Default auto-update settings
+            enable_telemetry: true, // Opt-out: on by default, disclosed in README and Settings
         }
     }
 }
@@ -279,6 +293,40 @@ mod tests {
             persisted.enable_sound,
             "stale save silently restores enable_sound - the clobber this guards against"
         );
+    }
+
+    /// Telemetry is opt-out, so a fresh install must have it on. If this ever
+    /// flips, the README and the Settings caption both become lies.
+    #[test]
+    fn telemetry_defaults_to_on() {
+        assert!(AppConfig::default().enable_telemetry);
+    }
+
+    /// A config written before `enable_telemetry` existed must still load. The
+    /// load path resets *every* setting on a deserialize error, so a missing
+    /// `#[serde(default)]` here would wipe the user's whole config on upgrade.
+    #[test]
+    fn a_config_without_the_telemetry_field_still_loads() {
+        let mut value = serde_json::to_value(AppConfig::default()).expect("config serializes");
+        value.as_object_mut().expect("config is a json object").remove("enable_telemetry");
+
+        let restored: AppConfig = serde_json
+            ::from_value(value)
+            .expect("configs predating enable_telemetry must deserialize, not reset");
+
+        assert!(restored.enable_telemetry, "an absent field must default to on, not to false");
+    }
+
+    /// `data_equals` drives whether a change is persisted at all. A field
+    /// missing from it means the Settings toggle appears to work and is
+    /// silently forgotten on restart.
+    #[test]
+    fn toggling_telemetry_counts_as_a_change_worth_saving() {
+        let original = AppConfig::default();
+        let mut toggled = original.clone();
+        toggled.enable_telemetry = !original.enable_telemetry;
+
+        assert!(!toggled.data_equals(&original), "the toggle must mark the config dirty");
     }
 
     /// The fix: re-read immediately before mutating, so the concurrent change
