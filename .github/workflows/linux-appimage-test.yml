@@ -41,6 +41,24 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked
 
+      # Replicates release.yml's real ordering: cargo-deb runs FIRST and the
+      # AppImage reuses the same target/release binary afterwards. cargo-deb
+      # can strip the binary it packages, so building the AppImage second has
+      # to be proven safe rather than assumed.
+      - name: Install cargo-deb
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+
+      - name: Build .deb package
+        run: cargo deb --no-build
+
+      - name: Binary state after cargo-deb
+        run: |
+          set -euo pipefail
+          ls -la target/release/mechvibes-dx
+          file target/release/mechvibes-dx
+
       - name: Build AppImage
         run: |
           set -euo pipefail
