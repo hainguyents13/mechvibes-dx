@@ -1,0 +1,166 @@
+name: Deb fixes (temporary test)
+
+# TEMPORARY - delete before merging. Verifies the two .deb fixes by actually
+# installing the package and running the installed binary, rather than
+# inspecting the .deb's file list and calling it proven.
+#
+# workflow_dispatch is not usable from a feature branch (GitHub only dispatches
+# workflows present on the default branch), so this is pinned to a push on this
+# one branch.
+on:
+  push:
+    branches: [fix/deb-config-and-assets]
+
+jobs:
+  deb:
+    name: Install the .deb and run it
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libevdev-dev \
+            libxdo-dev \
+            xvfb
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Install cargo-deb
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+
+      - name: Build .deb package
+        run: cargo deb --no-build
+
+      # The package's own file list, before installing anything. Asserts the
+      # assets actually made it in at the resolver's expected location.
+      - name: Inspect the .deb contents
+        run: |
+          set -euo pipefail
+          DEB=$(ls target/debian/*.deb | head -1)
+          echo "=== $DEB ==="
+          dpkg-deb -c "$DEB" | awk '{print $6}' | sort > /tmp/deb-files.txt
+
+          echo "=== usr/lib tree in package ==="
+          grep '^\./usr/lib/' /tmp/deb-files.txt || true
+
+          SRC_FONTS=$(find assets/fonts -type f -name '*.ttf' | wc -l)
+          DEB_FONTS=$(grep -c '^\./usr/lib/mechvibes-dx/assets/fonts/.*\.ttf$' /tmp/deb-files.txt || echo 0)
+          SRC_AUDIO=$(find soundpacks -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
+          DEB_AUDIO=$(grep -cE '^\./usr/share/mechvibes-dx/soundpacks/.*\.(ogg|mp3|wav)$' /tmp/deb-files.txt || echo 0)
+
+          echo "fonts: deb=$DEB_FONTS source=$SRC_FONTS"
+          echo "soundpack audio: deb=$DEB_AUDIO source=$SRC_AUDIO"
+          test "$DEB_FONTS" -eq "$SRC_FONTS" && test "$DEB_FONTS" -gt 0
+          test "$DEB_AUDIO" -eq "$SRC_AUDIO" && test "$DEB_AUDIO" -gt 0
+
+          # style.css is what the UI actually loads at runtime.
+          grep -q '^\./usr/lib/mechvibes-dx/assets/style.css$' /tmp/deb-files.txt
+          echo "assets present at the resolver's scan location"
+
+      - name: Install the .deb
+        run: |
+          set -euo pipefail
+          DEB=$(ls target/debian/*.deb | head -1)
+          sudo dpkg -i "$DEB" || sudo apt-get install -f -y
+          echo "=== installed layout ==="
+          ls -la /usr/bin/mechvibes-dx
+          ls -la /usr/lib/mechvibes-dx/assets/ | head
+          ls /usr/share/mechvibes-dx/soundpacks/
+
+      # Proves the resolver's scan rule against the REAL installed layout
+      # rather than against my reading of its source: /usr/bin/../../lib is
+      # /usr/lib, and the scan wants a subdir of it holding an `assets/` dir.
+      - name: Verify the asset resolver's scan path exists on disk
+        run: |
+          set -euo pipefail
+          test -d /usr/lib/mechvibes-dx/assets || { echo "::error::resolver scan target missing"; exit 1; }
+          test -f /usr/lib/mechvibes-dx/assets/style.css
+          test -f /usr/lib/mechvibes-dx/assets/fonts/Lato-Regular.ttf
+          echo "resolver would resolve /assets/... to /usr/lib/mechvibes-dx/assets"
+
+      # The actual bug repro. Run the INSTALLED binary as a normal (non-root)
+      # user and check where config lands. Before this fix it targeted
+      # /usr/data and silently saved nothing.
+      - name: Run the installed binary and check the config location
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          rm -rf ~/.local/share/mechvibes
+          echo "=== run (xvfb, non-root) ==="
+          timeout 25s xvfb-run -a /usr/bin/mechvibes-dx 2>&1 | head -40 || true
+
+          echo "=== did anything land in /usr/data? (must not exist) ==="
+          ls -la /usr/data 2>&1 || echo "  /usr/data does not exist - correct"
+
+          echo "=== XDG location ==="
+          find ~/.local/share/mechvibes -type f 2>/dev/null | sort || echo "  nothing found"
+
+      - name: Assert config landed under the XDG path, not /usr
+        run: |
+          set -euo pipefail
+          if [ -e /usr/data ]; then
+            echo "::error::/usr/data exists - writable state is still targeting the system prefix"
+            exit 1
+          fi
+          if [ ! -f "$HOME/.local/share/mechvibes/data/config.json" ]; then
+            echo "::error::no config at ~/.local/share/mechvibes/data/config.json"
+            exit 1
+          fi
+          echo "config.json is at the XDG location:"
+          ls -la "$HOME/.local/share/mechvibes/data/"
+
+      # The migration branch, exercised with a planted old-location config.
+      # /usr/data is created as root here to simulate the only way a real user
+      # could have one: having run the app as root.
+      - name: Verify the legacy-config migration
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          rm -rf ~/.local/share/mechvibes
+          sudo mkdir -p /usr/data
+          echo '{"volume":0.4242}' | sudo tee /usr/data/config.json >/dev/null
+          sudo chmod -R a+r /usr/data
+
+          echo "=== run with a planted legacy config ==="
+          timeout 25s xvfb-run -a /usr/bin/mechvibes-dx 2>&1 | grep -iE "migrat|config|volume" | head -20 || true
+
+          echo "=== migrated config content ==="
+          cat "$HOME/.local/share/mechvibes/data/config.json" 2>/dev/null | head -c 400 || echo "  not found"
+
+      - name: Assert the migration carried the planted settings across
+        run: |
+          set -euo pipefail
+          CFG="$HOME/.local/share/mechvibes/data/config.json"
+          if [ ! -f "$CFG" ]; then
+            echo "::error::migration produced no config at $CFG"
+            exit 1
+          fi
+          if ! grep -q '0.4242' "$CFG"; then
+            echo "::error::migrated config does not contain the planted volume value"
+            head -c 400 "$CFG"
+            exit 1
+          fi
+          echo "migration carried the planted value across:"
+          grep -o '"volume":[0-9.]*' "$CFG" | head -1
+          # The original must survive - the migration copies, never moves.
+          test -f /usr/data/config.json && echo "legacy file left in place (copy, not move)"
+          sudo rm -rf /usr/data

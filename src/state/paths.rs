@@ -147,19 +147,31 @@ fn get_app_root() -> &'static PathBuf {
     })
 }
 
-/// True when this process is running from inside a macOS `.app` bundle.
+/// True when `exe_path` is a Linux system-wide install location, i.e. what the
+/// `.deb` produces: `/usr/bin/mechvibes-dx` (or `/usr/local/bin/...`).
 ///
-/// Used to route *writable* state away from the bundle: `/Applications` is not
-/// user-writable, so a config written next to the resources would silently fail
-/// to save and every setting would reset on restart.
-fn is_running_from_macos_bundle() -> bool {
-    static IN_BUNDLE: OnceLock<bool> = OnceLock::new();
-    *IN_BUNDLE.get_or_init(|| {
-        std::env::current_exe()
-            .ok()
-            .and_then(|exe| macos_bundle_resource_root(&exe))
-            .is_some()
-    })
+/// These directories are root-owned. The app root for such a binary is
+/// `/usr/bin`, so `{app_root}/data` resolved to `/usr/data` - a directory a
+/// normal user cannot create, let alone write. `AppConfig::save()` fails soft,
+/// so this did not error: it produced an app that silently discarded every
+/// setting and reset on each launch.
+///
+/// Absolute paths only, so a *portable* build that merely happens to live in
+/// some `bin/` directory under the user's home keeps its existing
+/// resources-beside-the-exe behavior. An AppImage's `/tmp/.mount_X/usr/bin`
+/// is likewise excluded here (it is absolute but not rooted at `/usr`), and is
+/// handled by `appimage_root` instead.
+///
+/// Pure path logic with no filesystem access, so it is testable on every
+/// platform - including the Windows CI that actually runs these tests.
+fn is_linux_system_install(exe_path: &Path) -> bool {
+    let Some(parent) = exe_path.parent() else {
+        return false;
+    };
+    matches!(
+        parent.to_str(),
+        Some("/usr/bin") | Some("/usr/local/bin")
+    )
 }
 
 /// The mounted AppDir for this process, if it is running from an AppImage.
@@ -170,28 +182,100 @@ fn running_from_appimage() -> Option<&'static PathBuf> {
         .as_ref()
 }
 
+/// Whether writable state must live in the system app data dir rather than
+/// beside the executable, given where the executable is.
+///
+/// Split out from [`get_writable_data_dir`] as pure path logic so the decision
+/// is unit-testable on every platform, including Windows CI. All three cases it
+/// answers `true` for share one property: the app root is not writable by the
+/// user running the app.
+///
+/// - macOS `.app` - `/Applications` is admin-owned.
+/// - Linux AppImage - the image is mounted read-only, and its mount point is a
+///   fresh temporary directory on every launch, so anything written beside the
+///   binary would be unreachable next time even if the write succeeded.
+/// - Linux system install (`.deb`) - `/usr/bin` is root-owned, and
+///   `{app_root}/data` for it is `/usr/data`.
+fn writable_data_belongs_in_system_dir(exe_path: &Path) -> bool {
+    macos_bundle_resource_root(exe_path).is_some()
+        || appimage_root(exe_path).is_some()
+        || is_linux_system_install(exe_path)
+}
+
 /// Directory holding writable application data (`config.json`, `themes.json`,
 /// the soundpack cache).
 ///
-/// Normally `{app_root}/data`, which keeps the Windows portable/installed layout
-/// and the plain Linux behavior exactly as they were. It moves to the system app
-/// data dir in the two cases where the app root is genuinely not writable:
-///
-/// - a macOS `.app` (`~/Library/Application Support/Mechvibes/data`) - the
-///   bundle is read-only for anyone who did not install it as an admin;
-/// - a Linux AppImage (`~/.local/share/mechvibes/data`) - the image is mounted
-///   read-only, and its mount point is a fresh temporary directory on every
-///   launch, so anything written beside the binary would be unreachable next
-///   time even if the write somehow succeeded.
+/// Normally `{app_root}/data`, which keeps the Windows portable/installed
+/// layout, the dev-mode cwd layout, and macOS/Linux bare builds exactly as they
+/// were. It moves to the system app data dir only where the app root is
+/// genuinely not writable - see [`writable_data_belongs_in_system_dir`].
 ///
 /// `AppConfig::save()` fails soft, so getting this wrong does not error - it
 /// produces an app that silently discards every setting and resets on each
 /// launch. Hence the explicit branches rather than a best-effort write.
-fn get_writable_data_dir() -> PathBuf {
-    if is_running_from_macos_bundle() || running_from_appimage().is_some() {
-        get_system_app_data_dir().join("data")
-    } else {
-        get_app_root().join("data")
+fn get_writable_data_dir() -> &'static PathBuf {
+    static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+    DATA_DIR.get_or_init(|| {
+        let in_system_dir = std::env::current_exe()
+            .ok()
+            .as_deref()
+            .is_some_and(writable_data_belongs_in_system_dir);
+
+        if !in_system_dir {
+            return get_app_root().join("data");
+        }
+
+        let system_dir = get_system_app_data_dir().join("data");
+        migrate_legacy_data_dir(&get_app_root().join("data"), &system_dir);
+        system_dir
+    })
+}
+
+/// One-time courtesy copy of a config left at the old, pre-fix location.
+///
+/// Only ever relevant to someone who ran a `.deb` install as root (or otherwise
+/// had a writable `/usr/data`), which is the sole way a file could exist there.
+/// Everyone else's old location was never writable, so there is nothing to
+/// move and this is a cheap `exists()` check that finds nothing.
+///
+/// Deliberately conservative:
+/// - never overwrites - if the new location already has a config, that one is
+///   authoritative and the old file is left untouched;
+/// - copies rather than moves, so a failure cannot destroy the only copy, and
+///   the old file stays readable if the user downgrades;
+/// - fails soft on every error, since this is a nicety and must never stop the
+///   app from starting.
+fn migrate_legacy_data_dir(legacy_dir: &Path, system_dir: &Path) {
+    let legacy_config = legacy_dir.join("config.json");
+    if !legacy_config.is_file() {
+        return;
+    }
+    if system_dir.join("config.json").exists() {
+        return;
+    }
+    if std::fs::create_dir_all(system_dir).is_err() {
+        return;
+    }
+
+    // config.json is the one that carries user settings. The cache and manifest
+    // are regenerated on demand, and themes.json is copied only if present.
+    for name in ["config.json", "themes.json"] {
+        let from = legacy_dir.join(name);
+        if from.is_file() {
+            match std::fs::copy(&from, system_dir.join(name)) {
+                Ok(_) => {
+                    crate::always_print!(
+                        "📦 Migrated {} from {} to {}",
+                        name,
+                        legacy_dir.display(),
+                        system_dir.display()
+                    );
+                }
+                Err(e) => {
+                    crate::always_eprint!("⚠️  Could not migrate {}: {}", name, e);
+                }
+            }
+        }
     }
 }
 
@@ -535,7 +619,12 @@ pub mod soundpacks {
 
 #[cfg(test)]
 mod tests {
-    use super::{appimage_root, macos_bundle_resource_root};
+    use super::{
+        appimage_root,
+        is_linux_system_install,
+        macos_bundle_resource_root,
+        writable_data_belongs_in_system_dir,
+    };
     use std::path::{Path, PathBuf};
 
     /// The shipping layout: resources resolve to the sibling `Resources` dir,
@@ -691,6 +780,165 @@ mod tests {
                 exe
             );
         }
+    }
+
+    /// The `.deb` install locations. `{app_root}/data` for these is
+    /// `/usr/data` and `/usr/local/data`, neither of which a normal user can
+    /// write - which is the bug this detector exists to fix.
+    #[test]
+    fn detects_the_deb_system_install_locations() {
+        assert!(is_linux_system_install(Path::new("/usr/bin/mechvibes-dx")));
+        assert!(is_linux_system_install(Path::new("/usr/local/bin/mechvibes-dx")));
+    }
+
+    /// Everything a user can actually write to must keep the old
+    /// data-beside-the-exe behavior, byte for byte.
+    #[test]
+    fn writable_locations_are_never_treated_as_system_installs() {
+        let user_writable = [
+            // Windows installed and portable
+            r"C:\Program Files\MechvibesDX\mechvibes-dx.exe",
+            r"D:\mechvibes-dx\target\release\mechvibes-dx.exe",
+            // Linux dev build and portable layouts
+            "/home/someone/mechvibes-dx/target/release/mechvibes-dx",
+            "/opt/mechvibes-dx/mechvibes-dx",
+            // A portable build that merely happens to sit in a `bin/` dir:
+            // relative, and under the user's home, so it stays portable.
+            "/home/someone/apps/mechvibes/bin/mechvibes-dx",
+            "bin/mechvibes-dx",
+            // The AppImage mount is handled by appimage_root, not this.
+            "/tmp/.mount_MechviAbC123/usr/bin/mechvibes-dx",
+            // Near misses on the exact directory match.
+            "/usr/bin/subdir/mechvibes-dx",
+            "/usr/sbin/mechvibes-dx",
+            "/usr/lib/mechvibes-dx",
+        ];
+
+        for exe in user_writable {
+            assert!(
+                !is_linux_system_install(Path::new(exe)),
+                "'{}' was wrongly treated as a system install",
+                exe
+            );
+        }
+    }
+
+    /// The combined decision that `get_writable_data_dir` actually branches on.
+    /// This is the regression guard for Windows and dev mode: those must keep
+    /// resolving `{app_root}/data` exactly as before the .deb fix.
+    #[test]
+    fn only_unwritable_app_roots_move_data_to_the_system_dir() {
+        let moves_to_system_dir = [
+            // macOS bundle
+            "/Applications/MechvibesDX.app/Contents/MacOS/mechvibes-dx",
+            // Linux AppImage
+            "/tmp/.mount_MechviAbC123/usr/bin/mechvibes-dx",
+            // Linux .deb
+            "/usr/bin/mechvibes-dx",
+            "/usr/local/bin/mechvibes-dx",
+        ];
+        for exe in moves_to_system_dir {
+            assert!(
+                writable_data_belongs_in_system_dir(Path::new(exe)),
+                "'{}' must write its data to the system app data dir",
+                exe
+            );
+        }
+
+        let stays_beside_the_exe = [
+            r"C:\Program Files\MechvibesDX\mechvibes-dx.exe",
+            r"D:\mechvibes-dx\target\release\mechvibes-dx.exe",
+            "/home/someone/mechvibes-dx/target/release/mechvibes-dx",
+            "/opt/mechvibes-dx/mechvibes-dx",
+            // Bare macOS dev build - same binary, no bundle around it.
+            "/Users/someone/mechvibes-dx/target/release/mechvibes-dx",
+        ];
+        for exe in stays_beside_the_exe {
+            assert!(
+                !writable_data_belongs_in_system_dir(Path::new(exe)),
+                "'{}' must keep writing data beside the executable",
+                exe
+            );
+        }
+    }
+
+    /// A scratch directory unique to the calling test, cleaned up first so a
+    /// previous run cannot leak into this one.
+    fn scratch_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("mechvibes-paths-test-{}", name));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("failed to create scratch dir");
+        dir
+    }
+
+    /// The case the migration exists for: someone ran the .deb as root, so a
+    /// config really does sit at the old location, and the new location is
+    /// empty.
+    #[test]
+    fn a_legacy_config_is_copied_to_the_system_dir() {
+        let root = scratch_dir("migrates");
+        let legacy = root.join("legacy");
+        let system = root.join("system");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("config.json"), r#"{"volume":0.42}"#).unwrap();
+        std::fs::write(legacy.join("themes.json"), "[]").unwrap();
+
+        super::migrate_legacy_data_dir(&legacy, &system);
+
+        assert_eq!(
+            std::fs::read_to_string(system.join("config.json")).unwrap(),
+            r#"{"volume":0.42}"#,
+            "the user's settings must survive the move"
+        );
+        assert_eq!(std::fs::read_to_string(system.join("themes.json")).unwrap(), "[]");
+        assert!(
+            legacy.join("config.json").exists(),
+            "the original must be copied, not moved - a downgrade should still find it"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// An existing config at the new location is authoritative and must never
+    /// be clobbered by a stale file left in /usr/data.
+    #[test]
+    fn migration_never_overwrites_an_existing_config() {
+        let root = scratch_dir("no-overwrite");
+        let legacy = root.join("legacy");
+        let system = root.join("system");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::create_dir_all(&system).unwrap();
+        std::fs::write(legacy.join("config.json"), r#"{"volume":0.11}"#).unwrap();
+        std::fs::write(system.join("config.json"), r#"{"volume":0.99}"#).unwrap();
+
+        super::migrate_legacy_data_dir(&legacy, &system);
+
+        assert_eq!(
+            std::fs::read_to_string(system.join("config.json")).unwrap(),
+            r#"{"volume":0.99}"#,
+            "the current config must win over the legacy one"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The overwhelmingly common case: nothing was ever written to /usr/data
+    /// because it was never writable. Must be a silent no-op that creates
+    /// nothing.
+    #[test]
+    fn migration_does_nothing_when_there_is_no_legacy_config() {
+        let root = scratch_dir("nothing-to-do");
+        let legacy = root.join("legacy");
+        let system = root.join("system");
+
+        super::migrate_legacy_data_dir(&legacy, &system);
+
+        assert!(
+            !system.exists(),
+            "no legacy config means the system dir must not be created here"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The two detectors describe disjoint layouts. A path can never be both,
