@@ -201,8 +201,9 @@ body {
         // Nothing about the styling moved, so re-running the script would swap
         // the `<style>` element for an identical one - a webview round trip and
         // a style recalculation that can only produce the frame already on
-        // screen. Navigation remounts the layout and can re-run this effect
-        // without any of its inputs having changed.
+        // screen. This effect is subscribed to the config and theme signals,
+        // either of which can be republished with an unchanged value, so it
+        // re-runs without any of its inputs having actually moved.
         if *injected_css.peek() == dynamic_css {
             return;
         }

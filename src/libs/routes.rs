@@ -20,14 +20,14 @@ pub fn Layout() -> Element {
 
     // Adopt the theme the config was saved with.
     //
-    // The guard is what keeps navigation cheap. `dioxus-router` generates a
-    // separate `rsx! { Layout {} }` per route variant, so every variant carries
-    // a different template identity and `diff_node` replaces rather than diffs
-    // it - navigating remounts this whole component and re-runs this effect
-    // with the value it already holds. `Signal::set` notifies subscribers
-    // unconditionally, so writing that unchanged value scheduled a second
-    // render of the layout and re-ran every effect subscribed to the theme -
-    // including the font/CSS injection in `Header`. Only publish a real change.
+    // The guard keeps a re-render of this component from cascading. `theme` is
+    // a global signal, so this effect re-runs whenever the config signal moves,
+    // and it would otherwise write the value it already holds. `Signal::set`
+    // has no equality gate and notifies every subscriber regardless, which
+    // scheduled a second render here and re-ran every effect subscribed to the
+    // theme - including the font/CSS injection in `Header`, i.e. a webview
+    // round trip producing the frame already on screen. Only publish a real
+    // change.
     use_effect(move || {
         let from_config = config_signal.read().theme.clone();
         if *theme.peek() != from_config {
@@ -91,9 +91,10 @@ pub fn Layout() -> Element {
 /// navigations is attributable to the tab that produced it.
 ///
 /// This lives in its own component on purpose. `use_route` subscribes its
-/// caller to the router, so reading the route directly in `Layout` added a
-/// router-driven render on top of the remount navigation already causes.
-/// Isolating the read here keeps the log without that extra subscription.
+/// caller to the router, so reading the route directly in `Layout` re-rendered
+/// the entire chrome - title bar, dock and background - on every tab switch.
+/// Isolating the read here keeps the log while leaving `Layout` untouched by
+/// navigation, so only this leaf and the `Outlet` re-render.
 #[component]
 fn TabLogger() -> Element {
     let tab_name = match use_route::<Route>() {
