@@ -9,7 +9,7 @@ use crate::utils::auto_updater::{ check_for_updates_simple, UpdateInfo };
 use crate::state::app::use_update_info_setter;
 use crate::utils::time::format_relative_time;
 use dioxus::prelude::*;
-use lucide_dioxus::{ PartyPopper, Settings };
+use lucide_dioxus::{ Heart, PartyPopper, Settings };
 use std::sync::Arc;
 
 #[component]
@@ -426,6 +426,31 @@ pub fn SettingsPage() -> Element {
                 }
               }
             },
+          }
+          // Footer: app name, version and credits
+          div { class: "text-center space-y-2 mt-8 pb-4",
+            div { class: "text-sm text-base-content/70 font-bold",
+              "{APP_NAME_DISPLAY} (v{current_version})"
+            }
+            div { class: "text-xs leading-relaxed text-base-content/50",
+              span { "Made with " }
+              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-primary/70 fill-primary/30" }
+              span { " by " }
+              a {
+                href: "https://github.com/hainguyents13/mechvibes-dx",
+                target: "_blank",
+                class: "link ",
+                "hainguyents13"
+              }
+              br {}
+              " and "
+              a {
+                href: "https://github.com/hainguyents13/mechvibes-dx/graphs/contributors?all=1",
+                target: "_blank",
+                class: "link ",
+                "these awesome people"
+              }
+            }
           }
         }
       }

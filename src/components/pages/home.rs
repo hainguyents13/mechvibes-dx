@@ -3,10 +3,8 @@ use crate::components::soundpack_selector::{ KeyboardSoundpackSelector, MouseSou
 use crate::components::volume_slider::{ KeyboardVolumeSlider, MouseVolumeSlider };
 use crate::libs::AudioContext;
 use crate::utils::config::use_config;
-use crate::utils::constants::APP_NAME_DISPLAY;
 use dioxus::prelude::*;
 use futures_timer::Delay;
-use lucide_dioxus::Heart;
 use std::sync::atomic::{ AtomicU64, Ordering };
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,9 +13,6 @@ use std::time::Duration;
 pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
     // Use shared config hook
     let (config, update_config) = use_config();
-
-    // Get current version for display
-    let current_version = crate::utils::constants::APP_VERSION;
 
     // Volume states from config
     let mut volume = use_signal(|| config().volume);
@@ -147,33 +142,6 @@ pub fn HomePage(audio_ctx: Arc<AudioContext>) -> Element {
               on_change: move |new_mouse_volume: f32| {
                   mouse_volume.set(new_mouse_volume);
               },
-            }
-          }
-          // div { class: "divider m-0" }
-          div { class: "text-center space-y-2 mt-8",
-            // Version
-            div { class: "text-sm text-base-content/70 font-bold",
-              "{APP_NAME_DISPLAY} (v{current_version})"
-            }
-            // Footer with credits
-            div { class: "text-xs text-base-content/50",
-              span { "Made with " }
-              Heart { class: "inline w-3.5 h-3.5 -mt-1 text-primary/70 fill-primary/30" }
-              span { " by " }
-              a {
-                href: "https://github.com/hainguyents13/mechvibes-dx",
-                target: "_blank",
-                class: "link ",
-                "hainguyents13"
-              }
-              br {}
-              " and "
-              a {
-                href: "https://github.com/hainguyents13/mechvibes-dx/graphs/contributors",
-                target: "_blank",
-                class: "link ",
-                "these awesome people"
-              }
             }
           }
         }
