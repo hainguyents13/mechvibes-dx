@@ -15,6 +15,21 @@ pub enum Route {
 pub fn Layout() -> Element {
     let (config_signal, _set_config) = use_config();
 
+    // Log every tab switch with a divider, so console output between two
+    // navigations is attributable to the tab that produced it.
+    let route = use_route::<Route>();
+    let tab_name = match route {
+        Route::Home {} => "Home",
+        Route::Customize {} => "Customize",
+        Route::Soundpacks {} => "Soundpacks",
+        Route::Mood {} => "Mood",
+        Route::Settings {} => "Settings",
+    };
+    use_effect(use_reactive!(|tab_name| {
+        println!("──────────────────────────────────────");
+        println!("📍 Tab: {tab_name}");
+    }));
+
     // Theme state - use theme context and initialize from config
     let mut theme = use_theme();
 
