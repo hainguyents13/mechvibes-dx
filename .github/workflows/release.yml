@@ -171,9 +171,9 @@ jobs:
         run: cargo deb --no-build
 
       # Installable only - the portable tarball was dropped by user decision
-      # (260803): one canonical Linux artifact, and the .deb already carries
-      # the desktop entry, icon and soundpacks. Non-Debian users build from
-      # source per README.md until a broader packaging pass (AppImage) lands.
+      # (260803): the .deb already carries the desktop entry, icon and
+      # soundpacks. The AppImage below covers every non-Debian distro, which
+      # is what that decision left to "build from source" until now.
       - name: Stage Linux assets
         run: |
           set -euo pipefail
@@ -189,13 +189,81 @@ jobs:
 
           ls -la dist/
 
+      # The AppDir mirrors the .deb layout (usr/bin, usr/share) so one binary
+      # serves both. The script asserts the bundled soundpack/font counts match
+      # the source tree before packaging, rather than merely being non-zero -
+      # the four mouse packs are .mp3, so an .ogg-only check would pass while
+      # silently dropping all of them.
+      - name: Build AppImage
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          chmod +x scripts/build-linux-appimage.sh
+          ./scripts/build-linux-appimage.sh "$VERSION"
+
+      # Unpack the finished image and walk it, so the run log is itself the
+      # evidence that the shipped artifact has the right shape - a green check
+      # on an assembly step only proves the commands exited 0.
+      - name: Verify the produced AppImage
+        run: |
+          set -euo pipefail
+          APPIMAGE=$(ls dist/*.AppImage)
+          echo "=== AppImage: $APPIMAGE ($(du -h "$APPIMAGE" | cut -f1)) ==="
+
+          rm -rf verify && mkdir verify && cd verify
+          "../$APPIMAGE" --appimage-extract >/dev/null
+          echo "=== AppDir tree (depth 4) ==="
+          find squashfs-root -maxdepth 4 | sort
+          echo "=== Binary ==="
+          file squashfs-root/usr/bin/mechvibes-dx
+          echo "=== AppRun ==="
+          cat squashfs-root/AppRun
+          cd ..
+
+          IMG=verify/squashfs-root
+          SRC_AUDIO=$(find soundpacks -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
+          IMG_AUDIO=$(find "$IMG/usr/share/mechvibes-dx/soundpacks" -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
+          SRC_CFG=$(find soundpacks -type f -name 'config.json' | wc -l)
+          IMG_CFG=$(find "$IMG/usr/share/mechvibes-dx/soundpacks" -type f -name 'config.json' | wc -l)
+          SRC_FONTS=$(find assets/fonts -type f -name '*.ttf' | wc -l)
+          IMG_FONTS=$(find "$IMG/usr/lib/mechvibes-dx/assets/fonts" -type f -name '*.ttf' | wc -l)
+
+          echo "soundpack audio: image=$IMG_AUDIO source=$SRC_AUDIO"
+          echo "soundpack config.json: image=$IMG_CFG source=$SRC_CFG"
+          echo "fonts: image=$IMG_FONTS source=$SRC_FONTS"
+          test "$IMG_AUDIO" -eq "$SRC_AUDIO" && test "$IMG_AUDIO" -gt 0
+          test "$IMG_CFG" -eq "$SRC_CFG" && test "$IMG_CFG" -gt 0
+          test "$IMG_FONTS" -eq "$SRC_FONTS" && test "$IMG_FONTS" -gt 0
+
+          # ELF magic checked byte-wise rather than trusting `file`'s wording.
+          test "$(head -c 4 "$IMG/usr/bin/mechvibes-dx" | xxd -p)" = "7f454c46"
+          echo "ELF magic OK"
+          rm -rf verify
+
+      # Informational only, and deliberately NOT gated on: a GUI app on a
+      # headless runner with no audio or input device is expected to be
+      # unhappy, so what matters is WHICH way it fails. Verified on
+      # 260804 (run 30909285529): the app reaches soundpack scanning, resolves
+      # every bundled pack out of the mounted image, and writes its config to
+      # ~/.local/share/mechvibes - which is the whole point of the path work.
+      - name: Headless smoke (informational, never gates)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          APPIMAGE=$(ls dist/*.AppImage)
+          timeout 20s env APPIMAGE_EXTRACT_AND_RUN=1 "./$APPIMAGE" 2>&1 | head -40 || true
+
       # The Windows auto-updater picks the first asset whose name contains
       # "x64" AND ends in ".exe"; anything else it ignores (falling back to
       # assets[0] only if nothing matches, which cannot happen while the
-      # Windows installer is present). "x86_64"/"amd64" contain no "x64"
-      # substring and these are .deb/.tar.gz, so they are doubly safe - but
-      # assert it rather than trust it, since a rename could break Windows
-      # updates silently.
+      # Windows installer is present).
+      #
+      # Both Linux names are doubly safe: "amd64" and "x86_64" contain no "x64"
+      # substring (x-8-6-underscore-6-4 - the "6-4" is separated from the "x"),
+      # and .deb/.AppImage are not .exe. Asserted rather than trusted, since a
+      # rename could break Windows updates silently. The same pairing is
+      # covered by a unit test in auto_updater.rs, which runs on every commit
+      # while this only runs at release time.
       - name: Verify Linux asset names cannot hijack the Windows auto-updater
         run: |
           set -euo pipefail
@@ -369,6 +437,11 @@ jobs:
           if ls release/*.deb >/dev/null 2>&1; then
             {
               echo "- **Linux (Debian/Ubuntu)**: \`.deb\` — install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
+            } >> notes.md
+          fi
+          if ls release/*.AppImage >/dev/null 2>&1; then
+            {
+              echo "- **Linux (any distro)**: \`.AppImage\` is portable, with no install step. Run \`chmod +x\` on it first, then launch it. The \`input\` group requirement is the same as the \`.deb\` and nothing sets it up for you: \`sudo usermod -a -G input \$USER\`, then log out and back in, or key events won't be seen."
             } >> notes.md
           fi
           if ls release/*macos*.dmg >/dev/null 2>&1; then

@@ -108,7 +108,8 @@ mechvibes-dx/
 │   ├── bump-version.ps1        # Increment version (PowerShell)
 │   ├── extract-changelog.ps1   # Extract CHANGELOG.md section (PowerShell)
 │   ├── build-windows-installer.ps1 # Inno Setup builder (Windows)
-│   └── build-linux-installer.sh # DEB/AppImage builder (Linux)
+│   ├── build-macos-app.sh      # .app + DMG assembler (macOS)
+│   └── build-linux-appimage.sh # AppDir + AppImage assembler (Linux)
 ├── installer/
 │   ├── windows/
 │   │   └── mechvibes-dx-setup.iss # Inno Setup config
@@ -470,8 +471,8 @@ cargo test --release  # For audio tests (opt=2 in dev profile)
 
 **Platforms:**
 - Windows: Inno Setup EXE installer (interim; waiting for dioxus bundle fix DioxusLabs/dioxus#5723).
-- Linux: DEB package (Ubuntu/Debian) + AppImage (universal).
-- macOS: dx bundle (app not installer; pending user test).
+- Linux: DEB package (Ubuntu/Debian) + AppImage (any distro), both built in CI from one binary.
+- macOS: hand-assembled .app in a DMG (experimental; `dx bundle` unusable, see DioxusLabs/dioxus#5723).
 
 **Current release:** v0.7.0 (Phase 3 + Phase 6 + Phase 7 on main).
 

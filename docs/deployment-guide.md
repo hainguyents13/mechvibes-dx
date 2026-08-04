@@ -59,7 +59,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    The workflow runs four jobs (~15 minutes end to end):
 
    - **`windows-build`** — validates the tag matches `Cargo.toml`'s version, extracts the CHANGELOG section as release notes, runs `cargo test --release` + `cargo check --release` as a smoke test, builds the release binary, and builds the installer via `scripts/build-windows-installer.ps1` (the same script used locally).
-   - **`linux-build`** — builds the release binary on `ubuntu-latest` and packages a `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`) plus a portable `.tar.gz`.
+   - **`linux-build`** — builds the release binary on `ubuntu-latest`, packages a `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`), then assembles an AppImage from the same binary via `scripts/build-linux-appimage.sh`. That order is verified safe: `cargo deb --no-build` leaves `target/release/mechvibes-dx` unstripped and byte-identical (same BuildID lands inside the AppImage).
    - **`macos-build`** — builds the release binary, then hand-assembles `MechvibesDX.app` and packages it as a DMG via `scripts/build-macos-app.sh`. Marked `continue-on-error`, so a red macOS job never blocks the release.
    - **`release`** — downloads all three jobs' artifacts and creates one **draft** release with everything attached.
 
@@ -75,6 +75,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    |---|---|---|
    | `MechvibesDX-<version>-Setup-x64.exe` | Windows | The installer. **The only asset the auto-updater consumes** — its name must keep containing `x64` and ending in `.exe`. |
    | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
+   | `mechvibes-dx-<version>-x86_64.AppImage` | Any Linux distro | Portable, no install. Needs `chmod +x` first, and has the **same** `input` group requirement as the `.deb`. |
    | `mechvibes-dx-<version>-macos-<arch>-experimental.dmg` | macOS | **Experimental, ad-hoc signed, not notarized, untested.** Contains `MechvibesDX.app` and an `/Applications` symlink. |
    | `README-macos-<version>.txt` | macOS | DMG install, Gatekeeper and Accessibility instructions. |
    | `SHA256SUMS.txt` | all | Digests of every other asset. **The in-app auto-updater refuses to run an installer that is not listed here with a matching hash**, so a release missing this file silently degrades every Windows user to a manual download. |
@@ -85,7 +86,16 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    Releases published before this step existed (v0.6.1 and earlier) have no `SHA256SUMS.txt`. That is handled, not broken: the app reports "checksums unavailable" and falls back to the browser download button, which is the pre-Phase-6 behavior.
 
-   **The `.deb` does not configure input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803 — the `.deb` is the only Linux artifact; non-Debian users build from source.)
+   **Neither Linux artifact configures input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups, and an AppImage has no install step that could do so even in principle. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this for both assets; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803; the AppImage now covers the non-Debian users that decision left building from source.)
+
+   **The AppImage's AppDir mirrors the `.deb` layout** (`usr/bin`, `usr/share/mechvibes-dx/soundpacks`) so a single binary serves both packages. Two placements are load-bearing, not cosmetic:
+
+   - `usr/lib/mechvibes-dx/assets` — `dioxus-asset-resolver`'s Linux branch scans `<exe>/../../lib/<dir>/` for a directory containing `assets/`. Put the fonts anywhere else and every `asset!()` font silently 404s.
+   - The `.desktop` file and icon are duplicated at the **AppDir root**, which `appimagetool` requires; the copies under `usr/share` are what a desktop-integration helper installs later.
+
+   `src/state/paths.rs` resolves soundpacks **relative to the mount point** when running from an AppImage, and that ordering matters: the absolute `/usr/share/mechvibes-dx/soundpacks` fallback is a real directory on a machine that also has the `.deb` installed, so checking it first would make a running AppImage silently load the other installation's soundpacks. Writable state goes to `~/.local/share/mechvibes/data` for the same reason it does on macOS — the image is mounted read-only, and its mount point is a fresh temporary directory on every launch.
+
+   The job asserts bundled soundpack audio, `config.json` and font counts **match the source tree** (same rationale as macOS: the mouse packs are `.mp3`, so an `.ogg`-only check would pass while dropping all four), unpacks the finished image with `--appimage-extract` and checks the ELF magic byte-wise. `appimagetool` runs with `APPIMAGE_EXTRACT_AND_RUN=1` because GitHub runners have no FUSE, so it cannot mount itself.
 
    **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac and is **not notarized**, so Gatekeeper still blocks a plain double-click (right-click → Open clears it, once). The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
 
@@ -144,7 +154,7 @@ Install Inno Setup 6 from https://jrsoftware.org/isinfo.php, or if already insta
 
 Windows is the only fully supported platform: installer, upgrade path, and in-app auto-update.
 
-Linux gets a working `.deb` but no automated input-group setup and no auto-update. AppImage is not built — the tooling is heavy and the legacy `scripts/build-linux-installer.sh` is unverified; it remains a roadmap item.
+Linux gets a working `.deb` **and** an AppImage, but no automated input-group setup and no auto-update on either. The AppImage is built by `scripts/build-linux-appimage.sh`, written fresh for this pipeline; the legacy `scripts/build-linux-installer.sh` referenced by older docs no longer exists and was never verified.
 
 ## How in-app update install works (Windows)
 

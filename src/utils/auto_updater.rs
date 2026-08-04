@@ -910,8 +910,46 @@ mod tests {
             asset("MechvibesDX-0.7.0-Setup-x64.exe"),
             asset("SHA256SUMS.txt"),
             asset("mechvibes-dx-0.7.0-macos-arm64-experimental.dmg"),
+            asset("mechvibes-dx-0.7.0-x86_64.AppImage"),
             asset("mechvibes-dx_0.7.0_amd64.deb")
         ]
+    }
+
+    /// Linux releases now carry two installable assets. Neither is served as a
+    /// silent update (`silent_update_supported()` is Windows-only and the UI
+    /// links to the Releases page), so which one wins matters far less than
+    /// that it is a Linux one - asserted here so a future reordering of the
+    /// asset list cannot start handing Linux users a `.dmg` or an `.exe`.
+    #[test]
+    fn a_linux_build_is_only_ever_offered_a_linux_asset() {
+        if cfg!(any(target_os = "windows", target_os = "macos")) {
+            return;
+        }
+        let url = AutoUpdater::new().find_download_url(&release_assets()).unwrap_or_default();
+        let name = url.to_lowercase();
+        assert!(
+            name.ends_with(".deb") || name.ends_with(".appimage"),
+            "a Linux build was offered {}",
+            url
+        );
+    }
+
+    /// The AppImage alone must also be recognised: a release that (for any
+    /// reason) ships no `.deb` still has to light up the Linux download path
+    /// rather than falling through to None and hiding the asset entirely.
+    #[test]
+    fn an_appimage_only_release_is_still_recognised_on_linux() {
+        if cfg!(any(target_os = "windows", target_os = "macos")) {
+            return;
+        }
+        let assets = vec![
+            asset("MechvibesDX-0.7.0-Setup-x64.exe"),
+            asset("mechvibes-dx-0.7.0-x86_64.AppImage"),
+        ];
+        assert_eq!(
+            AutoUpdater::new().find_download_url(&assets).as_deref(),
+            Some("https://example.com/mechvibes-dx-0.7.0-x86_64.AppImage")
+        );
     }
 
     #[test]
@@ -959,6 +997,10 @@ mod tests {
             "mechvibes-dx-0.7.0-macos-arm64-experimental.dmg",
             "mechvibes-dx-0.7.0-macos-x86_64-experimental.dmg",
             "mechvibes-dx_0.7.0_amd64.deb",
+            // "x86_64" is x-8-6-_-6-4: the substring "x64" does not occur in
+            // it, and the extension is not .exe either. Both halves of the
+            // filter have to fail, and this asserts it rather than eyeballing.
+            "mechvibes-dx-0.7.0-x86_64.AppImage",
             "README-macos-0.7.0.txt",
             "SHA256SUMS.txt",
         ] {
