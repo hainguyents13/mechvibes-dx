@@ -58,7 +58,11 @@ pub fn DebugLogViewer() -> Element {
 
         // The terminal-style tail.
         div {
-          class: "mockup-code bg-neutral text-neutral-content text-xs overflow-y-auto overflow-x-auto max-h-64 w-full p-3 rounded-lg",
+          class: "mockup-code text-xs overflow-y-auto overflow-x-auto w-full p-3 rounded-lg",
+          // Fixed terminal colors on purpose: theme-dependent neutral vars made
+          // the text unreadable in light mode. Inline because the prebuilt
+          // stylesheet has no arbitrary-value classes.
+          style: "max-height: 300px; background: #16181d; color: #c8ccd4;",
           // Newest lines sit at the bottom, and the container is pinned there
           // so the view follows output the way a terminal does. `column-reverse`
           // makes the browser keep the scroll anchored at the bottom for free,

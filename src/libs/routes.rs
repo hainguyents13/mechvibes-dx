@@ -108,7 +108,7 @@ pub fn Layout() -> Element {
 /// call site is the only point that provably precedes all of it, and it covers
 /// every navigation because it is the one way the app changes route.
 pub fn navigate(route: &'static str) {
-    crate::always_print!("──────────────────────────────────────");
+    crate::always_print!("────────────────────");
     crate::always_print!("📍 Tab: {}", tab_name_for(route));
     navigator().push(route);
 }
