@@ -22,6 +22,25 @@
 /// `dioxus-asset-resolver` looks for `asset!()` files on macOS. Writable state
 /// must NOT go there: an app installed in `/Applications` is not user-writable,
 /// so `data/` moves to the system app data dir on macOS only.
+///
+/// ## Linux AppImage
+///
+/// An AppImage runs from a read-only SquashFS mounted at a fresh temporary
+/// directory on every launch:
+///
+/// ```text
+/// /tmp/.mount_MechviXXXXXX/usr/bin/mechvibes-dx        <- current_exe()
+/// /tmp/.mount_MechviXXXXXX/usr/lib/mechvibes-dx/assets
+/// /tmp/.mount_MechviXXXXXX/usr/share/mechvibes-dx/soundpacks
+/// ```
+///
+/// The layout deliberately mirrors the `.deb` (`usr/bin`, `usr/share`), which
+/// is what lets one binary serve both. But the paths must be resolved
+/// *relative to the mount point*, never as absolute `/usr/share/...`: that
+/// would read a co-installed `.deb`'s soundpacks off the host instead of the
+/// ones inside the image. Writable state goes to the XDG data dir, exactly as
+/// it already did for the `.deb`, because the mount is read-only and its path
+/// changes on every launch.
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -54,6 +73,42 @@ fn macos_bundle_resource_root(exe_path: &Path) -> Option<PathBuf> {
     }
 
     Some(contents_dir.join("Resources"))
+}
+
+/// Root of the mounted AppImage (the AppDir), if `exe_path` is inside one.
+///
+/// Detection is structural, matching the macOS approach and for the same
+/// reason: the identical binary is also installed by the `.deb` at
+/// `/usr/bin/mechvibes-dx`, and that layout must keep resolving `/usr/share`
+/// absolutely. Only the exact `<root>/usr/bin/<exe>` shape counts, and only
+/// when `<root>` is not the filesystem root - `/usr/bin/mechvibes-dx` from the
+/// `.deb` would otherwise yield an AppDir of `/`.
+///
+/// `APPDIR` (exported by AppRun) is deliberately NOT consulted. It is
+/// inherited by child processes and by anything launched from a terminal that
+/// once sourced it, so trusting it would let a stale value redirect a normally
+/// installed app. The executable's own location cannot be spoofed that way.
+///
+/// Pure path logic with no filesystem access, so it is testable on every
+/// platform - including the Windows CI that actually runs these tests.
+fn appimage_root(exe_path: &Path) -> Option<PathBuf> {
+    let bin_dir = exe_path.parent()?;
+    if bin_dir.file_name()? != "bin" {
+        return None;
+    }
+
+    let usr_dir = bin_dir.parent()?;
+    if usr_dir.file_name()? != "usr" {
+        return None;
+    }
+
+    // The AppDir root itself. `file_name()` is None for `/` and for a bare
+    // relative `usr`, which is exactly the case that must not be treated as an
+    // AppImage: that is the .deb's `/usr/bin/mechvibes-dx`.
+    let app_dir = usr_dir.parent()?;
+    app_dir.file_name()?;
+
+    Some(app_dir.to_path_buf())
 }
 
 /// Get the application root directory (where the executable is located)
@@ -107,15 +162,33 @@ fn is_running_from_macos_bundle() -> bool {
     })
 }
 
+/// The mounted AppDir for this process, if it is running from an AppImage.
+fn running_from_appimage() -> Option<&'static PathBuf> {
+    static APP_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+    APP_DIR
+        .get_or_init(|| std::env::current_exe().ok().as_deref().and_then(appimage_root))
+        .as_ref()
+}
+
 /// Directory holding writable application data (`config.json`, `themes.json`,
 /// the soundpack cache).
 ///
 /// Normally `{app_root}/data`, which keeps the Windows portable/installed layout
-/// and the Linux behavior exactly as they were. Inside a macOS `.app` it becomes
-/// `~/Library/Application Support/Mechvibes/data`, because the bundle is
-/// read-only for anyone who did not install it as an admin.
+/// and the plain Linux behavior exactly as they were. It moves to the system app
+/// data dir in the two cases where the app root is genuinely not writable:
+///
+/// - a macOS `.app` (`~/Library/Application Support/Mechvibes/data`) - the
+///   bundle is read-only for anyone who did not install it as an admin;
+/// - a Linux AppImage (`~/.local/share/mechvibes/data`) - the image is mounted
+///   read-only, and its mount point is a fresh temporary directory on every
+///   launch, so anything written beside the binary would be unreachable next
+///   time even if the write somehow succeeded.
+///
+/// `AppConfig::save()` fails soft, so getting this wrong does not error - it
+/// produces an app that silently discards every setting and resets on each
+/// launch. Hence the explicit branches rather than a best-effort write.
 fn get_writable_data_dir() -> PathBuf {
-    if is_running_from_macos_bundle() {
+    if is_running_from_macos_bundle() || running_from_appimage().is_some() {
         get_system_app_data_dir().join("data")
     } else {
         get_app_root().join("data")
@@ -191,7 +264,7 @@ pub mod data {
 
 /// Soundpack directory paths
 pub mod soundpacks {
-    use super::{get_app_root, get_system_app_data_dir};
+    use super::{get_app_root, get_system_app_data_dir, running_from_appimage};
     use std::path::{Path, PathBuf};
     use std::sync::OnceLock;
 
@@ -231,11 +304,30 @@ pub mod soundpacks {
     ///
     /// Checks multiple locations in order:
     ///
-    /// 1. /usr/share/mechvibes-dx/soundpacks (installed via DEB/system package)
-    /// 2. {app_root}/soundpacks (portable/dev mode)
+    /// 1. {appdir}/usr/share/mechvibes-dx/soundpacks (running from an AppImage)
+    /// 2. /usr/share/mechvibes-dx/soundpacks (installed via DEB/system package)
+    /// 3. {app_root}/soundpacks (portable/dev mode)
+    ///
+    /// The AppImage check must come first and must be **relative to the mount
+    /// point**. The absolute `/usr/share` path below is a real directory on a
+    /// machine that also has the `.deb` installed, so checking it first would
+    /// make a running AppImage load the *other* installation's soundpacks -
+    /// silently, and with whatever version those happen to be.
     pub fn get_builtin_soundpacks_dir() -> PathBuf {
         static BUILTIN_SOUNDPACKS_DIR: OnceLock<PathBuf> = OnceLock::new();
         BUILTIN_SOUNDPACKS_DIR.get_or_init(|| {
+            // Inside a mounted AppImage: resolve against the AppDir, never `/`.
+            if let Some(app_dir) = running_from_appimage() {
+                let bundled = app_dir.join("usr/share/mechvibes-dx/soundpacks");
+                if bundled.exists() {
+                    crate::always_print!(
+                        "📂 Using AppImage soundpacks directory: {}",
+                        bundled.display()
+                    );
+                    return bundled;
+                }
+            }
+
             // Check standard Linux data directory first (for installed packages)
             #[cfg(target_os = "linux")]
             {
@@ -443,7 +535,7 @@ pub mod soundpacks {
 
 #[cfg(test)]
 mod tests {
-    use super::macos_bundle_resource_root;
+    use super::{appimage_root, macos_bundle_resource_root};
     use std::path::{Path, PathBuf};
 
     /// The shipping layout: resources resolve to the sibling `Resources` dir,
@@ -524,6 +616,100 @@ mod tests {
             "/Applications/MechvibesDX.app/Contents/macos/mechvibes-dx",
         ] {
             assert_eq!(macos_bundle_resource_root(Path::new(exe)), None, "failed for {}", exe);
+        }
+    }
+
+    /// The shipping AppImage layout. The mount point is generated fresh by the
+    /// runtime on every launch, so only its *shape* can be relied on.
+    #[test]
+    fn detects_the_mounted_appimage_layout() {
+        let exe = Path::new("/tmp/.mount_MechviAbC123/usr/bin/mechvibes-dx");
+        assert_eq!(
+            appimage_root(exe),
+            Some(PathBuf::from("/tmp/.mount_MechviAbC123"))
+        );
+    }
+
+    /// The mount point is not fixed: the runtime picks a random suffix each
+    /// launch, and `TMPDIR` can move the whole thing elsewhere.
+    #[test]
+    fn appimage_detection_is_independent_of_the_mount_point() {
+        for (exe, expected) in [
+            ("/tmp/.mount_Mechvi000001/usr/bin/mechvibes-dx", "/tmp/.mount_Mechvi000001"),
+            ("/run/user/1000/.mount_MechviXY/usr/bin/mechvibes-dx", "/run/user/1000/.mount_MechviXY"),
+            // --appimage-extract produces a plain directory, and running the
+            // binary out of it must behave identically to the mounted image.
+            ("/home/someone/squashfs-root/usr/bin/mechvibes-dx", "/home/someone/squashfs-root"),
+        ] {
+            assert_eq!(
+                appimage_root(Path::new(exe)),
+                Some(PathBuf::from(expected)),
+                "failed for {}",
+                exe
+            );
+        }
+    }
+
+    /// The single most important case: the `.deb` installs the *same binary* to
+    /// `/usr/bin/mechvibes-dx`. Treating that as an AppImage would compute an
+    /// AppDir of `/`, and then resolve soundpacks and writable data against the
+    /// filesystem root. It must fall through to the existing absolute-path
+    /// behavior instead.
+    #[test]
+    fn the_deb_install_location_is_never_treated_as_an_appimage() {
+        assert_eq!(appimage_root(Path::new("/usr/bin/mechvibes-dx")), None);
+        assert_eq!(appimage_root(Path::new("/usr/local/bin/mechvibes-dx")), None);
+    }
+
+    /// Everything that is NOT an AppImage must keep resolving resources beside
+    /// the executable. Runs on every platform, so Windows CI guards it too.
+    #[test]
+    fn non_appimage_layouts_are_never_treated_as_appimages() {
+        let non_appimages = [
+            // Windows installed and portable layouts
+            r"C:\Program Files\MechvibesDX\mechvibes-dx.exe",
+            r"D:\mechvibes-dx\target\release\mechvibes-dx.exe",
+            // Linux dev build and other install shapes
+            "/home/someone/mechvibes-dx/target/release/mechvibes-dx",
+            "/opt/mechvibes-dx/mechvibes-dx",
+            // macOS bundle - must be claimed by the macOS branch, not this one
+            "/Applications/MechvibesDX.app/Contents/MacOS/mechvibes-dx",
+            // `bin` present but not under `usr`
+            "/home/someone/.local/bin/mechvibes-dx",
+            // `usr` present but the binary is not in `bin`
+            "/tmp/.mount_MechviAbC123/usr/lib/mechvibes-dx",
+            // Nothing to walk up to
+            "mechvibes-dx",
+            "bin/mechvibes-dx",
+        ];
+
+        for exe in non_appimages {
+            assert_eq!(
+                appimage_root(Path::new(exe)),
+                None,
+                "'{}' was wrongly detected as an AppImage",
+                exe
+            );
+        }
+    }
+
+    /// The two detectors describe disjoint layouts. A path can never be both,
+    /// which is what lets `get_writable_data_dir` check them with an `||`
+    /// without having to decide precedence.
+    #[test]
+    fn the_macos_and_appimage_layouts_never_overlap() {
+        for exe in [
+            "/Applications/MechvibesDX.app/Contents/MacOS/mechvibes-dx",
+            "/tmp/.mount_MechviAbC123/usr/bin/mechvibes-dx",
+            "/usr/bin/mechvibes-dx",
+            r"C:\Program Files\MechvibesDX\mechvibes-dx.exe",
+        ] {
+            let path = Path::new(exe);
+            assert!(
+                macos_bundle_resource_root(path).is_none() || appimage_root(path).is_none(),
+                "'{}' was detected as both a macOS bundle and an AppImage",
+                exe
+            );
         }
     }
 }

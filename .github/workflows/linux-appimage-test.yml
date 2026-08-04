@@ -1,0 +1,128 @@
+name: Linux AppImage (temporary test)
+
+# TEMPORARY - delete before merging. Exists only to iterate on the AppImage
+# packaging without pushing tags or creating releases.
+#
+# workflow_dispatch is NOT used: GitHub only dispatches workflows that exist on
+# the default branch, so `gh workflow run` returns 404 for a file that lives
+# only on a feature branch (learned during the macOS DMG round). A push trigger
+# pinned to this one branch works without touching main.
+on:
+  push:
+    branches: [feat/linux-appimage]
+
+jobs:
+  appimage:
+    name: Build and verify AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libevdev-dev \
+            libxdo-dev
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Build AppImage
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build-linux-appimage.sh
+          ./scripts/build-linux-appimage.sh 0.8.0
+
+      - name: Verify the produced AppImage
+        run: |
+          set -euo pipefail
+          APPIMAGE=$(ls dist/*.AppImage)
+          echo "=== AppImage: $APPIMAGE ($(du -h "$APPIMAGE" | cut -f1)) ==="
+
+          rm -rf verify && mkdir verify && cd verify
+          "../$APPIMAGE" --appimage-extract >/dev/null
+
+          echo "=== AppDir tree (depth 4) ==="
+          find squashfs-root -maxdepth 4 | sort
+
+          echo "=== Binary ==="
+          file squashfs-root/usr/bin/mechvibes-dx
+          head -c 4 squashfs-root/usr/bin/mechvibes-dx | xxd
+
+          echo "=== Desktop entry ==="
+          cat squashfs-root/mechvibes-dx.desktop
+
+          echo "=== AppRun ==="
+          cat squashfs-root/AppRun
+
+          cd ..
+          SRC_AUDIO=$(find soundpacks -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
+          IMG_AUDIO=$(find verify/squashfs-root/usr/share/mechvibes-dx/soundpacks -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
+          SRC_CFG=$(find soundpacks -type f -name 'config.json' | wc -l)
+          IMG_CFG=$(find verify/squashfs-root/usr/share/mechvibes-dx/soundpacks -type f -name 'config.json' | wc -l)
+          SRC_FONTS=$(find assets/fonts -type f -name '*.ttf' | wc -l)
+          IMG_FONTS=$(find verify/squashfs-root/usr/lib/mechvibes-dx/assets/fonts -type f -name '*.ttf' | wc -l)
+
+          echo "soundpack audio: image=$IMG_AUDIO source=$SRC_AUDIO"
+          echo "soundpack config.json: image=$IMG_CFG source=$SRC_CFG"
+          echo "fonts: image=$IMG_FONTS source=$SRC_FONTS"
+
+          test "$IMG_AUDIO" -eq "$SRC_AUDIO" && test "$IMG_AUDIO" -gt 0
+          test "$IMG_CFG" -eq "$SRC_CFG" && test "$IMG_CFG" -gt 0
+          test "$IMG_FONTS" -eq "$SRC_FONTS" && test "$IMG_FONTS" -gt 0
+
+          # ELF check, byte level rather than trusting `file`.
+          test "$(head -c 4 verify/squashfs-root/usr/bin/mechvibes-dx | xxd -p)" = "7f454c46"
+          echo "ELF magic OK"
+
+      # Informational only. A GUI app on a headless runner with no audio device
+      # is expected to be unhappy; what matters is WHICH way it fails, so the
+      # output is captured and reported rather than gated on.
+      - name: Headless smoke (informational, never gates)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          sudo apt-get install -y xvfb || true
+          APPIMAGE=$(ls dist/*.AppImage)
+          echo "=== plain run (no display) ==="
+          timeout 20s env APPIMAGE_EXTRACT_AND_RUN=1 "./$APPIMAGE" 2>&1 | head -60 || true
+          echo "exit: $?"
+          echo "=== xvfb-run ==="
+          timeout 20s xvfb-run -a env APPIMAGE_EXTRACT_AND_RUN=1 "./$APPIMAGE" 2>&1 | head -60 || true
+          echo "exit: $?"
+
+      - name: Verify asset name cannot hijack the Windows auto-updater
+        run: |
+          set -euo pipefail
+          status=0
+          for f in dist/*; do
+            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
+            case "$name" in
+              *x64*.exe)
+                echo "::error::asset '$name' matches the Windows auto-updater filter"
+                status=1
+                ;;
+            esac
+          done
+          exit $status
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-test
+          path: dist/*.AppImage
+          if-no-files-found: error
