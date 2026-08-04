@@ -193,6 +193,7 @@ pub mod data {
 pub mod soundpacks {
     use super::{get_app_root, get_system_app_data_dir};
     use std::path::{Path, PathBuf};
+    use std::sync::OnceLock;
 
     /// List of built-in soundpack IDs that ship with the app
     /// These are stored in the app root soundpacks directory
@@ -219,25 +220,43 @@ pub mod soundpacks {
         BUILTIN_SOUNDPACKS.contains(&soundpack_id)
     }
 
-    /// Get the base soundpacks directory for built-in soundpacks
+    /// Get the base soundpacks directory for built-in soundpacks.
+    ///
+    /// Resolved once per process: every input it depends on (the executable
+    /// location, and on Linux the presence of the system data directory) is
+    /// fixed for the run. Callers hit this on hot paths - once per soundpack
+    /// image request and per metadata load - so re-resolving and re-logging on
+    /// each one produced a burst of identical lines whose count tracked the
+    /// number of soundpacks rather than anything meaningful.
+    ///
     /// Checks multiple locations in order:
+    ///
     /// 1. /usr/share/mechvibes-dx/soundpacks (installed via DEB/system package)
     /// 2. {app_root}/soundpacks (portable/dev mode)
     pub fn get_builtin_soundpacks_dir() -> PathBuf {
-        // Check standard Linux data directory first (for installed packages)
-        #[cfg(target_os = "linux")]
-        {
-            let system_soundpacks = PathBuf::from("/usr/share/mechvibes-dx/soundpacks");
-            if system_soundpacks.exists() {
-                println!("📂 Using system soundpacks directory: {}", system_soundpacks.display());
-                return system_soundpacks;
+        static BUILTIN_SOUNDPACKS_DIR: OnceLock<PathBuf> = OnceLock::new();
+        BUILTIN_SOUNDPACKS_DIR.get_or_init(|| {
+            // Check standard Linux data directory first (for installed packages)
+            #[cfg(target_os = "linux")]
+            {
+                let system_soundpacks = PathBuf::from("/usr/share/mechvibes-dx/soundpacks");
+                if system_soundpacks.exists() {
+                    println!(
+                        "📂 Using system soundpacks directory: {}",
+                        system_soundpacks.display()
+                    );
+                    return system_soundpacks;
+                }
             }
-        }
 
-        // Fallback to app root (for portable/dev mode)
-        let app_root_soundpacks = get_app_root().join("soundpacks");
-        println!("📂 Using app root soundpacks directory: {}", app_root_soundpacks.display());
-        app_root_soundpacks
+            // Fallback to app root (for portable/dev mode)
+            let app_root_soundpacks = get_app_root().join("soundpacks");
+            println!(
+                "📂 Using app root soundpacks directory: {}",
+                app_root_soundpacks.display()
+            );
+            app_root_soundpacks
+        }).clone()
     }
 
     /// Get the base soundpacks directory for custom soundpacks (system app data)

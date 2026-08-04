@@ -15,21 +15,6 @@ pub enum Route {
 pub fn Layout() -> Element {
     let (config_signal, _set_config) = use_config();
 
-    // Log every tab switch with a divider, so console output between two
-    // navigations is attributable to the tab that produced it.
-    let route = use_route::<Route>();
-    let tab_name = match route {
-        Route::Home {} => "Home",
-        Route::Customize {} => "Customize",
-        Route::Soundpacks {} => "Soundpacks",
-        Route::Mood {} => "Mood",
-        Route::Settings {} => "Settings",
-    };
-    use_effect(use_reactive!(|tab_name| {
-        println!("──────────────────────────────────────");
-        println!("📍 Tab: {tab_name}");
-    }));
-
     // Theme state - use theme context and initialize from config
     let mut theme = use_theme();
 
@@ -78,8 +63,36 @@ pub fn Layout() -> Element {
         }
         // Dock at the bottom
         crate::components::dock::Dock {}
+
+        // Renders nothing; exists so that reading the route subscribes only
+        // this leaf to navigation rather than the whole layout.
+        TabLogger {}
       }
     }
+}
+
+/// Logs every tab switch with a divider, so console output between two
+/// navigations is attributable to the tab that produced it.
+///
+/// This lives in its own component on purpose. `use_route` subscribes its
+/// caller to the router, so reading the route directly in `Layout` made the
+/// entire layout subtree re-render on every navigation. Isolating the read
+/// here keeps the log while leaving `Layout` untouched by navigation.
+#[component]
+fn TabLogger() -> Element {
+    let tab_name = match use_route::<Route>() {
+        Route::Home {} => "Home",
+        Route::Customize {} => "Customize",
+        Route::Soundpacks {} => "Soundpacks",
+        Route::Mood {} => "Mood",
+        Route::Settings {} => "Settings",
+    };
+    use_effect(use_reactive!(|tab_name| {
+        println!("──────────────────────────────────────");
+        println!("📍 Tab: {tab_name}");
+    }));
+
+    rsx! {}
 }
 
 #[component]
