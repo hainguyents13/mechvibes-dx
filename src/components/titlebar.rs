@@ -68,7 +68,7 @@ pub fn TitleBar() -> Element {
                   // SHA256 verification the in-app path performs, and on
                   // Linux/macOS there is no installable asset to open at all.
                   onclick: move |_| {
-                    navigator().push(crate::libs::routes::Route::Settings {});
+                    crate::libs::routes::navigate("/settings");
                   },
                   Download { class: "w-3 h-3" }
                   "{update.latest_version}"

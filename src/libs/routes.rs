@@ -37,11 +37,25 @@ pub fn Layout() -> Element {
 
     // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
-    crate::debug_print!(
-        "🎨 Layout rendering with theme: {:?} -> DaisyUI: {}",
-        theme(),
-        daisy_theme
-    );
+
+    // Report the theme only when it actually moves. Navigating remounts this
+    // component (the router builds a separate `rsx! { Layout {} }` per route,
+    // so each carries its own template identity and gets replaced rather than
+    // diffed), which re-runs this line with an unchanged theme and made the
+    // console read as though every tab switch re-themed the app.
+    {
+        use std::sync::Mutex;
+        static LAST_LOGGED: Mutex<Option<String>> = Mutex::new(None);
+        let mut last = LAST_LOGGED.lock().unwrap_or_else(|e| e.into_inner());
+        if last.as_deref() != Some(daisy_theme.as_str()) {
+            *last = Some(daisy_theme.clone());
+            crate::debug_print!(
+                "🎨 Theme applied: {:?} -> DaisyUI: {}",
+                theme(),
+                daisy_theme
+            );
+        }
+    }
 
     // Get background customization settings (reactive to config changes)
     let background_style = use_memo(move || {
@@ -79,37 +93,36 @@ pub fn Layout() -> Element {
         }
         // Dock at the bottom
         crate::components::dock::Dock {}
-
-        // Renders nothing; exists so that reading the route subscribes only
-        // this leaf to navigation rather than the whole layout.
-        TabLogger {}
       }
     }
 }
 
-/// Logs every tab switch with a divider, so console output between two
-/// navigations is attributable to the tab that produced it.
+/// Navigate to `route`, logging a divider and the destination first.
 ///
-/// This lives in its own component on purpose. `use_route` subscribes its
-/// caller to the router, so reading the route directly in `Layout` re-rendered
-/// the entire chrome - title bar, dock and background - on every tab switch.
-/// Isolating the read here keeps the log while leaving `Layout` untouched by
-/// navigation, so only this leaf and the `Outlet` re-render.
-#[component]
-fn TabLogger() -> Element {
-    let tab_name = match use_route::<Route>() {
-        Route::Home {} => "Home",
-        Route::Customize {} => "Customize",
-        Route::Soundpacks {} => "Soundpacks",
-        Route::Mood {} => "Mood",
-        Route::Settings {} => "Settings",
-    };
-    use_effect(use_reactive!(|tab_name| {
-        println!("──────────────────────────────────────");
-        println!("📍 Tab: {tab_name}");
-    }));
+/// The log has to happen here rather than in a component, because it must come
+/// out *before* the render work the navigation triggers. Rendering is where
+/// every other line in the console originates, and a component - even one
+/// placed ahead of the `Outlet` in the layout's `rsx!` - is not guaranteed to
+/// run before its siblings: sibling order in `rsx!` is not render order, and a
+/// log written from `use_effect` lands after the whole pass. Emitting at the
+/// call site is the only point that provably precedes all of it, and it covers
+/// every navigation because it is the one way the app changes route.
+pub fn navigate(route: &'static str) {
+    println!("──────────────────────────────────────");
+    println!("📍 Tab: {}", tab_name_for(route));
+    navigator().push(route);
+}
 
-    rsx! {}
+/// The human-readable name for a route path, falling back to the path itself.
+fn tab_name_for(route: &str) -> &str {
+    match route {
+        "/" => "Home",
+        "/customize" => "Customize",
+        "/soundpacks" => "Soundpacks",
+        "/mood" => "Mood",
+        "/settings" => "Settings",
+        other => other,
+    }
 }
 
 #[component]
@@ -149,5 +162,56 @@ pub fn Customize() -> Element {
 pub fn Settings() -> Element {
     rsx! {
       crate::components::pages::SettingsPage {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    /// Every path `navigate` is called with must parse back to a real route and
+    /// must produce a tab name rather than falling through to the raw path.
+    ///
+    /// `navigate` takes a `&str` because it is called from `rsx!` event
+    /// handlers, so a typo would otherwise be a silent 404 at runtime with a
+    /// divider logged for a tab the user never reached.
+    #[test]
+    fn every_navigable_path_maps_to_a_route_and_a_tab_name() {
+        let expected = [
+            ("/", "Home"),
+            ("/customize", "Customize"),
+            ("/soundpacks", "Soundpacks"),
+            ("/mood", "Mood"),
+            ("/settings", "Settings"),
+        ];
+
+        for (path, tab) in expected {
+            assert!(
+                Route::from_str(path).is_ok(),
+                "{path} is passed to navigate() but does not parse as a route"
+            );
+            assert_eq!(tab_name_for(path), tab, "wrong tab name logged for {path}");
+        }
+    }
+
+    /// The five paths above are the whole routing table; if a route is added
+    /// without teaching `navigate` about it, the divider would log a raw URL.
+    #[test]
+    fn the_tab_name_table_covers_every_route() {
+        for route in [
+            Route::Home {},
+            Route::Customize {},
+            Route::Soundpacks {},
+            Route::Mood {},
+            Route::Settings {},
+        ] {
+            let path = route.to_string();
+            let name = tab_name_for(&path);
+            assert!(
+                !name.starts_with('/'),
+                "{path} has no tab name - navigate() would log the raw path"
+            );
+        }
     }
 }
