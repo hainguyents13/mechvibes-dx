@@ -142,8 +142,18 @@ pub fn verbose_enabled() -> bool {
 }
 
 /// Turns verbose capture on or off. Not persisted anywhere.
+///
+/// Opening this door is only half the job: the per-keystroke timing lines come
+/// from the trace facility, whose points are inert unless tracing is enabled.
+/// Before this call also drove `trace::set_runtime_tracing`, turning the toggle
+/// on produced nothing at all unless the user had launched the app with
+/// `MECHVIBES_TRACE=1` - which an installed build gives them no way to do.
 pub fn set_verbose(on: bool) {
     VERBOSE.store(on, Ordering::Relaxed);
+    // Order matters on the way up: the producer must be live before the first
+    // line can arrive, and on the way down the flag above has already closed
+    // `push_verbose`, so nothing slips through while the producer stops.
+    crate::libs::trace::set_runtime_tracing(on);
     push(if on {
         "🔊 Verbose logging ON - per-keystroke timings will be captured with key identities masked"
     } else {
@@ -593,6 +603,88 @@ mod tests {
         }
     }
 
+    /// The reported bug, end to end through the real producer: flipping the
+    /// Settings toggle must make an actual recorded trace point arrive in the
+    /// buffer, with no environment variable involved.
+    ///
+    /// The earlier verbose tests all called `push_verbose` directly, which is
+    /// why they passed while the feature was broken - they exercised the door
+    /// and never checked that anything was on the other side of it.
+    #[test]
+    fn the_verbose_toggle_makes_real_trace_points_reach_the_buffer() {
+        use crate::libs::trace::{ Point, record };
+
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset();
+
+        assert!(
+            std::env::var("MECHVIBES_TRACE").is_err(),
+            "this test must prove the toggle works with no env var set"
+        );
+
+        set_verbose(true);
+
+        // A full keystroke's worth of points, the same sequence the worker
+        // host, engine and UI loop emit for one press.
+        record(Point::WorkerSend, "KeyA", 0.0);
+        record(Point::EngineDequeue, "KeyA", 0.0);
+        record(Point::PlayedSound, "KeyA", 0.4);
+        record(Point::UiEventSent, "KeyA", 0.0);
+        record(Point::UiWrite, "KeyA", 0.0);
+
+        // The writer is a separate thread; give it a moment to drain.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut captured = String::new();
+        while std::time::Instant::now() < deadline {
+            captured = snapshot().join("\n");
+            if captured.contains("TRACE") {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+
+        assert!(
+            captured.contains("TRACE"),
+            "a recorded keystroke must reach the buffer once verbose is on:\n{captured}"
+        );
+        assert!(captured.contains("total="), "the timing is the payload:\n{captured}");
+        // The masking invariant holds on this path too.
+        assert!(!captured.contains("KeyA"), "the key identity leaked:\n{captured}");
+        assert!(captured.contains("key=***"), "{captured}");
+
+        set_verbose(false);
+    }
+
+    /// And the other direction: once off, further recorded points must not
+    /// reach the buffer at all.
+    #[test]
+    fn turning_verbose_off_stops_the_flow() {
+        use crate::libs::trace::{ Point, record };
+
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset();
+
+        set_verbose(true);
+        record(Point::PackLoad, "somepack", 12.0);
+
+        // Let the writer drain whatever the enabled phase produced.
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        set_verbose(false);
+        // Clear everything the enabled phase left, including the toggle's own
+        // "verbose OFF" line, so what follows is measured from empty.
+        buffer().lock().unwrap().clear();
+        let generation_before = generation();
+
+        for _ in 0..200 {
+            record(Point::PackLoad, "somepack", 12.0);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        assert_eq!(len(), 0, "verbose off must capture nothing: {:?}", snapshot());
+        assert_eq!(generation_before, generation(), "an idle app must not move the generation");
+    }
+
     /// The same promise, checked behaviorally: pushing input-shaped verbose
     /// lines while verbose is off must leave the buffer untouched.
     #[test]
@@ -611,6 +703,60 @@ mod tests {
             generation_before,
             "an idle app must not move the generation, or the viewer would redraw for nothing"
         );
+    }
+
+    /// End-to-end demonstration against the real producer, printing what a
+    /// user would see in the Debug section. Ignored by default; run with
+    /// `cargo test --release -- --ignored --nocapture demonstrate_verbose_toggle`.
+    ///
+    /// Exists because the original bug was invisible to assertions that only
+    /// exercised `push_verbose`: this drives `trace::record` exactly as the
+    /// worker host, engine and UI loop do, with no environment variable.
+    #[test]
+    #[ignore = "diagnostic: demonstrates the verbose toggle end to end"]
+    fn demonstrate_verbose_toggle() {
+        use crate::libs::trace::{ Point, record };
+
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset();
+
+        println!(
+            "MECHVIBES_TRACE env var: {:?}",
+            std::env::var("MECHVIBES_TRACE").unwrap_or_else(|_| "<unset>".to_string())
+        );
+
+        println!("\n--- toggle OFF, simulating 50 keystrokes ---");
+        for _ in 0..50 {
+            record(Point::WorkerSend, "KeyA", 0.0);
+            record(Point::UiWrite, "KeyA", 0.0);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        println!("buffer lines captured: {} (expected 0)", len());
+
+        println!("\n--- toggle ON, simulating 3 keystrokes ---");
+        set_verbose(true);
+        for key in ["KeyA", "KeyS", "KeyD"] {
+            record(Point::WorkerSend, key, 0.0);
+            record(Point::EngineDequeue, key, 0.0);
+            record(Point::PlayedSound, key, 0.4);
+            record(Point::UiEventSent, key, 0.0);
+            record(Point::UiWrite, key, 0.0);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        println!("buffer now holds {} line(s):", len());
+        for line in snapshot() {
+            println!("  {}", line);
+        }
+
+        println!("\n--- toggle OFF again, simulating 50 more keystrokes ---");
+        set_verbose(false);
+        let after_off = len();
+        for _ in 0..50 {
+            record(Point::WorkerSend, "KeyA", 0.0);
+            record(Point::UiWrite, "KeyA", 0.0);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        println!("lines at toggle-off: {}, lines now: {} (must be equal)", after_off, len());
     }
 
     /// Prints a real export to stdout so the shipped format can be read by a

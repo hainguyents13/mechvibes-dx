@@ -23,10 +23,23 @@ use std::sync::OnceLock;
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::time::Instant;
 
-/// Master switch, read on every trace point. Set once at startup.
+/// Master switch, read on every trace point. True when either source of
+/// tracing is live: `MECHVIBES_TRACE=1` at launch, or the Settings verbose
+/// toggle at runtime. Kept as a single flag so the hot path stays one relaxed
+/// load rather than two.
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
-/// Sender to the writer thread. `None` until `init` runs with tracing on.
+/// Whether `MECHVIBES_TRACE=1` was set at launch. This is what gates the
+/// console lines and the detail file: those are a developer's tool and their
+/// behavior is deliberately unchanged by the user-facing toggle.
+static ENV_TRACING: AtomicBool = AtomicBool::new(false);
+
+/// Whether the Settings verbose toggle is on. Drives the buffer path only.
+static RUNTIME_TRACING: AtomicBool = AtomicBool::new(false);
+
+/// Sender to the writer thread. Populated by `ensure_writer`, which runs on
+/// whichever enable happens first - the env var at startup or the first
+/// runtime toggle.
 static SINK: OnceLock<crossbeam_channel::Sender<Record>> = OnceLock::new();
 
 /// Process start, so every timestamp is a small monotonic offset rather than
@@ -160,28 +173,98 @@ pub fn time<T>(point: Point, key: &str, f: impl FnOnce() -> T) -> T {
     out
 }
 
+/// Recomputes the master switch from its two sources.
+///
+/// Ordering matters on the way up: callers must spawn the writer before
+/// flipping this, so a trace point that observes `true` always finds a live
+/// `SINK` behind it.
+fn refresh_enabled() {
+    let on = ENV_TRACING.load(Ordering::Relaxed) || RUNTIME_TRACING.load(Ordering::Relaxed);
+    ENABLED.store(on, Ordering::Relaxed);
+}
+
+/// Starts the writer thread if it is not already running, and returns whether
+/// a sink is available.
+///
+/// Idempotent: `SINK`/`ORIGIN` are `OnceLock`s, so the second and later calls
+/// (env at launch, then a runtime toggle, then another) find the thread from
+/// the first and leave it alone. There is exactly one writer per process for
+/// the life of the process - a toggle-off parks it on `recv()` rather than
+/// tearing it down, which keeps the shutdown path free of any join.
+///
+/// `write_to_console` reflects whether `MECHVIBES_TRACE=1` was set, so the
+/// developer-facing console and file output stay exactly as they were and the
+/// user-facing toggle never starts printing to a console nobody is watching.
+fn ensure_writer(write_to_console: bool) -> bool {
+    if SINK.get().is_some() {
+        return true;
+    }
+
+    let _ = ORIGIN.set(Instant::now());
+    let (tx, rx) = crossbeam_channel::unbounded::<Record>();
+    if SINK.set(tx).is_err() {
+        // Another thread won the race and its writer is live.
+        return true;
+    }
+
+    // The detail file belongs to the env-var workflow only. A user flipping
+    // the Settings toggle asked for lines in the app, not a file on disk, and
+    // writing one would break the "nothing is written to disk" promise the
+    // Debug section makes.
+    let path = write_to_console.then(|| {
+        std::env::temp_dir().join(format!("mechvibes-trace-{}.log", std::process::id()))
+    });
+
+    if let Some(path) = path.as_ref() {
+        eprintln!(
+            "🔬 [trace] MECHVIBES_TRACE=1 - per-keystroke timings below; detail log: {}",
+            path.display()
+        );
+        eprintln!(
+            "🔬 [trace] columns: total = worker->ui_write. A hop over {:.0}ms is marked <== SLOW",
+            SLOW_HOP_MS
+        );
+    }
+
+    std::thread::spawn(move || writer_loop(rx, path, write_to_console));
+    true
+}
+
 /// Turns tracing on when `MECHVIBES_TRACE=1` is set, spawning the writer
 /// thread. Call once, early in `main`, before any traced thread starts.
-/// Without the env var this returns immediately and the app is unchanged.
+/// Without the env var this returns immediately and the app is unchanged -
+/// the writer is then spawned lazily if the user turns on verbose logging.
 pub fn init() {
     let on = std::env::var("MECHVIBES_TRACE").map(|v| v == "1").unwrap_or(false);
     if !on {
         return;
     }
 
-    let _ = ORIGIN.set(Instant::now());
-    let (tx, rx) = crossbeam_channel::unbounded::<Record>();
-    if SINK.set(tx).is_err() {
-        return; // already initialized
+    ENV_TRACING.store(true, Ordering::Relaxed);
+    ensure_writer(true);
+    refresh_enabled();
+}
+
+/// Turns per-keystroke tracing on or off at runtime, for the Settings verbose
+/// toggle.
+///
+/// This exists because the trace points are the only thing in the app that
+/// measures the input -> sound -> pixel path, and they were previously dead
+/// unless the user had known to set an environment variable before launching.
+/// An installed build has no console to set one from, so the feature was
+/// unreachable for exactly the people who need to report latency.
+///
+/// Turning it on spawns the writer thread on first use. Turning it off drops
+/// the master switch back, so every trace point returns on its first branch
+/// again and the steady-state cost returns to zero.
+pub fn set_runtime_tracing(on: bool) {
+    if on {
+        // Writer first, flag second: a trace point must never see `enabled()`
+        // return true while `SINK` is still empty.
+        ensure_writer(ENV_TRACING.load(Ordering::Relaxed));
     }
-
-    let path = std::env::temp_dir().join(format!("mechvibes-trace-{}.log", std::process::id()));
-    eprintln!("🔬 [trace] MECHVIBES_TRACE=1 - per-keystroke timings below; detail log: {}", path.display());
-    eprintln!("🔬 [trace] columns: total = worker->ui_write. A hop over {:.0}ms is marked <== SLOW", SLOW_HOP_MS);
-
-    std::thread::spawn(move || writer_loop(rx, path));
-
-    ENABLED.store(true, Ordering::Relaxed);
+    RUNTIME_TRACING.store(on, Ordering::Relaxed);
+    refresh_enabled();
 }
 
 /// A hop at or above this is called out on the console line - well above the
@@ -229,10 +312,18 @@ impl Pending {
 
 /// Owns all trace I/O. Runs on its own thread so no traced path ever formats
 /// or writes anything itself.
-fn writer_loop(rx: crossbeam_channel::Receiver<Record>, path: std::path::PathBuf) {
+///
+/// `path` is `Some` only for the env-var workflow; a runtime toggle keeps the
+/// Debug section's "nothing is written to disk" promise. `to_console` likewise
+/// gates the stderr lines, so the user-facing toggle feeds the buffer alone.
+fn writer_loop(
+    rx: crossbeam_channel::Receiver<Record>,
+    path: Option<std::path::PathBuf>,
+    to_console: bool
+) {
     use std::io::Write;
 
-    let mut file = std::fs::File::create(&path).ok();
+    let mut file = path.as_ref().and_then(|path| std::fs::File::create(path).ok());
     // At most one keystroke is in flight per key code; a small vec beats a map
     // here because it is only ever a handful of entries.
     let mut pending: Vec<Pending> = Vec::new();
@@ -287,7 +378,9 @@ fn writer_loop(rx: crossbeam_channel::Receiver<Record>, path: std::path::PathBuf
                 if let Some(idx) = pending.iter().position(find) {
                     let done = pending.remove(idx);
                     let line = done.summarize(rec.at_ms);
-                    eprintln!("{}", line);
+                    if to_console {
+                        eprintln!("{}", line);
+                    }
                     // Tee into the Debug section's buffer when the user asked
                     // for verbose. `push_verbose` masks the key identity, so
                     // the timing is captured and the key never is. Done here,
@@ -302,7 +395,9 @@ fn writer_loop(rx: crossbeam_channel::Receiver<Record>, path: std::path::PathBuf
                     rec.key.as_str(),
                     rec.dur_ms
                 );
-                eprintln!("{}", line);
+                if to_console {
+                    eprintln!("{}", line);
+                }
                 crate::utils::log_buffer::push_verbose(&line);
             }
             Point::DeviceSwitch => {
@@ -311,7 +406,9 @@ fn writer_loop(rx: crossbeam_channel::Receiver<Record>, path: std::path::PathBuf
                     rec.key.as_str(),
                     rec.dur_ms
                 );
-                eprintln!("{}", line);
+                if to_console {
+                    eprintln!("{}", line);
+                }
                 crate::utils::log_buffer::push_verbose(&line);
             }
         }
@@ -347,13 +444,109 @@ mod tests {
         assert_ne!(stored.as_str(), "?");
     }
 
+    /// The runtime-tracing tests below drive process-global flags, so they
+    /// must not interleave with each other or with the default-state test.
+    static TRACE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Puts the global switches back to the shipping default so one test
+    /// cannot leak state into another.
+    fn reset_tracing() {
+        RUNTIME_TRACING.store(false, Ordering::Relaxed);
+        ENV_TRACING.store(false, Ordering::Relaxed);
+        refresh_enabled();
+    }
+
     #[test]
     fn tracing_is_off_until_initialized() {
         // The shipping default: every trace point must be inert, so the hot
         // paths carry no cost for code that only exists to diagnose.
+        let _guard = TRACE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_tracing();
+
         assert!(!enabled());
         record(Point::WorkerSend, "KeyA", 0.0);
         assert_eq!(time(Point::PlayedSound, "KeyA", || 7), 7);
+    }
+
+    #[test]
+    fn the_runtime_toggle_enables_tracing_without_the_env_var() {
+        // The reported bug: the Settings verbose toggle opened the buffer door
+        // but left the producer dead, because only `init` with
+        // `MECHVIBES_TRACE=1` ever set the master switch. An installed build
+        // has no console to set that variable from, so the feature was
+        // unreachable for the users it exists for.
+        let _guard = TRACE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_tracing();
+
+        assert!(!enabled(), "precondition: tracing starts off");
+        assert!(!ENV_TRACING.load(Ordering::Relaxed), "and with no env var set");
+
+        set_runtime_tracing(true);
+        assert!(enabled(), "the toggle alone must make trace points live");
+
+        // The whole point of enabling: a recorded point must reach the writer.
+        assert!(SINK.get().is_some(), "the writer must be spawned on first enable");
+
+        reset_tracing();
+    }
+
+    #[test]
+    fn turning_the_runtime_toggle_off_makes_trace_points_inert_again() {
+        let _guard = TRACE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_tracing();
+
+        set_runtime_tracing(true);
+        assert!(enabled());
+
+        set_runtime_tracing(false);
+        assert!(!enabled(), "off must restore the zero-cost steady state");
+
+        // Inert means the first branch returns; nothing panics and nothing is
+        // recorded.
+        record(Point::WorkerSend, "KeyA", 0.0);
+        assert_eq!(time(Point::PlayedSound, "KeyA", || 7), 7);
+
+        reset_tracing();
+    }
+
+    #[test]
+    fn the_env_var_keeps_tracing_on_across_a_runtime_toggle_off() {
+        // A developer running with MECHVIBES_TRACE=1 must not have their
+        // console output silenced by a user-facing toggle they also flipped.
+        let _guard = TRACE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_tracing();
+
+        ENV_TRACING.store(true, Ordering::Relaxed);
+        refresh_enabled();
+        assert!(enabled());
+
+        set_runtime_tracing(true);
+        assert!(enabled());
+
+        set_runtime_tracing(false);
+        assert!(enabled(), "the env var is an independent source and must survive");
+
+        reset_tracing();
+        assert!(!enabled());
+    }
+
+    #[test]
+    fn enabling_twice_reuses_the_one_writer() {
+        // `ensure_writer` is idempotent by way of OnceLock; a toggle flipped
+        // repeatedly must not spawn a thread per flip.
+        let _guard = TRACE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_tracing();
+
+        set_runtime_tracing(true);
+        let first = SINK.get().expect("writer must exist after the first enable") as *const _;
+
+        set_runtime_tracing(false);
+        set_runtime_tracing(true);
+        let second = SINK.get().expect("writer must still exist") as *const _;
+
+        assert_eq!(first, second, "the sink must be the same one, not a fresh thread");
+
+        reset_tracing();
     }
 
     #[test]
