@@ -300,6 +300,12 @@ mod tests {
     /// The buffer is process-global, so tests that push must not run
     /// concurrently with each other. Each takes this lock rather than relying
     /// on the harness's thread scheduling.
+    ///
+    /// The lock is NOT enough on its own: tests in OTHER modules exercise app
+    /// code that logs through `always_print!`, so foreign lines can land in
+    /// the buffer at any moment. Order-sensitive tests therefore tag their own
+    /// lines with a unique marker and assert on the filtered subset, never on
+    /// absolute buffer positions.
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn reset() {
@@ -307,18 +313,30 @@ mod tests {
         VERBOSE.store(false, Ordering::Relaxed);
     }
 
+    /// The indices of this test's own lines, in buffer order.
+    fn our_indices(marker: &str) -> Vec<usize> {
+        snapshot()
+            .iter()
+            .filter_map(|line| line.split(marker).nth(1)?.trim().parse().ok())
+            .collect()
+    }
+
     #[test]
     fn lines_are_kept_in_order_with_a_timestamp() {
         let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset();
 
-        push("first");
-        push("second");
+        push("ordertest 0");
+        push("ordertest 1");
 
-        let lines = snapshot();
-        assert_eq!(lines.len(), 2);
-        assert!(lines[0].ends_with("first"), "{}", lines[0]);
-        assert!(lines[1].ends_with("second"), "{}", lines[1]);
+        let ours = our_indices("ordertest ");
+        assert_eq!(ours, vec![0, 1], "own lines must be kept in push order");
+        let first = snapshot()
+            .into_iter()
+            .find(|l| l.contains("ordertest 0"))
+            .expect("pushed line must be present");
+        // HH:MM:SS.mmm prefix.
+        assert!(first.chars().take(2).all(|c| c.is_ascii_digit()), "{}", first);
     }
 
     #[test]
@@ -329,19 +347,21 @@ mod tests {
         // Overfill by a clear margin so both the cap and the drop order are
         // exercised, not just the boundary.
         for i in 0..CAPACITY + 50 {
-            push(&format!("line {}", i));
+            push(&format!("rotcap {}", i));
         }
 
         assert_eq!(len(), CAPACITY, "a long-running app must not grow without bound");
 
-        let lines = snapshot();
-        // The oldest 50 were dropped, so the window now starts at 50.
-        assert!(lines[0].ends_with("line 50"), "{}", lines[0]);
-        assert!(
-            lines[lines.len() - 1].ends_with(&format!("line {}", CAPACITY + 49)),
-            "{}",
-            lines[lines.len() - 1]
+        let ours = our_indices("rotcap ");
+        assert!(ours.windows(2).all(|w| w[0] < w[1]), "retained lines must keep push order");
+        assert_eq!(
+            *ours.last().unwrap(),
+            CAPACITY + 49,
+            "the newest line must always survive rotation"
         );
+        // At least the oldest 50 are gone; foreign lines from parallel tests
+        // can push a few more of ours out, never fewer.
+        assert!(*ours.first().unwrap() >= 50, "the oldest lines must be dropped first");
     }
 
     #[test]
@@ -350,13 +370,19 @@ mod tests {
         reset();
 
         for i in 0..10 {
-            push(&format!("line {}", i));
+            push(&format!("tailtest {}", i));
         }
 
-        let tail = recent(3);
-        assert_eq!(tail.len(), 3);
-        assert!(tail[0].ends_with("line 7"), "{}", tail[0]);
-        assert!(tail[2].ends_with("line 9"), "{}", tail[2]);
+        // Ask for a window big enough that our tail is inside it even if a few
+        // foreign lines landed after ours.
+        let tail = recent(6);
+        let ours: Vec<usize> = tail
+            .iter()
+            .filter_map(|line| line.split("tailtest ").nth(1)?.trim().parse().ok())
+            .collect();
+        assert!(ours.len() >= 3, "tail must contain our newest lines: {:?}", tail);
+        assert!(ours.windows(2).all(|w| w[0] < w[1]), "tail must be oldest first");
+        assert_eq!(*ours.last().unwrap(), 9, "tail must end at the newest line");
     }
 
     #[test]
@@ -364,8 +390,13 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset();
 
-        push("only one");
-        assert_eq!(recent(VIEWER_LINES).len(), 1);
+        push("loneline 0");
+        let tail = recent(VIEWER_LINES);
+        assert!(
+            tail.iter().any(|l| l.contains("loneline 0")),
+            "a window larger than the buffer must still include everything: {:?}",
+            tail
+        );
     }
 
     #[test]
