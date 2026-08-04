@@ -18,14 +18,30 @@ pub fn Layout() -> Element {
     // Theme state - use theme context and initialize from config
     let mut theme = use_theme();
 
-    // Initialize theme from config on first load
+    // Adopt the theme the config was saved with.
+    //
+    // The guard is what keeps navigation cheap. `dioxus-router` generates a
+    // separate `rsx! { Layout {} }` per route variant, so every variant carries
+    // a different template identity and `diff_node` replaces rather than diffs
+    // it - navigating remounts this whole component and re-runs this effect
+    // with the value it already holds. `Signal::set` notifies subscribers
+    // unconditionally, so writing that unchanged value scheduled a second
+    // render of the layout and re-ran every effect subscribed to the theme -
+    // including the font/CSS injection in `Header`. Only publish a real change.
     use_effect(move || {
-        theme.set(config_signal.read().theme.clone());
+        let from_config = config_signal.read().theme.clone();
+        if *theme.peek() != from_config {
+            theme.set(from_config);
+        }
     });
 
     // Convert theme to DaisyUI theme name
     let daisy_theme = theme().to_daisy_theme();
-    println!("🎨 Layout rendering with theme: {:?} -> DaisyUI: {}", theme(), daisy_theme);
+    crate::debug_print!(
+        "🎨 Layout rendering with theme: {:?} -> DaisyUI: {}",
+        theme(),
+        daisy_theme
+    );
 
     // Get background customization settings (reactive to config changes)
     let background_style = use_memo(move || {
@@ -75,9 +91,9 @@ pub fn Layout() -> Element {
 /// navigations is attributable to the tab that produced it.
 ///
 /// This lives in its own component on purpose. `use_route` subscribes its
-/// caller to the router, so reading the route directly in `Layout` made the
-/// entire layout subtree re-render on every navigation. Isolating the read
-/// here keeps the log while leaving `Layout` untouched by navigation.
+/// caller to the router, so reading the route directly in `Layout` added a
+/// router-driven render on top of the remount navigation already causes.
+/// Isolating the read here keeps the log without that extra subscription.
 #[component]
 fn TabLogger() -> Element {
     let tab_name = match use_route::<Route>() {

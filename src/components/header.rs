@@ -22,9 +22,13 @@ pub fn Header() -> Element {
     let (themes, _) = use_themes();
     let theme = use_theme();
 
+    // Remembers the CSS last handed to the webview, so an effect run that
+    // produces byte-identical CSS skips the DOM work instead of removing and
+    // re-appending the same `<style>` element.
+    let mut injected_css = use_signal(String::new);
+
     // Use effect to inject fonts and dynamic CSS
     use_effect(move || {
-        println!("🎨 Header: Injecting fonts and dynamic CSS");
         let custom_css = config().custom_css.clone();
 
         // Create font-face declarations using Manganis assets
@@ -193,6 +197,18 @@ body {
 
         // Combine all dynamic CSS parts
         let dynamic_css = format!("{}\n{}\n{}\n{}", font_css, custom_theme_css, custom_css, platform_css); // Inject only dynamic CSS using eval
+
+        // Nothing about the styling moved, so re-running the script would swap
+        // the `<style>` element for an identical one - a webview round trip and
+        // a style recalculation that can only produce the frame already on
+        // screen. Navigation remounts the layout and can re-run this effect
+        // without any of its inputs having changed.
+        if *injected_css.peek() == dynamic_css {
+            return;
+        }
+        injected_css.set(dynamic_css.clone());
+
+        crate::debug_print!("🎨 Header: Injecting fonts and dynamic CSS");
         let script = format!(
             r#"
               // Remove existing custom style if any
