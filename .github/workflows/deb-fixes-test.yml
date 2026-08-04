@@ -108,8 +108,12 @@ jobs:
           echo "=== run (xvfb, non-root) ==="
           timeout 25s xvfb-run -a /usr/bin/mechvibes-dx 2>&1 | head -40 || true
 
-          echo "=== did anything land in /usr/data? (must not exist) ==="
-          ls -la /usr/data 2>&1 || echo "  /usr/data does not exist - correct"
+          # The pre-fix location was {app_root}/data, and app_root for a .deb
+          # install is the exe's own dir - so /usr/bin/data, NOT /usr/data as
+          # first assumed. Established from the app's own "App root (from exe)"
+          # log line on this runner.
+          echo "=== did anything land in /usr/bin/data? (must not exist) ==="
+          ls -la /usr/bin/data 2>&1 || echo "  /usr/bin/data does not exist - correct"
 
           echo "=== XDG location ==="
           find ~/.local/share/mechvibes -type f 2>/dev/null | sort || echo "  nothing found"
@@ -117,8 +121,8 @@ jobs:
       - name: Assert config landed under the XDG path, not /usr
         run: |
           set -euo pipefail
-          if [ -e /usr/data ]; then
-            echo "::error::/usr/data exists - writable state is still targeting the system prefix"
+          if [ -e /usr/bin/data ]; then
+            echo "::error::/usr/bin/data exists - writable state is still targeting the system prefix"
             exit 1
           fi
           if [ ! -f "$HOME/.local/share/mechvibes/data/config.json" ]; then
@@ -129,16 +133,17 @@ jobs:
           ls -la "$HOME/.local/share/mechvibes/data/"
 
       # The migration branch, exercised with a planted old-location config.
-      # /usr/data is created as root here to simulate the only way a real user
-      # could have one: having run the app as root.
+      # The legacy path is {app_root}/data = /usr/bin/data (app_root is the
+      # exe's own directory). Created as root here to simulate the only way a
+      # real user could have one: having run the app as root.
       - name: Verify the legacy-config migration
         continue-on-error: true
         run: |
           set -uo pipefail
           rm -rf ~/.local/share/mechvibes
-          sudo mkdir -p /usr/data
-          echo '{"volume":0.4242}' | sudo tee /usr/data/config.json >/dev/null
-          sudo chmod -R a+r /usr/data
+          sudo mkdir -p /usr/bin/data
+          echo '{"volume":0.4242}' | sudo tee /usr/bin/data/config.json >/dev/null
+          sudo chmod -R a+r /usr/bin/data
 
           echo "=== run with a planted legacy config ==="
           timeout 25s xvfb-run -a /usr/bin/mechvibes-dx 2>&1 | grep -iE "migrat|config|volume" | head -20 || true
@@ -162,5 +167,5 @@ jobs:
           echo "migration carried the planted value across:"
           grep -o '"volume":[0-9.]*' "$CFG" | head -1
           # The original must survive - the migration copies, never moves.
-          test -f /usr/data/config.json && echo "legacy file left in place (copy, not move)"
-          sudo rm -rf /usr/data
+          test -f /usr/bin/data/config.json && echo "legacy file left in place (copy, not move)"
+          sudo rm -rf /usr/bin/data

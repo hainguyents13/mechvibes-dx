@@ -151,7 +151,7 @@ fn get_app_root() -> &'static PathBuf {
 /// `.deb` produces: `/usr/bin/mechvibes-dx` (or `/usr/local/bin/...`).
 ///
 /// These directories are root-owned. The app root for such a binary is
-/// `/usr/bin`, so `{app_root}/data` resolved to `/usr/data` - a directory a
+/// `/usr/bin`, so `{app_root}/data` resolved to `/usr/bin/data` - a directory a
 /// normal user cannot create, let alone write. `AppConfig::save()` fails soft,
 /// so this did not error: it produced an app that silently discarded every
 /// setting and reset on each launch.
@@ -195,7 +195,7 @@ fn running_from_appimage() -> Option<&'static PathBuf> {
 ///   fresh temporary directory on every launch, so anything written beside the
 ///   binary would be unreachable next time even if the write succeeded.
 /// - Linux system install (`.deb`) - `/usr/bin` is root-owned, and
-///   `{app_root}/data` for it is `/usr/data`.
+///   `{app_root}/data` for it is `/usr/bin/data`.
 fn writable_data_belongs_in_system_dir(exe_path: &Path) -> bool {
     macos_bundle_resource_root(exe_path).is_some()
         || appimage_root(exe_path).is_some()
@@ -234,7 +234,8 @@ fn get_writable_data_dir() -> &'static PathBuf {
 /// One-time courtesy copy of a config left at the old, pre-fix location.
 ///
 /// Only ever relevant to someone who ran a `.deb` install as root (or otherwise
-/// had a writable `/usr/data`), which is the sole way a file could exist there.
+/// had a writable `/usr/bin/data`), which is the sole way a file could exist
+/// there.
 /// Everyone else's old location was never writable, so there is nothing to
 /// move and this is a cheap `exists()` check that finds nothing.
 ///
@@ -783,7 +784,7 @@ mod tests {
     }
 
     /// The `.deb` install locations. `{app_root}/data` for these is
-    /// `/usr/data` and `/usr/local/data`, neither of which a normal user can
+    /// `/usr/bin/data` and `/usr/local/bin/data`, neither of which a normal user can
     /// write - which is the bug this detector exists to fix.
     #[test]
     fn detects_the_deb_system_install_locations() {
@@ -900,7 +901,7 @@ mod tests {
     }
 
     /// An existing config at the new location is authoritative and must never
-    /// be clobbered by a stale file left in /usr/data.
+    /// be clobbered by a stale file left in /usr/bin/data.
     #[test]
     fn migration_never_overwrites_an_existing_config() {
         let root = scratch_dir("no-overwrite");
@@ -922,7 +923,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The overwhelmingly common case: nothing was ever written to /usr/data
+    /// The overwhelmingly common case: nothing was ever written to /usr/bin/data
     /// because it was never writable. Must be a silent no-op that creates
     /// nothing.
     #[test]
