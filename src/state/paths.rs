@@ -69,25 +69,25 @@ fn get_app_root() -> &'static PathBuf {
                 if exe_path_str.contains("target\\dx\\") || exe_path_str.contains("target/dx/") {
                     // In dev mode, use current working directory (project root)
                     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                    println!("📂 App root (dev mode - from cwd): {}", cwd.display());
+                    crate::always_print!("📂 App root (dev mode - from cwd): {}", cwd.display());
                     return cwd;
                 }
 
                 // Inside a macOS .app the resources live in ../Resources, not
                 // beside the executable in Contents/MacOS.
                 if let Some(resources) = macos_bundle_resource_root(&exe_path) {
-                    println!("📂 App root (macOS bundle): {}", resources.display());
+                    crate::always_print!("📂 App root (macOS bundle): {}", resources.display());
                     return resources;
                 }
 
-                println!("📂 App root (from exe): {}", exe_dir.display());
+                crate::always_print!("📂 App root (from exe): {}", exe_dir.display());
                 return exe_dir.to_path_buf();
             }
         }
 
         // Fallback to current working directory (for development)
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        println!("📂 App root (fallback - from cwd): {}", cwd.display());
+        crate::always_print!("📂 App root (fallback - from cwd): {}", cwd.display());
         cwd
     })
 }
@@ -241,7 +241,7 @@ pub mod soundpacks {
             {
                 let system_soundpacks = PathBuf::from("/usr/share/mechvibes-dx/soundpacks");
                 if system_soundpacks.exists() {
-                    println!(
+                    crate::always_print!(
                         "📂 Using system soundpacks directory: {}",
                         system_soundpacks.display()
                     );
@@ -251,7 +251,7 @@ pub mod soundpacks {
 
             // Fallback to app root (for portable/dev mode)
             let app_root_soundpacks = get_app_root().join("soundpacks");
-            println!(
+            crate::always_print!(
                 "📂 Using app root soundpacks directory: {}",
                 app_root_soundpacks.display()
             );

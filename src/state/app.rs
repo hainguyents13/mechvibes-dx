@@ -70,7 +70,7 @@ pub fn use_state_trigger() -> Callback<()> {
         // Refresh cache and trigger UI update
         if let Some(global_state) = GLOBAL_APP_STATE.get() {
             if let Ok(mut state) = global_state.lock() {
-                println!("🔄 Triggering cache refresh...");
+                crate::always_print!("🔄 Triggering cache refresh...");
                 state.refresh_cache();
             }
         }
@@ -143,7 +143,7 @@ pub fn reload_current_soundpacks(audio_ctx: &crate::libs::audio::AudioContext) {
 // Initialize the app state - call this once at startup
 pub fn init_app_state() {
     if GLOBAL_APP_STATE.get().is_none() {
-        println!("📝 Initializing global app state (mutex)...");
+        crate::always_print!("📝 Initializing global app state (mutex)...");
         let _ = GLOBAL_APP_STATE.set(Mutex::new(AppState::new()));
     }
 }
@@ -180,12 +180,12 @@ pub fn set_update_info(update_info: Option<crate::utils::auto_updater::UpdateInf
 // Initialize update state - call this once at startup
 pub fn init_update_state() {
     if GLOBAL_UPDATE_STATE.get().is_none() {
-        println!("📝 Initializing global update state...");
+        crate::always_print!("📝 Initializing global update state...");
         let _ = GLOBAL_UPDATE_STATE.set(Mutex::new(None));
 
         // Load saved update info from config if available
         if let Some(saved_update) = crate::utils::auto_updater::get_saved_update_info() {
-            println!(
+            crate::always_print!(
                 "📦 Found saved update info: {} -> {}",
                 saved_update.current_version,
                 saved_update.latest_version

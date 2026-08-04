@@ -52,7 +52,7 @@ fn ImagePicker(
                                         on_change.call(Some(asset_url));
                                     }
                                     Err(e) => {
-                                        eprintln!("Failed to copy image: {}", e);
+                                        crate::always_eprint!("Failed to copy image: {}", e);
                                     }
                                 }
                             }

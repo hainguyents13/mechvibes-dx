@@ -148,21 +148,21 @@ impl SoundpackCache {
             data::load_json_from_file::<SoundpackCache>(std::path::Path::new(&cache_file))
         {
             Ok(cache) => {
-                println!(
+                crate::always_print!(
                     "📦 Loaded soundpack metadata cache with {} entries",
                     cache.soundpacks.len()
                 );
                 cache
             }
             Err(e) => {
-                eprintln!("⚠️  Failed to load cache file: {}", e);
+                crate::always_eprint!("⚠️  Failed to load cache file: {}", e);
                 Self::new()
             }
         };
 
         // Auto-refresh if cache is empty or missing
         if cache.soundpacks.is_empty() {
-            println!("🔄 Cache is empty, refreshing from soundpack directories...");
+            crate::always_print!("🔄 Cache is empty, refreshing from soundpack directories...");
             cache.refresh_from_directory();
             cache.save();
         }
@@ -184,18 +184,18 @@ impl SoundpackCache {
         // Ensure parent directory exists
         if let Some(parent) = Path::new(&cache_file).parent() {
             if let Err(e) = path::ensure_directory_exists(parent) {
-                eprintln!("⚠️  Failed to create cache directory: {}", e);
+                crate::always_eprint!("⚠️  Failed to create cache directory: {}", e);
                 return;
             }
         }
 
         match data::save_json_to_file(self, std::path::Path::new(&cache_file)) {
             Ok(_) =>
-                println!(
+                crate::always_print!(
                     "💾 Saved soundpack metadata cache with {} entries",
                     self.soundpacks.len()
                 ),
-            Err(e) => eprintln!("⚠️  Failed to save metadata cache: {}", e),
+            Err(e) => crate::always_eprint!("⚠️  Failed to save metadata cache: {}", e),
         }
     }
 
@@ -204,7 +204,7 @@ impl SoundpackCache {
         self.soundpacks.insert(metadata.id.clone(), metadata);
     } // Refresh cache by scanning soundpacks directory
     pub fn refresh_from_directory(&mut self) {
-        println!("📂 Scanning soundpacks directories...");
+        crate::always_print!("📂 Scanning soundpacks directories...");
 
         self.soundpacks.clear(); // Clear all existing entries
 
@@ -212,7 +212,7 @@ impl SoundpackCache {
         let builtin_soundpacks_dir = paths::soundpacks::get_builtin_soundpacks_dir()
             .to_string_lossy()
             .to_string();
-        println!("📂 Scanning built-in soundpacks in: {}", builtin_soundpacks_dir);
+        crate::always_print!("📂 Scanning built-in soundpacks in: {}", builtin_soundpacks_dir);
         self.scan_soundpack_type(&builtin_soundpacks_dir, "keyboard", false);
         self.scan_soundpack_type(&builtin_soundpacks_dir, "mouse", true);
 
@@ -220,7 +220,7 @@ impl SoundpackCache {
         let custom_soundpacks_dir = paths::soundpacks::get_custom_soundpacks_dir()
             .to_string_lossy()
             .to_string();
-        println!("📂 Scanning custom soundpacks in: {}", custom_soundpacks_dir);
+        crate::always_print!("📂 Scanning custom soundpacks in: {}", custom_soundpacks_dir);
         self.scan_soundpack_type(&custom_soundpacks_dir, "keyboard", false);
         self.scan_soundpack_type(&custom_soundpacks_dir, "mouse", true);
 
@@ -233,7 +233,7 @@ impl SoundpackCache {
             .unwrap_or_default()
             .as_secs();
 
-        println!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
+        crate::always_print!("📦 Loaded {} soundpacks metadata", self.soundpacks.len());
     }
 
     // Update count based on current soundpacks in cache
@@ -254,34 +254,34 @@ impl SoundpackCache {
         self.count.keyboard = keyboard_count;
         self.count.mouse = mouse_count;
 
-        println!("📊 Updated count: {} keyboard, {} mouse soundpacks", keyboard_count, mouse_count);
+        crate::always_print!("📊 Updated count: {} keyboard, {} mouse soundpacks", keyboard_count, mouse_count);
     }
 
     fn scan_soundpack_type(&mut self, soundpacks_dir: &str, soundpack_type: &str, is_mouse: bool) {
         let type_dir = std::path::Path::new(soundpacks_dir).join(soundpack_type);
-        println!(
+        crate::always_print!(
             "📂 [CACHE DEBUG] Scanning {} soundpacks in: {}",
             soundpack_type,
             type_dir.display()
         );
-        println!("   Directory exists: {}", type_dir.exists());
+        crate::always_print!("   Directory exists: {}", type_dir.exists());
 
         if type_dir.exists() {
-            println!("✅ Directory found, reading entries...");
+            crate::always_print!("✅ Directory found, reading entries...");
 
             if let Ok(entries) = std::fs::read_dir(&type_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if let Some(soundpack_name) = entry.file_name().to_str() {
                         let full_soundpack_id = format!("{}/{}", soundpack_type, soundpack_name);
-                        println!("🔍 [CACHE DEBUG] Processing soundpack: {}", full_soundpack_id);
+                        crate::always_print!("🔍 [CACHE DEBUG] Processing soundpack: {}", full_soundpack_id);
 
                         match soundpack::load_soundpack_metadata(&full_soundpack_id) {
                             Ok(metadata) => {
-                                println!("✅ [CACHE DEBUG] Successfully loaded metadata for: {}", full_soundpack_id);
+                                crate::always_print!("✅ [CACHE DEBUG] Successfully loaded metadata for: {}", full_soundpack_id);
                                 self.soundpacks.insert(full_soundpack_id, metadata);
                             }
                             Err(e) => {
-                                println!(
+                                crate::always_print!(
                                     "❌ [CACHE DEBUG] Failed to load {} metadata for {}: {}",
                                     soundpack_type,
                                     soundpack_name,
@@ -298,14 +298,14 @@ impl SoundpackCache {
                     }
                 }
             } else {
-                println!("❌ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
+                crate::always_print!("❌ [CACHE DEBUG] Failed to read directory: {}", type_dir.display());
             }
         } else {
-            println!("⚠️ [CACHE DEBUG] Directory does not exist: {}", type_dir.display());
-            println!("   Expected at: {}", type_dir.display());
+            crate::always_print!("⚠️ [CACHE DEBUG] Directory does not exist: {}", type_dir.display());
+            crate::always_print!("   Expected at: {}", type_dir.display());
             if let Some(parent) = type_dir.parent() {
-                println!("   Parent directory: {}", parent.display());
-                println!("   Parent exists: {}", parent.exists());
+                crate::always_print!("   Parent directory: {}", parent.display());
+                crate::always_print!("   Parent exists: {}", parent.exists());
             }
         }
     }

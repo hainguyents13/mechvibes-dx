@@ -136,7 +136,7 @@ pub fn listen_for_wake_requests(on_wake: impl Fn() + Send + 'static) {
     // case the thread is simply not started.
     let handle = unsafe { CreateEventW(null_mut(), 0, 0, name.as_ptr()) };
     if handle.is_null() {
-        eprintln!("⚠️ Could not create the wake-up event; a second launch will not raise the window");
+        crate::always_eprint!("⚠️ Could not create the wake-up event; a second launch will not raise the window");
         return;
     }
 

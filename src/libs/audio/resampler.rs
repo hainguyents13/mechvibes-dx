@@ -43,7 +43,7 @@ pub fn resample_interleaved(
     {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("❌ Failed to create resampler: {}", e);
+            crate::always_eprint!("❌ Failed to create resampler: {}", e);
             return samples.to_vec();
         }
     };
@@ -85,7 +85,7 @@ pub fn resample_interleaved(
                 }
             }
             Err(e) => {
-                eprintln!("❌ Resample chunk failed: {}", e);
+                crate::always_eprint!("❌ Resample chunk failed: {}", e);
                 break;
             }
         }

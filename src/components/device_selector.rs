@@ -100,7 +100,7 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
 
         use_callback(move |_| {
             spawn(async move {
-                println!("📋 [DeviceSelector] Loading devices...");
+                crate::always_print!("📋 [DeviceSelector] Loading devices...");
                 is_loading.set(true);
                 error_message.set(String::new());
 
@@ -109,13 +109,13 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         // Use cached audio devices to avoid enumeration interference
                         match DeviceManager::get_cached_output_devices() {
                             Ok(device_list) => {
-                                println!("✅ [DeviceSelector] Loaded {} cached audio devices", device_list.len());
+                                crate::always_print!("✅ [DeviceSelector] Loaded {} cached audio devices", device_list.len());
                                 audio_devices.set(device_list);
                                 mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                             Err(e) => {
-                                println!("❌ [DeviceSelector] Failed to load cached devices: {}", e);
+                                crate::always_print!("❌ [DeviceSelector] Failed to load cached devices: {}", e);
                                 error_message.set(format!("Failed to load audio devices: {}", e));
                                 mark_devices_enumerated();
                                 has_loaded.set(true);
@@ -126,14 +126,14 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
                         // Input devices don't interfere with audio, load fresh
                         match InputDeviceManager::get_devices() {
                             Ok(device_list) => {
-                                println!("✅ [DeviceSelector] Loaded {} input devices", device_list.len());
+                                crate::always_print!("✅ [DeviceSelector] Loaded {} input devices", device_list.len());
                                 store_input_devices(&device_list);
                                 input_devices.set(device_list);
                                 mark_devices_enumerated();
                                 has_loaded.set(true);
                             }
                             Err(e) => {
-                                println!("❌ [DeviceSelector] Failed to load input devices: {}", e);
+                                crate::always_print!("❌ [DeviceSelector] Failed to load input devices: {}", e);
                                 error_message.set(format!("Failed to load input devices: {}", e));
                                 mark_devices_enumerated();
                                 has_loaded.set(true);
@@ -154,24 +154,24 @@ pub fn DeviceSelector(props: DeviceSelectorProps) -> Element {
 
         use_callback(move |_| {
             spawn(async move {
-                println!("🔄 [DeviceSelector] User clicked refresh - re-enumerating devices...");
+                crate::always_print!("🔄 [DeviceSelector] User clicked refresh - re-enumerating devices...");
                 match device_type {
                     DeviceType::AudioOutput => {
                         // Refresh audio device cache
                         match DeviceManager::refresh_cache() {
                             Ok(_) => {
-                                println!("✅ [DeviceSelector] Audio cache refreshed successfully");
+                                crate::always_print!("✅ [DeviceSelector] Audio cache refreshed successfully");
                                 // Reload from refreshed cache
                                 load_cached.call(());
                             }
                             Err(e) => {
-                                println!("❌ [DeviceSelector] Failed to refresh audio cache: {}", e);
+                                crate::always_print!("❌ [DeviceSelector] Failed to refresh audio cache: {}", e);
                             }
                         }
                     }
                     DeviceType::Keyboard | DeviceType::Mouse => {
                         // Input devices - just reload fresh
-                        println!("🔄 [DeviceSelector] Reloading input devices...");
+                        crate::always_print!("🔄 [DeviceSelector] Reloading input devices...");
                         load_cached.call(());
                     }
                 }

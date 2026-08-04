@@ -71,7 +71,7 @@ impl WindowManager {
             std::thread::sleep(INTERVAL);
         }
 
-        eprintln!("⚠️ Could not deliver a show request: the window never became ready");
+        crate::always_eprint!("⚠️ Could not deliver a show request: the window never became ready");
     }
 }
 

@@ -20,10 +20,10 @@ fn open_soundpack_folder(soundpack_id: &str) -> Result<(), String> {
     let normalized_path = PathBuf::from(&soundpack_path);
     let normalized_str = normalized_path.to_string_lossy().to_string();
 
-    println!("🔍 Opening soundpack folder:");
-    println!("   Soundpack ID: {}", soundpack_id);
-    println!("   Resolved path: {}", soundpack_path);
-    println!("   Normalized path: {}", normalized_str);
+    crate::always_print!("🔍 Opening soundpack folder:");
+    crate::always_print!("   Soundpack ID: {}", soundpack_id);
+    crate::always_print!("   Resolved path: {}", soundpack_path);
+    crate::always_print!("   Normalized path: {}", normalized_str);
 
     // Check if path exists
     if !normalized_path.exists() {
@@ -47,7 +47,7 @@ fn delete_soundpack(soundpack_id: &str) -> Result<(), String> {
         ::remove_dir_all(&soundpack_path)
         .map_err(|e| format!("Failed to delete soundpack directory: {}", e))?;
 
-    println!("🗑️ Successfully deleted soundpack: {}", soundpack_id);
+    crate::always_print!("🗑️ Successfully deleted soundpack: {}", soundpack_id);
     Ok(())
 }
 
@@ -92,7 +92,7 @@ pub fn SoundpackTable(
         Callback::new(move |_| {
             // Prevent multiple concurrent refreshes
             if refreshing_soundpacks() {
-                println!("🔄 Refresh already in progress, skipping...");
+                crate::always_print!("🔄 Refresh already in progress, skipping...");
                 return;
             }
 
@@ -102,7 +102,7 @@ pub fn SoundpackTable(
 
             spawn(async move {
                 refreshing_soundpacks.set(true);
-                println!("🔄 Refreshing soundpack cache...");
+                crate::always_print!("🔄 Refreshing soundpack cache...");
 
                 // Reload soundpacks in audio context
                 crate::state::app::reload_current_soundpacks(&audio_ctx);
@@ -110,7 +110,7 @@ pub fn SoundpackTable(
                 // Trigger state update to refresh UI
                 state_trigger.call(());
 
-                println!("✅ Soundpack cache refreshed");
+                crate::always_print!("✅ Soundpack cache refreshed");
                 refreshing_soundpacks.set(false);
             });
         })
@@ -186,10 +186,10 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             let soundpack_id = soundpack_id.clone();
             let soundpack_name = soundpack_name.clone();
             spawn(async move {
-                println!("🔍 Soundpack info:");
-                println!("   Name: {}", soundpack_name);
-                println!("   ID: {}", soundpack_id);
-                println!("   Folder path: {}", folder_path);
+                crate::always_print!("🔍 Soundpack info:");
+                crate::always_print!("   Name: {}", soundpack_name);
+                crate::always_print!("   ID: {}", soundpack_id);
+                crate::always_print!("   Folder path: {}", folder_path);
 
                 // Use folder_path if not empty, otherwise fall back to id
                 let path_to_use = if !folder_path.is_empty() {
@@ -200,9 +200,9 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
 
                 match open_soundpack_folder(&path_to_use) {
                     Ok(_) =>
-                        println!("✅ Successfully opened folder for soundpack: {}", soundpack_name),
+                        crate::always_print!("✅ Successfully opened folder for soundpack: {}", soundpack_name),
                     Err(e) =>
-                        eprintln!("❌ Failed to open folder for soundpack {}: {}", soundpack_name, e),
+                        crate::always_eprint!("❌ Failed to open folder for soundpack {}: {}", soundpack_name, e),
                 }
             });
         }
@@ -218,13 +218,13 @@ pub fn SoundpackTableRow(soundpack: SoundpackMetadata) -> Element {
             spawn(async move {
                 match delete_soundpack(&soundpack_id) {
                     Ok(_) => {
-                        println!("✅ Successfully deleted soundpack: {}", soundpack_id);
+                        crate::always_print!("✅ Successfully deleted soundpack: {}", soundpack_id);
                         // The modal will close automatically due to form method="dialog"
                         // Trigger state refresh to update the UI
                         trigger.call(());
                     }
                     Err(e) => {
-                        eprintln!("❌ Failed to delete soundpack {}: {}", soundpack_id, e);
+                        crate::always_eprint!("❌ Failed to delete soundpack {}: {}", soundpack_id, e);
                         // Could show an error modal here if needed
                     }
                 }

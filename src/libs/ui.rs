@@ -34,7 +34,7 @@ pub fn app() -> Element {
     // from the single writer, which owns the authoritative struct; this signal
     // is a render-side mirror of it, never a second source of truth.
     let global_config = use_signal(|| {
-        println!("🌍 Initializing global config context");
+        crate::always_print!("🌍 Initializing global config context");
         crate::state::config_writer::current()
     });
     use_context_provider(|| global_config);

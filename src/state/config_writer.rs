@@ -106,7 +106,7 @@ pub fn apply(mutate: impl FnOnce(&mut AppConfig)) -> bool {
         if changed {
             guard.last_updated = chrono::Utc::now();
             if let Err(e) = guard.save() {
-                eprintln!("❌ [config] Failed to save config: {}", e);
+                crate::always_eprint!("❌ [config] Failed to save config: {}", e);
             }
         } else {
             // Undo a metadata-only edit so the in-memory struct cannot drift

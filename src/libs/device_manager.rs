@@ -76,7 +76,7 @@ impl DeviceManager {
 
     /// Get all available audio output devices
     pub fn get_output_devices(&self) -> Result<Vec<DeviceInfo>, String> {
-        println!("🔍 [DeviceManager] Starting audio output device enumeration...");
+        crate::always_print!("🔍 [DeviceManager] Starting audio output device enumeration...");
         let mut devices = Vec::new();
         let default_device = self.host.default_output_device();
         let default_name = default_device
@@ -84,14 +84,14 @@ impl DeviceManager {
             .and_then(|d| d.name().ok())
             .unwrap_or_else(|| "Unknown".to_string());
 
-        println!("🔍 [DeviceManager] Default device: {}", default_name);
+        crate::always_print!("🔍 [DeviceManager] Default device: {}", default_name);
 
         // Suppress ALSA error messages on Linux during device enumeration
         // ALSA probes all possible devices and generates expected errors for invalid/misconfigured ones
         #[cfg(target_os = "linux")]
         let _alsa_suppressor = AlsaErrorSuppressor::new();
 
-        println!("🔍 [DeviceManager] Enumerating output devices via ALSA/cpal...");
+        crate::always_print!("🔍 [DeviceManager] Enumerating output devices via ALSA/cpal...");
         match self.host.output_devices() {
             Ok(device_iter) => {
                 for (index, device) in device_iter.enumerate() {
@@ -109,7 +109,7 @@ impl DeviceManager {
                                 || name.starts_with("surround")
                                 || name.starts_with("iec958:")
                             {
-                                println!("🔍 [DeviceManager] Skipping low-level ALSA alias: {}", name);
+                                crate::always_print!("🔍 [DeviceManager] Skipping low-level ALSA alias: {}", name);
                                 continue;
                             }
                         }
@@ -121,7 +121,7 @@ impl DeviceManager {
                                 .and_then(|d| d.name().ok())
                                 .as_ref();
 
-                        println!("🔍 [DeviceManager] Found device #{}: {} {}",
+                        crate::always_print!("🔍 [DeviceManager] Found device #{}: {} {}",
                             index,
                             name,
                             if is_default { "(default)" } else { "" }
@@ -134,17 +134,17 @@ impl DeviceManager {
                         });
                     }
                 }
-                println!("✅ [DeviceManager] Enumeration complete. Found {} devices", devices.len());
+                crate::always_print!("✅ [DeviceManager] Enumeration complete. Found {} devices", devices.len());
             }
             Err(e) => {
-                println!("❌ [DeviceManager] Failed to enumerate: {}", e);
+                crate::always_print!("❌ [DeviceManager] Failed to enumerate: {}", e);
                 return Err(format!("Failed to enumerate output devices: {}", e));
             }
         }
 
         // Ensure we have at least the default device
         if devices.is_empty() {
-            println!("⚠️ [DeviceManager] No devices found, adding default fallback");
+            crate::always_print!("⚠️ [DeviceManager] No devices found, adding default fallback");
             devices.push(DeviceInfo {
                 id: "output_default".to_string(),
                 name: default_name,
@@ -152,7 +152,7 @@ impl DeviceManager {
             });
         }
 
-        println!("🔍 [DeviceManager] Returning {} total devices", devices.len());
+        crate::always_print!("🔍 [DeviceManager] Returning {} total devices", devices.len());
         Ok(devices)
     }
 
@@ -351,17 +351,17 @@ impl Default for DeviceManager {
 impl DeviceManager {
     /// Initialize device cache on app startup (enumerate once and cache)
     pub fn initialize_cache() {
-        println!("🔍 [DeviceCache] Initializing device cache on app startup...");
+        crate::always_print!("🔍 [DeviceCache] Initializing device cache on app startup...");
         let manager = DeviceManager::new();
 
         // Load output devices
         match manager.get_output_devices() {
             Ok(devices) => {
-                println!("✅ [DeviceCache] Cached {} output devices", devices.len());
+                crate::always_print!("✅ [DeviceCache] Cached {} output devices", devices.len());
                 CACHED_OUTPUT_DEVICES.get_or_init(|| Mutex::new(devices));
             }
             Err(e) => {
-                println!("❌ [DeviceCache] Failed to cache output devices: {}", e);
+                crate::always_print!("❌ [DeviceCache] Failed to cache output devices: {}", e);
                 CACHED_OUTPUT_DEVICES.get_or_init(|| Mutex::new(Vec::new()));
             }
         }
@@ -369,11 +369,11 @@ impl DeviceManager {
         // Load input devices
         match manager.get_input_devices() {
             Ok(devices) => {
-                println!("✅ [DeviceCache] Cached {} input devices", devices.len());
+                crate::always_print!("✅ [DeviceCache] Cached {} input devices", devices.len());
                 CACHED_INPUT_DEVICES.get_or_init(|| Mutex::new(devices));
             }
             Err(e) => {
-                println!("❌ [DeviceCache] Failed to cache input devices: {}", e);
+                crate::always_print!("❌ [DeviceCache] Failed to cache input devices: {}", e);
                 CACHED_INPUT_DEVICES.get_or_init(|| Mutex::new(Vec::new()));
             }
         }
@@ -381,15 +381,15 @@ impl DeviceManager {
 
     /// Get cached output devices (no enumeration - instant)
     pub fn get_cached_output_devices() -> Result<Vec<DeviceInfo>, String> {
-        println!("📋 [DeviceCache] Returning cached output devices...");
+        crate::always_print!("📋 [DeviceCache] Returning cached output devices...");
         if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
             if let Ok(devices) = cache.lock() {
-                println!("✅ [DeviceCache] Found {} cached output devices", devices.len());
+                crate::always_print!("✅ [DeviceCache] Found {} cached output devices", devices.len());
                 return Ok(devices.clone());
             }
         }
 
-        println!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
+        crate::always_print!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
         Self::initialize_cache();
 
         if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
@@ -403,15 +403,15 @@ impl DeviceManager {
 
     /// Get cached input devices (no enumeration - instant)
     pub fn get_cached_input_devices() -> Result<Vec<DeviceInfo>, String> {
-        println!("📋 [DeviceCache] Returning cached input devices...");
+        crate::always_print!("📋 [DeviceCache] Returning cached input devices...");
         if let Some(cache) = CACHED_INPUT_DEVICES.get() {
             if let Ok(devices) = cache.lock() {
-                println!("✅ [DeviceCache] Found {} cached input devices", devices.len());
+                crate::always_print!("✅ [DeviceCache] Found {} cached input devices", devices.len());
                 return Ok(devices.clone());
             }
         }
 
-        println!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
+        crate::always_print!("⚠️ [DeviceCache] Cache not initialized, initializing now...");
         Self::initialize_cache();
 
         if let Some(cache) = CACHED_INPUT_DEVICES.get() {
@@ -425,7 +425,7 @@ impl DeviceManager {
 
     /// Force refresh cache (re-enumerate and update)
     pub fn refresh_cache() -> Result<(), String> {
-        println!("🔄 [DeviceCache] Force refreshing device cache...");
+        crate::always_print!("🔄 [DeviceCache] Force refreshing device cache...");
         let manager = DeviceManager::new();
 
         // Refresh output devices
@@ -434,12 +434,12 @@ impl DeviceManager {
                 if let Some(cache) = CACHED_OUTPUT_DEVICES.get() {
                     if let Ok(mut cached) = cache.lock() {
                         *cached = devices;
-                        println!("✅ [DeviceCache] Refreshed output devices cache");
+                        crate::always_print!("✅ [DeviceCache] Refreshed output devices cache");
                     }
                 }
             }
             Err(e) => {
-                println!("❌ [DeviceCache] Failed to refresh output devices: {}", e);
+                crate::always_print!("❌ [DeviceCache] Failed to refresh output devices: {}", e);
                 return Err(e);
             }
         }
@@ -450,12 +450,12 @@ impl DeviceManager {
                 if let Some(cache) = CACHED_INPUT_DEVICES.get() {
                     if let Ok(mut cached) = cache.lock() {
                         *cached = devices;
-                        println!("✅ [DeviceCache] Refreshed input devices cache");
+                        crate::always_print!("✅ [DeviceCache] Refreshed input devices cache");
                     }
                 }
             }
             Err(e) => {
-                println!("❌ [DeviceCache] Failed to refresh input devices: {}", e);
+                crate::always_print!("❌ [DeviceCache] Failed to refresh input devices: {}", e);
                 return Err(e);
             }
         }

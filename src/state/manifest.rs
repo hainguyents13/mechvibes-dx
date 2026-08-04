@@ -87,14 +87,14 @@ impl AppManifest {
                 Ok(content) =>
                     match serde_json::from_str::<AppManifest>(&content) {
                         Ok(manifest) => {
-                            println!("✅ Loaded app manifest from {}", manifest_path.display());
+                            crate::always_print!("✅ Loaded app manifest from {}", manifest_path.display());
                             manifest
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to parse manifest.json: {}", e);
+                            crate::always_eprint!("❌ Failed to parse manifest.json: {}", e);
                             let new_manifest = Self::new();
                             if let Err(e) = new_manifest.save() {
-                                eprintln!("❌ Failed to create new manifest: {}", e);
+                                crate::always_eprint!("❌ Failed to create new manifest: {}", e);
                             }
                             new_manifest
                         }

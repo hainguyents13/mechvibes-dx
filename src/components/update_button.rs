@@ -104,7 +104,7 @@ pub fn UpdateInstallButton(info: UpdateInfo) -> Element {
                           window.close();
                       }
                       Err(e) => {
-                          eprintln!("❌ Could not start the update installer: {}", e);
+                          crate::always_eprint!("❌ Could not start the update installer: {}", e);
                       }
                   }
               },

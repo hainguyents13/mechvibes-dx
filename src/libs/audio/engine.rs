@@ -180,7 +180,7 @@ impl EngineState {
             &device_manager,
             config.selected_audio_device.as_deref()
         ).unwrap_or_else(|e| {
-            eprintln!("❌ [AudioEngine] {} - falling back to default", e);
+            crate::always_eprint!("❌ [AudioEngine] {} - falling back to default", e);
             open_stream(&device_manager, None).expect("Failed to open default audio output stream")
         });
         let current_device_id = opened_device_id.or(config.selected_audio_device.clone());
@@ -353,7 +353,7 @@ fn play_segment(
     let end_sample = ((end_ms / 1000.0) * (sample_rate as f32) * (channels as f32)) as usize;
     let end_sample = end_sample.min(samples.len());
     if start_sample >= end_sample {
-        eprintln!(
+        crate::always_eprint!(
             "❌ [AudioEngine] Invalid sample range for '{}': {}..{} (max {})",
             code,
             start_sample,
@@ -489,7 +489,7 @@ fn handle_toggle_sound() -> bool {
     });
 
     crate::libs::tray_service::request_tray_update();
-    println!("🔄 [AudioEngine] Sound toggled: {}", enabled);
+    crate::always_print!("🔄 [AudioEngine] Sound toggled: {}", enabled);
 
     // Keep the UI-side cache (`AudioContext::is_sound_enabled`) in step: the
     // tray toggle derives its next value from it, so a stale cache here would

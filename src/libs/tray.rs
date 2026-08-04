@@ -57,7 +57,7 @@ impl TrayIcons {
             EMBEDDED_ICON,
             image::ImageFormat::Ico
         ).map_err(|e| {
-            eprintln!("❌ Failed to load embedded tray icon data: {}", e);
+            crate::always_eprint!("❌ Failed to load embedded tray icon data: {}", e);
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Failed to load embedded icon: {}", e)
@@ -76,15 +76,15 @@ impl TrayIcons {
         fade_alpha(&mut muted_pixels);
 
         let normal = Icon::from_rgba(normal_pixels, width, height).map_err(|e| {
-            eprintln!("❌ Failed to create tray icon from embedded data: {}", e);
+            crate::always_eprint!("❌ Failed to create tray icon from embedded data: {}", e);
             e
         })?;
         let muted = Icon::from_rgba(muted_pixels, width, height).map_err(|e| {
-            eprintln!("❌ Failed to create muted tray icon: {}", e);
+            crate::always_eprint!("❌ Failed to create muted tray icon: {}", e);
             e
         })?;
 
-        println!("✅ Loaded embedded tray icon ({}x{}, normal + muted)", width, height);
+        crate::always_print!("✅ Loaded embedded tray icon ({}x{}, normal + muted)", width, height);
         Ok(Self { normal, muted })
     }
 
@@ -197,7 +197,7 @@ impl TrayManager {
         self.mute_item.set_checked(!enabled);
         self.tray_icon.set_icon(Some(self.icons.for_sound_enabled(enabled)))?;
 
-        println!("🔄 Tray updated: sounds {}", if enabled { "on" } else { "muted" });
+        crate::always_print!("🔄 Tray updated: sounds {}", if enabled { "on" } else { "muted" });
 
         Ok(())
     }
@@ -230,7 +230,7 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
                     drop(last_click);
 
                     if is_double_click {
-                        println!("🔼 Tray icon double-clicked - showing window");
+                        crate::always_print!("🔼 Tray icon double-clicked - showing window");
                         return Some(TrayMessage::Show);
                     }
                 }
@@ -243,34 +243,34 @@ pub fn handle_tray_events() -> Option<TrayMessage> {
 
     // Handle menu events
     if let Ok(event) = MenuEvent::receiver().try_recv() {
-        println!("🖱️ Tray menu event received: {:?}", event);
+        crate::always_print!("🖱️ Tray menu event received: {:?}", event);
         match event.id.0.as_str() {
             "show" => {
-                println!("🔼 Tray menu: Show {} clicked", APP_NAME);
+                crate::always_print!("🔼 Tray menu: Show {} clicked", APP_NAME);
                 return Some(TrayMessage::Show);
             }
             "toggle_mute" => {
-                println!("🔇 Tray menu: Toggle Mute clicked");
+                crate::always_print!("🔇 Tray menu: Toggle Mute clicked");
                 return Some(TrayMessage::ToggleMute);
             }
             "github" => {
-                println!("🐙 Tray menu: GitHub Repository clicked");
+                crate::always_print!("🐙 Tray menu: GitHub Repository clicked");
                 return Some(TrayMessage::OpenGitHub);
             }
             "discord" => {
-                println!("💬 Tray menu: Discord Community clicked");
+                crate::always_print!("💬 Tray menu: Discord Community clicked");
                 return Some(TrayMessage::OpenDiscord);
             }
             "website" => {
-                println!("🌐 Tray menu: Official Website clicked");
+                crate::always_print!("🌐 Tray menu: Official Website clicked");
                 return Some(TrayMessage::OpenWebsite);
             }
             "exit" => {
-                println!("❌ Tray menu: Exit clicked");
+                crate::always_print!("❌ Tray menu: Exit clicked");
                 return Some(TrayMessage::Exit);
             }
             _ => {
-                println!("❓ Tray menu: Unknown menu item: {}", event.id.0);
+                crate::always_print!("❓ Tray menu: Unknown menu item: {}", event.id.0);
             }
         }
     }

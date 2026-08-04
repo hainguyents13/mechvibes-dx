@@ -286,15 +286,33 @@ fn writer_loop(rx: crossbeam_channel::Receiver<Record>, path: std::path::PathBuf
             Point::UiWrite => {
                 if let Some(idx) = pending.iter().position(find) {
                     let done = pending.remove(idx);
-                    eprintln!("{}", done.summarize(rec.at_ms));
+                    let line = done.summarize(rec.at_ms);
+                    eprintln!("{}", line);
+                    // Tee into the Debug section's buffer when the user asked
+                    // for verbose. `push_verbose` masks the key identity, so
+                    // the timing is captured and the key never is. Done here,
+                    // on the writer thread, so no traced path pays for it.
+                    crate::utils::log_buffer::push_verbose(&line);
                 }
             }
             // Points that stand alone rather than belonging to a keystroke.
             Point::PackLoad => {
-                eprintln!("🔬 TRACE pack_load {} took {:.0}ms", rec.key.as_str(), rec.dur_ms);
+                let line = format!(
+                    "🔬 TRACE pack_load {} took {:.0}ms",
+                    rec.key.as_str(),
+                    rec.dur_ms
+                );
+                eprintln!("{}", line);
+                crate::utils::log_buffer::push_verbose(&line);
             }
             Point::DeviceSwitch => {
-                eprintln!("🔬 TRACE device_switch {} took {:.0}ms", rec.key.as_str(), rec.dur_ms);
+                let line = format!(
+                    "🔬 TRACE device_switch {} took {:.0}ms",
+                    rec.key.as_str(),
+                    rec.dur_ms
+                );
+                eprintln!("{}", line);
+                crate::utils::log_buffer::push_verbose(&line);
             }
         }
 

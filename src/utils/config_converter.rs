@@ -173,11 +173,11 @@ pub fn convert_v1_to_v2(
             }
         }
 
-        println!("🔧 Found {} unique audio files in V1 multi method", audio_files_ordered.len());
+        crate::always_print!("🔧 Found {} unique audio files in V1 multi method", audio_files_ordered.len());
 
         // Create a concatenated audio file name
         let concat_filename = "concatenated_audio.wav";
-        println!("🎵 Creating concatenated audio file: {}", concat_filename);
+        crate::always_print!("🎵 Creating concatenated audio file: {}", concat_filename);
 
         // Actually concatenate the audio files and get accurate timing
         let audio_file_info = match
@@ -189,7 +189,7 @@ pub fn convert_v1_to_v2(
         {
             Ok(timing_info) => timing_info,
             Err(e) => {
-                println!("❌ Failed to create concatenated audio file: {}", e);
+                crate::always_print!("❌ Failed to create concatenated audio file: {}", e);
                 return Err(format!("Audio concatenation failed: {}", e).into());
             }
         };
@@ -199,7 +199,7 @@ pub fn convert_v1_to_v2(
         // For V1 single method, use the main sound file
         let main_file = if let Some(sound) = config.get("sound") {
             if let Some(sound_str) = sound.as_str() {
-                println!("🎵 Using main audio file from V1 single method: {}", sound_str);
+                crate::always_print!("🎵 Using main audio file from V1 single method: {}", sound_str);
                 sound_str.to_string()
             } else {
                 return Err("Invalid sound field in V1 config".into());
@@ -227,7 +227,7 @@ pub fn convert_v1_to_v2(
             }
 
             if let Some(audio_file) = found_audio {
-                println!("🎵 Found audio file in directory: {}", audio_file);
+                crate::always_print!("🎵 Found audio file in directory: {}", audio_file);
                 audio_file
             } else {
                 return Err("No audio file found for single method conversion".into());
@@ -250,11 +250,11 @@ pub fn convert_v1_to_v2(
     let mut definitions = Map::new();
     if let Some(defines) = config.get("defines").and_then(|d| d.as_object()) {
         let key_mappings = create_iohook_to_web_key_mapping();
-        println!("🔧 Converting {} key definitions to new format (single method)", defines.len());
+        crate::always_print!("🔧 Converting {} key definitions to new format (single method)", defines.len());
         if v1_define_type == "multi" {
             // V1 multi method: defines contains IOHook code -> audio filename mappings
             // We need to create timing based on concatenated audio file offsets
-            println!("🔧 Processing V1 multi method defines");
+            crate::always_print!("🔧 Processing V1 multi method defines");
 
             for (iohook_code, value) in defines {
                 if let Ok(iohook_num) = iohook_code.parse::<u32>() {
@@ -272,12 +272,12 @@ pub fn convert_v1_to_v2(
 
                                     // Special debug for Enter key
                                     if key_name == "Enter" {
-                                        println!("🔍 [ENTER DEBUG] Key: {}", key_name);
-                                        println!("🔍 [ENTER DEBUG] IOHook code: {}", iohook_num);
-                                        println!("🔍 [ENTER DEBUG] Audio file: {}", audio_filename);
-                                        println!("🔍 [ENTER DEBUG] Offset: {}ms", offset);
-                                        println!("🔍 [ENTER DEBUG] Duration: {}ms", duration);
-                                        println!("🔍 [ENTER DEBUG] End time: {}ms", end_time);
+                                        crate::always_print!("🔍 [ENTER DEBUG] Key: {}", key_name);
+                                        crate::always_print!("🔍 [ENTER DEBUG] IOHook code: {}", iohook_num);
+                                        crate::always_print!("🔍 [ENTER DEBUG] Audio file: {}", audio_filename);
+                                        crate::always_print!("🔍 [ENTER DEBUG] Offset: {}ms", offset);
+                                        crate::always_print!("🔍 [ENTER DEBUG] Duration: {}ms", duration);
+                                        crate::always_print!("🔍 [ENTER DEBUG] End time: {}ms", end_time);
 
                                         // Check concatenated audio file duration
                                         let concat_path =
@@ -287,9 +287,9 @@ pub fn convert_v1_to_v2(
                                                 &concat_path
                                             )
                                         {
-                                            println!("🔍 [ENTER DEBUG] Concatenated audio duration: {}ms", concat_duration);
+                                            crate::always_print!("🔍 [ENTER DEBUG] Concatenated audio duration: {}ms", concat_duration);
                                             if end_time > concat_duration {
-                                                println!(
+                                                crate::always_print!(
                                                     "❌ [ENTER DEBUG] ERROR: End time ({}) > Concat duration ({})",
                                                     end_time,
                                                     concat_duration
@@ -314,7 +314,7 @@ pub fn convert_v1_to_v2(
                                     key_def.insert("timing".to_string(), Value::Array(timing));
 
                                     definitions.insert(key_name.clone(), Value::Object(key_def));
-                                    println!(
+                                    crate::always_print!(
                                         "   ✅ Key '{}' -> {} [offset: {}ms, end: {}ms]",
                                         key_name,
                                         audio_filename,
@@ -322,20 +322,20 @@ pub fn convert_v1_to_v2(
                                         end_time
                                     );
                                 } else {
-                                    println!("   ⚠️ No offset found for audio file: {}", audio_filename);
+                                    crate::always_print!("   ⚠️ No offset found for audio file: {}", audio_filename);
                                 }
                             } else {
-                                println!("   ⚠️ Key IOHook {} has empty/null audio file", iohook_code);
+                                crate::always_print!("   ⚠️ Key IOHook {} has empty/null audio file", iohook_code);
                             }
                         }
                     } else {
-                        println!("   ⚠️ No key mapping found for IOHook code: {}", iohook_code);
+                        crate::always_print!("   ⚠️ No key mapping found for IOHook code: {}", iohook_code);
                     }
                 }
             }
         } else {
             // V1 single method: defines contains IOHook code -> timing array mappings
-            println!("🔧 Processing V1 single method defines");
+            crate::always_print!("🔧 Processing V1 single method defines");
 
             for (iohook_code, value) in defines {
                 if let Ok(iohook_num) = iohook_code.parse::<u32>() {
@@ -365,10 +365,10 @@ pub fn convert_v1_to_v2(
                                 key_def.insert("timing".to_string(), Value::Array(timing));
 
                                 definitions.insert(key_name.clone(), Value::Object(key_def));
-                                println!("   ✅ Key '{}' -> timing [{}, {}]", key_name, start, end);
+                                crate::always_print!("   ✅ Key '{}' -> timing [{}, {}]", key_name, start, end);
                             }
                         } else {
-                            println!("   ⚠️ Key '{}' has invalid timing format", key_name);
+                            crate::always_print!("   ⚠️ Key '{}' has invalid timing format", key_name);
                         }
                     }
                 }
@@ -382,8 +382,8 @@ pub fn convert_v1_to_v2(
     let output_json = serde_json::to_string_pretty(&converted_config)?;
     std::fs::write(output_path, output_json)?;
 
-    println!("✅ Successfully converted V1 to V2 config");
-    println!("📁 Output written to: {}", output_path);
+    crate::always_print!("✅ Successfully converted V1 to V2 config");
+    crate::always_print!("📁 Output written to: {}", output_path);
 
     Ok(())
 }
@@ -394,7 +394,7 @@ pub fn convert_v2_multi_to_single(
     config_path: &str,
     soundpack_dir: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔄 Converting V2 multi method to single method...");
+    crate::always_print!("🔄 Converting V2 multi method to single method...");
 
     // Read the existing V2 config
     let content = std::fs::read_to_string(config_path)?;
@@ -403,12 +403,12 @@ pub fn convert_v2_multi_to_single(
     // Check if this is already single method
     if let Some(definition_method) = config.get("definition_method").and_then(|v| v.as_str()) {
         if definition_method == "single" {
-            println!("✅ Already using single method, no conversion needed");
+            crate::always_print!("✅ Already using single method, no conversion needed");
             return Ok(());
         }
     }
 
-    println!("🔧 Converting from multi method to single method");
+    crate::always_print!("🔧 Converting from multi method to single method");
 
     // Analyze audio files used in definitions to find the most common one
     let mut audio_file_usage = std::collections::HashMap::new();
@@ -417,7 +417,7 @@ pub fn convert_v2_multi_to_single(
             if let Some(key_obj) = key_def.as_object() {
                 if let Some(audio_file) = key_obj.get("audio_file").and_then(|v| v.as_str()) {
                     *audio_file_usage.entry(audio_file.to_string()).or_insert(0) += 1;
-                    println!("🔍 Key '{}' uses audio file: {}", key_name, audio_file);
+                    crate::always_print!("🔍 Key '{}' uses audio file: {}", key_name, audio_file);
                 }
             }
         }
@@ -426,7 +426,7 @@ pub fn convert_v2_multi_to_single(
     let main_audio_file = if
         let Some((audio_file, count)) = audio_file_usage.iter().max_by_key(|(_, count)| *count)
     {
-        println!("🎵 Most used audio file: {} (used by {} keys)", audio_file, count);
+        crate::always_print!("🎵 Most used audio file: {} (used by {} keys)", audio_file, count);
         audio_file.clone()
     } else {
         // Fallback: find any audio file in the directory
@@ -453,7 +453,7 @@ pub fn convert_v2_multi_to_single(
         found_audio.ok_or("No audio file found in soundpack directory")?
     };
 
-    println!("🎵 Using main audio file for single method: {}", main_audio_file);
+    crate::always_print!("🎵 Using main audio file for single method: {}", main_audio_file);
 
     // Update config to single method
     config
@@ -489,7 +489,7 @@ pub fn convert_v2_multi_to_single(
                     // This key uses the main audio file, keep its timing
                     if let Some(timing) = key_obj.get("timing") {
                         new_key_def.insert("timing".to_string(), timing.clone());
-                        println!("✅ Key '{}' kept timing (uses main audio file)", key_name);
+                        crate::always_print!("✅ Key '{}' kept timing (uses main audio file)", key_name);
                     } else {
                         // Create default timing for the whole audio file
                         let audio_path = format!("{}/{}", soundpack_dir, main_audio_file);
@@ -504,13 +504,13 @@ pub fn convert_v2_multi_to_single(
                             )
                         ];
                         new_key_def.insert("timing".to_string(), Value::Array(timing));
-                        println!("⚠️ Key '{}' got default timing (no timing specified)", key_name);
+                        crate::always_print!("⚠️ Key '{}' got default timing (no timing specified)", key_name);
                     }
 
                     new_definitions.insert(key_name, Value::Object(new_key_def));
                 } else if !key_audio_file.is_empty() {
                     // This key uses a different audio file, we'll skip it in single method
-                    println!(
+                    crate::always_print!(
                         "⚠️ Key '{}' uses different audio file '{}', skipping in single method conversion",
                         key_name,
                         key_audio_file
@@ -529,7 +529,7 @@ pub fn convert_v2_multi_to_single(
                         )
                     ];
                     new_key_def.insert("timing".to_string(), Value::Array(timing));
-                    println!("⚠️ Key '{}' got default timing (no audio_file specified)", key_name);
+                    crate::always_print!("⚠️ Key '{}' got default timing (no audio_file specified)", key_name);
                     new_definitions.insert(key_name, Value::Object(new_key_def));
                 }
             }
@@ -545,7 +545,7 @@ pub fn convert_v2_multi_to_single(
     let output_json = serde_json::to_string_pretty(&config)?;
     std::fs::write(config_path, output_json)?;
 
-    println!("✅ Successfully converted to single method");
+    crate::always_print!("✅ Successfully converted to single method");
     Ok(())
 }
 
@@ -587,7 +587,7 @@ pub fn back_up_existing_file(path: &Path) -> Result<Option<PathBuf>, String> {
         ::copy(path, &target)
         .map_err(|e| format!("failed to back up {} to {}: {}", path.display(), target.display(), e))?;
 
-    println!("🗄️  Backed up existing {} to {}", path.display(), target.display());
+    crate::always_print!("🗄️  Backed up existing {} to {}", path.display(), target.display());
     Ok(Some(target))
 }
 
@@ -598,7 +598,7 @@ fn concatenate_audio_files_with_timing(
     soundpack_dir: &str,
     output_filename: &str
 ) -> Result<std::collections::HashMap<String, (f64, f64)>, Box<dyn std::error::Error>> {
-    println!("🔧 Concatenating {} audio files with timing...", audio_files.len());
+    crate::always_print!("🔧 Concatenating {} audio files with timing...", audio_files.len());
 
     let mut all_samples = Vec::new();
     let mut sample_rate = 44100u32; // Default sample rate
@@ -607,10 +607,10 @@ fn concatenate_audio_files_with_timing(
 
     for (i, filename) in audio_files.iter().enumerate() {
         let file_path = format!("{}/{}", soundpack_dir, filename);
-        println!("   📁 Loading audio file {}/{}: {}", i + 1, audio_files.len(), filename);
+        crate::always_print!("   📁 Loading audio file {}/{}: {}", i + 1, audio_files.len(), filename);
 
         if !Path::new(&file_path).exists() {
-            println!("   ⚠️ Audio file not found, skipping: {}", file_path);
+            crate::always_print!("   ⚠️ Audio file not found, skipping: {}", file_path);
             continue;
         }
 
@@ -625,7 +625,7 @@ fn concatenate_audio_files_with_timing(
                 if i == 0 {
                     sample_rate = file_sample_rate;
                     channels = file_channels;
-                    println!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
+                    crate::always_print!("   🎵 Using format: {}Hz, {} channels", sample_rate, channels);
                 }
 
                 // Convert to target format if needed
@@ -633,7 +633,7 @@ fn concatenate_audio_files_with_timing(
                     file_sample_rate != sample_rate ||
                     file_channels != channels
                 {
-                    println!(
+                    crate::always_print!(
                         "   🔄 Converting from {}Hz {} channels to {}Hz {} channels",
                         file_sample_rate,
                         file_channels,
@@ -662,18 +662,18 @@ fn concatenate_audio_files_with_timing(
 
                 // Special debug for Enter audio file
                 if filename == "SPMEnter.wav" {
-                    println!("🔍 [ENTER TIMING DEBUG] File: {}", filename);
-                    println!("🔍 [ENTER TIMING DEBUG] Offset: {:.2}ms", current_offset_ms);
-                    println!("🔍 [ENTER TIMING DEBUG] Duration: {:.2}ms", actual_duration_ms);
-                    println!(
+                    crate::always_print!("🔍 [ENTER TIMING DEBUG] File: {}", filename);
+                    crate::always_print!("🔍 [ENTER TIMING DEBUG] Offset: {:.2}ms", current_offset_ms);
+                    crate::always_print!("🔍 [ENTER TIMING DEBUG] Duration: {:.2}ms", actual_duration_ms);
+                    crate::always_print!(
                         "🔍 [ENTER TIMING DEBUG] End time: {:.2}ms",
                         current_offset_ms + actual_duration_ms
                     );
-                    println!("🔍 [ENTER TIMING DEBUG] Samples: {}", converted_samples.len());
+                    crate::always_print!("🔍 [ENTER TIMING DEBUG] Samples: {}", converted_samples.len());
                 }
 
                 all_samples.extend(&converted_samples);
-                println!(
+                crate::always_print!(
                     "   ✅ Added {} samples from {} (offset: {:.2}ms, duration: {:.2}ms)",
                     converted_samples.len(),
                     filename,
@@ -682,7 +682,7 @@ fn concatenate_audio_files_with_timing(
                 );
             }
             Err(e) => {
-                println!("   ❌ Failed to load {}: {}", filename, e);
+                crate::always_print!("   ❌ Failed to load {}: {}", filename, e);
                 // Continue with other files
             }
         }
@@ -702,22 +702,22 @@ fn concatenate_audio_files_with_timing(
     let final_duration_ms =
         ((all_samples.len() as f64) / ((sample_rate as f64) * (channels as f64))) * 1000.0;
 
-    println!("✅ Successfully concatenated audio to: {}", output_path);
-    println!("🎵 Total samples: {}, Final duration: {:.2}ms", all_samples.len(), final_duration_ms);
+    crate::always_print!("✅ Successfully concatenated audio to: {}", output_path);
+    crate::always_print!("🎵 Total samples: {}, Final duration: {:.2}ms", all_samples.len(), final_duration_ms);
 
     // Debug output for Enter file timing
     if let Some((offset, duration)) = timing_info.get("SPMEnter.wav") {
-        println!(
+        crate::always_print!(
             "🔍 [FINAL TIMING DEBUG] SPMEnter.wav: offset={:.2}ms, duration={:.2}ms, end={:.2}ms",
             offset,
             duration,
             offset + duration
         );
-        println!("🔍 [FINAL TIMING DEBUG] Concatenated total: {:.2}ms", final_duration_ms);
+        crate::always_print!("🔍 [FINAL TIMING DEBUG] Concatenated total: {:.2}ms", final_duration_ms);
         if offset + duration > final_duration_ms {
-            println!("❌ [FINAL TIMING DEBUG] ERROR: End time exceeds total duration!");
+            crate::always_print!("❌ [FINAL TIMING DEBUG] ERROR: End time exceeds total duration!");
         } else {
-            println!("✅ [FINAL TIMING DEBUG] Timing looks correct!");
+            crate::always_print!("✅ [FINAL TIMING DEBUG] Timing looks correct!");
         }
     }
 

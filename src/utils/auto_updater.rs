@@ -108,7 +108,7 @@ impl AutoUpdater {
             .find(|release| !release.prerelease)
             .ok_or(UpdateError::NotFound)?;
 
-        println!(
+        crate::always_print!(
             "Latest release: {} ({}), published at {}",
             latest_release.tag_name,
             latest_release.name,
@@ -267,7 +267,7 @@ impl UpdateService {
                     }
                 }
 
-                println!("🔄 Checking for updates...");
+                crate::always_print!("🔄 Checking for updates...");
 
                 match check_for_updates_simple().await {
                     Ok(update_info) => {
@@ -298,7 +298,7 @@ impl UpdateService {
                             }
                         });
                         if update_info.update_available {
-                            println!(
+                            crate::always_print!(
                                 "🆕 Update available: {} -> {}",
                                 update_info.current_version,
                                 update_info.latest_version
@@ -309,13 +309,13 @@ impl UpdateService {
                             // starts on its own.
                             crate::state::app::set_update_info(Some(update_info));
                         } else {
-                            println!("✅ No updates available");
+                            crate::always_print!("✅ No updates available");
                             // Clear update info if no updates
                             crate::state::app::set_update_info(None);
                         }
                     }
                     Err(e) => {
-                        eprintln!("❌ Failed to check for updates: {}", e);
+                        crate::always_eprint!("❌ Failed to check for updates: {}", e);
                     }
                 }
             }
@@ -344,7 +344,7 @@ impl UpdateService {
     //     update_info: &UpdateInfo
     // ) -> Result<(), Box<dyn std::error::Error>> {
     //     if let Some(download_url) = &update_info.download_url {
-    //         println!("📥 Downloading update...");
+    //         crate::always_print!("📥 Downloading update...");
 
     //         let temp_dir = std::env::temp_dir();
     //         let default_filename = format!("mechvibes_dx_v{}.exe", update_info.latest_version);
@@ -354,10 +354,10 @@ impl UpdateService {
     //         let updater = AutoUpdater::new();
     //         updater.download_update(download_url, &installer_path).await?;
 
-    //         println!("🔧 Installing update...");
+    //         crate::always_print!("🔧 Installing update...");
     //         updater.install_update(&installer_path)?;
 
-    //         println!("✅ Update installed successfully. Please restart the application.");
+    //         crate::always_print!("✅ Update installed successfully. Please restart the application.");
     //         Ok(())
     //     } else {    //         Err("No download URL available".into())
     //     }
@@ -467,7 +467,7 @@ pub async fn download_and_stage_update(update_info: &UpdateInfo) {
     }
 
     set_update_stage(UpdateStage::Downloading { version: version.clone() });
-    println!("📥 Downloading update {} (user requested)...", version);
+    crate::always_print!("📥 Downloading update {} (user requested)...", version);
 
     let user_agent = AutoUpdater::new().user_agent();
     match update_installer::download_and_verify(&download_url, &version, &user_agent).await {
@@ -476,7 +476,7 @@ pub async fn download_and_stage_update(update_info: &UpdateInfo) {
             crate::state::config_writer::apply(move |config| {
                 config.auto_update.staged_update = Some(staged);
             });
-            println!("✅ Update {} verified and ready to install", version);
+            crate::always_print!("✅ Update {} verified and ready to install", version);
             set_update_stage(UpdateStage::Ready { version, installer_path });
         }
         Err(e) => {
@@ -489,7 +489,7 @@ pub async fn download_and_stage_update(update_info: &UpdateInfo) {
                     "The downloaded installer failed verification and was discarded.".to_string(),
                 other => other.to_string(),
             };
-            eprintln!("⚠️  Update download failed ({}); falling back to manual download", e);
+            crate::always_eprint!("⚠️  Update download failed ({}); falling back to manual download", e);
             set_update_stage(UpdateStage::Failed { version, reason });
         }
     }
@@ -526,7 +526,7 @@ pub fn restore_staged_update() {
     let current = crate::utils::constants::APP_VERSION;
 
     if !is_upgrade(current, &staged.version) {
-        println!("🧹 Discarding staged update {} (no longer newer than {})", staged.version, current);
+        crate::always_print!("🧹 Discarding staged update {} (no longer newer than {})", staged.version, current);
         update_installer::discard_staged(&staged);
         crate::state::config_writer::apply(|config| {
             config.auto_update.staged_update = None;
@@ -536,14 +536,14 @@ pub fn restore_staged_update() {
 
     match staged.validate(&staged.version) {
         Ok(path) => {
-            println!("📦 Staged update {} is ready from a previous session", staged.version);
+            crate::always_print!("📦 Staged update {} is ready from a previous session", staged.version);
             set_update_stage(UpdateStage::Ready {
                 version: staged.version.clone(),
                 installer_path: path.to_string_lossy().into_owned(),
             });
         }
         Err(e) => {
-            eprintln!("⚠️  Discarding unusable staged update: {}", e);
+            crate::always_eprint!("⚠️  Discarding unusable staged update: {}", e);
             update_installer::discard_staged(&staged);
             crate::state::config_writer::apply(|config| {
                 config.auto_update.staged_update = None;
@@ -593,7 +593,7 @@ pub fn install_staged_update() -> Result<(), StageError> {
     });
 
     update_installer::spawn_installer_detached(&path)?;
-    println!("🚀 Installer for {} launched; shutting down for upgrade", version);
+    crate::always_print!("🚀 Installer for {} launched; shutting down for upgrade", version);
     Ok(())
 }
 
@@ -653,7 +653,7 @@ pub fn clear_stale_available_version() -> bool {
         return false;
     }
 
-    println!(
+    crate::always_print!(
         "🧹 Clearing stale update record: v{} is not newer than the running v{}",
         available_version,
         crate::utils::constants::APP_VERSION
@@ -667,7 +667,7 @@ pub fn clear_stale_available_version() -> bool {
 
 // Check for updates on app startup (when app was completely closed)
 pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
-    println!("🔄 Checking for updates on startup...");
+    crate::always_print!("🔄 Checking for updates on startup...");
 
     // Only the timestamp is kept across the request: holding the whole struct
     // would invite saving it back after the await and reverting anything the
@@ -685,20 +685,20 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
     // 2. Last check was more than 1 hour ago (to avoid spam on frequent restarts)
     let should_check = match last_check {
         None => {
-            println!("📅 First time checking for updates");
+            crate::always_print!("📅 First time checking for updates");
             true
         }
         Some(last_check) => {
             let time_since_last_check = now.saturating_sub(last_check);
             let one_hour = 3600; // 1 hour in seconds
             if time_since_last_check >= one_hour {
-                println!(
+                crate::always_print!(
                     "📅 Last check was {} hours ago, checking again",
                     time_since_last_check / 3600
                 );
                 true
             } else {
-                println!(
+                crate::always_print!(
                     "📅 Recently checked ({} minutes ago), skipping startup check",
                     time_since_last_check / 60
                 );
@@ -738,13 +738,13 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
             ));
 
             if update_info.update_available {
-                println!(
+                crate::always_print!(
                     "🆕 Startup check: Update available {} -> {}",
                     update_info.current_version,
                     update_info.latest_version
                 );
             } else {
-                println!("✅ Startup check: No updates available");
+                crate::always_print!("✅ Startup check: No updates available");
             }
 
             crate::state::config_writer::apply(move |config| {
@@ -772,7 +772,7 @@ pub async fn check_for_updates_on_startup() -> Result<UpdateInfo, UpdateError> {
             Ok(update_info)
         }
         Err(e) => {
-            eprintln!("❌ Startup update check failed: {}", e);
+            crate::always_eprint!("❌ Startup update check failed: {}", e);
             // Return cached info if check failed
             if let Some(saved_update) = get_saved_update_info() {
                 Ok(saved_update)

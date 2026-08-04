@@ -23,7 +23,7 @@ pub fn TitleBar() -> Element {
     let minimize_to_tray = move |_| {
         // Hide the window to system tray
         WINDOW_MANAGER.hide();
-        println!("🔽 Window minimized to system tray");
+        crate::always_print!("🔽 Window minimized to system tray");
     };
 
     // Function to close application

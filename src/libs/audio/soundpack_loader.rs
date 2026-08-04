@@ -46,11 +46,11 @@ pub fn load_keyboard_soundpack_with_cache_control(
     // or freshly created config, not an error. Nothing to load, and nothing is
     // loaded yet either, so leave the engine alone and let the user pick.
     if soundpack_id.is_empty() {
-        println!("🎹 No keyboard soundpack selected");
+        crate::always_print!("🎹 No keyboard soundpack selected");
         return Ok(());
     }
 
-    println!("🎹 Requesting keyboard soundpack load: {}", soundpack_id);
+    crate::always_print!("🎹 Requesting keyboard soundpack load: {}", soundpack_id);
     context.send(AudioCommand::LoadKeyboardPack {
         soundpack_id: soundpack_id.to_string(),
         update_cache_on_error,
@@ -71,11 +71,11 @@ pub fn load_mouse_soundpack_with_cache_control(
 ) -> Result<(), String> {
     // See the keyboard loader: an empty slot is tolerated, not unloaded.
     if soundpack_id.is_empty() {
-        println!("🖱️ No mouse soundpack selected");
+        crate::always_print!("🖱️ No mouse soundpack selected");
         return Ok(());
     }
 
-    println!("🖱️ Requesting mouse soundpack load: {}", soundpack_id);
+    crate::always_print!("🖱️ Requesting mouse soundpack load: {}", soundpack_id);
     context.send(AudioCommand::LoadMousePack {
         soundpack_id: soundpack_id.to_string(),
         update_cache_on_error,
@@ -126,7 +126,7 @@ fn load_audio_file(
                 file_rate,
                 device_rate
             );
-            println!(
+            crate::always_print!(
                 "🔁 Resampled soundpack audio {}Hz -> {}Hz in {:.1}ms",
                 file_rate,
                 device_rate,
@@ -436,7 +436,7 @@ fn load_audio_with_symphonia(file_path: &str) -> Result<(Vec<f32>, u16, u32), St
                 }
             }
             Err(e) => {
-                println!("⚠️ [DEBUG] Decode error (continuing): {}", e);
+                crate::always_print!("⚠️ [DEBUG] Decode error (continuing): {}", e);
                 continue;
             }
         }
@@ -557,7 +557,7 @@ fn create_mouse_mappings(
         }
     } else {
         // This is a keyboard soundpack, create default mouse mappings from keyboard sounds
-        println!(
+        crate::always_print!(
             "🖱️ No mouse definitions found, creating default mouse mappings from keyboard sounds"
         );
 
@@ -649,7 +649,7 @@ fn load_keyboard_pack_into_engine_inner(
     state.key_sinks.clear();
 
     update_soundpack_cache(&soundpack_path, &soundpack, soundpack_id);
-    println!("✅ [Engine] Loaded keyboard soundpack: {}", soundpack.name);
+    crate::always_print!("✅ [Engine] Loaded keyboard soundpack: {}", soundpack.name);
     Ok(soundpack.name)
 }
 
@@ -712,7 +712,7 @@ fn load_mouse_pack_into_engine_inner(
     state.mouse_sinks.clear();
 
     update_soundpack_cache(&soundpack_path, &soundpack, soundpack_id);
-    println!("✅ [Engine] Loaded mouse soundpack: {}", soundpack.name);
+    crate::always_print!("✅ [Engine] Loaded mouse soundpack: {}", soundpack.name);
     Ok(soundpack.name)
 }
 
@@ -726,7 +726,7 @@ fn update_soundpack_cache(soundpack_path: &str, soundpack: &SoundPack, soundpack
             cache.add_soundpack(metadata);
         }
         Err(e) => {
-            println!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
+            crate::always_print!("⚠️ Failed to create metadata for {}: {}", soundpack_id, e);
         }
     }
     cache.save();
@@ -736,11 +736,11 @@ fn update_soundpack_cache(soundpack_path: &str, soundpack: &SoundPack, soundpack
 fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
     // Skip creating cache entries for empty soundpack IDs
     if soundpack_id.is_empty() {
-        println!("⚠️ Skipping cache entry for empty soundpack ID: {}", error);
+        crate::always_print!("⚠️ Skipping cache entry for empty soundpack ID: {}", error);
         return;
     }
 
-    println!("📝 Capturing loading error for {}: {}", soundpack_id, error);
+    crate::always_print!("📝 Capturing loading error for {}: {}", soundpack_id, error);
 
     let mut cache = SoundpackCache::load();
 
@@ -778,5 +778,5 @@ fn capture_soundpack_loading_error(soundpack_id: &str, error: &str) {
     }
 
     cache.save();
-    println!("💾 Updated cache with error information for {}", soundpack_id);
+    crate::always_print!("💾 Updated cache with error information for {}", soundpack_id);
 }

@@ -193,7 +193,7 @@ body {
         let platform_css = String::new();
 
         #[cfg(target_os = "linux")]
-        println!("🐧 Injecting Linux-specific CSS for border-radius and box-shadow rendering");
+        crate::always_print!("🐧 Injecting Linux-specific CSS for border-radius and box-shadow rendering");
 
         // Combine all dynamic CSS parts
         let dynamic_css = format!("{}\n{}\n{}\n{}", font_css, custom_theme_css, custom_css, platform_css); // Inject only dynamic CSS using eval

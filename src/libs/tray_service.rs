@@ -25,7 +25,7 @@ impl TrayUpdateService {
     /// Send a request to update the tray menu
     pub fn request_update(&self) {
         if let Err(e) = self.sender.send(TrayUpdateMessage::RefreshMenu) {
-            eprintln!("❌ Failed to send tray update request: {}", e);
+            crate::always_eprint!("❌ Failed to send tray update request: {}", e);
         }
     }
 
@@ -41,5 +41,5 @@ pub static TRAY_UPDATE_SERVICE: Lazy<TrayUpdateService> = Lazy::new(TrayUpdateSe
 /// Request a tray menu update from anywhere in the application
 pub fn request_tray_update() {
     TRAY_UPDATE_SERVICE.request_update();
-    println!("🔄 Tray menu update requested");
+    crate::always_print!("🔄 Tray menu update requested");
 }

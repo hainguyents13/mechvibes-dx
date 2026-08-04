@@ -36,7 +36,7 @@ pub fn enable_auto_startup() -> Result<(), String> {
         .set_value(APP_NAME, &command)
         .map_err(|e| format!("Failed to set registry value: {}", e))?;
 
-    println!("✅ Auto startup enabled: {}", command);
+    crate::always_print!("✅ Auto startup enabled: {}", command);
     Ok(())
 }
 
@@ -50,12 +50,12 @@ pub fn disable_auto_startup() -> Result<(), String> {
 
     match run_key.delete_value(APP_NAME) {
         Ok(_) => {
-            println!("✅ Auto startup disabled");
+            crate::always_print!("✅ Auto startup disabled");
             Ok(())
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             // Entry doesn't exist, which is fine
-            println!("ℹ️ Auto startup was not enabled");
+            crate::always_print!("ℹ️ Auto startup was not enabled");
             Ok(())
         }
         Err(e) => Err(format!("Failed to delete registry value: {}", e)),

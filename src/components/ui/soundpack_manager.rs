@@ -16,11 +16,11 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
         Callback::new(move |_| {
             // Prevent multiple concurrent refreshes
             if refreshing_soundpacks() {
-                println!("🔄 Refresh already in progress, skipping...");
+                crate::always_print!("🔄 Refresh already in progress, skipping...");
                 return;
             }
 
-            println!("🔄 Refresh button clicked!");
+            crate::always_print!("🔄 Refresh button clicked!");
             // Set loading state to true
             refreshing_soundpacks.set(true);
             // Clone necessary variables for the async task
@@ -35,23 +35,23 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
                 use std::time::Duration;
 
                 Delay::new(Duration::from_millis(100)).await;
-                println!("🔄 Starting soundpack refresh operation...");
+                crate::always_print!("🔄 Starting soundpack refresh operation...");
 
                 // Use the state trigger to refresh cache and update UI
                 // This will automatically update the count as well
-                println!("🔄 Calling state trigger...");
+                crate::always_print!("🔄 Calling state trigger...");
                 trigger.call(());
-                println!("🔄 State trigger called successfully");
+                crate::always_print!("🔄 State trigger called successfully");
 
                 // Reload current soundpacks to apply any changes
-                println!("🔄 Reloading current soundpacks...");
+                crate::always_print!("🔄 Reloading current soundpacks...");
                 crate::state::app::reload_current_soundpacks(&audio_ctx_clone);
 
                 // Add another small delay before changing the loading state back
                 Delay::new(Duration::from_millis(100)).await;
                 // Reset loading state
                 refreshing_signal.set(false);
-                println!("✅ Soundpack refresh complete");
+                crate::always_print!("✅ Soundpack refresh complete");
             });
         })
     };
@@ -118,20 +118,20 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               class: "btn btn-soft btn-sm",
               onclick: move |_| {
                   let builtin_keyboard_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("keyboard");
-                  println!("🔍 Opening built-in keyboard soundpacks folder: {}", builtin_keyboard_dir.display());
+                  crate::always_print!("🔍 Opening built-in keyboard soundpacks folder: {}", builtin_keyboard_dir.display());
 
                   // Check if directory exists
                   if !builtin_keyboard_dir.exists() {
-                      println!("❌ Built-in keyboard soundpacks directory not found: {}", builtin_keyboard_dir.display());
-                      println!("   This might be expected on Linux installations.");
-                      println!("   Trying parent directory instead...");
+                      crate::always_print!("❌ Built-in keyboard soundpacks directory not found: {}", builtin_keyboard_dir.display());
+                      crate::always_print!("   This might be expected on Linux installations.");
+                      crate::always_print!("   Trying parent directory instead...");
 
                       // Try opening parent directory (soundpacks root)
                       let soundpacks_root = crate::state::paths::soundpacks::get_builtin_soundpacks_dir();
                       if soundpacks_root.exists() {
                           let _ = crate::utils::path::open_path(&soundpacks_root.to_string_lossy());
                       } else {
-                          println!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
+                          crate::always_print!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
                       }
                   } else {
                       let _ = crate::utils::path::open_path(&builtin_keyboard_dir.to_string_lossy());
@@ -144,20 +144,20 @@ pub fn SoundpackManager(on_import_click: EventHandler<MouseEvent>) -> Element {
               class: "btn btn-soft btn-sm",
               onclick: move |_| {
                   let builtin_mouse_dir = crate::state::paths::soundpacks::get_builtin_soundpacks_dir().join("mouse");
-                  println!("🔍 Opening built-in mouse soundpacks folder: {}", builtin_mouse_dir.display());
+                  crate::always_print!("🔍 Opening built-in mouse soundpacks folder: {}", builtin_mouse_dir.display());
 
                   // Check if directory exists
                   if !builtin_mouse_dir.exists() {
-                      println!("❌ Built-in mouse soundpacks directory not found: {}", builtin_mouse_dir.display());
-                      println!("   This might be expected on Linux installations.");
-                      println!("   Trying parent directory instead...");
+                      crate::always_print!("❌ Built-in mouse soundpacks directory not found: {}", builtin_mouse_dir.display());
+                      crate::always_print!("   This might be expected on Linux installations.");
+                      crate::always_print!("   Trying parent directory instead...");
 
                       // Try opening parent directory (soundpacks root)
                       let soundpacks_root = crate::state::paths::soundpacks::get_builtin_soundpacks_dir();
                       if soundpacks_root.exists() {
                           let _ = crate::utils::path::open_path(&soundpacks_root.to_string_lossy());
                       } else {
-                          println!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
+                          crate::always_print!("❌ Soundpacks root directory also not found: {}", soundpacks_root.display());
                       }
                   } else {
                       let _ = crate::utils::path::open_path(&builtin_mouse_dir.to_string_lossy());

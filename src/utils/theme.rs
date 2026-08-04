@@ -30,7 +30,7 @@ pub fn use_themes() -> (Signal<ThemesConfig>, Rc<dyn Fn(Box<dyn FnOnce(&mut Them
             updater(&mut *config_guard);
 
             if let Err(e) = config_guard.save() {
-                eprintln!("❌ Failed to save themes: {}", e);
+                crate::always_eprint!("❌ Failed to save themes: {}", e);
                 return;
             }
         } // Trigger refresh of all components using themes

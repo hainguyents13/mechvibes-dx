@@ -178,7 +178,7 @@ pub fn parse_lenient(contents: &str) -> Result<AppConfig, String> {
         if serde_json::from_value::<AppConfig>(serde_json::Value::Object(probe)).is_ok() {
             accepted.insert(key.clone(), entry);
         } else {
-            eprintln!("⚠️  Ignoring unusable config entry '{}', using its default", key);
+            crate::always_eprint!("⚠️  Ignoring unusable config entry '{}', using its default", key);
         }
     }
 
@@ -278,7 +278,7 @@ impl AppConfig {
         // Ensure data directory exists
         if let Some(parent) = config_path.parent() {
             if let Err(_) = path::ensure_directory_exists(parent) {
-                eprintln!("⚠️  Could not create data directory");
+                crate::always_eprint!("⚠️  Could not create data directory");
             }
         }
 
@@ -298,12 +298,12 @@ impl AppConfig {
 
                 // Migrate old soundpack IDs to new format
                 if config.keyboard_soundpack == "oreo" {
-                    println!("🔄 Migrating keyboard soundpack: oreo -> keyboard/eg-oreo");
+                    crate::always_print!("🔄 Migrating keyboard soundpack: oreo -> keyboard/eg-oreo");
                     config.keyboard_soundpack = "keyboard/eg-oreo".to_string();
                     config_updated = true;
                 }
                 if config.mouse_soundpack == "test-mouse" {
-                    println!("🔄 Migrating mouse soundpack: test-mouse -> mouse/ping");
+                    crate::always_print!("🔄 Migrating mouse soundpack: test-mouse -> mouse/ping");
                     config.mouse_soundpack = "mouse/ping".to_string();
                     config_updated = true;
                 }
@@ -311,7 +311,7 @@ impl AppConfig {
                 // Sync auto_start with actual registry state
                 let actual_auto_start = crate::utils::auto_startup::get_auto_startup_state();
                 if config.auto_start != actual_auto_start {
-                    println!(
+                    crate::always_print!(
                         "🔄 Syncing auto_start config with registry: {} -> {}",
                         config.auto_start,
                         actual_auto_start
@@ -332,8 +332,8 @@ impl AppConfig {
                 // Per-field tolerance above means reaching here needs the
                 // document itself to be unreadable (truncated, not JSON, or
                 // unreadable from disk) - not merely one bad setting.
-                eprintln!("❌ Failed to load config file: {}", e);
-                eprintln!("   Config path: {}", config_path.display());
+                crate::always_eprint!("❌ Failed to load config file: {}", e);
+                crate::always_eprint!("   Config path: {}", config_path.display());
 
                 // Never overwrite the user's file in place: it is the only
                 // copy of their theme, customizations and device choices, and
@@ -348,18 +348,18 @@ impl AppConfig {
                         default_config
                     }
                     Preserved::MovedTo(backup) => {
-                        eprintln!(
+                        crate::always_eprint!(
                             "   Your previous config was kept at: {}",
                             backup.display()
                         );
-                        eprintln!("   Defaults are in use for this session.");
+                        crate::always_eprint!("   Defaults are in use for this session.");
                         let default_config = Self::default();
                         let _ = default_config.save();
                         default_config
                     }
                     Preserved::Failed(err) => {
-                        eprintln!("   Could not set the damaged config aside: {}", err);
-                        eprintln!(
+                        crate::always_eprint!("   Could not set the damaged config aside: {}", err);
+                        crate::always_eprint!(
                             "   Leaving it untouched and running on defaults; \
                              settings changed now will not be saved over it."
                         );

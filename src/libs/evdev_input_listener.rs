@@ -11,13 +11,13 @@ pub fn start_evdev_keyboard_listener(
     hotkey_tx: Sender<String>,
     _is_focused: Arc<Mutex<bool>>,
 ) {
-    println!("🔍 [evdev] start_evdev_keyboard_listener() called - spawning thread");
+    crate::always_print!("🔍 [evdev] start_evdev_keyboard_listener() called - spawning thread");
     thread::spawn(move || {
         use evdev::{Device, EventType, KeyCode};
 
-        println!("🔍 [evdev] Thread started - initializing keyboard listener");
-        println!("🔍 [evdev] Current user: {:?}", std::env::var("USER"));
-        println!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
+        crate::always_print!("🔍 [evdev] Thread started - initializing keyboard listener");
+        crate::always_print!("🔍 [evdev] Current user: {:?}", std::env::var("USER"));
+        crate::always_print!("🔍 [evdev] Starting Linux keyboard listener (Wayland/X11 compatible)");
 
         // Track modifier keys for hotkey detection
         let mut ctrl_pressed = false;
@@ -26,45 +26,45 @@ pub fn start_evdev_keyboard_listener(
         // Find all keyboard devices
         let mut keyboards = Vec::new();
 
-        println!("🔍 [evdev] Enumerating input devices...");
+        crate::always_print!("🔍 [evdev] Enumerating input devices...");
         let devices: Vec<_> = evdev::enumerate().collect();
         let device_count = devices.len();
-        println!("🔍 [evdev] Found {} total input devices", device_count);
+        crate::always_print!("🔍 [evdev] Found {} total input devices", device_count);
 
         if device_count == 0 {
-            eprintln!("❌ [evdev] No devices found - cannot access /dev/input/event* devices");
-            eprintln!("💡 [evdev] Troubleshooting steps:");
-            eprintln!("   1. Check if you're in the 'input' group: groups $USER");
-            eprintln!("   2. Add yourself to input group: sudo usermod -a -G input $USER");
-            eprintln!("   3. Log out and log back in for group changes to take effect");
-            eprintln!("   4. Check /dev/input permissions: ls -la /dev/input/event*");
+            crate::always_eprint!("❌ [evdev] No devices found - cannot access /dev/input/event* devices");
+            crate::always_eprint!("💡 [evdev] Troubleshooting steps:");
+            crate::always_eprint!("   1. Check if you're in the 'input' group: groups $USER");
+            crate::always_eprint!("   2. Add yourself to input group: sudo usermod -a -G input $USER");
+            crate::always_eprint!("   3. Log out and log back in for group changes to take effect");
+            crate::always_eprint!("   4. Check /dev/input permissions: ls -la /dev/input/event*");
             return;
         }
 
         for (path, mut device) in devices {
             // Check if device has keyboard capabilities
             if device.supported_keys().is_some() {
-                println!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
+                crate::always_print!("🔍 [evdev] Found keyboard device: {:?} - {}", path.display(), device.name().unwrap_or("Unknown"));
 
                 // Set device to non-blocking mode to prevent blocking on idle devices
                 if let Err(e) = device.set_nonblocking(true) {
-                    eprintln!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
+                    crate::always_eprint!("⚠️ [evdev] Failed to set non-blocking mode for {:?}: {}", path.display(), e);
                 }
 
                 keyboards.push(device);
             } else {
-                println!("🔍 [evdev] Skipping non-keyboard device: {:?}", path.display());
+                crate::always_print!("🔍 [evdev] Skipping non-keyboard device: {:?}", path.display());
             }
         }
 
         if keyboards.is_empty() {
-            eprintln!("❌ [evdev] No keyboard devices found among the {} input devices!", device_count);
-            eprintln!("💡 [evdev] This might indicate a permission issue or unusual hardware setup");
+            crate::always_eprint!("❌ [evdev] No keyboard devices found among the {} input devices!", device_count);
+            crate::always_eprint!("💡 [evdev] This might indicate a permission issue or unusual hardware setup");
             return;
         }
 
-        println!("✅ [evdev] Successfully initialized {} keyboard device(s)", keyboards.len());
-        println!("🔍 [evdev] Starting event monitoring loop...");
+        crate::always_print!("✅ [evdev] Successfully initialized {} keyboard device(s)", keyboards.len());
+        crate::always_print!("🔍 [evdev] Starting event monitoring loop...");
 
         let mut event_count = 0;
         let mut first_event_logged = false;
@@ -79,7 +79,7 @@ pub fn start_evdev_keyboard_listener(
                             if event.event_type() == EventType::KEY {
                                 event_count += 1;
                                 if !first_event_logged {
-                                    println!("✅ [evdev] First keyboard event detected!");
+                                    crate::always_print!("✅ [evdev] First keyboard event detected!");
                                     first_event_logged = true;
                                 }
 
@@ -103,7 +103,7 @@ pub fn start_evdev_keyboard_listener(
                                                 "KeyM" => {
                                                     // Check for Ctrl+Alt+M hotkey combination
                                                     if ctrl_pressed && alt_pressed {
-                                                        println!("🔥 [evdev] Hotkey detected: Ctrl+Alt+M - Toggling global sound");
+                                                        crate::always_print!("🔥 [evdev] Hotkey detected: Ctrl+Alt+M - Toggling global sound");
                                                         let _ = hotkey_tx.send("TOGGLE_SOUND".to_string());
                                                         continue; // Don't process this as a regular key event
                                                     }
@@ -113,7 +113,7 @@ pub fn start_evdev_keyboard_listener(
 
                                             // Send key press event
                                             if event_count <= 5 {
-                                                println!("🔍 [evdev] Sending key press: {}", key_code);
+                                                crate::always_print!("🔍 [evdev] Sending key press: {}", key_code);
                                             }
                                             let _ = keyboard_tx.send(key_code.to_string());
                                         }
@@ -143,7 +143,7 @@ pub fn start_evdev_keyboard_listener(
                         // No events available, this is normal
                     }
                     Err(e) => {
-                        eprintln!("⚠️ [evdev] Error fetching events: {}", e);
+                        crate::always_eprint!("⚠️ [evdev] Error fetching events: {}", e);
                     }
                 }
             }

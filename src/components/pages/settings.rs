@@ -133,10 +133,10 @@ pub fn SettingsPage() -> Element {
                               match crate::utils::auto_startup::set_auto_startup(new_value) {
                                   Ok(_) => {
                                       let status = if new_value { "enabled" } else { "disabled" };
-                                      println!("✅ Auto startup {}", status);
+                                      crate::always_print!("✅ Auto startup {}", status);
                                   }
                                   Err(e) => {
-                                      eprintln!("❌ Failed to set auto startup: {}", e);
+                                      crate::always_eprint!("❌ Failed to set auto startup: {}", e);
                                   }
                               }
                           });
@@ -166,10 +166,10 @@ pub fn SettingsPage() -> Element {
                                             } else {
                                                 "without minimized flag"
                                             };
-                                            println!("✅ Auto startup updated {}", status);
+                                            crate::always_print!("✅ Auto startup updated {}", status);
                                         }
                                         Err(e) => {
-                                            eprintln!("❌ Failed to update auto startup: {}", e);
+                                            crate::always_eprint!("❌ Failed to update auto startup: {}", e);
                                         }
                                     }
                                 }
@@ -216,7 +216,7 @@ pub fn SettingsPage() -> Element {
                     class: "btn btn-soft btn-sm",
                     disabled: is_checking_updates(),
                     onclick: move |_| {
-                        println!("Manual update check requested");
+                        crate::always_print!("Manual update check requested");
                         is_checking_updates.set(true);
                         check_error.set(None);
                         let mut update_info = update_info.clone();
@@ -383,6 +383,20 @@ pub fn SettingsPage() -> Element {
             content_class: "collapse-content text-sm",
             children: rsx! {
               crate::components::app_info::AppInfoDisplay {}
+            },
+          }
+          // Debug Section
+          //
+          // `lazy_children` is required, not cosmetic: this Collapse is a CSS
+          // accordion, so without it the viewer's poll loop would be mounted
+          // and running for every user whether or not they ever open Debug.
+          Collapse {
+            title: "Debug".to_string(),
+            group_name: "setting-accordion".to_string(),
+            content_class: "collapse-content text-sm",
+            lazy_children: true,
+            children: rsx! {
+              crate::components::debug_log_viewer::DebugLogViewer {}
             },
           }
           // Danger Zone Section

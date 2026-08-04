@@ -193,7 +193,7 @@ pub fn SoundpackImportModal(
                 current_step.set(ImportStep::Installing);
                 delay::Delay::ms(500).await;
 
-                println!("⚒️ Installing soundpack ...");
+                crate::always_print!("⚒️ Installing soundpack ...");
 
                 let soundpack_info = match
                     extract_and_install_soundpack_with_type(&file_path, target_soundpack_type)
@@ -223,7 +223,7 @@ pub fn SoundpackImportModal(
                 delay::Delay::ms(500).await;
 
                 // Refresh the soundpack cache to show the new soundpack in the UI
-                println!("🔄 Triggering soundpack cache refresh after import...");
+                crate::always_print!("🔄 Triggering soundpack cache refresh after import...");
                 state_trigger.call(());
 
                 // Notify parent component (this will trigger UI update)

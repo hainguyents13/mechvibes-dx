@@ -111,7 +111,7 @@ fn open_stream(device_id: Option<&str>) -> Result<(OutputStream, OutputStreamHan
                 return Ok(pair);
             }
         }
-        eprintln!("❌ [Ambiance] Failed to open device {}, falling back to default", id);
+        crate::always_eprint!("❌ [Ambiance] Failed to open device {}, falling back to default", id);
     }
     rodio::OutputStream
         ::try_default()
@@ -136,7 +136,7 @@ pub fn initialize_global_ambiance_player() {
         let (mut stream, mut stream_handle) = match open_stream(initial_device.as_deref()) {
             Ok(pair) => pair,
             Err(e) => {
-                eprintln!("❌ [Ambiance] Failed to open audio stream: {}", e);
+                crate::always_eprint!("❌ [Ambiance] Failed to open audio stream: {}", e);
                 return;
             }
         };
@@ -152,15 +152,15 @@ pub fn initialize_global_ambiance_player() {
                     match build_ambiance_sink(&stream_handle, &audio_url, volume) {
                         Ok(sink) => {
                             sinks.insert(sound_id.clone(), sink);
-                            println!("🎵 [Ambiance] Started playing sound: {}", sound_id);
+                            crate::always_print!("🎵 [Ambiance] Started playing sound: {}", sound_id);
                         }
-                        Err(e) => eprintln!("❌ [Ambiance] Failed to play sound {}: {}", sound_id, e),
+                        Err(e) => crate::always_eprint!("❌ [Ambiance] Failed to play sound {}: {}", sound_id, e),
                     }
                 }
                 AmbianceEngineCommand::Stop(sound_id) => {
                     if let Some(sink) = sinks.remove(&sound_id) {
                         sink.stop();
-                        println!("🔇 [Ambiance] Stopped sound: {}", sound_id);
+                        crate::always_print!("🔇 [Ambiance] Stopped sound: {}", sound_id);
                     }
                 }
                 AmbianceEngineCommand::SetVolume { sound_id, volume } => {
@@ -204,16 +204,16 @@ pub fn initialize_global_ambiance_player() {
                                         sinks.insert(sound_id, sink);
                                     }
                                     Err(e) =>
-                                        eprintln!(
+                                        crate::always_eprint!(
                                             "❌ [Ambiance] Failed to resume sound {} after device switch: {}",
                                             sound_id,
                                             e
                                         ),
                                 }
                             }
-                            println!("🎵 [Ambiance] Switched output device");
+                            crate::always_print!("🎵 [Ambiance] Switched output device");
                         }
-                        Err(e) => eprintln!("❌ [Ambiance] Failed to switch device: {}", e),
+                        Err(e) => crate::always_eprint!("❌ [Ambiance] Failed to switch device: {}", e),
                     }
                 }
             }
@@ -223,7 +223,7 @@ pub fn initialize_global_ambiance_player() {
         let _ = &stream;
     });
 
-    println!("🎵 Global ambiance player initialized");
+    crate::always_print!("🎵 Global ambiance player initialized");
 }
 
 // Initialize global ambiance player state (call from main component)
@@ -270,14 +270,14 @@ pub fn stop_ambiance_sound(sound_id: &str) -> Result<(), String> {
 // Pause all sounds
 pub fn pause_all_ambiance_sounds() -> Result<(), String> {
     send_engine_command(AmbianceEngineCommand::PauseAll);
-    println!("⏸️ Paused all ambiance sounds");
+    crate::always_print!("⏸️ Paused all ambiance sounds");
     Ok(())
 }
 
 // Resume all sounds
 pub fn resume_all_ambiance_sounds() -> Result<(), String> {
     send_engine_command(AmbianceEngineCommand::ResumeAll);
-    println!("▶️ Resumed all ambiance sounds");
+    crate::always_print!("▶️ Resumed all ambiance sounds");
     Ok(())
 }
 

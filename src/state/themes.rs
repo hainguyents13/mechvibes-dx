@@ -39,24 +39,24 @@ impl ThemesConfig {
         // Ensure data directory exists
         if let Some(parent) = themes_path.parent() {
             if let Err(e) = path::ensure_directory_exists(parent) {
-                eprintln!("Warning: Could not create themes data directory: {}", e);
+                crate::always_eprint!("Warning: Could not create themes data directory: {}", e);
             }
         }
 
         match data::load_json_from_file::<ThemesConfig>(&themes_path) {
             Ok(config) => {
-                println!(
+                crate::always_print!(
                     "✅ Loaded themes configuration from {}",
                     themes_path.display()
                 );
                 config
             }
             Err(e) => {
-                eprintln!("❌ Failed to load themes.json: {}", e);
-                println!("📝 Creating new themes configuration");
+                crate::always_eprint!("❌ Failed to load themes.json: {}", e);
+                crate::always_print!("📝 Creating new themes configuration");
                 let config = Self::default();
                 if let Err(e) = config.save() {
-                    eprintln!("❌ Failed to create initial themes.json: {}", e);
+                    crate::always_eprint!("❌ Failed to create initial themes.json: {}", e);
                 }
                 config
             }
@@ -73,7 +73,7 @@ impl ThemesConfig {
         }
 
         data::save_json_to_file(self, &themes_path)?;
-        println!("💾 Saved themes configuration to {}", themes_path.display());
+        crate::always_print!("💾 Saved themes configuration to {}", themes_path.display());
         Ok(())
     }
     pub fn add_theme(

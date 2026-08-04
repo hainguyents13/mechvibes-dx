@@ -62,12 +62,12 @@ pub fn WindowController() -> Element {
                                 window_clone.set_visible(true);
                                 window_clone.set_focus();
                                 WINDOW_MANAGER.set_visible(true);
-                                println!("🔼 Window shown from internal action");
+                                crate::always_print!("🔼 Window shown from internal action");
                             }
                             WindowAction::Hide => {
                                 window_clone.set_visible(false);
                                 WINDOW_MANAGER.set_visible(false);
-                                println!("🔽 Window hidden from internal action");
+                                crate::always_print!("🔽 Window hidden from internal action");
                             }
                         }
                     }
@@ -77,9 +77,9 @@ pub fn WindowController() -> Element {
                     tray_manager_clone.with_mut(|tray_opt| {
                         if let Some(tray) = tray_opt {
                             if let Err(e) = tray.update_menu() {
-                                eprintln!("❌ Failed to update tray menu from global request: {}", e);
+                                crate::always_eprint!("❌ Failed to update tray menu from global request: {}", e);
                             } else {
-                                println!("✅ Tray menu updated from global request");
+                                crate::always_print!("✅ Tray menu updated from global request");
                             }
                         }
                     });
@@ -133,21 +133,21 @@ pub fn WindowController() -> Element {
                         TrayMessage::OpenDiscord => {
                             let url = "https://discord.com/invite/MMVrhWxa4w";
                             if let Err(e) = open::that(url) {
-                                eprintln!("❌ Failed to open Discord URL: {}", e);
+                                crate::always_eprint!("❌ Failed to open Discord URL: {}", e);
                             } else {
-                                println!("💬 Opened Discord community in browser");
+                                crate::always_print!("💬 Opened Discord community in browser");
                             }
                         }
                         TrayMessage::OpenWebsite => {
                             let url = "https://mechvibes.com";
                             if let Err(e) = open::that(url) {
-                                eprintln!("❌ Failed to open website URL: {}", e);
+                                crate::always_eprint!("❌ Failed to open website URL: {}", e);
                             } else {
-                                println!("🌐 Opened official website in browser");
+                                crate::always_print!("🌐 Opened official website in browser");
                             }
                         }
                         TrayMessage::Exit => {
-                            println!("📢 Tray: Exit requested - closing application");
+                            crate::always_print!("📢 Tray: Exit requested - closing application");
                             // Close the window which will trigger app exit
                             window_clone.close();
                         }

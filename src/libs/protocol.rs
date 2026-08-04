@@ -11,7 +11,7 @@ use crate::utils::constants::APP_NAME_LOWERCASE;
 pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
     let exe_path = env::current_exe()?;
     let exe_path_str = exe_path.to_string_lossy();
-    println!("🔗 Registering {}// protocol... {}", APP_PROTOCOL, exe_path_str); // Store formatted strings to avoid temporary value issues
+    crate::always_print!("🔗 Registering {}// protocol... {}", APP_PROTOCOL, exe_path_str); // Store formatted strings to avoid temporary value issues
     let icon_path = format!("\"{}\"", exe_path_str);
     let command_path = format!("\"{}\" \"%1\"", exe_path_str); // Registry commands to register the protocol
     let protocol_key = format!("HKCU\\Software\\Classes\\{}", APP_PROTOCOL);
@@ -32,19 +32,19 @@ pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            eprintln!("❌ Registry command failed: {}", error);
+            crate::always_eprint!("❌ Registry command failed: {}", error);
         }
     }
 
-    println!("✅ Protocol {}// registered successfully", APP_PROTOCOL);
+    crate::always_print!("✅ Protocol {}// registered successfully", APP_PROTOCOL);
     Ok(())
 }
 
 #[cfg(target_os = "macos")]
 pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🍎 Protocol registration on macOS requires app bundle configuration in Info.plist");
-    println!("Add the following to your Info.plist:");
-    println!(
+    crate::always_print!("🍎 Protocol registration on macOS requires app bundle configuration in Info.plist");
+    crate::always_print!("Add the following to your Info.plist:");
+    crate::always_print!(
         r#"
 <key>CFBundleURLTypes</key>    <array>
         <dict>
@@ -75,7 +75,7 @@ pub fn register_protocol() -> Result<(), Box<dyn std::error::Error>> {
     );
     let exe_path = env::current_exe()?;
 
-    println!("🐧 Registering {}// protocol on Linux...", APP_PROTOCOL);
+    crate::always_print!("🐧 Registering {}// protocol on Linux...", APP_PROTOCOL);
 
     let desktop_content = format!(
         r#"[Desktop Entry]
@@ -101,7 +101,7 @@ Categories=AudioVideo;Utility;
     // Update desktop database
     let _output = Command::new("update-desktop-database").arg(&apps_dir).output();
 
-    println!("✅ Protocol {}// registered successfully", APP_PROTOCOL);
+    crate::always_print!("✅ Protocol {}// registered successfully", APP_PROTOCOL);
     Ok(())
 }
 
