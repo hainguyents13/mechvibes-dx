@@ -4,7 +4,11 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.7.3] - 2026-08-04
+## [0.8.0] - 2026-08-04
+
+### Added
+
+- **Debug section in Settings**: a live log viewer showing the app's most recent log lines in a small terminal-style window, an "Export logs" button that writes them to a file you can attach to bug reports, and a Verbose toggle that adds per-keystroke timing lines for diagnosing latency issues. Everything stays in memory and on your device until you press Export, key identities are always masked, and the Verbose toggle resets on every launch.
 
 ### Fixed
 
@@ -18,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Every settings write now goes through a single writer with atomic file saves.** This is the structural fix behind the "my settings reverted" saga: previously twelve different places in the app could each save a whole copy of the settings, and whichever finished last silently undid the others. That mistake is now impossible to write, not merely discouraged, and a half-written settings file can no longer exist even if the app is killed mid-save.
+- The app name, version and credits moved from the Home page to the bottom of Settings, leaving Home to the things you actually use.
 
 ## [0.7.2] - 2026-08-03
 
@@ -130,6 +135,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.5.1] and earlier
 
 See git history for changes prior to this changelog's introduction.
+
 
 
 
