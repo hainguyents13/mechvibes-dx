@@ -42,12 +42,11 @@ pub fn load_keyboard_soundpack_with_cache_control(
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
-    // No pack selected. This is a real state the user can choose ("None"), not
-    // an error, and it has to reach the engine: simply not loading would leave
-    // whatever was loaded before still playing.
+    // An empty id means the config has no pack for this slot - a hand-edited
+    // or freshly created config, not an error. Nothing to load, and nothing is
+    // loaded yet either, so leave the engine alone and let the user pick.
     if soundpack_id.is_empty() {
-        println!("🎹 No keyboard soundpack selected - unloading");
-        context.send(AudioCommand::UnloadKeyboardPack);
+        println!("🎹 No keyboard soundpack selected");
         return Ok(());
     }
 
@@ -70,9 +69,9 @@ pub fn load_mouse_soundpack_with_cache_control(
     soundpack_id: &str,
     update_cache_on_error: bool
 ) -> Result<(), String> {
+    // See the keyboard loader: an empty slot is tolerated, not unloaded.
     if soundpack_id.is_empty() {
-        println!("🖱️ No mouse soundpack selected - unloading");
-        context.send(AudioCommand::UnloadMousePack);
+        println!("🖱️ No mouse soundpack selected");
         return Ok(());
     }
 

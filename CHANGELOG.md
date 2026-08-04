@@ -6,16 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.3] - 2026-08-04
 
-### Added
-
-- **"None" option for soundpack slots**: you can now unselect the keyboard or mouse soundpack. Clearing a slot silences it immediately, no restart needed. The logo still animates while you type; only the audio stops.
-
 ### Fixed
 
 - **"Start with Windows" no longer switches itself off.** The app compared its registry entry against the wrong form of the path whenever "Start minimized" was also enabled, concluded autostart was off, and helpfully saved that conclusion over your setting. Both toggles now work, so Task Scheduler workarounds are no longer needed.
 - **Keys used as global hotkeys by other apps now play sound.** If another program (Rainmeter, macro tools, and similar) claims a key like F1 as a hotkey, Windows hides the key press from us but still delivers the release; the app now recognizes that pattern and plays the sound anyway. Mechvibes classic behavior restored.
 - **Launching the app while it is already running now brings up the running window** instead of doing nothing.
-- **A damaged config file no longer wipes your settings.** Unknown or invalid fields fall back to sensible defaults for that field only, and if the file is truly unreadable it is preserved as `config.json.corrupt` instead of being overwritten, so nothing is lost. Hand-editors: use `""` to clear a soundpack slot, or better, use the new None button.
+- **A damaged config file no longer wipes your settings.** Unknown or invalid fields fall back to sensible defaults for that field only, and if the file is truly unreadable it is preserved as `config.json.corrupt` instead of being overwritten, so nothing is lost. Hand-editors: a soundpack slot set to `""` is accepted and simply loads no pack for that slot.
 - **Muting with Ctrl+Alt+M now updates the window immediately**, matching the tray and in-app buttons.
 - The classic-Mechvibes converter backs up an existing converted audio file before overwriting it, and stops instead of proceeding when any backup fails.
 
