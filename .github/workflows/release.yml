@@ -441,7 +441,7 @@ jobs:
           fi
           if ls release/*.AppImage >/dev/null 2>&1; then
             {
-              echo "- **Linux (any distro)**: \`.AppImage\` — portable, no install. Run \`chmod +x\` on it first, then launch it. The \`input\` group requirement is the same as the \`.deb\` and nothing sets it up for you: \`sudo usermod -a -G input \$USER\`, then log out and back in, or key events won't be seen."
+              echo "- **Linux (any distro)**: \`.AppImage\` is portable, with no install step. Run \`chmod +x\` on it first, then launch it. The \`input\` group requirement is the same as the \`.deb\` and nothing sets it up for you: \`sudo usermod -a -G input \$USER\`, then log out and back in, or key events won't be seen."
             } >> notes.md
           fi
           if ls release/*macos*.dmg >/dev/null 2>&1; then

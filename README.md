@@ -50,12 +50,10 @@ sudo apt-get install -y \
     libayatana-appindicator3-dev \
     librsvg2-dev \
     libevdev-dev \
-    libxdo-dev \
-    autoconf \
-    automake \
-    libtool \
-    libfuse2
-# Note: libfuse2 is required for building AppImage
+    libxdo-dev
+# Note: no FUSE package is needed to BUILD the AppImage - the build script
+# runs appimagetool with APPIMAGE_EXTRACT_AND_RUN=1. Running a finished
+# AppImage on a machine without FUSE needs that same env var, or libfuse2.
 ```
 
 **Linux (Fedora/RHEL)**
@@ -68,12 +66,10 @@ sudo dnf install -y \
     libappindicator-gtk3-devel \
     librsvg2-devel \
     libevdev-devel \
-    xdotool-devel \
-    autoconf \
-    automake \
-    libtool \
-    fuse-libs
-# Note: fuse-libs is required for building AppImage
+    xdotool-devel
+# Note: no FUSE package is needed to BUILD the AppImage - the build script
+# runs appimagetool with APPIMAGE_EXTRACT_AND_RUN=1. Running a finished
+# AppImage on a machine without FUSE needs that same env var, or fuse-libs.
 ```
 
 **macOS**
@@ -111,39 +107,26 @@ cargo build --release
 
 Linux:
 ```bash
-# Option 1: Build both DEB and AppImage (recommended)
-./scripts/build-linux-installer.sh
-
-# Outputs (unified in dist/ directory):
-# - dist/mechvibes-dx_0.4.0_amd64.deb (Ubuntu/Debian)
-# - dist/mechvibes-dx-0.4.0-x86_64.AppImage (Universal)
-
-# Install DEB (does NOT add you to the input group - see below)
-sudo dpkg -i dist/mechvibes-dx_0.4.0_amd64.deb
-
-# Or run AppImage (portable, no install needed)
-chmod +x dist/mechvibes-dx-0.4.0-x86_64.AppImage
-./dist/mechvibes-dx-0.4.0-x86_64.AppImage
-
-# Every install method requires this once - the package ships no
-# maintainer scripts, so nothing touches your groups automatically:
-sudo usermod -a -G input $USER
-# Log out and log back in for group changes to take effect
-
-# Option 2: Build DEB only
-cargo install cargo-deb
-cargo deb
-# Output: target/debian/mechvibes-dx_0.4.0_amd64.deb
-
-# Option 3: Build binary only
-# Add user to input group manually (required for keyboard input)
-sudo usermod -a -G input $USER
-# Log out and log back in for group changes to take effect
-
-# Build release binary
+# Everything below needs the release binary first
 cargo build --release
-
 # Binary location: target/release/mechvibes-dx
+
+# Option 1: AppImage (portable, runs on any distro)
+./scripts/build-linux-appimage.sh 0.8.0
+# Output: dist/mechvibes-dx-0.8.0-x86_64.AppImage
+chmod +x dist/mechvibes-dx-0.8.0-x86_64.AppImage
+./dist/mechvibes-dx-0.8.0-x86_64.AppImage
+
+# Option 2: DEB (Ubuntu/Debian)
+cargo install cargo-deb
+cargo deb --no-build
+# Output: target/debian/mechvibes-dx_0.8.0_amd64.deb
+sudo dpkg -i target/debian/mechvibes-dx_0.8.0_amd64.deb
+
+# Every method requires this once - neither package ships maintainer
+# scripts, so nothing touches your groups automatically:
+sudo usermod -a -G input $USER
+# Log out and log back in for group changes to take effect
 ```
 
 macOS:
