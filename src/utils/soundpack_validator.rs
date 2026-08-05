@@ -12,6 +12,37 @@ pub enum SoundpackValidationStatus {
     InvalidStructure(String),
     MissingRequiredFields(Vec<String>),
     VersionOneNeedsConversion,
+    /// The pack declares a config version this build does not understand.
+    /// Refusing it with a clear message beats guessing at a layout that was
+    /// designed after this build shipped.
+    RequiresNewerAppVersion(u32),
+}
+
+/// Read `config_version` regardless of whether it was written as a JSON number
+/// or as a string.
+///
+/// Both spellings exist in the wild: every pack this app ships stores `"2"` as
+/// a string, because that is what the V1 converter writes, while hand-written
+/// and third-party configs commonly use the bare number `2`. Accepting only one
+/// form silently misclassifies half of the real corpus.
+fn read_config_version(config: &Value) -> Option<u32> {
+    let raw = config.get("config_version")?;
+
+    if let Some(n) = raw.as_u64() {
+        return u32::try_from(n).ok();
+    }
+
+    raw.as_str()?.trim().parse::<u32>().ok()
+}
+
+/// The key-definition map, under either name it has been given.
+///
+/// V2 packs store their key definitions under `definitions`; that is what the
+/// converter emits and what the deserializer in `state::soundpack` requires.
+/// `defs` is accepted purely as an alias so a config using the shorter spelling
+/// is not rejected outright.
+fn key_definitions(config: &Value) -> Option<&Value> {
+    config.get("definitions").or_else(|| config.get("defs"))
 }
 
 #[derive(Debug, Clone)]
@@ -60,10 +91,7 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
     };
 
     // Extract version information
-    let config_version = config
-        .get("config_version")
-        .and_then(|v| v.as_u64())
-        .map(|v| v as u32);
+    let config_version = read_config_version(&config);
     let package_version = config
         .get("version")
         .and_then(|v| v.as_str())
@@ -76,12 +104,23 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
         config.get("method").is_some() || config.get("key_define_type").is_some();
 
     // Check for V2 indicators
-    let has_defs = config.get("defs").is_some();
+    let has_defs = key_definitions(&config).is_some();
     let _has_source_field = config.get("source").is_some();
     let has_author = config.get("author").is_some();
 
     // Determine version based on structure
-    if config_version == Some(2) {
+    if let Some(version) = config_version.filter(|v| *v > 2) {
+        // Newer than anything this build knows how to read. Say so plainly
+        // instead of reporting the unfamiliar layout as missing fields.
+        SoundpackValidationResult {
+            status: SoundpackValidationStatus::RequiresNewerAppVersion(version),
+            config_version: Some(version),
+            detected_version: package_version,
+            is_valid_v2: false,
+            can_be_converted: false,
+            message: "This soundpack requires a newer version of MechvibesDX".to_string(),
+        }
+    } else if config_version == Some(2) {
         // Explicitly marked as V2, validate V2 structure
         validate_v2_structure(&config, config_version, package_version)
     } else if config_version == Some(1) || (has_defines && has_sound_field && !has_defs) {
@@ -107,7 +146,7 @@ pub fn validate_soundpack_config(config_path: &str) -> SoundpackValidationResult
         let mut missing_fields = Vec::new();
 
         if !has_defs && !has_defines {
-            missing_fields.push("defs or defines".to_string());
+            missing_fields.push("definitions or defines".to_string());
         }
 
         if !config.get("name").is_some() {
@@ -142,39 +181,53 @@ fn validate_v2_structure(
         missing_fields.push("author".to_string());
     }
 
-    if !config.get("defs").is_some() {
-        missing_fields.push("defs".to_string());
+    let definitions = key_definitions(config);
+
+    if definitions.is_none() {
+        missing_fields.push("definitions".to_string());
     }
 
-    // Validate defs structure
-    if let Some(defs) = config.get("defs") {
+    // Validate the key-definition structure
+    if let Some(defs) = definitions {
         if let Some(defs_obj) = defs.as_object() {
             for (key, value) in defs_obj {
-                if !value.is_array() {
-                    issues.push(format!("Invalid defs entry for '{}': expected array", key));
-                    continue;
-                }
+                // A key maps either to `{ "timing": [[start, end], ...] }` (the
+                // shape the converter writes and the loader deserializes) or
+                // directly to the timing array itself.
+                let timings = match value.get("timing") {
+                    Some(timing) => timing,
+                    None => value,
+                };
 
-                if let Some(arr) = value.as_array() {
-                    for (i, timing) in arr.iter().enumerate() {
-                        if let Some(timing_arr) = timing.as_array() {
-                            if timing_arr.len() != 2 {
-                                issues.push(format!(
-                                    "Invalid timing array for '{}[{}]': expected [start, end]",
-                                    key, i
-                                ));
-                            }
-                        } else {
+                let arr = match timings.as_array() {
+                    Some(arr) => arr,
+                    None => {
+                        issues.push(format!(
+                            "Invalid definitions entry for '{}': expected timing array",
+                            key
+                        ));
+                        continue;
+                    }
+                };
+
+                for (i, timing) in arr.iter().enumerate() {
+                    if let Some(timing_arr) = timing.as_array() {
+                        if timing_arr.len() != 2 {
                             issues.push(format!(
-                                "Invalid timing entry for '{}[{}]': expected array",
+                                "Invalid timing array for '{}[{}]': expected [start, end]",
                                 key, i
                             ));
                         }
+                    } else {
+                        issues.push(format!(
+                            "Invalid timing entry for '{}[{}]': expected array",
+                            key, i
+                        ));
                     }
                 }
             }
         } else {
-            issues.push("defs field should be an object".to_string());
+            issues.push("definitions field should be an object".to_string());
         }
     }
 
@@ -322,6 +375,227 @@ pub async fn validate_soundpack_structure(file_path: &str) -> Result<(String, St
         }
         SoundpackValidationStatus::InvalidVersion => {
             Err("Invalid or unsupported soundpack version".to_string())
+        }
+        SoundpackValidationStatus::RequiresNewerAppVersion(_) => {
+            Err("This soundpack requires a newer version of MechvibesDX".to_string())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The exact `config_version` spelling every bundled pack uses: a string,
+    /// not a number. Reading it as a number only is what made real V2 packs
+    /// fall through to the "missing fields" branch.
+    const REAL_PACK_CONFIG: &str =
+        r#"{
+            "audio_file": "sound.ogg",
+            "config_version": "2",
+            "created_at": "2025-06-17T12:23:39.537516300+00:00",
+            "definition_method": "single",
+            "author": "Mechvibes",
+            "definitions": {
+                "AltLeft": { "timing": [[45750.0, 45832.0], [45832.0, 45914.0]] },
+                "Escape": { "timing": [[2894.0, 3007.0], [3007.0, 3120.0]] }
+            },
+            "id": "keyboad-cherrymx-black-abs",
+            "name": "CherryMX Black - ABS keycaps",
+            "options": { "random_pitch": false, "recommended_volume": 1.0 },
+            "icon": "black.jpg",
+            "tags": []
+        }"#;
+
+    fn validate_json(contents: &str) -> SoundpackValidationResult {
+        let path = std::env
+            ::temp_dir()
+            .join(format!("mechvibes-validator-{}-{}.json", std::process::id(), uuid::Uuid::new_v4()));
+        std::fs::write(&path, contents).expect("write temp config");
+        let result = validate_soundpack_config(path.to_str().expect("utf-8 temp path"));
+        std::fs::remove_file(&path).ok();
+        result
+    }
+
+    fn version_of(raw: &str) -> Option<u32> {
+        read_config_version(&serde_json::from_str(raw).expect("valid json"))
+    }
+
+    #[test]
+    fn config_version_is_read_from_both_number_and_string_forms() {
+        assert_eq!(version_of(r#"{"config_version": 2}"#), Some(2));
+        assert_eq!(version_of(r#"{"config_version": "2"}"#), Some(2));
+        assert_eq!(version_of(r#"{"config_version": 1}"#), Some(1));
+        assert_eq!(version_of(r#"{"config_version": "1"}"#), Some(1));
+        assert_eq!(version_of(r#"{"config_version": 3}"#), Some(3));
+        assert_eq!(version_of(r#"{"config_version": "3"}"#), Some(3));
+    }
+
+    #[test]
+    fn an_unreadable_config_version_is_treated_as_absent() {
+        assert_eq!(version_of(r#"{}"#), None, "absent");
+        assert_eq!(version_of(r#"{"config_version": null}"#), None, "null");
+        assert_eq!(version_of(r#"{"config_version": "banana"}"#), None, "garbage text");
+        assert_eq!(version_of(r#"{"config_version": ""}"#), None, "empty string");
+        assert_eq!(version_of(r#"{"config_version": -1}"#), None, "negative");
+        assert_eq!(version_of(r#"{"config_version": 2.5}"#), None, "fractional");
+    }
+
+    /// The defect this pins: a real bundled pack must reach the V2 branch and
+    /// be reported valid, with its version recognised as 2.
+    #[test]
+    fn a_real_bundled_pack_validates_as_v2() {
+        let result = validate_json(REAL_PACK_CONFIG);
+
+        assert_eq!(
+            result.status,
+            SoundpackValidationStatus::Valid,
+            "a shipped pack must validate; got: {}",
+            result.message
+        );
+        assert_eq!(result.config_version, Some(2), "the string \"2\" must be understood as version 2");
+        assert!(result.is_valid_v2);
+        assert!(!result.can_be_converted, "a valid V2 pack needs no conversion");
+    }
+
+    /// Every pack in the repository must be loadable. This is the regression
+    /// net for the whole shipped corpus, not just the one sampled above.
+    #[test]
+    fn every_bundled_soundpack_validates() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("soundpacks");
+
+        let mut checked = 0;
+        let mut dirs = vec![root.clone()];
+        while let Some(dir) = dirs.pop() {
+            let entries = match std::fs::read_dir(&dir) {
+                Ok(entries) => entries,
+                Err(_) => {
+                    continue;
+                }
+            };
+
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                } else if path.file_name().and_then(|n| n.to_str()) == Some("config.json") {
+                    let result = validate_soundpack_config(path.to_str().expect("utf-8 path"));
+                    assert_eq!(
+                        result.status,
+                        SoundpackValidationStatus::Valid,
+                        "bundled pack {} must validate; got: {}",
+                        path.display(),
+                        result.message
+                    );
+                    assert!(result.is_valid_v2, "bundled pack {} must be valid V2", path.display());
+                    checked += 1;
+                }
+            }
+        }
+
+        assert!(checked > 0, "expected to find bundled soundpack configs under {}", root.display());
+    }
+
+    /// `defs` is accepted as an alias so a config using the shorter spelling is
+    /// not rejected for a naming difference alone.
+    #[test]
+    fn the_defs_spelling_is_accepted_as_an_alias() {
+        let result = validate_json(
+            r#"{
+                "config_version": 2,
+                "name": "alias pack",
+                "author": "someone",
+                "defs": { "Escape": [[0.0, 100.0]] }
+            }"#
+        );
+
+        assert_eq!(result.status, SoundpackValidationStatus::Valid, "got: {}", result.message);
+    }
+
+    /// A version from the future must say so, in both spellings, rather than
+    /// blaming the author for fields this build simply does not know about.
+    #[test]
+    fn a_newer_config_version_asks_the_user_to_update() {
+        for raw in ["3", "\"3\"", "99"] {
+            let result = validate_json(
+                &format!(r#"{{"config_version": {}, "name": "future", "author": "a"}}"#, raw)
+            );
+
+            assert!(
+                matches!(result.status, SoundpackValidationStatus::RequiresNewerAppVersion(_)),
+                "config_version {} must report a newer app version, got {:?}",
+                raw,
+                result.status
+            );
+            assert_eq!(result.message, "This soundpack requires a newer version of MechvibesDX");
+            assert!(!result.can_be_converted, "a future format cannot be converted by this build");
+            assert!(!result.is_valid_v2);
+        }
+    }
+
+    /// A future pack that happens to carry a V1-looking body must still be
+    /// refused as too new, rather than being downgraded and converted.
+    #[test]
+    fn a_newer_version_is_not_mistaken_for_a_convertible_v1_pack() {
+        let result = validate_json(
+            r#"{
+                "config_version": "3",
+                "name": "future",
+                "defines": { "1": [0, 100] },
+                "sound": "sound.ogg"
+            }"#
+        );
+
+        assert!(
+            matches!(result.status, SoundpackValidationStatus::RequiresNewerAppVersion(_)),
+            "got {:?}",
+            result.status
+        );
+        assert!(!result.can_be_converted, "converting a format we cannot read would corrupt it");
+    }
+
+    /// V1 packs must keep taking the conversion path untouched.
+    #[test]
+    fn a_v1_pack_still_asks_to_be_converted() {
+        let result = validate_json(
+            r#"{
+                "config_version": 1,
+                "name": "old pack",
+                "defines": { "1": [0, 100] },
+                "sound": "sound.ogg"
+            }"#
+        );
+
+        assert_eq!(result.status, SoundpackValidationStatus::VersionOneNeedsConversion);
+        assert!(result.can_be_converted);
+    }
+
+    /// An unversioned V1 pack is recognised by its shape alone.
+    #[test]
+    fn an_unversioned_v1_pack_is_detected_by_structure() {
+        let result = validate_json(
+            r#"{ "name": "old", "defines": { "1": [0, 100] }, "sound": "sound.ogg" }"#
+        );
+
+        assert_eq!(result.status, SoundpackValidationStatus::VersionOneNeedsConversion);
+        assert!(result.can_be_converted);
+    }
+
+    /// A config that is neither shape still reports what it is missing, and
+    /// names the field by the spelling packs actually use.
+    #[test]
+    fn a_config_with_no_definitions_reports_the_missing_field() {
+        let result = validate_json(r#"{ "name": "empty" }"#);
+
+        match result.status {
+            SoundpackValidationStatus::MissingRequiredFields(fields) => {
+                assert!(
+                    fields.iter().any(|f| f.contains("definitions")),
+                    "the missing field should be named as packs spell it, got {:?}",
+                    fields
+                );
+            }
+            other => panic!("expected missing required fields, got {:?}", other),
         }
     }
 }

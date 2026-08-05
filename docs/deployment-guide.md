@@ -86,6 +86,10 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    Releases published before this step existed (v0.6.1 and earlier) have no `SHA256SUMS.txt`. That is handled, not broken: the app reports "checksums unavailable" and falls back to the browser download button, which is the pre-Phase-6 behavior.
 
+   **Both Linux artifacts store settings in `~/.local/share/mechvibes/data`.** Neither writes beside its binary: the AppImage mount is read-only and temporary, and the `.deb`'s app root is `/usr/bin` (root-owned), which used to make `{app_root}/data` resolve to `/usr/bin/data` and silently discard every setting because `AppConfig::save()` fails soft. Fixed 260804. A config left at the old location by anyone who ran the app as root is copied across once on first launch, never overwriting a newer one; the original is left in place.
+
+   **The `.deb` ships `assets/` to `/usr/lib/mechvibes-dx/assets`**, which is not a free choice: `dioxus-asset-resolver` computes `current_exe()/../../lib` (so `/usr/lib` for `/usr/bin/mechvibes-dx`) and scans it for the first subdirectory containing an `assets/` folder. Before 260804 the package shipped no `assets/` at all, so every `asset!()` font fell back to a system font. The AppImage uses the same relative location.
+
    **Neither Linux artifact configures input permissions.** `maintainer-scripts` was deliberately removed from `[package.metadata.deb]`, so installing the package never modifies the user's groups, and an AppImage has no install step that could do so even in principle. Linux users must run `sudo usermod -a -G input $USER` and start a new session themselves, or the app runs silently. The generated release notes say this for both assets; keep that wording if you touch them. (The portable tarball was dropped by user decision 260803; the AppImage now covers the non-Debian users that decision left building from source.)
 
    **The AppImage's AppDir mirrors the `.deb` layout** (`usr/bin`, `usr/share/mechvibes-dx/soundpacks`) so a single binary serves both packages. Two placements are load-bearing, not cosmetic:

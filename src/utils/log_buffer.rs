@@ -558,7 +558,18 @@ mod tests {
         // A line the viewer would never have shown must still be exported.
         assert!(contents.contains("event 0"), "export must not be limited to the viewer window");
         assert!(contents.contains(&format!("event {}", total - 1)));
-        assert!(contents.contains(&format!("Lines captured: {}", total)));
+        // Foreign lines from parallel tests may land between our pushes, so
+        // the reported count is a floor, never an exact match.
+        let captured: usize = contents
+            .lines()
+            .find_map(|l| l.split("Lines captured: ").nth(1)?.split(' ').next()?.parse().ok())
+            .expect("export header must report a line count");
+        assert!(
+            captured >= total,
+            "export must cover at least our {} lines, header said {}",
+            total,
+            captured
+        );
     }
 
     #[test]

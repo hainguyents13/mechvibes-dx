@@ -99,10 +99,30 @@ jobs:
             fi
           fi
 
+          # A full changelog reads well on GitHub but overflows Discord's
+          # 2000-char cap, and a mid-sentence cut looks broken (it happened
+          # to v0.8.0). Compress to one line per change: each bullet keeps
+          # only its bold lead, or its first sentence when it has none.
+          # Headings and the appended Downloads section are dropped - the
+          # footer links to the full notes.
+          RELEASE_BODY=$(printf '%s\n' "$RELEASE_BODY" | awk '
+            /^### Downloads/ { exit }
+            /^- / {
+              line = $0
+              if (match(line, /\*\*[^*]+\*\*/)) {
+                print "- " substr(line, RSTART+2, RLENGTH-4)
+              } else {
+                sub(/^- /, "", line)
+                n = index(line, ". ")
+                if (n == 0) { print "- " line } else { print "- " substr(line, 1, n) }
+              }
+            }')
+
           # Plain message in the Mantine-announcement style (greeting +
           # what's new + links), not an embed. Discord caps `content` at
-          # 2000 chars, so the notes body is trimmed to leave room for the
-          # greeting and the links footer, which must always survive.
+          # 2000 chars, so the digest is still trimmed as a last resort to
+          # leave room for the greeting and the links footer, which must
+          # always survive.
           payload=$(jq -n \
             --arg name "$RELEASE_NAME" \
             --arg url "$RELEASE_URL" \

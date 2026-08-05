@@ -7,13 +7,24 @@ use std::fs;
 /// Load soundpack metadata from config.json
 pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, String> {
     let config_path = paths::soundpacks::config_json(soundpack_id);
-    // Reaching the end of this function means metadata loaded, so there is no
-    // error left to report. Conversion problems return early instead of being
-    // recorded here - a pack whose conversion failed has no usable metadata.
-    let last_error: Option<String> = None;
 
     // Validate the soundpack configuration first
     let validation_result = validate_soundpack_config(&config_path);
+
+    // A pack built for a newer release still yields readable metadata (name,
+    // author, icon), so it is listed rather than dropped. Carrying the reason
+    // in `last_error` is what keeps "why is this one not working" answerable -
+    // the status string alone has no text for a human to read.
+    let last_error: Option<String> = match validation_result.status {
+        SoundpackValidationStatus::RequiresNewerAppVersion(_) => {
+            Some(validation_result.message.clone())
+        }
+        // Reaching the end of this function means metadata loaded, so there is
+        // no error left to report. Conversion problems return early instead of
+        // being recorded here - a pack whose conversion failed has no usable
+        // metadata.
+        _ => None,
+    };
 
     // If it's a V1 config that can be converted, auto-convert it
     if
@@ -221,6 +232,9 @@ pub fn load_soundpack_metadata(soundpack_id: &str) -> Result<SoundpackMetadata, 
             SoundpackValidationStatus::MissingRequiredFields(_) => "missing_fields".to_string(),
             SoundpackValidationStatus::VersionOneNeedsConversion => {
                 "v1_needs_conversion".to_string()
+            }
+            SoundpackValidationStatus::RequiresNewerAppVersion(_) => {
+                "requires_newer_app_version".to_string()
             }
         },
         can_be_converted: final_validation.can_be_converted,
