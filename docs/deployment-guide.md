@@ -38,6 +38,8 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    Edit `CHANGELOG.md` and replace the empty `### Added` / `### Changed` / `### Fixed` headings under the new version section with real, user-facing entries. This becomes the GitHub release's notes verbatim (via `extract-changelog.ps1`), so write it for end users, not for other developers.
 
+   **Start every bullet with a short bold lead that states the outcome, not the defect.** The Discord announcement keeps only that bold lead, one line per change, so each lead must read as good news on its own: "**Windows settings now save on every install.**" works standalone; "**Soundpack version checks were broken for every pack.**" reads as bad news with no resolution. Phrase leads as what is better now; put the defect story in the sentences after the bold. No em dashes anywhere in the file.
+
 3. **Commit**
 
    ```powershell
