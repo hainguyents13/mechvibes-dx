@@ -35,5 +35,10 @@ We keep all important docs in `./docs` folder and keep updating them, structure 
 ├── system-architecture.md
 └── project-roadmap.md
 ```
+## Context ngoài repo
+Chiến lược, quyết định sản phẩm và guideline content nằm ở repo `hq`
+(github.com/hainguyents13/hq, thư mục shared/ + unikorn/).
+Trước khi đề xuất feature lớn hoặc viết content, đọc unikorn/decisions/ trước.
+```
 
 **IMPORTANT:** *MUST READ* and *MUST COMPLY* all *INSTRUCTIONS* in project `./CLAUDE.md`, especially *WORKFLOWS* section is *CRITICALLY IMPORTANT*, this rule is *MANDATORY. NON-NEGOTIABLE. NO EXCEPTIONS. MUST REMEMBER AT ALL TIMES!!!*

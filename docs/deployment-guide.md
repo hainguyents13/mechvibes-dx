@@ -154,6 +154,23 @@ Expected to be possible: the crate's macOS support is unverified. The job is `co
 **Local installer build fails with "Inno Setup not found"**
 Install Inno Setup 6 from https://jrsoftware.org/isinfo.php, or if already installed via winget, confirm it's at one of the paths `scripts/build-windows-installer.ps1` checks (`Program Files\Inno Setup 6`, or `%LOCALAPPDATA%\Programs\Inno Setup 6` for a per-user winget install).
 
+## Where writable state lives
+
+One rule across all three platforms: **writable state never goes next to the executable unless that location is genuinely the user's own.** Getting this wrong does not raise an error, because `AppConfig::save()` fails soft — it produces an app that silently discards every setting and resets on each launch. All three platforms shipped that bug at some point.
+
+| Build | Writable data (`config.json`, `themes.json`, `manifest.json`, `music.json`, cache) | Decided by |
+|---|---|---|
+| Windows installed (admin **or** per-user) | `%APPDATA%\Mechvibes\data` | `unins000.exe` beside the exe |
+| Windows portable / `cargo run` | `{app_root}\data` | no uninstaller present |
+| macOS `.app` | `~/Library/Application Support/Mechvibes/data` | `<name>.app/Contents/MacOS/` layout |
+| Linux `.deb` | `~/.local/share/mechvibes/data` | exe in `/usr/bin` or `/usr/local/bin` |
+| Linux AppImage | `~/.local/share/mechvibes/data` | `<mount>/usr/bin/` layout |
+| Linux portable / dev | `{app_root}/data` | none of the above |
+
+**Why Windows keys off the uninstaller rather than "is the directory writable".** A per-user install (`%LOCALAPPDATA%\Programs\MechvibesDX`) *is* writable, so a write-probe would send admin installs to `%APPDATA%` and per-user installs to the app folder — two installs of the same version disagreeing about where settings live. Worse, a probe result can change between launches (an admin repair, an antivirus lock, a policy change), silently relocating a user's config. Inno writes `unins000.exe` into the install directory and a portable copy never has one, so the answer is stable for the life of the install. `installer/windows/mechvibes-dx-setup.iss` uses `DefaultDirName={autopf}` with `PrivilegesRequired=lowest`, which is exactly why both install shapes exist in the wild.
+
+**Migration.** When the location moves, the *entire* old `data/` directory is copied once (files only, no recursion), never overwriting anything already at the destination, and the originals are left in place so a downgrade still finds them. This matters most on Windows: per-user installs have fully populated, working data directories right now, so without the copy the fix for admin installs would reset everyone else. The copy is not a curated file list on purpose — a real installed machine held `music.json` (37 KB, the largest file there), which no accessor in `paths.rs` names and any hand-maintained list would have dropped.
+
 ## Scope note
 
 Windows is the only fully supported platform: installer, upgrade path, and in-app auto-update.
