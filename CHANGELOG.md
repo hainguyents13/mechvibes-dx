@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Linux AppImage**: releases now include a portable `mechvibes-dx-<version>-x86_64.AppImage`. Download, `chmod +x`, run on any distro. Like the `.deb`, it needs your user in the `input` group (`sudo usermod -a -G input $USER`, then re-log). Settings are stored in `~/.local/share/mechvibes`.
+
+### Fixed
+
+- **Linux settings now actually save.** The `.deb` build tried to write its config next to the binary in a system directory normal users cannot write to, so every setting silently reset on each launch. Settings now live in `~/.local/share/mechvibes` following the XDG convention, and a config previously saved by running as root is migrated over automatically.
+- **Linux fonts and styling restored.** The `.deb` package never shipped the app's fonts and stylesheets, so the interface fell back to system fonts. They are now installed alongside the app.
+- **Soundpack version checks were broken for every pack.** A type mismatch and a wrong field name meant no soundpack ever passed the version check as designed; sound still played, but import validation was running on luck. Also, a soundpack made for a future format version now gets a clear "requires a newer version of MechvibesDX" message instead of a confusing missing-fields error.
+- **Discord release announcements no longer get cut off**: they now carry a one-line digest per change and link to the full notes.
+
 ## [0.8.0] - 2026-08-04
 
 ### Added
