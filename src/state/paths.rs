@@ -174,6 +174,52 @@ fn is_linux_system_install(exe_path: &Path) -> bool {
     )
 }
 
+/// True when `exe_path` looks like an *installed* Windows build, i.e. one the
+/// Inno Setup installer put there, as opposed to a portable copy or a
+/// `cargo build` output.
+///
+/// Detection is the presence of Inno's uninstaller (`unins000.exe`) beside the
+/// executable. This is the one marker that reliably separates the two, and it
+/// is a deliberate choice over the two obvious alternatives:
+///
+/// - **"is the directory writable?"** - the tempting rule, but it answers the
+///   question at the wrong moment. A per-user install under
+///   `%LOCALAPPDATA%\Programs` *is* writable, so a write-probe would keep
+///   writing data beside the exe there while an admin install writes to
+///   `%APPDATA%`. Two installs of the same version would then disagree about
+///   where settings live, and a probe result can change between launches (an
+///   admin repair, an antivirus lock, a policy change) - silently relocating a
+///   user's config. The rule must be stable for the life of an install.
+/// - **matching `Program Files`** - catches only the admin case, leaving the
+///   per-user install on the old path. It also hardcodes a localised,
+///   relocatable directory name.
+///
+/// So: every installed build routes writable state to `%APPDATA%\Mechvibes`
+/// regardless of which install mode was used, and portable/dev builds keep
+/// writing beside the executable, which is what makes a portable copy portable.
+///
+/// This is the one detector in this module that must touch the filesystem;
+/// the layout alone cannot distinguish an installed tree from a portable one,
+/// since both are just `<dir>/mechvibes-dx.exe` next to `assets/`. The decision
+/// is cached by the `OnceLock` in [`get_writable_data_dir`], so this runs once
+/// per process. Split from the pure-path helpers for exactly that reason, and
+/// tested through [`windows_install_marker_name`] plus the directory-probing
+/// tests below.
+#[cfg(target_os = "windows")]
+fn is_installed_windows_build(exe_path: &Path) -> bool {
+    exe_path
+        .parent()
+        .is_some_and(|dir| dir.join(windows_install_marker_name()).is_file())
+}
+
+/// The filename Inno Setup gives the uninstaller it writes into the install
+/// directory. Named so the tests can assert the exact string rather than
+/// duplicating a literal that could drift from the `.iss`.
+#[cfg(any(target_os = "windows", test))]
+fn windows_install_marker_name() -> &'static str {
+    "unins000.exe"
+}
+
 /// The mounted AppDir for this process, if it is running from an AppImage.
 fn running_from_appimage() -> Option<&'static PathBuf> {
     static APP_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
@@ -196,6 +242,12 @@ fn running_from_appimage() -> Option<&'static PathBuf> {
 ///   binary would be unreachable next time even if the write succeeded.
 /// - Linux system install (`.deb`) - `/usr/bin` is root-owned, and
 ///   `{app_root}/data` for it is `/usr/bin/data`.
+///
+/// The Windows installed-build case is deliberately NOT here: it is the only
+/// one that cannot be decided from the path alone (a portable copy and an
+/// installed tree look identical), so it needs a filesystem probe and lives in
+/// [`is_installed_windows_build`]. Keeping this function pure is what lets the
+/// other three rules be unit-tested on any platform.
 fn writable_data_belongs_in_system_dir(exe_path: &Path) -> bool {
     macos_bundle_resource_root(exe_path).is_some()
         || appimage_root(exe_path).is_some()
@@ -205,21 +257,31 @@ fn writable_data_belongs_in_system_dir(exe_path: &Path) -> bool {
 /// Directory holding writable application data (`config.json`, `themes.json`,
 /// the soundpack cache).
 ///
-/// Normally `{app_root}/data`, which keeps the Windows portable/installed
-/// layout, the dev-mode cwd layout, and macOS/Linux bare builds exactly as they
-/// were. It moves to the system app data dir only where the app root is
-/// genuinely not writable - see [`writable_data_belongs_in_system_dir`].
+/// Normally `{app_root}/data`, which keeps the portable layout, the dev-mode
+/// cwd layout, and macOS/Linux bare builds exactly as they were. It moves to
+/// the system app data dir where the app root is not a safe place to write -
+/// see [`writable_data_belongs_in_system_dir`] and, on Windows,
+/// [`is_installed_windows_build`].
 ///
 /// `AppConfig::save()` fails soft, so getting this wrong does not error - it
 /// produces an app that silently discards every setting and resets on each
-/// launch. Hence the explicit branches rather than a best-effort write.
+/// launch. That is exactly what an admin (`Program Files`) Windows install did
+/// before this branch existed. Hence the explicit rules rather than a
+/// best-effort write.
 fn get_writable_data_dir() -> &'static PathBuf {
     static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
     DATA_DIR.get_or_init(|| {
-        let in_system_dir = std::env::current_exe()
-            .ok()
+        let exe_path = std::env::current_exe().ok();
+
+        let in_system_dir = exe_path
             .as_deref()
             .is_some_and(writable_data_belongs_in_system_dir);
+
+        // Windows installed builds (both admin and per-user) also move, which
+        // needs a filesystem probe rather than a path rule.
+        #[cfg(target_os = "windows")]
+        let in_system_dir = in_system_dir
+            || exe_path.as_deref().is_some_and(is_installed_windows_build);
 
         if !in_system_dir {
             return get_app_root().join("data");
@@ -231,24 +293,36 @@ fn get_writable_data_dir() -> &'static PathBuf {
     })
 }
 
-/// One-time courtesy copy of a config left at the old, pre-fix location.
+/// One-time copy of a data directory left at the old, pre-fix location.
 ///
-/// Only ever relevant to someone who ran a `.deb` install as root (or otherwise
-/// had a writable `/usr/bin/data`), which is the sole way a file could exist
-/// there.
-/// Everyone else's old location was never writable, so there is nothing to
-/// move and this is a cheap `exists()` check that finds nothing.
+/// On Windows this is load-bearing rather than a courtesy. A **per-user**
+/// install (`%LOCALAPPDATA%\Programs\MechvibesDX`) is writable, so those users
+/// have a fully populated `data/` directory right now - settings, themes, the
+/// music library. Without this copy, the same fix that rescues admin installs
+/// would silently reset every per-user install to defaults.
+///
+/// Every regular file in the directory is copied, not a hardcoded list. The
+/// real inventory on an installed machine was `config.json`, `manifest.json`,
+/// `music.json`, `soundpack_cache.json` and `themes.json` - two more than the
+/// list this function used to carry, which would have silently dropped
+/// `manifest.json` (live) and `music.json` (a leftover cache from the removed
+/// music player). Enumerating is the rule that cannot rot as files come and
+/// go. Subdirectories are not recursed: nothing writes any, and copying an
+/// unbounded tree on startup is not a risk worth taking for a case that does
+/// not occur.
 ///
 /// Deliberately conservative:
-/// - never overwrites - if the new location already has a config, that one is
-///   authoritative and the old file is left untouched;
-/// - copies rather than moves, so a failure cannot destroy the only copy, and
-///   the old file stays readable if the user downgrades;
-/// - fails soft on every error, since this is a nicety and must never stop the
-///   app from starting.
+/// - **triggers only on an empty destination** - if the new location already
+///   has a `config.json`, that install has been running there and is
+///   authoritative; nothing is touched;
+/// - **never overwrites** an individual file, even so;
+/// - **copies rather than moves**, so a failure cannot destroy the only copy
+///   and a downgrade still finds the original;
+/// - **fails soft everywhere**, since this must never stop the app starting.
 fn migrate_legacy_data_dir(legacy_dir: &Path, system_dir: &Path) {
-    let legacy_config = legacy_dir.join("config.json");
-    if !legacy_config.is_file() {
+    // config.json is the marker for "this directory holds a real install's
+    // state", on both sides of the copy.
+    if !legacy_dir.join("config.json").is_file() {
         return;
     }
     if system_dir.join("config.json").exists() {
@@ -258,25 +332,51 @@ fn migrate_legacy_data_dir(legacy_dir: &Path, system_dir: &Path) {
         return;
     }
 
-    // config.json is the one that carries user settings. The cache and manifest
-    // are regenerated on demand, and themes.json is copied only if present.
-    for name in ["config.json", "themes.json"] {
-        let from = legacy_dir.join(name);
-        if from.is_file() {
-            match std::fs::copy(&from, system_dir.join(name)) {
-                Ok(_) => {
-                    crate::always_print!(
-                        "📦 Migrated {} from {} to {}",
-                        name,
-                        legacy_dir.display(),
-                        system_dir.display()
-                    );
-                }
-                Err(e) => {
-                    crate::always_eprint!("⚠️  Could not migrate {}: {}", name, e);
-                }
+    let entries = match std::fs::read_dir(legacy_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            // Worth a line rather than a silent return: it means a data
+            // directory that demonstrably holds a config.json could not be
+            // enumerated, so the user's settings are about to look lost.
+            crate::always_eprint!(
+                "⚠️  Could not read the previous data directory {}: {}",
+                legacy_dir.display(),
+                e
+            );
+            return;
+        }
+    };
+
+    let mut copied = 0usize;
+    for entry in entries.flatten() {
+        let from = entry.path();
+        if !from.is_file() {
+            continue;
+        }
+        let Some(name) = from.file_name() else {
+            continue;
+        };
+        let to = system_dir.join(name);
+        if to.exists() {
+            continue;
+        }
+        match std::fs::copy(&from, &to) {
+            Ok(_) => {
+                copied += 1;
+            }
+            Err(e) => {
+                crate::always_eprint!("⚠️  Could not migrate {}: {}", name.to_string_lossy(), e);
             }
         }
+    }
+
+    if copied > 0 {
+        crate::always_print!(
+            "📦 Migrated {} settings file(s) from {} to {}",
+            copied,
+            legacy_dir.display(),
+            system_dir.display()
+        );
     }
 }
 
@@ -940,6 +1040,129 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The whole point of copying the directory rather than a curated list:
+    /// `music.json` is real user data (37 KB on the machine this was found on)
+    /// that no accessor in this module names, so any hardcoded list drops it.
+    #[test]
+    fn every_data_file_is_migrated_not_just_the_known_ones() {
+        let root = scratch_dir("whole-dir");
+        let legacy = root.join("legacy");
+        let system = root.join("system");
+        std::fs::create_dir_all(&legacy).unwrap();
+
+        // The exact inventory found in a real per-user install.
+        for (name, body) in [
+            ("config.json", r#"{"volume":0.5}"#),
+            ("manifest.json", "{}"),
+            ("music.json", r#"{"tracks":[1,2,3]}"#),
+            ("soundpack_cache.json", r#"{"soundpacks":{}}"#),
+            ("themes.json", "[]"),
+        ] {
+            std::fs::write(legacy.join(name), body).unwrap();
+        }
+
+        super::migrate_legacy_data_dir(&legacy, &system);
+
+        for name in [
+            "config.json",
+            "manifest.json",
+            "music.json",
+            "soundpack_cache.json",
+            "themes.json",
+        ] {
+            assert!(
+                system.join(name).is_file(),
+                "{} was left behind by the migration",
+                name
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(system.join("music.json")).unwrap(),
+            r#"{"tracks":[1,2,3]}"#,
+            "music.json content must survive intact"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Subdirectories are intentionally not recursed. Asserted so that a future
+    /// change to recursive copying is a deliberate decision rather than a
+    /// silent one.
+    #[test]
+    fn migration_copies_files_but_does_not_recurse_into_subdirectories() {
+        let root = scratch_dir("no-recurse");
+        let legacy = root.join("legacy");
+        let system = root.join("system");
+        std::fs::create_dir_all(legacy.join("nested")).unwrap();
+        std::fs::write(legacy.join("config.json"), "{}").unwrap();
+        std::fs::write(legacy.join("nested").join("deep.json"), "{}").unwrap();
+
+        super::migrate_legacy_data_dir(&legacy, &system);
+
+        assert!(system.join("config.json").is_file());
+        assert!(
+            !system.join("nested").exists(),
+            "subdirectories must not be copied"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Windows rule keys off Inno's uninstaller sitting beside the exe.
+    /// Exercised against a real directory, since it is a filesystem probe.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn a_windows_build_is_installed_only_when_innos_uninstaller_is_present() {
+        use super::{ is_installed_windows_build, windows_install_marker_name };
+
+        let root = scratch_dir("win-install");
+        let portable = root.join("portable");
+        let installed = root.join("installed");
+        std::fs::create_dir_all(&portable).unwrap();
+        std::fs::create_dir_all(&installed).unwrap();
+
+        let portable_exe = portable.join("mechvibes-dx.exe");
+        let installed_exe = installed.join("mechvibes-dx.exe");
+        std::fs::write(&portable_exe, "").unwrap();
+        std::fs::write(&installed_exe, "").unwrap();
+        std::fs::write(installed.join(windows_install_marker_name()), "").unwrap();
+
+        assert!(
+            is_installed_windows_build(&installed_exe),
+            "an exe beside unins000.exe is an installed build"
+        );
+        assert!(
+            !is_installed_windows_build(&portable_exe),
+            "a portable copy must keep writing data beside itself"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A directory that merely *contains* the marker name is not enough - it
+    /// has to be a file beside the executable.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn a_directory_named_like_the_uninstaller_does_not_count() {
+        use super::{ is_installed_windows_build, windows_install_marker_name };
+
+        let root = scratch_dir("win-marker-dir");
+        std::fs::create_dir_all(root.join(windows_install_marker_name())).unwrap();
+        let exe = root.join("mechvibes-dx.exe");
+        std::fs::write(&exe, "").unwrap();
+
+        assert!(!is_installed_windows_build(&exe));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The marker name must match what the Inno script actually produces.
+    /// Pinned here so a rename in the `.iss` cannot silently disable the fix.
+    #[test]
+    fn the_windows_install_marker_is_innos_default_uninstaller_name() {
+        assert_eq!(super::windows_install_marker_name(), "unins000.exe");
     }
 
     /// The two detectors describe disjoint layouts. A path can never be both,
