@@ -228,6 +228,20 @@ fn running_from_appimage() -> Option<&'static PathBuf> {
         .as_ref()
 }
 
+/// Whether this process is running from a mounted AppImage.
+///
+/// Exposed for the auto-updater, which offers the `.AppImage` release asset to
+/// AppImage users and the `.deb` to everyone else on Linux - the download link
+/// should match how the app is actually being run. Cached, like every other
+/// detector here.
+///
+/// Only the Linux arm of `current_install_kind()` calls this, so it reads as
+/// dead code on a Windows or macOS build.
+#[allow(dead_code)]
+pub fn is_running_from_appimage() -> bool {
+    running_from_appimage().is_some()
+}
+
 /// Whether writable state must live in the system app data dir rather than
 /// beside the executable, given where the executable is.
 ///
