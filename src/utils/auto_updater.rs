@@ -70,6 +70,87 @@ impl fmt::Display for UpdateError {
 
 impl Error for UpdateError {}
 
+/// How this build is packaged, which is what decides *which* release asset the
+/// user should be pointed at.
+///
+/// This exists so the choice is a pure function of an enum rather than a
+/// `#[cfg]`-gated closure. The previous shape compiled exactly one arm per
+/// platform, so the Linux rule could only ever be exercised by a Linux test
+/// run - and a Windows-only local suite reported green while `main` went red on
+/// ubuntu. Every arm is now reachable from every OS.
+///
+/// Every variant is constructed on the platform it describes, but only one
+/// platform is ever compiled at a time - so on any given build the other
+/// variants look dead to the lint. That is the whole point of the type: the
+/// rules for all four are compiled, and tested, everywhere.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallKind {
+    /// Windows, installed or portable: the `.exe` installer is the asset.
+    Windows,
+    /// macOS: the `.dmg`.
+    MacOs,
+    /// Linux, running from a mounted AppImage.
+    LinuxAppImage,
+    /// Linux, anything else (a `.deb` install, or a build from source).
+    LinuxPackage,
+}
+
+/// The packaging of the currently running build.
+///
+/// The only part of the asset choice that is platform- and runtime-dependent;
+/// everything downstream of it is pure.
+fn current_install_kind() -> InstallKind {
+    #[cfg(target_os = "windows")]
+    {
+        InstallKind::Windows
+    }
+    #[cfg(target_os = "macos")]
+    {
+        InstallKind::MacOs
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        if crate::state::paths::is_running_from_appimage() {
+            InstallKind::LinuxAppImage
+        } else {
+            InstallKind::LinuxPackage
+        }
+    }
+}
+
+/// Whether `name` (already lowercased) is the asset `kind` should install.
+///
+/// On Linux the answer deliberately depends on how the app is *running*, not
+/// merely on the OS: someone who launched an AppImage should be pointed at the
+/// next AppImage, and someone on a `.deb` install at the next `.deb`. Both
+/// assets ship in every release, so without this the alphabetically-first one
+/// won - which is exactly how the `.AppImage` started being offered to `.deb`
+/// users.
+fn asset_matches(kind: InstallKind, name: &str) -> bool {
+    match kind {
+        // Must contain "x64" and end in ".exe" - the same contract the release
+        // pipeline asserts on (see release.yml).
+        InstallKind::Windows => name.ends_with(".exe") && name.contains("x64"),
+        InstallKind::MacOs => name.ends_with(".dmg") || name.ends_with(".pkg"),
+        InstallKind::LinuxAppImage => name.ends_with(".appimage"),
+        InstallKind::LinuxPackage => name.ends_with(".deb"),
+    }
+}
+
+/// The download URL `kind` should be offered from `assets`, if any.
+///
+/// Pure, so every platform's rule is testable from every platform. Linux and
+/// macOS still have no unattended in-place upgrade path; these arms exist to
+/// keep the "what's new" UI honest, and the UI links to the Releases page
+/// rather than downloading anything.
+fn find_download_url_for(kind: InstallKind, assets: &[GitHubAsset]) -> Option<String> {
+    assets
+        .iter()
+        .find(|asset| asset_matches(kind, &asset.name.to_lowercase()))
+        .map(|asset| asset.browser_download_url.clone())
+}
+
 pub struct AutoUpdater {
     pub current_version: String,
 }
@@ -152,30 +233,7 @@ impl AutoUpdater {
     /// alphabetically first in every release. A missing button is correct;
     /// a button that downloads an unusable file is not.
     fn find_download_url(&self, assets: &[GitHubAsset]) -> Option<String> {
-        #[cfg(target_os = "windows")]
-        let matches = |name: &str| {
-            // Must contain "x64" and end in ".exe" - the same contract the
-            // release pipeline asserts on (see release.yml).
-            name.ends_with(".exe") && name.contains("x64")
-        };
-
-        // Linux and macOS have no unattended in-place upgrade path yet, so
-        // these arms exist only to keep the "what's new" UI honest; the UI
-        // links to the Releases page instead of downloading anything.
-        #[cfg(target_os = "macos")]
-        let matches = |name: &str| {
-            name.ends_with(".dmg") || name.ends_with(".pkg") || name.contains("macos")
-        };
-
-        #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-        let matches = |name: &str| {
-            name.ends_with(".deb") || name.ends_with(".appimage")
-        };
-
-        assets
-            .iter()
-            .find(|asset| matches(&asset.name.to_lowercase()))
-            .map(|asset| asset.browser_download_url.clone())
+        find_download_url_for(current_install_kind(), assets)
     }
 
     /// Link to the release page, used wherever a direct download is not
@@ -915,58 +973,122 @@ mod tests {
         ]
     }
 
-    /// Linux releases now carry two installable assets. Neither is served as a
-    /// silent update (`silent_update_supported()` is Windows-only and the UI
-    /// links to the Releases page), so which one wins matters far less than
-    /// that it is a Linux one - asserted here so a future reordering of the
-    /// asset list cannot start handing Linux users a `.dmg` or an `.exe`.
+    /// Both Linux kinds must only ever see a Linux asset, never a `.dmg` or an
+    /// `.exe`. The earlier version of this test early-returned on Windows,
+    /// which is the same blind spot as a `#[cfg]` - it simply never ran where
+    /// the suite was actually being run.
     #[test]
-    fn a_linux_build_is_only_ever_offered_a_linux_asset() {
-        if cfg!(any(target_os = "windows", target_os = "macos")) {
-            return;
+    fn neither_linux_kind_is_ever_offered_a_foreign_asset() {
+        let assets = release_assets();
+        for kind in [InstallKind::LinuxAppImage, InstallKind::LinuxPackage] {
+            let url = find_download_url_for(kind, &assets).unwrap().to_lowercase();
+            assert!(
+                url.ends_with(".deb") || url.ends_with(".appimage"),
+                "{:?} was offered {}",
+                kind,
+                url
+            );
         }
-        let url = AutoUpdater::new().find_download_url(&release_assets()).unwrap_or_default();
-        let name = url.to_lowercase();
-        assert!(
-            name.ends_with(".deb") || name.ends_with(".appimage"),
-            "a Linux build was offered {}",
-            url
-        );
     }
 
-    /// The AppImage alone must also be recognised: a release that (for any
-    /// reason) ships no `.deb` still has to light up the Linux download path
-    /// rather than falling through to None and hiding the asset entirely.
+    /// Every packaging kind's choice, asserted from **every** OS.
+    ///
+    /// The predecessor of this test gated each expectation behind a `#[cfg]`,
+    /// so only one arm compiled per platform. A Windows-only local run
+    /// therefore never executed the Linux rule, and `main` went red on ubuntu
+    /// the moment the AppImage asset started sorting ahead of the `.deb`. This
+    /// version has no `cfg` at all.
     #[test]
-    fn an_appimage_only_release_is_still_recognised_on_linux() {
-        if cfg!(any(target_os = "windows", target_os = "macos")) {
-            return;
-        }
-        let assets = vec![
-            asset("MechvibesDX-0.7.0-Setup-x64.exe"),
-            asset("mechvibes-dx-0.7.0-x86_64.AppImage"),
-        ];
+    fn each_install_kind_is_offered_the_asset_it_can_install() {
+        let assets = release_assets();
+        let pick = |kind| find_download_url_for(kind, &assets);
+
         assert_eq!(
-            AutoUpdater::new().find_download_url(&assets).as_deref(),
-            Some("https://example.com/mechvibes-dx-0.7.0-x86_64.AppImage")
+            pick(InstallKind::Windows).as_deref(),
+            Some("https://example.com/MechvibesDX-0.7.0-Setup-x64.exe")
         );
-    }
-
-    #[test]
-    fn picks_the_asset_this_platform_can_actually_install() {
-        let url = AutoUpdater::new().find_download_url(&release_assets());
-
-        #[cfg(target_os = "windows")]
-        assert_eq!(url.as_deref(), Some("https://example.com/MechvibesDX-0.7.0-Setup-x64.exe"));
-
-        #[cfg(target_os = "macos")]
         assert_eq!(
-            url.as_deref(),
+            pick(InstallKind::MacOs).as_deref(),
             Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64-experimental.dmg")
         );
+        assert_eq!(
+            pick(InstallKind::LinuxAppImage).as_deref(),
+            Some("https://example.com/mechvibes-dx-0.7.0-x86_64.AppImage"),
+            "an AppImage user must be offered the next AppImage"
+        );
+        assert_eq!(
+            pick(InstallKind::LinuxPackage).as_deref(),
+            Some("https://example.com/mechvibes-dx_0.7.0_amd64.deb"),
+            "a .deb user must be offered the next .deb"
+        );
+    }
 
-        #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-        assert_eq!(url.as_deref(), Some("https://example.com/mechvibes-dx_0.7.0_amd64.deb"));
+    /// The exact regression that turned `main` red: both Linux assets ship in
+    /// every release, and the `.AppImage` sorts before the `.deb`, so a rule
+    /// that accepted either would hand `.deb` users an AppImage purely by
+    /// list order. Pinned so asset naming cannot resurrect it.
+    #[test]
+    fn linux_asset_order_in_the_release_never_decides_the_pick() {
+        let forward = release_assets();
+        let mut reversed = release_assets();
+        reversed.reverse();
+
+        for assets in [forward, reversed] {
+            assert!(
+                find_download_url_for(InstallKind::LinuxPackage, &assets)
+                    .unwrap()
+                    .ends_with(".deb"),
+                "a .deb install was offered a non-.deb asset"
+            );
+            assert!(
+                find_download_url_for(InstallKind::LinuxAppImage, &assets)
+                    .unwrap()
+                    .to_lowercase()
+                    .ends_with(".appimage"),
+                "an AppImage run was offered a non-AppImage asset"
+            );
+        }
+    }
+
+    /// No kind may ever be handed another platform's installer, checked
+    /// exhaustively rather than for the one platform being compiled.
+    #[test]
+    fn no_install_kind_is_ever_offered_another_platforms_asset() {
+        let assets = release_assets();
+        for (kind, expected_suffix) in [
+            (InstallKind::Windows, ".exe"),
+            (InstallKind::MacOs, ".dmg"),
+            (InstallKind::LinuxAppImage, ".appimage"),
+            (InstallKind::LinuxPackage, ".deb"),
+        ] {
+            let url = find_download_url_for(kind, &assets).unwrap().to_lowercase();
+            assert!(
+                url.ends_with(expected_suffix),
+                "{:?} was offered {}, expected a {} asset",
+                kind,
+                url,
+                expected_suffix
+            );
+        }
+    }
+
+    /// `README-macos-<version>.txt` ships in real releases. The macOS rule used
+    /// to accept any name containing "macos", which would have matched that
+    /// text file ahead of the DMG had it sorted first.
+    #[test]
+    fn the_macos_rule_does_not_match_the_readme_text_file() {
+        assert!(!asset_matches(InstallKind::MacOs, "readme-macos-0.7.0.txt"));
+        assert!(asset_matches(InstallKind::MacOs, "mechvibes-dx-0.7.0-macos-arm64-experimental.dmg"));
+    }
+
+    /// A release missing this kind's asset yields None, so the UI falls back to
+    /// the Releases-page link instead of offering something unusable.
+    #[test]
+    fn a_kind_with_no_matching_asset_gets_nothing() {
+        let only_windows = vec![asset("MechvibesDX-0.7.0-Setup-x64.exe")];
+        assert_eq!(find_download_url_for(InstallKind::LinuxPackage, &only_windows), None);
+        assert_eq!(find_download_url_for(InstallKind::LinuxAppImage, &only_windows), None);
+        assert_eq!(find_download_url_for(InstallKind::MacOs, &only_windows), None);
     }
 
     /// The regression that mattered: no platform may ever be handed a
