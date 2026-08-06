@@ -293,20 +293,25 @@ pub fn reveal_in_file_manager(path: &std::path::Path) {
     }
 }
 
+/// Serializes every test, in ANY module, that asserts against the
+/// process-global ring buffer.
+///
+/// Marker-filtering alone is not enough: the rotation test floods past
+/// capacity and EVICTS other tests' lines from the buffer entirely, which is
+/// how this flake family hit three different tests across two modules before
+/// this guard existed. A test that pushes and then asserts on buffer contents
+/// must hold this guard; incidental pushes from app code under test elsewhere
+/// remain possible, so guarded tests still tag their own lines and assert on
+/// the filtered subset rather than absolute positions.
+#[cfg(test)]
+pub fn buffer_test_guard() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The buffer is process-global, so tests that push must not run
-    /// concurrently with each other. Each takes this lock rather than relying
-    /// on the harness's thread scheduling.
-    ///
-    /// The lock is NOT enough on its own: tests in OTHER modules exercise app
-    /// code that logs through `always_print!`, so foreign lines can land in
-    /// the buffer at any moment. Order-sensitive tests therefore tag their own
-    /// lines with a unique marker and assert on the filtered subset, never on
-    /// absolute buffer positions.
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn reset() {
         buffer().lock().unwrap().clear();
@@ -323,7 +328,7 @@ mod tests {
 
     #[test]
     fn lines_are_kept_in_order_with_a_timestamp() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push("ordertest 0");
@@ -341,7 +346,7 @@ mod tests {
 
     #[test]
     fn the_buffer_rotates_and_never_grows_past_capacity() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         // Overfill by a clear margin so both the cap and the drop order are
@@ -366,7 +371,7 @@ mod tests {
 
     #[test]
     fn recent_returns_the_tail_oldest_first() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         for i in 0..10 {
@@ -387,7 +392,7 @@ mod tests {
 
     #[test]
     fn recent_asking_for_more_than_exists_returns_everything() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push("loneline 0");
@@ -404,7 +409,7 @@ mod tests {
         // Otherwise the viewer's "last 100 lines" would be a lie for any
         // message carrying an embedded newline, and one entry would render as
         // several rows.
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push("alpha\nbeta");
@@ -427,7 +432,7 @@ mod tests {
 
     #[test]
     fn every_push_moves_the_generation() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         let before = generation();
@@ -468,7 +473,7 @@ mod tests {
 
     #[test]
     fn verbose_lines_are_dropped_entirely_while_verbose_is_off() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push_verbose("🔬 TRACE key=KeyA total=3.1ms");
@@ -477,7 +482,7 @@ mod tests {
 
     #[test]
     fn verbose_lines_reach_the_buffer_masked_when_on() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         VERBOSE.store(true, Ordering::Relaxed);
@@ -496,7 +501,7 @@ mod tests {
     fn no_raw_key_code_can_reach_the_buffer_through_the_verbose_door() {
         // Guards the hard rule across a spread of real key codes rather than
         // one example, since this is the promise made to the user.
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
         VERBOSE.store(true, Ordering::Relaxed);
 
@@ -514,7 +519,7 @@ mod tests {
 
     #[test]
     fn the_export_carries_the_header_and_every_line() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         for i in 0..5 {
@@ -544,7 +549,7 @@ mod tests {
     fn the_export_contains_more_than_the_viewer_shows() {
         // The whole point of Export: the viewer is a 100-line tail, the file
         // is the entire buffer.
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         let total = VIEWER_LINES + 250;
@@ -574,7 +579,7 @@ mod tests {
 
     #[test]
     fn the_export_reports_verbose_state_in_its_header() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         VERBOSE.store(true, Ordering::Relaxed);
@@ -656,7 +661,7 @@ mod tests {
     fn the_verbose_toggle_makes_real_trace_points_reach_the_buffer() {
         use crate::libs::trace::{ Point, record };
 
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         assert!(
@@ -703,7 +708,7 @@ mod tests {
     fn turning_verbose_off_stops_the_flow() {
         use crate::libs::trace::{ Point, record };
 
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         set_verbose(true);
@@ -731,7 +736,7 @@ mod tests {
     /// lines while verbose is off must leave the buffer untouched.
     #[test]
     fn typing_with_verbose_off_produces_no_pushes() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         let generation_before = generation();
@@ -759,7 +764,7 @@ mod tests {
     fn demonstrate_verbose_toggle() {
         use crate::libs::trace::{ Point, record };
 
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         println!(
@@ -807,7 +812,7 @@ mod tests {
     #[test]
     #[ignore = "diagnostic: prints a sample export"]
     fn show_a_real_export() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push("🐛 Debug logging enabled");
@@ -828,7 +833,7 @@ mod tests {
 
     #[test]
     fn exporting_writes_a_readable_file_containing_the_buffer() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = super::buffer_test_guard();
         reset();
 
         push("a line that must survive the round trip");

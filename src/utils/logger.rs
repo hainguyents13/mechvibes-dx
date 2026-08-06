@@ -80,6 +80,11 @@ mod tests {
     /// place an installed release build's logs exist.
     #[test]
     fn always_print_reaches_the_ring_buffer() {
+        // Serialized with every other buffer-asserting test: without this,
+        // log_buffer's rotation test can flood the shared buffer and evict
+        // this test's line before the assertion reads it back.
+        let _guard = crate::utils::log_buffer::buffer_test_guard();
+
         let before = crate::utils::log_buffer::generation();
         crate::always_print!("logger test marker {}", 42);
         assert!(
