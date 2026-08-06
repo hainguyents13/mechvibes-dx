@@ -2,44 +2,136 @@
 
 # MechvibesDX
 
-**A fun and practical way to bring your favorite sounds anywhere!**
+Play rich keyboard and mouse sounds with every keystroke and click. A polyphonic, low-latency mechanical keyboard sound simulator for Windows, macOS, and Linux. Successor of Mechvibes, now with resample-on-load audio, dedicated audio engine thread, and one-click verified updates.
 
-MechvibesDX lets you play any sound when you type or click. Use it for education, presentations, gaming, or just for fun.
+## Download
+
+| Platform | Installer | Notes |
+|----------|-----------|-------|
+| **Windows** | [`MechvibesDX-*-Setup-x64.exe`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | One-click installer with automatic in-app updates (SHA-256 verified). |
+| **Linux (Debian/Ubuntu)** | [`mechvibes-dx_*_amd64.deb`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | `sudo dpkg -i`. Requires: `sudo usermod -a -G input $USER` + re-log. |
+| **Linux (any distro)** | [`mechvibes-dx-*-x86_64.AppImage`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | Portable (no install). Requires: `chmod +x` + same input group setup. |
+| **macOS** | [`mechvibes-dx-*-macos-arm64-experimental.dmg`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | Experimental, unsigned. Right-click the app, then Open to bypass Gatekeeper. |
+
+All links point to the [latest release](https://github.com/hainguyents13/mechvibes-dx/releases/latest); every release also ships a `SHA256SUMS.txt` covering all assets.
 
 ## Features
 
--   Play sounds on every keystroke (keydown/keyup) and mouse click (press/release)
--   Works with education, business, gaming, and accessibility needs
--   Global hotkey toggle (`Ctrl+Alt+M`)
--   System tray integration
--   Custom soundpack support
--   Multiple themes available
--   Logo and background customizations
+- **Polyphonic low-latency audio**: Sounds play within ~15ms of keystroke. Resampled at load time (not realtime) for high quality. 32-voice pool with soft eviction prevents clicks and clipping on rapid keystrokes.
+- **Works while app is focused**: Dedicated Raw Input worker process on Windows; in-process listeners on Linux/macOS. Keyboard and mouse capture work the same whether MechvibesDX window is active or not.
+- **Per-device input filtering** (Windows): Disable specific keyboards or mice in Settings, effective immediately.
+- **Runtime output device switching**: Change audio output (headphones, speakers, virtual devices) in Settings without restarting.
+- **Soundpack support**: Import or create custom soundpacks. Drag and drop folders into the app. Supports OGG, WAV, MP3, FLAC. Auto-converts classic Mechvibes packs (V1) to V2 format.
+- **Ambiance sounds**: Long-playing background audio (rain, coffee shop) that moves with your selected output device.
+- **Themes and customization**: Light/dark themes, custom logo, background images.
+- **Tray icon and global hotkey**: `Ctrl+Alt+M` to mute/unmute. Tray icon shows mute state at a glance.
+- **One-click verified updates** (Windows): When new versions are available, download and install with SHA-256 verification. Choose "Later" to defer, but the verified file stays ready.
+- **Settings save correctly**: Writable state lives in `%APPDATA%\Mechvibes` (Windows), `~/.local/share/mechvibes` (Linux), or `~/Library/Application Support/Mechvibes` (macOS). Settings persist across restarts, reinstalls, and updates.
+- **Debug section**: Live log viewer in Settings with export button for bug reports. Optional verbose mode adds per-keystroke timing for diagnosing latency.
 
-## Installation
+## Soundpacks
 
-### End Users
+Soundpacks define the sounds that play for each key and mouse button. The app ships with a curated collection (Classic Mechvibes, Cherry MX Black, etc.). You can add your own.
 
-1. Download from [Releases](https://github.com/hainguyents13/mechvibes-dx/releases)
-2. Run installer
-3. Select soundpacks
-4. Enjoy the sounds or playing with Customizations
+### Import a soundpack
 
-### Building from Source
+1. Download or create a soundpack folder.
+2. In the app, Settings > Soundpacks > "Import Soundpack" (or drag the folder in).
+3. Choose which soundpack to load for keyboard and mouse sounds.
 
-#### Prerequisites
+### Create a soundpack
 
-All platforms:
-- [Rust](https://rustup.rs/) (1.70 or later)
-- [Dioxus CLI](https://dioxuslabs.com/learn/0.6/getting_started): `cargo install dioxus-cli`
+A soundpack is a folder containing:
+- **config.json** (required): metadata and key mappings
+- **Audio files** (OGG, WAV, MP3, FLAC): the sounds to play
+- **icon.png** (optional): a display icon
 
-#### Platform-Specific Dependencies
+**Minimal example:**
+```
+my-keyboard-pack/
+├── config.json
+└── typewriter-click.ogg
+```
 
-**Windows**
-- Visual Studio Build Tools (C++ build tools)
-- [Inno Setup](https://jrsoftware.org/isinfo.php) (for creating installer)
+**config.json (V2 format):**
+```json
+{
+  "id": "typewriter-minimal",
+  "name": "Typewriter",
+  "author": "You",
+  "config_version": "2",
+  "definition_method": "single",
+  "audio_file": "typewriter-click.ogg",
+  "definitions": {
+    "KeyA": { "timing": [[0, 50]] },
+    "KeyB": { "timing": [[50, 100]] }
+  },
+  "options": { "recommended_volume": 0.8, "random_pitch": false },
+  "soundpack_type": "Keyboard"
+}
+```
 
-**Linux (Ubuntu/Debian)**
+Timing values are `[start_ms, end_ms]` within the audio file. For "single" method, all keys reference the same audio file with different timing windows. For "multi" method, each key can use a different file.
+
+### Classic Mechvibes packs
+
+Old V1 soundpacks (e.g., from the original Mechvibes) are auto-detected on import. The app automatically converts them to V2 format with no loss of sound quality. Your original files stay intact; a backup is kept if re-imported.
+
+## Platform Notes
+
+### Windows
+- SmartScreen may warn on first run (unsigned installer). Click "More info" then "Run anyway" to proceed.
+- "Start with Windows" in Settings uses Task Scheduler (admin install required for per-user startup).
+- Single-instance mutex prevents multiple app windows running at once.
+
+### Linux
+- **Input group requirement**: The app reads raw keyboard/mouse events from `/dev/input/event*`, which requires membership in the `input` group:
+  ```bash
+  sudo usermod -a -G input $USER
+  # Log out and log back in for the group change to take effect
+  ```
+- **Wayland**: rdev (the input listener) supports Wayland as of recent versions; X11 is also fully supported.
+- **AppImage notes**: The `.AppImage` mounts read-only; writable state goes to `~/.local/share/mechvibes`. No FUSE required to run.
+
+### macOS
+- **Experimental**: Not tested on real hardware. Ad-hoc signed, not notarized.
+- **First launch**: Right-click the app, choose "Open" to bypass Gatekeeper's "unidentified developer" block.
+- **Accessibility permission**: macOS may ask for microphone/accessibility access. Grant it for global hotkey and input capture to work.
+- Arm64 (Apple Silicon) only in current builds. Intel builds available on request.
+
+## Privacy and Telemetry
+
+MechvibesDX sends one anonymous ping per launch to track rough usage. Nothing else leaves your device.
+
+**What is sent (once per launch):**
+- OS name and version
+- App version
+- Your system language (locale)
+- A random session ID (generated fresh each launch, never stored)
+
+**What is never sent:**
+- Keystrokes, mouse clicks, or any input data
+- Soundpack names or usage
+- File paths or personal data
+- IP-derived identity or persistent identifiers
+
+Telemetry is handled by [Aptabase](https://aptabase.com), an open-source privacy-first service. **Opt out** anytime in Settings > Privacy > "Share anonymous usage stats".
+
+Debug logs stay local until you export them via the Debug button. Key names in logs are always masked (e.g., "KEY_A" instead of actual keystroke data).
+
+## Building from Source
+
+### Prerequisites
+
+**All platforms:**
+- [Rust](https://rustup.rs/) 1.70 or later
+- [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started) 0.7.10: `cargo install dioxus-cli --version 0.7.10`
+
+**Windows:**
+- Visual Studio Build Tools (C++ support)
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (for building installers)
+
+**Linux (Ubuntu/Debian):**
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
@@ -51,12 +143,9 @@ sudo apt-get install -y \
     librsvg2-dev \
     libevdev-dev \
     libxdo-dev
-# Note: no FUSE package is needed to BUILD the AppImage - the build script
-# runs appimagetool with APPIMAGE_EXTRACT_AND_RUN=1. Running a finished
-# AppImage on a machine without FUSE needs that same env var, or libfuse2.
 ```
 
-**Linux (Fedora/RHEL)**
+**Linux (Fedora/RHEL):**
 ```bash
 sudo dnf install -y \
     alsa-lib-devel \
@@ -67,136 +156,87 @@ sudo dnf install -y \
     librsvg2-devel \
     libevdev-devel \
     xdotool-devel
-# Note: no FUSE package is needed to BUILD the AppImage - the build script
-# runs appimagetool with APPIMAGE_EXTRACT_AND_RUN=1. Running a finished
-# AppImage on a machine without FUSE needs that same env var, or fuse-libs.
 ```
 
-**macOS**
+**macOS:**
 ```bash
 xcode-select --install
 ```
 
-#### Build Instructions
+### Build
 
-**Development (all platforms)**
+**Development (all platforms):**
 ```bash
-# Clone repository
 git clone https://github.com/hainguyents13/mechvibes-dx.git
 cd mechvibes-dx
-
-# Run in development mode
 dx serve
-
-# Or use cargo directly
-cargo run
 ```
 
-**Release Build**
-
-Windows:
+**Release (Windows):**
 ```bash
-# Build release binary
 cargo build --release
-
-# Create installer (requires Inno Setup)
 .\scripts\build-windows-installer.ps1
-
-# Output: dist/MechvibesDX-0.4.0-Setup.exe
+# Output: dist/MechvibesDX-0.8.1-Setup-x64.exe
 ```
 
-Linux:
+**Release (Linux, AppImage):**
 ```bash
-# Everything below needs the release binary first
 cargo build --release
-# Binary location: target/release/mechvibes-dx
+./scripts/build-linux-appimage.sh 0.8.1
+chmod +x dist/mechvibes-dx-0.8.1-x86_64.AppImage
+# Remember: run 'sudo usermod -a -G input $USER' and re-log before first use
+```
 
-# Option 1: AppImage (portable, runs on any distro)
-./scripts/build-linux-appimage.sh 0.8.0
-# Output: dist/mechvibes-dx-0.8.0-x86_64.AppImage
-chmod +x dist/mechvibes-dx-0.8.0-x86_64.AppImage
-./dist/mechvibes-dx-0.8.0-x86_64.AppImage
-
-# Option 2: DEB (Ubuntu/Debian)
+**Release (Linux, DEB):**
+```bash
+cargo build --release
 cargo install cargo-deb
 cargo deb --no-build
-# Output: target/debian/mechvibes-dx_0.8.0_amd64.deb
-sudo dpkg -i target/debian/mechvibes-dx_0.8.0_amd64.deb
-
-# Every method requires this once - neither package ships maintainer
-# scripts, so nothing touches your groups automatically:
-sudo usermod -a -G input $USER
-# Log out and log back in for group changes to take effect
+sudo dpkg -i target/debian/mechvibes-dx_0.8.1_amd64.deb
 ```
 
-macOS:
+**Release (macOS):**
 ```bash
-# Build release binary
 cargo build --release
-
-# Assemble MechvibesDX.app and package it as a DMG
-# (`dx bundle` is not used - it currently ships an empty Contents/Resources,
-#  see DioxusLabs/dioxus#5723)
-./scripts/build-macos-app.sh 0.7.1
-
-# Output: dist/mechvibes-dx-0.7.1-macos-arm64-experimental.dmg
+./scripts/build-macos-app.sh 0.8.1
+# Output: dist/mechvibes-dx-0.8.1-macos-arm64-experimental.dmg
 ```
 
-macOS builds are **experimental**: ad-hoc signed, not notarized, and untested on
-real hardware. On first launch, right-click the app and choose "Open" to get
-past Gatekeeper. See `README-macos.txt` for details.
-
-## Use cases
-
-**Education** - Musical scales, animal sounds, language learning
-
-**Business** - Professional typewriter sounds, meeting-friendly modes
-
-**Gaming** - Retro arcade sounds, custom sound effects
-
-**Accessibility** - Audio feedback for visually impaired users
-
-## Creating soundpacks
-
-1. Record audio files (OGG, WAV, MP3)
-2. Create config.json mapping keys to sounds
-3. Drag and drop folder into app
-
-```
-Piano pack/
-├── config.json
-├── piano.ogg
-└── icon.png
-```
+For architecture details, see [docs/system-architecture.md](docs/system-architecture.md). For release procedures and deployment, see [docs/deployment-guide.md](docs/deployment-guide.md).
 
 ## Troubleshooting
 
-**No sounds?** Check if muted (`Ctrl+Alt+M`), soundpack selected, system volume
+**No sound playing?**
+- Check if muted (tray icon or `Ctrl+Alt+M`).
+- Verify a soundpack is selected in Settings > Soundpacks.
+- Check system volume.
 
-**Hotkey not working?** Run as administrator, check for conflicts
-
-**Soundpack won't load?** Verify config.json syntax, supported audio formats
+**Hotkey (`Ctrl+Alt+M`) not working?**
+- Windows: Run as administrator (required for global hotkey).
+- Verify no other app has claimed the same hotkey.
 
 **Linux: No keyboard input detected?**
-- Add user to `input` group: `sudo usermod -a -G input $USER`
-- Log out and log back in for changes to take effect
-- Verify with: `groups $USER` (should include `input`)
-- Check device permissions: `ls -la /dev/input/event*` (should show `crw-rw---- root input`)
+- Verify user is in `input` group: `groups $USER` should list `input`.
+- Re-log in for group changes to take effect.
+- Check device permissions: `ls -la /dev/input/event*` (should show `crw-rw---- root input`).
 
-## Telemetry
+**Soundpack won't import?**
+- Ensure `config.json` is valid JSON (use a JSON validator).
+- Check that `definitions` (or `defs`) contains valid key mappings.
+- Verify audio files (OGG, WAV, MP3, FLAC) exist and are readable.
 
-MechvibesDX sends one anonymous ping when the app starts, so I can see roughly how many people use it and on which operating systems. That is the entire scope.
+**Settings reset after restart?**
+- Settings are stored at: `%APPDATA%\Mechvibes` (Windows), `~/.local/share/mechvibes` (Linux), or `~/Library/Application Support/Mechvibes` (macOS). Verify these folders exist and are writable.
 
-**What is sent:** a single `app_started` event containing your OS name and version, the app version, your language locale, and a random session number that is generated fresh on every launch and never stored.
+**macOS: Right-click Open not working?**
+- Try `codesign --deep -s - /Applications/MechvibesDX.app` if you trust the build. Otherwise, await an official notarized release.
 
-**What is never sent:** your keystrokes, your mouse activity, which soundpacks you use, file paths, your name, your email, your IP-derived identity, or any other personal data. There is no account, no persistent identifier, and no way to link two launches back to the same person.
+## Credits
 
-Analytics are handled by [Aptabase](https://aptabase.com), an open source privacy-first service.
+MechvibesDX is built in Rust using [Dioxus](https://dioxuslabs.com/) (0.7), [rodio](https://github.com/RustAudio/rodio) (audio), and [rdev](https://github.com/enigo-rs/rdev) (input capture).
 
-**How to turn it off:** open Settings, expand the "Privacy" section, and switch off "Share anonymous usage stats". Once it is off, the app makes no telemetry requests at all.
+Based on the original [Mechvibes](https://github.com/hainguyents13/mechvibes) by hainguyents13. Distributed under the MIT License.
 
 ## License
 
-MIT License - do whatever you want with it.
-
-Report bugs or request features via GitHub Issues.
+MIT License. See [LICENSE](LICENSE) for details.
