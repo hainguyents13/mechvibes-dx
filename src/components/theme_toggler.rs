@@ -46,6 +46,11 @@ pub fn ThemeToggler() -> Element {
                           let update_fn = update_config.clone();
                           move |_| {
                               theme.set(Theme::BuiltIn(builtin_theme.clone()));
+
+                              
+                              let daisy_name = builtin_theme.to_daisy_theme();
+                              eval(&format!("document.documentElement.setAttribute('data-theme', '{}')", daisy_name));
+
                               update_fn(
                                   Box::new({
                                       let builtin_theme = builtin_theme.clone();
@@ -96,6 +101,10 @@ pub fn ThemeToggler() -> Element {
                             let update_fn = update_config.clone();
                             move |_| {
                                 theme.set(Theme::Custom(theme_id.clone()));
+
+                                
+                                eval(&format!("document.documentElement.setAttribute('data-theme', '{}')", theme_id));
+
                                 update_fn(
                                     Box::new({
                                         let theme_id = theme_id.clone();
