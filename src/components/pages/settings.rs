@@ -300,18 +300,23 @@ pub fn SettingsPage() -> Element {
                         PartyPopper { class: "w-5 h-5 shrink-0" }
                         span { "Update available: v{info.latest_version}" }
                       }
-                      div { class: "flex flex-wrap items-center gap-3",
+                      // Stacked on purpose: the settings column is ~400px and
+                      // the install button alone nearly fills it, so anything
+                      // placed beside the button is permanently cramped.
+                      div { class: "space-y-2",
                         // Owns the whole download -> verify -> restart
                         // sequence, including its own error states.
                         crate::components::update_button::UpdateInstallButton {
                           info: info.clone(),
                         }
                         if let Some(release_url) = &info.release_notes {
-                          a {
-                            href: "{release_url}",
-                            target: "_blank",
-                            class: "link link-hover text-base-content/70",
-                            "View release notes"
+                          div {
+                            a {
+                              href: "{release_url}",
+                              target: "_blank",
+                              class: "link link-hover text-xs text-base-content/70",
+                              "View release notes"
+                            }
                           }
                         }
                       }
@@ -335,15 +340,17 @@ pub fn SettingsPage() -> Element {
                         PartyPopper { class: "w-5 h-5 shrink-0" }
                         span { "Update available: v{saved.latest_version}" }
                       }
-                      div { class: "flex flex-wrap items-center gap-3",
+                      div { class: "space-y-2",
                         crate::components::update_button::UpdateInstallButton {
                           info: saved.clone(),
                         }
-                        a {
-                          href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{saved.latest_version}",
-                          target: "_blank",
-                          class: "link link-hover text-base-content/70",
-                          "View release notes"
+                        div {
+                          a {
+                            href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{saved.latest_version}",
+                            target: "_blank",
+                            class: "link link-hover text-xs text-base-content/70",
+                            "View release notes"
+                          }
                         }
                       }
                       p { class: "text-xs text-base-content/60",
