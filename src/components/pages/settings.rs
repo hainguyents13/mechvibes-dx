@@ -291,23 +291,27 @@ pub fn SettingsPage() -> Element {
                   div { class: "alert alert-error text-sm", "❌ {error}" }
                 } else if let Some(info) = update_info() {
                   if info.update_available {
-                    div { class: "alert alert-success alert-soft text-sm",
-                      PartyPopper { class: "w-6 h-6 mr-2" }
-                      div {
-                        p { "Update available: v{info.latest_version}" }
-                        div { class: "mt-2 space-y-2 text-sm",
-                          // Owns the whole download -> verify -> restart
-                          // sequence, including its own error states.
-                          crate::components::update_button::UpdateInstallButton {
-                            info: info.clone(),
-                          }
-                          if let Some(release_url) = &info.release_notes {
-                            a {
-                              href: "{release_url}",
-                              target: "_blank",
-                              class: "link link-neutral link-hover",
-                              "View release notes"
-                            }
+                    // Not a DaisyUI `alert` on purpose: its grid layout packs
+                    // the icon, text, button and link into one flow and lets
+                    // the link wrap around the button. A plain box with
+                    // explicit rows keeps the spacing predictable.
+                    div { class: "rounded-box border border-success/30 bg-success/10 p-4 space-y-3 text-sm",
+                      div { class: "flex items-center gap-2 font-medium text-success",
+                        PartyPopper { class: "w-5 h-5 shrink-0" }
+                        span { "Update available: v{info.latest_version}" }
+                      }
+                      div { class: "flex flex-wrap items-center gap-3",
+                        // Owns the whole download -> verify -> restart
+                        // sequence, including its own error states.
+                        crate::components::update_button::UpdateInstallButton {
+                          info: info.clone(),
+                        }
+                        if let Some(release_url) = &info.release_notes {
+                          a {
+                            href: "{release_url}",
+                            target: "_blank",
+                            class: "link link-hover text-base-content/70",
+                            "View release notes"
                           }
                         }
                       }
@@ -324,23 +328,26 @@ pub fn SettingsPage() -> Element {
                   // running build. Reading the raw field here is what once
                   // made an upgraded app advertise an update to itself.
                   if let Some(saved) = crate::utils::auto_updater::get_saved_update_info() {
-                    div { class: "alert alert-success text-sm",
-                      div {
-                        p { "🎉 Update available: v{saved.latest_version}" }
-                        div { class: "mt-2 space-y-2",
-                          crate::components::update_button::UpdateInstallButton {
-                            info: saved.clone(),
-                          }
-                          a {
-                            href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{saved.latest_version}",
-                            target: "_blank",
-                            class: "link link-secondary",
-                            "View Release Notes"
-                          }
+                    // Same structure as the fresh-check card above, so the
+                    // two states are visually identical.
+                    div { class: "rounded-box border border-success/30 bg-success/10 p-4 space-y-3 text-sm",
+                      div { class: "flex items-center gap-2 font-medium text-success",
+                        PartyPopper { class: "w-5 h-5 shrink-0" }
+                        span { "Update available: v{saved.latest_version}" }
+                      }
+                      div { class: "flex flex-wrap items-center gap-3",
+                        crate::components::update_button::UpdateInstallButton {
+                          info: saved.clone(),
                         }
-                        p { class: "text-xs text-base-content/60 mt-1",
-                          "Current version: v{current_version}"
+                        a {
+                          href: "https://github.com/hainguyents13/mechvibes-dx/releases/tag/v{saved.latest_version}",
+                          target: "_blank",
+                          class: "link link-hover text-base-content/70",
+                          "View release notes"
                         }
+                      }
+                      p { class: "text-xs text-base-content/60",
+                        "Current version: v{current_version}"
                       }
                     }
                   }
