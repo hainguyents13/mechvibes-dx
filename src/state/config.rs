@@ -69,7 +69,12 @@ pub struct BackgroundCustomization {
 impl Default for BackgroundCustomization {
     fn default() -> Self {
         Self {
-            background_color: "".to_string(),
+            // A theme variable rather than an empty string: the layout
+            // interpolates this straight into `background: {};`, so `""`
+            // produced the invalid declaration `background: ;` and the app
+            // silently kept the theme background - which made Reset, and
+            // enabling the toggle before picking a colour, look like no-ops.
+            background_color: "var(--color-base-100)".to_string(),
             background_image: None,
             use_image: false,
         }

@@ -11,6 +11,32 @@ pub enum Route {
     #[route("/settings")] Settings {},
 }
 
+/// The inline `style` the layout carries for the app background.
+///
+/// An empty return means "emit nothing and let the theme show through", which
+/// is the only way to defer to the theme: any declaration written here wins
+/// over the stylesheet.
+fn background_style_for(
+    enabled: bool,
+    bg: &crate::state::config::BackgroundCustomization
+) -> String {
+    if !enabled {
+        return String::new();
+    }
+
+    match &bg.background_image {
+        Some(image) if bg.use_image => {
+            format!("background: url({}) center center / cover no-repeat;", image)
+        }
+        // Configs written before the default became a theme variable still hold
+        // an empty string here, and `background: ;` is invalid CSS - the whole
+        // declaration is dropped, so the app kept the theme background while the
+        // panel showed a customisation as active. Defer to the theme explicitly.
+        _ if bg.background_color.trim().is_empty() => String::new(),
+        _ => format!("background: {};", bg.background_color),
+    }
+}
+
 #[component]
 pub fn Layout() -> Element {
     let (config_signal, _set_config) = use_config();
@@ -60,22 +86,10 @@ pub fn Layout() -> Element {
     // Get background customization settings (reactive to config changes)
     let background_style = use_memo(move || {
         let config = config_signal.read();
-        if config.enable_background_customization {
-            let bg_config = &config.background_customization;
-            if bg_config.use_image && bg_config.background_image.is_some() {
-                // Use background image
-                format!(
-                    "background: url({}) center center / cover no-repeat;",
-                    bg_config.background_image.as_ref().unwrap()
-                )
-            } else {
-                // Use background color
-                format!("background: {};", bg_config.background_color)
-            }
-        } else {
-            // Default background (let theme handle it)
-            String::new()
-        }
+        background_style_for(
+            config.enable_background_customization,
+            &config.background_customization
+        )
     });
 
     rsx! {
@@ -168,7 +182,122 @@ pub fn Settings() -> Element {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::config::BackgroundCustomization;
     use std::str::FromStr;
+
+    /// Resetting the background must actually revert the app to the theme.
+    ///
+    /// The default used to carry an empty `background_color`, which the layout
+    /// interpolated into `background: ;` - a declaration the browser drops
+    /// whole. The theme background stayed on screen either way, so pressing
+    /// Reset produced no visible change and read as a dead button. The default
+    /// now names a theme variable, and it has to reach the page.
+    #[test]
+    fn the_default_background_applies_the_theme_colour_rather_than_empty_css() {
+        let style = background_style_for(true, &BackgroundCustomization::default());
+
+        assert!(
+            !style.contains("background: ;"),
+            "an empty colour must never reach the page as a broken declaration"
+        );
+        assert_eq!(
+            style, "background: var(--color-base-100);",
+            "the default has to resolve to a real theme colour"
+        );
+    }
+
+    /// A config saved before that default changed still holds `""`. Rather than
+    /// emitting broken CSS for those users, defer to the theme.
+    #[test]
+    fn a_background_colour_left_empty_by_an_older_config_defers_to_the_theme() {
+        let stored = BackgroundCustomization {
+            background_color: String::new(),
+            background_image: None,
+            use_image: false,
+        };
+
+        assert_eq!(
+            background_style_for(true, &stored),
+            "",
+            "an empty stored colour must emit nothing so the theme shows through"
+        );
+    }
+
+    /// Turning the toggle off keeps the customisation on disk - the user asked
+    /// for it to stop applying, not to be forgotten - so the switch has to be
+    /// what decides whether the style is emitted at all.
+    #[test]
+    fn disabling_the_toggle_stops_applying_a_background_it_still_remembers() {
+        let customised = BackgroundCustomization {
+            background_color: "var(--color-primary)".to_string(),
+            background_image: None,
+            use_image: false,
+        };
+
+        assert_eq!(
+            background_style_for(false, &customised),
+            "",
+            "a disabled customisation must not style the page"
+        );
+        assert_eq!(
+            background_style_for(true, &customised),
+            "background: var(--color-primary);",
+            "and turning it back on must restore the colour that was kept"
+        );
+    }
+
+    /// Pasting an image URL and then resetting must drop the image. The stored
+    /// path is cleared along with everything else, so nothing is left to build
+    /// a `url()` out of.
+    #[test]
+    fn resetting_after_pasting_an_image_url_stops_showing_that_image() {
+        let pasted = BackgroundCustomization {
+            background_color: "var(--color-base-100)".to_string(),
+            background_image: Some("https://example.com/wallpaper.png".to_string()),
+            use_image: true,
+        };
+        assert!(
+            background_style_for(true, &pasted).contains("wallpaper.png"),
+            "the pasted image is what the page shows to begin with"
+        );
+
+        let after_reset = BackgroundCustomization::default();
+        let style = background_style_for(true, &after_reset);
+
+        assert!(!style.contains("url("), "reset must not leave the image behind: {style}");
+        assert!(!style.contains("wallpaper.png"), "reset must not leave the image behind: {style}");
+    }
+
+    /// And switching the section off must stop applying it too, even though the
+    /// image itself is deliberately kept so turning it back on restores it.
+    #[test]
+    fn switching_the_section_off_stops_showing_a_pasted_image() {
+        let pasted = BackgroundCustomization {
+            background_color: "var(--color-base-100)".to_string(),
+            background_image: Some("https://example.com/wallpaper.png".to_string()),
+            use_image: true,
+        };
+
+        assert_eq!(
+            background_style_for(false, &pasted),
+            "",
+            "a disabled section must emit no background at all"
+        );
+    }
+
+    /// "Use image" can be on before a file has been picked. Falling through to
+    /// the colour keeps the page styled instead of emitting `url()` with
+    /// nothing in it.
+    #[test]
+    fn asking_for_an_image_before_choosing_one_falls_back_to_the_colour() {
+        let pending = BackgroundCustomization {
+            background_color: "var(--color-primary)".to_string(),
+            background_image: None,
+            use_image: true,
+        };
+
+        assert_eq!(background_style_for(true, &pending), "background: var(--color-primary);");
+    }
 
     /// Every path `navigate` is called with must parse back to a real route and
     /// must produce a tab name rather than falling through to the raw path.
