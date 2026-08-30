@@ -5,6 +5,34 @@ use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Duration;
 
+#[cfg(target_os = "macos")]
+fn macos_device_state_with_permission_checks(
+    is_trusted: impl FnOnce() -> bool,
+    request_trust: impl FnOnce() -> bool,
+) -> Option<DeviceState> {
+    if is_trusted() || request_trust() {
+        // DeviceState is a stateless handle on macOS. Constructing it directly
+        // avoids DeviceState::new(), which always performs another prompted AX
+        // check and panics when access has not been granted yet.
+        Some(DeviceState)
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_device_state() -> Option<DeviceState> {
+    use macos_accessibility_client::accessibility::{
+        application_is_trusted,
+        application_is_trusted_with_prompt,
+    };
+
+    macos_device_state_with_permission_checks(
+        application_is_trusted,
+        application_is_trusted_with_prompt,
+    )
+}
+
 /// Maps device_query Keycode to our standardized key code format (same as rdev)
 fn map_device_query_keycode(key: Keycode) -> &'static str {
     match key {
@@ -131,6 +159,15 @@ pub fn start_focused_keyboard_listener(
     thread::spawn(move || {
         crate::always_print!("🎮 Starting focused keyboard listener (device_query polling)...");
         
+        #[cfg(target_os = "macos")]
+        let Some(device_state) = macos_device_state() else {
+            crate::always_eprint!(
+                "Accessibility permission is not enabled; focused keyboard polling is disabled"
+            );
+            return;
+        };
+
+        #[cfg(not(target_os = "macos"))]
         let device_state = DeviceState::new();
         let mut prev_keys: HashSet<Keycode> = HashSet::new();
 
@@ -184,3 +221,40 @@ pub fn start_focused_keyboard_listener(
     });
 }
 
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::macos_device_state_with_permission_checks;
+    use std::cell::Cell;
+
+    #[test]
+    fn trusted_launch_does_not_request_accessibility_again() {
+        let requested = Cell::new(false);
+
+        let state = macos_device_state_with_permission_checks(
+            || true,
+            || {
+                requested.set(true);
+                false
+            },
+        );
+
+        assert!(state.is_some());
+        assert!(!requested.get());
+    }
+
+    #[test]
+    fn missing_permission_requests_once_without_panicking() {
+        let request_count = Cell::new(0);
+
+        let state = macos_device_state_with_permission_checks(
+            || false,
+            || {
+                request_count.set(request_count.get() + 1);
+                false
+            },
+        );
+
+        assert!(state.is_none());
+        assert_eq!(request_count.get(), 1);
+    }
+}
