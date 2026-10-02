@@ -98,7 +98,10 @@ Old V1 soundpacks (e.g., from the original Mechvibes) are auto-detected on impor
 ### macOS
 - **Experimental**: Not tested on real hardware. Ad-hoc signed, not notarized.
 - **First launch**: Right-click the app, choose "Open" to bypass Gatekeeper's "unidentified developer" block.
-- **Accessibility permission**: macOS may ask for microphone/accessibility access. Grant it for global hotkey and input capture to work.
+- **Permissions**: global key capture needs **both** of these in System Settings > Privacy & Security, enabled for `MechvibesDX` (or for your terminal, if you launch the binary from there):
+  - **Accessibility**: used while the MechvibesDX window is focused.
+  - **Input Monitoring**: used while the window is minimized or another app is focused. Without it the app runs normally but is silent unless its window has focus.
+- **After installing a new build**: the app is ad-hoc signed, so macOS ties its permissions to that exact binary. A rebuilt or reinstalled app keeps its toggles on but they stop working. Remove `MechvibesDX` from both lists with the `-` button, add `/Applications/MechvibesDX.app` back, and relaunch. Alternatively run `tccutil reset ListenEvent com.hainguyents13.mechvibesdx` and `tccutil reset Accessibility com.hainguyents13.mechvibesdx`, and macOS prompts again on next launch.
 - Arm64 (Apple Silicon) only in current builds. Intel builds available on request.
 
 ## Privacy and Telemetry
@@ -126,8 +129,8 @@ Debug logs stay local until you export them via the Debug button. Key names in l
 ### Prerequisites
 
 **All platforms:**
-- [Rust](https://rustup.rs/) 1.70 or later
-- [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started) 0.7.10: `cargo install dioxus-cli --version 0.7.10`
+- [Rust](https://rustup.rs/) 1.88.0 or later. `rust-toolchain.toml` pins it, so rustup installs it automatically on the first `cargo` run in the repo.
+- [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started) 0.7.10: `cargo install dioxus-cli --version 0.7.10`. If you use [mise](https://mise.jdx.dev/), `mise install` installs the pinned `dioxus-cli` from `.mise.toml`.
 
 **Windows:**
 - Visual Studio Build Tools (C++ support)
@@ -174,6 +177,17 @@ cd mechvibes-dx
 dx serve
 ```
 
+**Run the release binary directly (macOS/Linux):**
+
+The app looks for `soundpacks/` next to the executable. `cargo build` copies the bundled packs to `target/release/soundpacks/` for you (see `build.rs`), so the binary runs as is:
+```bash
+cargo build --release
+./target/release/mechvibes-dx
+```
+To capture a log for a bug report, run it as `RUST_BACKTRACE=1 MECHVIBES_TRACE=1 ./target/release/mechvibes-dx 2>&1 | tee /tmp/mv.log`.
+
+On macOS the permissions apply to the app that launched it. When run from a terminal, grant that terminal app **Accessibility** and **Input Monitoring** in System Settings > Privacy & Security, then restart the terminal.
+
 **Release (Windows):**
 ```bash
 cargo build --release
@@ -209,9 +223,12 @@ For architecture details, see [docs/system-architecture.md](docs/system-architec
 ## Troubleshooting
 
 **No sound playing?**
-- Check if muted (tray icon or `Ctrl+Alt+M`).
+- Check if muted (tray icon or `Ctrl+Alt+M`) and that **Allow all sounds** is on in Settings. The setting is saved, so it stays off across restarts.
 - Verify a soundpack is selected in Settings > Soundpacks.
 - Check system volume.
+
+**macOS: sounds only play while the app window is focused?**
+- Input Monitoring is missing or stale. See the macOS permissions notes above: remove and re-add `MechvibesDX` under both Accessibility and Input Monitoring, then relaunch.
 
 **Hotkey (`Ctrl+Alt+M`) not working?**
 - Windows: Run as administrator (required for global hotkey).
