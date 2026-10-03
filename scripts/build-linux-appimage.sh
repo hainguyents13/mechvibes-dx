@@ -2,11 +2,13 @@
 #
 # Assemble AppDir/ and package it as an AppImage.
 #
-# Usage: ./scripts/build-linux-appimage.sh <version>
+# Usage: ./scripts/build-linux-appimage.sh <version> [--skip-build]
 #   e.g. ./scripts/build-linux-appimage.sh 0.8.0
 #
-# Expects target/release/mechvibes-dx to already exist (the caller builds it,
-# so this script never triggers a second 10-minute compile).
+# Builds target/release/mechvibes-dx (cargo build --release --locked) first.
+# Pass --skip-build to reuse an existing binary - CI does, because it builds
+# once and shares that binary with the .deb, so this script never triggers a
+# second 10-minute compile there.
 #
 # The AppDir deliberately mirrors the .deb's filesystem layout - usr/bin,
 # usr/share/mechvibes-dx/soundpacks - so that one binary serves both packages
@@ -25,7 +27,19 @@
 
 set -euo pipefail
 
-VERSION="${1:?usage: build-linux-appimage.sh <version>}"
+SKIP_BUILD=0
+VERSION=""
+for arg in "$@"; do
+  case "$arg" in
+    --skip-build) SKIP_BUILD=1 ;;
+    -*) echo "unknown option: $arg" >&2; exit 2 ;;
+    *) VERSION="$arg" ;;
+  esac
+done
+if [ -z "$VERSION" ]; then
+  echo "usage: build-linux-appimage.sh <version> [--skip-build]" >&2
+  exit 2
+fi
 
 APP_NAME="mechvibes-dx"
 ARCH="x86_64"
@@ -33,9 +47,41 @@ BINARY="target/release/${APP_NAME}"
 APPDIR="build/AppDir"
 OUTPUT="dist/${APP_NAME}-${VERSION}-${ARCH}.AppImage"
 
+# Build step. The release binary is built here by default so a wrong toolchain
+# pin (rust-toolchain.toml / `rust-version` in Cargo.toml) or a stale Cargo.lock
+# fails at the start, with cargo's own message, instead of surfacing later.
+# `--locked` refuses to modify Cargo.lock.
+#
+# With --skip-build the caller has already built the binary (CI does, once, and
+# shares it between packages). Nothing is compiled here, so run a plain
+# `cargo check --locked` to still validate the pin and the lockfile.
+if [ "$SKIP_BUILD" -eq 1 ]; then
+  echo "Skipping build (--skip-build); checking the crate against the pinned toolchain..."
+  if ! cargo check --locked; then
+    echo "::error::'cargo check --locked' failed - fix the toolchain pin (rust-toolchain.toml) or Cargo.lock"
+    exit 1
+  fi
+else
+  echo "Building release binary..."
+  cargo build --release --locked
+fi
+
 if [ ! -f "$BINARY" ]; then
-  echo "::error::$BINARY not found - build it first with 'cargo build --release'"
+  echo "::error::$BINARY not found - run without --skip-build to build it"
   exit 1
+fi
+
+# --skip-build packages whatever binary is already there, which could be left
+# over from an older checkout. Refuse a binary older than anything it is built
+# from, rather than ship stale code under a new version number. Rebuild it, or
+# run without --skip-build.
+if [ "$SKIP_BUILD" -eq 1 ]; then
+  stale=$({ find src assets patches Cargo.toml Cargo.lock build.rs rust-toolchain.toml -type f -newer "$BINARY" 2>/dev/null || true; } | head -5)
+  if [ -n "$stale" ]; then
+    echo "::error::$BINARY is older than these files - rebuild it, or run without --skip-build:"
+    echo "$stale"
+    exit 1
+  fi
 fi
 
 echo "=== Assembling AppDir for ${APP_NAME} ${VERSION} ==="

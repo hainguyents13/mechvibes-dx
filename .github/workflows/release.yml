@@ -199,7 +199,7 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           chmod +x scripts/build-linux-appimage.sh
-          ./scripts/build-linux-appimage.sh "$VERSION"
+          ./scripts/build-linux-appimage.sh "$VERSION" --skip-build
 
       # Unpack the finished image and walk it, so the run log is itself the
       # evidence that the shipped artifact has the right shape - a green check
@@ -337,7 +337,7 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           chmod +x scripts/build-macos-app.sh
-          ./scripts/build-macos-app.sh "$VERSION"
+          ./scripts/build-macos-app.sh "$VERSION" --skip-build
 
       # Mount the finished DMG and walk it, so the run log is itself the
       # evidence that the shipped artifact has the right shape - a green

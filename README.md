@@ -190,15 +190,13 @@ On macOS the permissions apply to the app that launched it. When run from a term
 
 **Release (Windows):**
 ```bash
-cargo build --release
-.\scripts\build-windows-installer.ps1
+.\scripts\build-windows-installer.ps1   # builds first; add -SkipBuild to reuse target\release
 # Output: dist/MechvibesDX-0.8.1-Setup-x64.exe
 ```
 
 **Release (Linux, AppImage):**
 ```bash
-cargo build --release
-./scripts/build-linux-appimage.sh 0.8.1
+./scripts/build-linux-appimage.sh 0.8.1   # builds first; add --skip-build to reuse target/release
 chmod +x dist/mechvibes-dx-0.8.1-x86_64.AppImage
 # Remember: run 'sudo usermod -a -G input $USER' and re-log before first use
 ```
@@ -213,8 +211,7 @@ sudo dpkg -i target/debian/mechvibes-dx_0.8.1_amd64.deb
 
 **Release (macOS):**
 ```bash
-cargo build --release
-./scripts/build-macos-app.sh 0.8.1
+./scripts/build-macos-app.sh 0.8.1   # builds first; add --skip-build to reuse target/release
 # Output: dist/mechvibes-dx-0.8.1-macos-arm64-experimental.dmg
 ```
 
