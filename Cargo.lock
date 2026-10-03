@@ -3581,6 +3581,8 @@ dependencies = [
  "libc",
  "lucide-dioxus",
  "macos-accessibility-client",
+ "objc2",
+ "objc2-foundation",
  "once_cell",
  "open",
  "rand 0.9.1",

@@ -83,7 +83,7 @@ Old V1 soundpacks (e.g., from the original Mechvibes) are auto-detected on impor
 
 ### Windows
 - SmartScreen may warn on first run (unsigned installer). Click "More info" then "Run anyway" to proceed.
-- "Start with Windows" in Settings uses Task Scheduler (admin install required for per-user startup).
+- "Start at login" in Settings uses Task Scheduler (admin install required for per-user startup).
 - Single-instance mutex prevents multiple app windows running at once.
 
 ### Linux
@@ -102,6 +102,7 @@ Old V1 soundpacks (e.g., from the original Mechvibes) are auto-detected on impor
   - **Accessibility**: used while the MechvibesDX window is focused.
   - **Input Monitoring**: used while the window is minimized or another app is focused. Without it the app runs normally but is silent unless its window has focus.
 - **After installing a new build**: the app is ad-hoc signed, so macOS ties its permissions to that exact binary. A rebuilt or reinstalled app keeps its toggles on but they stop working. Remove `MechvibesDX` from both lists with the `-` button, add `/Applications/MechvibesDX.app` back, and relaunch. Alternatively run `tccutil reset ListenEvent com.hainguyents13.mechvibesdx` and `tccutil reset Accessibility com.hainguyents13.mechvibesdx`, and macOS prompts again on next launch.
+- **Start at login**: registers MechvibesDX as a login item (System Settings > General > Login Items), which needs macOS 13 or later and the app installed in `/Applications`. If macOS asks, allow it there. "Start minimized" is read from your saved settings, so it applies whenever the app launches.
 - Arm64 (Apple Silicon) only in current builds. Intel builds available on request.
 
 ## Privacy and Telemetry
