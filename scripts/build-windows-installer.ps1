@@ -31,6 +31,49 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# Fail first, and with a clear message, if the Rust in use is older than the
+# `rust-version` declared in Cargo.toml - the crate's minimum supported Rust.
+# It is a floor, not an exact match: any newer compiler is fine. What this
+# catches is a compiler too old to build the crate, which otherwise surfaces late
+# as an unrelated-looking error. This is the PowerShell twin of
+# verify_rust_toolchain in scripts/lib/common.sh.
+function ConvertTo-RustVersion([string]$Text) {
+    # "1.88", "1.88.0" or "1.89.0-nightly" -> [version], a missing part as 0.
+    # Normalised to three parts on purpose: a bare [version]"1.88" has Build = -1
+    # and so compares as OLDER than "1.88.0".
+    if ($Text -notmatch '^\s*(\d+)\.(\d+)(?:\.(\d+))?') { return $null }
+    $Patch = 0
+    if ($Matches[3]) { $Patch = [int]$Matches[3] }
+    return [version]::new([int]$Matches[1], [int]$Matches[2], $Patch)
+}
+
+function Get-ActiveRustVersion {
+    try { return ((& rustc --version) -split ' ')[1] } catch { return "" }
+}
+
+$CargoTomlFile = Join-Path $ProjectRoot "Cargo.toml"
+$FloorMatch = Select-String -Path $CargoTomlFile -Pattern '^\s*rust-version\s*=\s*"([^"]*)"' | Select-Object -First 1
+if (-not $FloorMatch) {
+    Write-Host "ERROR: Cargo.toml has no 'rust-version', so there is no minimum Rust to check against" -ForegroundColor Red
+    exit 1
+}
+$FloorRust = $FloorMatch.Matches[0].Groups[1].Value
+$FloorVersion = ConvertTo-RustVersion $FloorRust
+if (-not $FloorVersion) {
+    Write-Host "ERROR: could not read rust-version '$FloorRust' from Cargo.toml" -ForegroundColor Red
+    exit 1
+}
+
+$GotRust = Get-ActiveRustVersion
+$GotVersion = ConvertTo-RustVersion $GotRust
+if ($null -eq $GotVersion -or $GotVersion -lt $FloorVersion) {
+    Write-Host "ERROR: Rust '$GotRust' is active but Cargo.toml requires rust-version $FloorRust or newer." -ForegroundColor Red
+    Write-Host "Update it ('rustup update stable'), or check for a RUSTUP_TOOLCHAIN override." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Rust toolchain OK: $GotRust (at least rust-version $FloorRust from Cargo.toml)" -ForegroundColor Green
+Write-Host ""
+
 # Read version from Cargo.toml (single source of truth - no more manual sync
 # between Cargo.toml and the installer script).
 $CargoTomlPath = Join-Path $ProjectRoot "Cargo.toml"
@@ -171,6 +214,21 @@ if ($InstallerPath) {
     Write-Host ""
     Write-Host "Installer ready!" -ForegroundColor Green
 }
+
+# Verify the installer asset. The in-app auto-updater picks the first release
+# asset whose name contains "x64" and ends in ".exe", so the name is part of the
+# contract: asserted here rather than trusted.
+$ExpectedInstaller = "MechvibesDX-$AppVersion-Setup-x64.exe"
+$ExpectedInstallerPath = Join-Path $DistDir $ExpectedInstaller
+if (-not (Test-Path $ExpectedInstallerPath)) {
+    Write-Host "ERROR: expected installer $ExpectedInstaller not found in $DistDir" -ForegroundColor Red
+    exit 1
+}
+if ($ExpectedInstaller -notmatch "x64" -or $ExpectedInstaller -notmatch "\.exe$") {
+    Write-Host "ERROR: installer name '$ExpectedInstaller' does not match the auto-updater's filter (must contain 'x64' and end in '.exe')" -ForegroundColor Red
+    exit 1
+}
+Write-Host "Verified installer asset: $ExpectedInstallerPath" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan

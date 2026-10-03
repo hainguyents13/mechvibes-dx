@@ -102,14 +102,18 @@ mechvibes-dx/
 ├── Cargo.lock              # Locked dependency versions
 ├── build.rs                # Pre-build script (Windows icon setup)
 ├── .github/
+│   ├── actions/linux-system-deps/ # Shared Linux apt dependency list (CI + release)
 │   └── workflows/
-│       └── release.yml         # Release workflow: tag → build → GitHub release
+│       ├── ci.yml              # check + test matrix (Linux, Windows, macOS)
+│       └── release.yml         # Release workflow: tag → gate → build matrix → GitHub release
 ├── scripts/
 │   ├── bump-version.ps1        # Increment version (PowerShell)
 │   ├── extract-changelog.ps1   # Extract CHANGELOG.md section (PowerShell)
 │   ├── build-windows-installer.ps1 # Inno Setup builder (Windows)
 │   ├── build-macos-app.sh      # .app + DMG assembler (macOS)
-│   └── build-linux-appimage.sh # AppDir + AppImage assembler (Linux)
+│   ├── build-linux-appimage.sh # .deb + AppImage assembler (Linux)
+│   ├── ci-check.sh             # toolchain check + cargo check + cargo test (CI and local)
+│   └── lib/common.sh           # shared bash helpers (toolchain check, asset-name check)
 ├── installer/
 │   ├── windows/
 │   │   └── mechvibes-dx-setup.iss # Inno Setup config
@@ -463,11 +467,9 @@ cargo test --release  # For audio tests (opt=2 in dev profile)
 
 **Release workflow (`.github/workflows/release.yml`):**
 1. Tag pushed as `v0.6.0`.
-2. GitHub Actions checks tag matches `Cargo.toml` version.
-3. Runs `cargo test --release` + `cargo build --release`.
-4. Calls `scripts/build-windows-installer.ps1` (Inno Setup).
-5. Extracts changelog section via `scripts/extract-changelog.ps1`.
-6. Creates draft GitHub release with installer asset.
+2. `gate` job: checks the tag matches `Cargo.toml` and extracts the changelog section (`scripts/extract-changelog.ps1`).
+3. `build` matrix (Windows, Linux, macOS in parallel): each leg runs `scripts/ci-check.sh --release`, then its packaging script (`build-windows-installer.ps1`, `build-linux-appimage.sh`, `build-macos-app.sh`), which check that Rust is at least `rust-version` from `Cargo.toml`, build with `--locked` and check their own output.
+4. `release` job: all legs must pass; creates one draft GitHub release with every asset.
 
 **Platforms:**
 - Windows: Inno Setup EXE installer (interim; waiting for dioxus bundle fix DioxusLabs/dioxus#5723).

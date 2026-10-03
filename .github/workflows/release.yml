@@ -1,5 +1,12 @@
 name: Release
 
+# Pushing a `vX.Y.Z` tag builds every platform's package and drafts one release.
+#
+# Each build leg is a thin wrapper around the same script you run locally
+# (scripts/build-*.sh|ps1). The scripts check that the Rust in use is at least
+# `rust-version` from Cargo.toml, build with `--locked`, package, and check what
+# they produced, so this file only installs what a script cannot (the cache, the
+# OS's system libraries, packaging tools) and uploads the result.
 on:
   push:
     tags:
@@ -8,27 +15,26 @@ on:
 permissions:
   contents: write
 
-# Three build jobs run in parallel on their own runners, each uploading its
-# artifacts. A single `release` job then downloads everything and creates one
-# draft release. The alternative - letting every job call action-gh-release
-# against the same tag - races: concurrent runs read the draft, append their
-# own asset, and write back, so the last writer can drop the others' files.
-# One writer, no race.
+env:
+  CARGO_TERM_COLOR: always
+  # Incremental builds only bloat the cache on a runner that is thrown away.
+  CARGO_INCREMENTAL: 0
+
+# `gate` checks the tag and extracts the changelog notes, then the `build`
+# matrix runs one leg per OS in parallel, each uploading its artifacts. A single
+# `release` job then downloads everything and creates one draft release. The
+# alternative - letting every job call action-gh-release against the same tag -
+# races: concurrent runs read the draft, append their own asset, and write back,
+# so the last writer can drop the others' files. One writer, no race.
 jobs:
-  windows-build:
-    name: Windows installer
-    runs-on: windows-latest
+  gate:
+    name: Version and changelog gate
+    runs-on: ubuntu-latest
     outputs:
       app_version: ${{ steps.version_gate.outputs.app_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
 
       - name: Gate - tag must match Cargo.toml version
         id: version_gate
@@ -46,7 +52,6 @@ jobs:
             exit 1
           }
           Write-Host "Tag version matches Cargo.toml version: $tagVersion"
-          "APP_VERSION=$tagVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "app_version=$tagVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Gate - extract changelog notes
@@ -57,353 +62,129 @@ jobs:
           # a native exe) doesn't reliably set $LASTEXITCODE when piped, and
           # $null -ne 0 is $true in PowerShell, so that pattern silently
           # always looks like failure.
-          $notes = & .\scripts\extract-changelog.ps1 -Version $env:APP_VERSION
+          $notes = & .\scripts\extract-changelog.ps1 -Version "${{ steps.version_gate.outputs.app_version }}"
           $scriptSucceeded = $?
           if (-not $scriptSucceeded) {
-            Write-Error "Failed to extract CHANGELOG.md section for $env:APP_VERSION"
+            Write-Error "Failed to extract CHANGELOG.md section for ${{ steps.version_gate.outputs.app_version }}"
             exit 1
           }
           $notes | Out-File -FilePath notes.md -Encoding utf8
-          Write-Host "Extracted release notes for $env:APP_VERSION"
+          Write-Host "Extracted release notes for ${{ steps.version_gate.outputs.app_version }}"
 
-      - name: Smoke test
-        shell: pwsh
-        run: |
-          # No `clippy -D warnings` here on purpose - the repo currently has
-          # pre-existing clippy warnings unrelated to release correctness;
-          # gating on them would make every release red until that debt is
-          # paid down separately.
-          $ErrorActionPreference = "Continue"
-          cargo test --release
-          $testExit = $LASTEXITCODE
-          cargo check --release
-          $checkExit = $LASTEXITCODE
-          $ErrorActionPreference = "Stop"
-          if ($testExit -ne 0 -or $checkExit -ne 0) {
-            Write-Error "cargo test or cargo check failed"
-            exit 1
-          }
-
-      - name: Build release binary
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Continue"
-          cargo build --release
-          $buildExit = $LASTEXITCODE
-          $ErrorActionPreference = "Stop"
-          if ($buildExit -ne 0) {
-            Write-Error "cargo build --release failed"
-            exit 1
-          }
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      - name: Build installer
-        shell: pwsh
-        run: .\scripts\build-windows-installer.ps1 -SkipBuild
-
-      - name: Verify installer asset
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem -Path "dist" -Filter "MechvibesDX-*-Setup-x64.exe" | Select-Object -First 1
-          if (-not $installer) {
-            Write-Error "No installer asset found in dist/ matching 'MechvibesDX-*-Setup-x64.exe'"
-            exit 1
-          }
-          if ($installer.Name -notmatch "x64" -or $installer.Name -notmatch "\.exe$") {
-            Write-Error "Installer asset name '$($installer.Name)' does not match auto-updater's expected filter (must contain 'x64' and end in '.exe')"
-            exit 1
-          }
-          Write-Host "Verified installer asset: $($installer.FullName)"
-
-      - name: Upload Windows artifacts
+      - name: Upload release notes
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: |
-            dist/MechvibesDX-*-Setup-x64.exe
-            notes.md
+          name: release-notes
+          path: notes.md
           if-no-files-found: error
 
-  linux-build:
-    name: Linux packages
-    runs-on: ubuntu-latest
+  build:
+    name: ${{ matrix.name }}
+    needs: gate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Let every leg finish so one failure still shows the state of the rest.
+      # The release job requires all of them, so a failed leg stops the release.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows installer
+            os: windows-latest
+            shell: pwsh
+            package: .\scripts\build-windows-installer.ps1
+            artifact: windows-release
+            # The installer only. The version and notes come from `gate`.
+            paths: dist/MechvibesDX-*-Setup-x64.exe
+          - name: Linux packages
+            os: ubuntu-latest
+            shell: bash
+            # Produces the .deb and the AppImage from one binary.
+            package: ./scripts/build-linux-appimage.sh "$VERSION"
+            artifact: linux-release
+            paths: dist/*
+          - name: macOS DMG
+            os: macos-latest
+            shell: bash
+            package: ./scripts/build-macos-app.sh "$VERSION"
+            artifact: macos-release
+            paths: dist/*
+    env:
+      VERSION: ${{ needs.gate.outputs.app_version }}
+    # A step's own `shell:` cannot read the matrix, but a job default can. Steps
+    # that need a specific shell regardless of OS set it explicitly.
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
-      # Same list as ci.yml's linux-check job. Keep the two in sync: this
-      # build failing on a missing -dev package means CI would have caught it.
+      # --- tools and libraries a script cannot install for itself -------------
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev \
-            pkg-config \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libevdev-dev \
-            libxdo-dev
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-system-deps
 
-      - name: Build release binary
-        run: cargo build --release --locked
-
+      # build-linux-appimage.sh builds the .deb through this.
       - name: Install cargo-deb
+        if: runner.os == 'Linux'
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-deb
 
-      # --no-build: the binary is already built above, and cargo-deb's own
-      # build would not reuse it. `[package.metadata.deb]` in Cargo.toml owns
-      # the file list; it deliberately has no maintainer-scripts, so the
-      # package does NOT add the user to the `input` group - the release
-      # notes have to say so.
-      - name: Build .deb package
-        run: cargo deb --no-build
+      # build-windows-installer.ps1 compiles the installer with it.
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup -y
 
-      # Installable only - the portable tarball was dropped by user decision
-      # (260803): the .deb already carries the desktop entry, icon and
-      # soundpacks. The AppImage below covers every non-Debian distro, which
-      # is what that decision left to "build from source" until now.
-      - name: Stage Linux assets
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p dist
+      # --- the same steps as a local build ------------------------------------
+      # Compile and test in the release profile first, so a broken tag fails
+      # before anything is packaged and the package build reuses these
+      # artifacts. No `clippy -D warnings` on purpose - the repo has pre-existing
+      # clippy warnings unrelated to release correctness; gating on them would
+      # make every release red until that debt is paid down separately.
+      - name: Verify toolchain, check and test (release profile)
+        shell: bash
+        run: bash scripts/ci-check.sh --release
 
-          DEB_SOURCE=$(ls target/debian/mechvibes-dx_"${VERSION}"*.deb | head -1)
-          if [ ! -f "$DEB_SOURCE" ]; then
-            echo "::error::No .deb produced for version ${VERSION} in target/debian/"
-            exit 1
-          fi
-          cp "$DEB_SOURCE" "dist/mechvibes-dx_${VERSION}_amd64.deb"
-
-          ls -la dist/
-
-      # The AppDir mirrors the .deb layout (usr/bin, usr/share) so one binary
-      # serves both. The script asserts the bundled soundpack/font counts match
-      # the source tree before packaging, rather than merely being non-zero -
-      # the four mouse packs are .mp3, so an .ogg-only check would pass while
-      # silently dropping all of them.
-      - name: Build AppImage
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          chmod +x scripts/build-linux-appimage.sh
-          ./scripts/build-linux-appimage.sh "$VERSION" --skip-build
-
-      # Unpack the finished image and walk it, so the run log is itself the
-      # evidence that the shipped artifact has the right shape - a green check
-      # on an assembly step only proves the commands exited 0.
-      - name: Verify the produced AppImage
-        run: |
-          set -euo pipefail
-          APPIMAGE=$(ls dist/*.AppImage)
-          echo "=== AppImage: $APPIMAGE ($(du -h "$APPIMAGE" | cut -f1)) ==="
-
-          rm -rf verify && mkdir verify && cd verify
-          "../$APPIMAGE" --appimage-extract >/dev/null
-          echo "=== AppDir tree (depth 4) ==="
-          find squashfs-root -maxdepth 4 | sort
-          echo "=== Binary ==="
-          file squashfs-root/usr/bin/mechvibes-dx
-          echo "=== AppRun ==="
-          cat squashfs-root/AppRun
-          cd ..
-
-          IMG=verify/squashfs-root
-          SRC_AUDIO=$(find soundpacks -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
-          IMG_AUDIO=$(find "$IMG/usr/share/mechvibes-dx/soundpacks" -type f \( -name '*.ogg' -o -name '*.mp3' -o -name '*.wav' \) | wc -l)
-          SRC_CFG=$(find soundpacks -type f -name 'config.json' | wc -l)
-          IMG_CFG=$(find "$IMG/usr/share/mechvibes-dx/soundpacks" -type f -name 'config.json' | wc -l)
-          SRC_FONTS=$(find assets/fonts -type f -name '*.ttf' | wc -l)
-          IMG_FONTS=$(find "$IMG/usr/lib/mechvibes-dx/assets/fonts" -type f -name '*.ttf' | wc -l)
-
-          echo "soundpack audio: image=$IMG_AUDIO source=$SRC_AUDIO"
-          echo "soundpack config.json: image=$IMG_CFG source=$SRC_CFG"
-          echo "fonts: image=$IMG_FONTS source=$SRC_FONTS"
-          test "$IMG_AUDIO" -eq "$SRC_AUDIO" && test "$IMG_AUDIO" -gt 0
-          test "$IMG_CFG" -eq "$SRC_CFG" && test "$IMG_CFG" -gt 0
-          test "$IMG_FONTS" -eq "$SRC_FONTS" && test "$IMG_FONTS" -gt 0
-
-          # ELF magic checked byte-wise rather than trusting `file`'s wording.
-          test "$(head -c 4 "$IMG/usr/bin/mechvibes-dx" | xxd -p)" = "7f454c46"
-          echo "ELF magic OK"
-          rm -rf verify
+      # Builds the release binary (`--locked`), packages it and checks the
+      # result: the AppImage and DMG are unpacked/mounted and walked, the
+      # installer name is asserted against the auto-updater's filter.
+      - name: Build and package
+        run: ${{ matrix.package }}
 
       # Informational only, and deliberately NOT gated on: a GUI app on a
       # headless runner with no audio or input device is expected to be
-      # unhappy, so what matters is WHICH way it fails. Verified on
-      # 260804 (run 30909285529): the app reaches soundpack scanning, resolves
-      # every bundled pack out of the mounted image, and writes its config to
+      # unhappy, so what matters is WHICH way it fails. Verified on 260804
+      # (run 30909285529): the app reaches soundpack scanning, resolves every
+      # bundled pack out of the mounted image, and writes its config to
       # ~/.local/share/mechvibes - which is the whole point of the path work.
       - name: Headless smoke (informational, never gates)
+        if: runner.os == 'Linux'
         continue-on-error: true
+        shell: bash
         run: |
           set -uo pipefail
           APPIMAGE=$(ls dist/*.AppImage)
           timeout 20s env APPIMAGE_EXTRACT_AND_RUN=1 "./$APPIMAGE" 2>&1 | head -40 || true
 
-      # The Windows auto-updater picks the first asset whose name contains
-      # "x64" AND ends in ".exe"; anything else it ignores (falling back to
-      # assets[0] only if nothing matches, which cannot happen while the
-      # Windows installer is present).
-      #
-      # Both Linux names are doubly safe: "amd64" and "x86_64" contain no "x64"
-      # substring (x-8-6-underscore-6-4 - the "6-4" is separated from the "x"),
-      # and .deb/.AppImage are not .exe. Asserted rather than trusted, since a
-      # rename could break Windows updates silently. The same pairing is
-      # covered by a unit test in auto_updater.rs, which runs on every commit
-      # while this only runs at release time.
-      - name: Verify Linux asset names cannot hijack the Windows auto-updater
-        run: |
-          set -euo pipefail
-          status=0
-          for f in dist/*; do
-            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
-            case "$name" in
-              *x64*.exe)
-                echo "::error::Linux asset '$name' matches the Windows auto-updater filter (contains 'x64' and ends in '.exe')"
-                status=1
-                ;;
-            esac
-          done
-          exit $status
-
-      - name: Upload Linux artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-release
-          path: dist/*
-          if-no-files-found: error
-
-  macos-build:
-    name: macOS DMG (experimental)
-    runs-on: macos-latest
-    # First time this crate has ever been fed to a macOS compiler - every
-    # cfg gate here was written blind. A red job is a useful result, not a
-    # reason to block the Windows and Linux assets, so the release job
-    # tolerates this one failing.
-    continue-on-error: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: Cargo check
-        run: cargo check --release --locked
-
-      # `dx bundle` is NOT attempted here, and that is a verified decision
-      # rather than an omission. Run 30758484323 tried it on macos-latest with
-      # dioxus-cli 0.7.10 and it failed after 4m27s:
-      #
-      #   Failed to copy resource ./soundpacks/mouse/chat -> .../Contents/Resources/chat
-      #   the source path is neither a regular file nor a symlink to a regular file
-      #
-      # That is upstream DioxusLabs/dioxus#5723 showing its real shape: the
-      # 0.7.x resource copier only handles regular files, so every directory
-      # entry in Dioxus.toml's `resources` fails. Windows surfaced it as
-      # PermissionDenied (os error 5), macOS as InvalidInput - same bug, and
-      # NOT specific to the NSIS/Windows path as previously assumed.
-      #
-      # Worse than a clean failure: it exits non-zero having already created
-      # a half-built MechvibesDx.app with an EMPTY Contents/Resources. Any
-      # "use the .app if one exists" logic ships an app with no soundpacks.
-      # So the .app is assembled by hand instead - fully specified, and
-      # verified in this job rather than trusted.
-      - name: Build release binary
-        run: cargo build --release --locked
-
-      # Installable only, matching the Linux decision (260803): the DMG
-      # replaces the old bare-binary tarball. scripts/build-macos-app.sh does
-      # the assembly, ad-hoc codesign and hdiutil packaging, and asserts the
-      # soundpack/asset counts match the source tree before packaging.
-      - name: Assemble .app and DMG
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          chmod +x scripts/build-macos-app.sh
-          ./scripts/build-macos-app.sh "$VERSION" --skip-build
-
-      # Mount the finished DMG and walk it, so the run log is itself the
-      # evidence that the shipped artifact has the right shape - a green
-      # check on an assembly step only proves the commands exited 0.
-      - name: Verify the produced DMG
-        run: |
-          set -euo pipefail
-          DMG=$(ls dist/*.dmg)
-          echo "=== DMG: $DMG ($(du -h "$DMG" | cut -f1)) ==="
-          hdiutil attach "$DMG" -mountpoint /tmp/mvdmg -nobrowse -readonly
-
-          echo "=== DMG root (expect MechvibesDX.app + Applications symlink) ==="
-          ls -la /tmp/mvdmg/
-
-          echo "=== Bundle tree ==="
-          find /tmp/mvdmg/MechvibesDX.app -maxdepth 3 | sort
-
-          echo "=== Info.plist ==="
-          cat /tmp/mvdmg/MechvibesDX.app/Contents/Info.plist
-
-          echo "=== Binary ==="
-          file /tmp/mvdmg/MechvibesDX.app/Contents/MacOS/mechvibes-dx
-
-          echo "=== Resources ==="
-          ls -la /tmp/mvdmg/MechvibesDX.app/Contents/Resources/
-          echo "soundpack audio: $(find /tmp/mvdmg/MechvibesDX.app/Contents/Resources/soundpacks \( -name '*.ogg' -o -name '*.mp3' \) | wc -l)"
-
-          # Ad-hoc signature only. `spctl` is deliberately NOT gated on: it
-          # fails without notarization, which is expected for this build.
-          echo "=== codesign ==="
-          codesign --verify --deep --strict --verbose=2 /tmp/mvdmg/MechvibesDX.app
-
-          hdiutil detach /tmp/mvdmg
-
-      - name: Verify macOS asset names cannot hijack the Windows auto-updater
-        run: |
-          set -euo pipefail
-          status=0
-          for f in dist/*; do
-            name=$(basename "$f" | tr '[:upper:]' '[:lower:]')
-            case "$name" in
-              *x64*.exe)
-                echo "::error::macOS asset '$name' matches the Windows auto-updater filter"
-                status=1
-                ;;
-            esac
-          done
-          exit $status
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-release
-          path: dist/*
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.paths }}
           if-no-files-found: error
 
   release:
     name: Draft release
     runs-on: ubuntu-latest
-    # Windows is the only hard dependency: it owns the version/changelog
-    # gates and produces the asset the in-app auto-updater consumes. Linux
-    # and macOS are joined with always() so a failure there still lets the
-    # Windows release through - `needs.windows-build.result` is checked
-    # explicitly so a failed Windows job does NOT get silently skipped past.
-    needs: [windows-build, linux-build, macos-build]
-    if: always() && needs.windows-build.result == 'success'
+    # Every platform must build before anything is published: a release that
+    # silently lacks one platform's asset is worse than one that does not go
+    # out. (The default `success()` condition applies.)
+    needs: [gate, build]
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -417,7 +198,7 @@ jobs:
           mkdir -p release
           # notes.md is the release body, not an asset.
           find artifacts -type f ! -name notes.md -exec cp {} release/ \;
-          cp artifacts/windows-release/notes.md notes.md
+          cp artifacts/release-notes/notes.md notes.md
 
           if ! ls release/MechvibesDX-*-Setup-x64.exe >/dev/null 2>&1; then
             echo "::error::Windows installer missing from collected assets"
@@ -486,6 +267,6 @@ jobs:
           draft: true
           # Plain "vX.Y.Z" title by user preference (260803) - the repo name
           # already says what the project is.
-          name: "v${{ needs.windows-build.outputs.app_version }}"
+          name: "v${{ needs.gate.outputs.app_version }}"
           body_path: notes.md
           files: release/*

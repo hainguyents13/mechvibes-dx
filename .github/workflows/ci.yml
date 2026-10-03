@@ -1,10 +1,14 @@
 name: CI
 
-# Verifies the crate actually compiles on Linux. Everything up to now was
-# built and tested on Windows only, so the `#[cfg(target_os = ...)]` gates
-# added for the input worker were reviewed by eye but never fed to a Linux
-# compiler. A cfg typo, a Linux-only module that stopped compiling, or a
-# `use` that only resolves on Windows would all have shipped silently.
+# Verifies the crate compiles and its tests pass on every OS we ship for. The
+# platform-specific code sits behind `#[cfg(target_os = ...)]` gates, so a cfg
+# typo, a module that only compiles on one OS, or a `use` that only resolves on
+# another would otherwise ship silently.
+#
+# The job is a thin wrapper: scripts/ci-check.sh does the work, and it is the
+# same script you run locally. It also verifies that the Rust in use is at least
+# the `rust-version` in Cargo.toml. The only things set up here are what a script
+# cannot do for itself: the cache and the OS's system libraries.
 #
 # Tags are deliberately not a trigger: release.yml owns tag builds, and
 # duplicating them here would double the work on every release.
@@ -22,69 +26,36 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Incremental builds only bloat the cache on a runner that is thrown away.
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  linux-check:
-    name: Linux (check + test)
-    runs-on: ubuntu-latest
+  check:
+    name: ${{ matrix.name }} (check + test)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Let every OS finish: a failure on one is information about the others.
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-latest }
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
-      # Mirrors the "Linux (Ubuntu/Debian)" list in README.md. The AppImage
-      # extras from that list (autoconf, automake, libtool, libfuse2) are
-      # omitted on purpose: they are packaging tools, and this job never
-      # bundles an AppImage. libasound2-dev backs rodio/cpal, libevdev-dev
-      # backs the Linux input listener, and the webkit/gtk/appindicator/rsvg
-      # set backs the Dioxus desktop webview and tray icon.
+      # Windows needs none (the webview ships with the OS and the input path
+      # uses winapi) and neither does macOS (system frameworks).
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev \
-            pkg-config \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libevdev-dev \
-            libxdo-dev
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-system-deps
 
-      - name: Cargo check
-        run: cargo check --locked --all-targets
-
-      # Safe on a headless runner: the test suite is pure logic. The audio
-      # tests cover the voice pool, mute rules, and the resampler, and none
-      # of them opens a device. The Windows-only tests sit behind file-level
-      # `#![cfg(target_os = "windows")]` gates, so they compile out here.
-      - name: Cargo test
-        run: cargo test --locked
-
-  windows-check:
-    name: Windows (check + test)
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-
-      # No system deps step: the webview is part of Windows, and the Windows
-      # input path uses winapi, which needs no extra packages.
-      - name: Cargo check
-        run: cargo check --locked --all-targets
-
-      # This is the half that exercises the input-worker tests, which are
-      # cfg'd out of the Linux job.
-      - name: Cargo test
-        run: cargo test --locked
+      - name: Verify toolchain, check and test
+        run: bash scripts/ci-check.sh

@@ -195,19 +195,13 @@ On macOS the permissions apply to the app that launched it. When run from a term
 # Output: dist/MechvibesDX-0.8.1-Setup-x64.exe
 ```
 
-**Release (Linux, AppImage):**
+**Release (Linux, AppImage and DEB):**
 ```bash
+cargo install cargo-deb                   # once; or pass --no-deb to skip the .deb
 ./scripts/build-linux-appimage.sh 0.8.1   # builds first; add --skip-build to reuse target/release
 chmod +x dist/mechvibes-dx-0.8.1-x86_64.AppImage
+sudo dpkg -i dist/mechvibes-dx_0.8.1_amd64.deb
 # Remember: run 'sudo usermod -a -G input $USER' and re-log before first use
-```
-
-**Release (Linux, DEB):**
-```bash
-cargo build --release
-cargo install cargo-deb
-cargo deb --no-build
-sudo dpkg -i target/debian/mechvibes-dx_0.8.1_amd64.deb
 ```
 
 **Release (macOS):**
@@ -215,6 +209,8 @@ sudo dpkg -i target/debian/mechvibes-dx_0.8.1_amd64.deb
 ./scripts/build-macos-app.sh 0.8.1   # builds first; add --skip-build to reuse target/release
 # Output: dist/mechvibes-dx-0.8.1-macos-arm64-experimental.dmg
 ```
+
+To run the same compile-and-test gate that CI runs (it also checks that Rust is at least the `rust-version` in `Cargo.toml`): `./scripts/ci-check.sh` (add `--release` for the release profile).
 
 For architecture details, see [docs/system-architecture.md](docs/system-architecture.md). For release procedures and deployment, see [docs/deployment-guide.md](docs/deployment-guide.md).
 

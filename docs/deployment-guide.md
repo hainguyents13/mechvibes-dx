@@ -58,16 +58,23 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
 5. **Wait for GitHub Actions**
 
-   The workflow runs four jobs (~15 minutes end to end):
+   The workflow runs three stages (~15 minutes end to end):
 
-   - **`windows-build`** — validates the tag matches `Cargo.toml`'s version, extracts the CHANGELOG section as release notes, runs `cargo test --release` + `cargo check --release` as a smoke test, builds the release binary, and builds the installer via `scripts/build-windows-installer.ps1` (the same script used locally).
-   - **`linux-build`** — builds the release binary on `ubuntu-latest`, packages a `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`), then assembles an AppImage from the same binary via `scripts/build-linux-appimage.sh --skip-build`. The packaging scripts (`build-linux-appimage.sh`, `build-macos-app.sh`, `build-windows-installer.ps1`) build the release binary themselves with `--locked` unless told to skip; with the skip flag they run `cargo check --locked` instead, so a compiler older than `rust-version` or a stale `Cargo.lock` still fails early, and they refuse a binary older than `src/`, `assets/`, `patches/`, `Cargo.toml`, `Cargo.lock` or `build.rs`, so a stale binary is never packaged under a new version. That order is verified safe: `cargo deb --no-build` leaves `target/release/mechvibes-dx` unstripped and byte-identical (same BuildID lands inside the AppImage).
-   - **`macos-build`** — builds the release binary, then hand-assembles `MechvibesDX.app` and packages it as a DMG via `scripts/build-macos-app.sh --skip-build`. Marked `continue-on-error`, so a red macOS job never blocks the release.
-   - **`release`** — downloads all three jobs' artifacts and creates one **draft** release with everything attached.
+   - **`gate`** — validates the tag matches `Cargo.toml`'s version and extracts the CHANGELOG section as release notes (`scripts/extract-changelog.ps1`). Fails the whole run before any build starts.
+   - **`build`** — one matrix leg per OS (Windows, Linux, macOS), running in parallel. Every leg does the same thing: install what a script cannot (the cargo cache, the OS's system libraries, packaging tools), run `scripts/ci-check.sh --release`, then run that OS's packaging script, then upload `dist/`.
+     - **Windows** — `scripts/build-windows-installer.ps1` builds the installer with Inno Setup (installed by the leg).
+     - **Linux** — `scripts/build-linux-appimage.sh` builds the `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`, installed by the leg) and the AppImage from one binary. `cargo deb --no-build` leaves `target/release/mechvibes-dx` unstripped and byte-identical, so the same BuildID lands inside the AppImage.
+     - **macOS** — `scripts/build-macos-app.sh` hand-assembles `MechvibesDX.app` and packages it as a DMG.
+   - **`release`** — downloads every leg's artifacts and creates one **draft** release with everything attached.
 
-   The build jobs run in parallel and each uploads artifacts; only the final `release` job writes to GitHub Releases. That single-writer design is deliberate — having each job call `action-gh-release` against the same tag races, and the last writer can drop the others' assets.
+   These are the same scripts you run locally, so a local run is a faithful rehearsal of CI. Each one:
+   - checks that the active Rust is at least the `rust-version` in `Cargo.toml` (the crate's minimum supported Rust) and fails if not (`scripts/lib/common.sh`, with a PowerShell twin in the Windows script). It is a floor, not an exact match: any newer compiler passes;
+   - builds with `--locked` unless given `--skip-build` (`-SkipBuild` on Windows), in which case it runs `cargo check --locked` instead and refuses a binary older than `src/`, `assets/`, `patches/`, `Cargo.toml`, `Cargo.lock` or `build.rs`;
+   - checks what it produced: the AppImage and DMG are unpacked or mounted and their soundpack, font and binary contents compared with the source tree, and the Windows installer name is asserted against the auto-updater's filter.
 
-   `release` requires `windows-build` to succeed but tolerates the other two failing, so a Linux or macOS regression degrades the release rather than blocking it.
+   The legs run in parallel and each uploads artifacts; only the final `release` job writes to GitHub Releases. That single-writer design is deliberate — having each job call `action-gh-release` against the same tag races, and the last writer can drop the others' assets.
+
+   `release` requires **every** leg to succeed. A red Linux or macOS leg stops the release rather than shipping it without that platform's asset.
 
 6. **Review the draft release**
 
@@ -145,13 +152,16 @@ The workflow does not build an installer or create a release if this fails. Fix 
 **"No installer asset found" / asset name doesn't match the auto-updater filter**
 The auto-updater only recognizes Windows assets whose filename contains `x64` and ends in `.exe`. If you renamed the `.iss` script's `OutputBaseFilename`, keep that constraint (see `src/utils/auto_updater.rs`'s `find_download_url`).
 
-Note the same filter constrains the *other* platforms' asset names in reverse: no Linux or macOS asset may contain `x64` and end in `.exe`, or it could be served to Windows users as an update. Both jobs assert this before uploading, and the names use `x86_64`/`amd64`/`arm64` (none of which contain the substring `x64`) with non-`.exe` extensions. If the filter in `find_download_url` ever loosens, revisit those assertions.
+Note the same filter constrains the *other* platforms' asset names in reverse: no Linux or macOS asset may contain `x64` and end in `.exe`, or it could be served to Windows users as an update. The Linux and macOS packaging scripts assert this on their output (`assert_no_updater_collision` in `scripts/lib/common.sh`), and the names use `x86_64`/`amd64`/`arm64` (none of which contain the substring `x64`) with non-`.exe` extensions. If the filter in `find_download_url` ever loosens, revisit those assertions.
 
-**`linux-build` fails on a missing `-dev` package**
-Its system-dependency list mirrors `ci.yml`'s `linux-check` job. If you add a dependency to one, add it to the other — otherwise CI stays green while releases break.
+**The Linux leg fails on a missing `-dev` package**
+The system-dependency list lives in one place, `.github/actions/linux-system-deps/action.yml`, which both `ci.yml` and `release.yml` use. Add a new dependency there, and to the Linux list in `README.md`.
 
-**`macos-build` is red**
-Expected to be possible: the crate's macOS support is unverified. The job is `continue-on-error`, so the release still goes out with Windows and Linux assets and simply omits the macOS one. Fix it or leave it; it does not gate a release.
+**The macOS leg is red**
+It blocks the release like every other leg. The macOS build is experimental (see `README-macos.txt`), but it is now also checked on every push and pull request by the `macOS` entry in `ci.yml`'s matrix, so a break should show up there long before a tag.
+
+**A leg fails with "Rust ... is active but Cargo.toml requires rust-version ... or newer"**
+The Rust in use is older than the `rust-version` in `Cargo.toml` (or there is no `rustc` at all). Locally, run `rustup update stable`, or look for an exported `RUSTUP_TOOLCHAIN` pointing at an old toolchain. In CI the job uses the runner's preinstalled Rust, so this means the runner image is older than the floor. A Rust *newer* than the floor is not an error. To raise the minimum, change `rust-version` in `Cargo.toml`.
 
 **Local installer build fails with "Inno Setup not found"**
 Install Inno Setup 6 from https://jrsoftware.org/isinfo.php, or if already installed via winget, confirm it's at one of the paths `scripts/build-windows-installer.ps1` checks (`Program Files\Inno Setup 6`, or `%LOCALAPPDATA%\Programs\Inno Setup 6` for a per-user winget install).
