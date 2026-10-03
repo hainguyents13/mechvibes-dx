@@ -46,13 +46,21 @@ Write-Host ""
 # Step 1: Build release binary
 if ($SkipBuild) {
     Write-Host "[1/4] Skipping build (using existing binary)" -ForegroundColor Yellow
+    # Nothing is compiled here, so still validate the toolchain pin
+    # (rust-toolchain.toml / `rust-version` in Cargo.toml) and Cargo.lock.
+    Write-Host "Running: cargo check --locked" -ForegroundColor Gray
+    cargo check --locked
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: 'cargo check --locked' failed - fix the toolchain pin (rust-toolchain.toml) or Cargo.lock" -ForegroundColor Red
+        exit 1
+    }
     Write-Host ""
 }
 if (-not $SkipBuild) {
     Write-Host "[1/4] Building release binary..." -ForegroundColor Yellow
-    Write-Host "Running: cargo build --release" -ForegroundColor Gray
+    Write-Host "Running: cargo build --release --locked" -ForegroundColor Gray
 
-    cargo build --release
+    cargo build --release --locked
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Build failed" -ForegroundColor Red
@@ -69,6 +77,24 @@ if (-not (Test-Path $ExePath)) {
     Write-Host "ERROR: Executable not found at $ExePath" -ForegroundColor Red
     Write-Host "Please run without -SkipBuild flag" -ForegroundColor Red
     exit 1
+}
+
+# -SkipBuild packages whatever binary is already there, which could be left over
+# from an older checkout. Refuse a binary older than anything it is built from,
+# rather than ship stale code under a new version number.
+if ($SkipBuild) {
+    $ExeTime = (Get-Item $ExePath).LastWriteTime
+    $Sources = @("src", "assets", "patches", "Cargo.toml", "Cargo.lock", "build.rs", "rust-toolchain.toml") |
+        ForEach-Object { Join-Path $ProjectRoot $_ } |
+        Where-Object { Test-Path $_ }
+    $Stale = @(Get-ChildItem -Path $Sources -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -gt $ExeTime } |
+        Select-Object -First 5)
+    if ($Stale.Count -gt 0) {
+        Write-Host "ERROR: $ExePath is older than these files - rebuild it, or run without -SkipBuild:" -ForegroundColor Red
+        $Stale | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor Red }
+        exit 1
+    }
 }
 
 # Get file version

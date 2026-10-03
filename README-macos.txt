@@ -10,8 +10,8 @@ known to work.
 
 Known and expected rough edges:
   - Gatekeeper will refuse a normal double-click on first launch.
-  - Input capture needs Accessibility permission, which the app cannot
-    request properly without a signed bundle.
+  - Input capture needs Accessibility and Input Monitoring permission, which
+    the app cannot request properly without a signed bundle.
   - The tray icon, audio device switching, and soundpack loading are all
     unverified on macOS.
 
@@ -45,16 +45,28 @@ actual corruption:
   xattr -cr /Applications/MechvibesDX.app
 
 
-3. Accessibility permission
----------------------------
+3. Accessibility and Input Monitoring permissions
+-------------------------------------------------
 
-Global key capture requires it:
+Global key capture requires BOTH:
 
   System Settings -> Privacy & Security -> Accessibility
+  System Settings -> Privacy & Security -> Input Monitoring
 
-Add /Applications/MechvibesDX.app and enable the toggle.
-You may have to remove and re-add the entry after replacing the binary with a
-newer build, because macOS keys the permission to the binary's identity.
+Add /Applications/MechvibesDX.app to each list and enable the toggle.
+
+  - Accessibility covers key capture while the MechvibesDX window is focused.
+  - Input Monitoring covers key capture while the window is minimized or
+    another app is focused. Without it, sounds only play while the
+    MechvibesDX window has focus, and nothing tells you why.
+
+You have to remove and re-add both entries after replacing the app with a
+newer build, because macOS keys the permission to the binary's identity. The
+toggle can look on and still not work. Or reset them from a terminal and let
+macOS prompt again on the next launch:
+
+  tccutil reset ListenEvent com.hainguyents13.mechvibesdx
+  tccutil reset Accessibility com.hainguyents13.mechvibesdx
 
 
 4. Where your settings live
