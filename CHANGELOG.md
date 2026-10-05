@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Logo and background customization now apply as you pick them.** The "Save changes" buttons are gone: choosing a colour or an image updates the app straight away, so what you see is the result rather than a preview you had to commit. Reset is still there and now takes effect immediately too.
+
+### Fixed
+
+- **The Reset button under Logo and Background now works.** Pressing it appeared to do nothing and left the old colours in place. The panels kept their own copy of your settings and quietly wrote it back over anything you changed, which also made individual colour changes fail to stick.
+- **Turning on background customization no longer leaves the background unchanged.** With no colour picked yet, the app wrote an empty style rule that browsers discard, so the setting looked active while nothing happened. It now starts from your theme's colour. Choosing "Use image" before picking a file also falls back to the colour instead of blanking the background.
+
 ## [0.8.2] - 2026-08-16
 
 ### Added
