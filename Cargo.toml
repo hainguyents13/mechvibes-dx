@@ -3,6 +3,7 @@ name = "mechvibes-dx"
 version = "0.8.2"
 authors = ["Hải Nguyễn <hainguyen.ts13@gmail.com>"]
 edition = "2024"
+rust-version = "1.88"
 description = "A modern mechanical keyboard sound simulator with customizable soundpacks"
 license = "MIT"
 
@@ -130,3 +131,9 @@ assets = [
   ["README.md", "usr/share/doc/mechvibes-dx/", "644"],
   ["soundpacks/**/*", "usr/share/mechvibes-dx/soundpacks/", "644"],
 ]
+
+# Local patch: wraps rdev's TIS* API calls in dispatch::Queue::main().exec_sync()
+# to fix EXC_BREAKPOINT crash on macOS Sequoia+ (HIToolbox requires main queue).
+# Remove this once rdev publishes a release with the upstream fix.
+[patch.crates-io]
+rdev = { path = "patches/rdev" }
