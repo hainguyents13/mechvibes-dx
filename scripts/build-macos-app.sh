@@ -40,7 +40,7 @@ IDENTIFIER="com.hainguyents13.mechvibesdx"
 MIN_MACOS="11.0"
 
 # Build step. The release binary is built here by default so a wrong toolchain
-# pin (rust-toolchain.toml / `rust-version` in Cargo.toml) or a stale Cargo.lock
+# compiler older than `rust-version` in Cargo.toml, or a stale Cargo.lock,
 # fails at the start, with cargo's own message, instead of surfacing later.
 # `--locked` refuses to modify Cargo.lock.
 #
@@ -50,7 +50,7 @@ MIN_MACOS="11.0"
 if [ "$SKIP_BUILD" -eq 1 ]; then
   echo "Skipping build (--skip-build); checking the crate against the pinned toolchain..."
   if ! cargo check --locked; then
-    echo "::error::'cargo check --locked' failed - fix the toolchain pin (rust-toolchain.toml) or Cargo.lock"
+    echo "::error::'cargo check --locked' failed - check the Rust version against rust-version in Cargo.toml, or Cargo.lock"
     exit 1
   fi
 else
@@ -68,7 +68,7 @@ fi
 # from, rather than ship stale code under a new version number. Rebuild it, or
 # run without --skip-build.
 if [ "$SKIP_BUILD" -eq 1 ]; then
-  stale=$({ find src assets patches Cargo.toml Cargo.lock build.rs rust-toolchain.toml -type f -newer "$BINARY" 2>/dev/null || true; } | head -5)
+  stale=$({ find src assets patches Cargo.toml Cargo.lock build.rs -type f -newer "$BINARY" 2>/dev/null || true; } | head -5)
   if [ -n "$stale" ]; then
     echo "::error::$BINARY is older than these files - rebuild it, or run without --skip-build:"
     echo "$stale"

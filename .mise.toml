@@ -1,6 +1,6 @@
 # vim:filetype=toml syntax=toml tabstop=2 shiftwidth=2 softtabstop=2 expandtab fileencoding=utf-8
 
-# Rust itself is pinned in rust-toolchain.toml (read by rustup, and by mise as
-# an idiomatic version file), so it is deliberately not listed here.
+# Rust comes from rustup (any stable at or above `rust-version` in Cargo.toml),
+# so it is deliberately not listed here.
 [tools]
 "cargo:dioxus-cli" = "0.7.10"
