@@ -129,7 +129,7 @@ Debug logs stay local until you export them via the Debug button. Key names in l
 ### Prerequisites
 
 **All platforms:**
-- [Rust](https://rustup.rs/) 1.88.0 or later. `rust-toolchain.toml` pins it, so rustup installs it automatically on the first `cargo` run in the repo.
+- [Rust](https://rustup.rs/) 1.88.0 or later, declared as `rust-version` in `Cargo.toml`. The latest stable works.
 - [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started) 0.7.10: `cargo install dioxus-cli --version 0.7.10`. If you use [mise](https://mise.jdx.dev/), `mise install` installs the pinned `dioxus-cli` from `.mise.toml`.
 
 **Windows:**

@@ -1,6 +1,6 @@
 # Codebase Summary — MechvibesDX
 
-**Last Updated:** 2026-08-03 · **Language:** Rust (1.88.0) + Dioxus 0.7.10  
+**Last Updated:** 2026-08-03 · **Language:** Rust (1.88+) + Dioxus 0.7.10  
 **Build:** `cargo build --release` (Windows); CI via GitHub Actions  
 **Platform targets:** Windows (primary), Linux (X11/Wayland), macOS  
 **Current version:** v0.7.0 (device watchdog removed, input injection filter added, trace facility enabled)
@@ -479,7 +479,7 @@ cargo test --release  # For audio tests (opt=2 in dev profile)
 ## Build & Development
 
 **Prerequisites:**
-- Rust 1.88.0 (check `rust-toolchain.toml` or `rustup`).
+- Rust 1.88.0 or later (`rust-version` in `Cargo.toml`).
 - Dioxus CLI 0.7.10 (`cargo install dioxus-cli --version 0.7.10`).
 - Platform-specific:
   - Windows: Visual Studio Build Tools (MSVC).
