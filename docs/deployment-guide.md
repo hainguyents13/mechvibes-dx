@@ -22,7 +22,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 - **pre-commit** runs `cargo check` — the tree must compile before any commit.
 - **pre-push** runs `cargo test` — the full suite must pass before anything reaches origin (mirrors the CI smoke gate, so a red push never wastes a CI run or lands on another session's clone).
 
-`--no-verify` bypasses them in an emergency, but CI runs the same gates on release tags, so a bypassed failure only postpones the red light.
+`--no-verify` bypasses them in an emergency, but CI runs the same gates on every pull request and every push to `main`, so a bypassed failure only postpones the red light.
 
 ## Release steps
 
@@ -54,18 +54,34 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    git push origin main --tags
    ```
 
-   Pushing the `v*` tag triggers `.github/workflows/release.yml`.
+   Pushing the commit to `main` starts `.github/workflows/ci.yml`, the workflow that builds every pull request and push. **The tag does not start a run of its own.** When that run's builds finish, its `Find release tag` job asks the remote whether a `v*` tag points at the commit that was built. If one does, the same run drafts the release from the packages it just built.
+
+   **This gives you one run per commit, not two.** A tag-triggered release workflow would start a second run on the same commit (one for the branch push, one for the tag), which means the commit is built twice and the results are split: the packages in the branch's CI run, the release notes and the draft in the tag's run. Here the branch run does all of it, so a release has a single place to look. That one run's Actions page holds:
+   - the three packages (`windows-release`, `linux-release`, `macos-release`) as its artifacts,
+   - the test and build results for every OS,
+   - and the draft release, built from exactly those packages.
+
+   - **Push the tag with the commit, or while the builds are running.** Both work, because the remote is only asked after the builds finish. `git push origin main --tags` is fine.
+   - **For a squash or rebase merge, tag the new commit on `main`**, not the PR's branch commit. The tag has to point at the commit that was built.
+   - **Tagged after the run finished?** Open the run in the Actions tab and re-run the `Find release tag` job (and the `Draft release` job follows it). The packages are kept with the run (90 days by default), so nothing is rebuilt. For a commit with no run at all, start one with `gh workflow run ci.yml --ref <branch-or-tag>`.
 
 5. **Wait for GitHub Actions**
 
-   The workflow runs three stages (~15 minutes end to end):
+   **One workflow, one run per commit.** `.github/workflows/ci.yml` runs on:
 
-   - **`gate`** — validates the tag matches `Cargo.toml`'s version and extracts the CHANGELOG section as release notes (`scripts/extract-changelog.ps1`). Fails the whole run before any build starts.
-   - **`build`** — one matrix leg per OS (Windows, Linux, macOS), running in parallel. Every leg does the same thing: install what a script cannot (the cargo cache, the OS's system libraries, packaging tools), run `scripts/ci-check.sh --release`, then run that OS's packaging script, then upload `dist/`.
+   - **a pull request into `main`** (from this repo or a fork): verification only, nothing is uploaded.
+   - **a push to `main`, or manual dispatch**: builds and keeps `windows-release`, `linux-release` and `macos-release` as artifacts of the run. If a release tag points at the commit, the run also drafts the release. A branch with no pull request is not built; run `gh workflow run ci.yml --ref <branch>` to build one.
+
+   A pull request cancels its own superseded runs; every other run has a group of its own and is never cancelled, so a later push cannot kill a release halfway through, and no commit is skipped because a newer one arrived while it was queued.
+
+   **Only a tagged commit creates a release**, and it refuses a tag that already has a release, draft or published, so it can never add to or replace an existing one. Stages (~15 minutes end to end):
+
+   - **`build`** — one matrix leg per OS (Windows, Linux, macOS), running in parallel, on every run. Every leg does the same thing: install what a script cannot (the cargo cache, the OS's system libraries, packaging tools), run `scripts/ci-check.sh --release`, then run that OS's packaging script, then upload `dist/` (except for pull requests).
      - **Windows** — `scripts/build-windows-installer.ps1` builds the installer with Inno Setup (installed by the leg).
      - **Linux** — `scripts/build-linux-appimage.sh` builds the `.deb` (via `cargo-deb`, driven by `[package.metadata.deb]` in `Cargo.toml`, installed by the leg) and the AppImage from one binary. `cargo deb --no-build` leaves `target/release/mechvibes-dx` unstripped and byte-identical, so the same BuildID lands inside the AppImage.
      - **macOS** — `scripts/build-macos-app.sh` hand-assembles `MechvibesDX.app` and packages it as a DMG.
-   - **`release`** — downloads every leg's artifacts and creates one **draft** release with everything attached.
+   - **`tag`** (`Find release tag`; not on pull requests) — after every leg passed, runs `resolve_release_tag` from `scripts/lib/common.sh` against the remote. It finds `v<Cargo.toml version>` pointing at the built commit (annotated and lightweight tags both work), finds no tag (an ordinary build, the job just says so), or fails if the commit has a `v*` tag that does not match `Cargo.toml`'s version. You can run the same function locally.
+   - **`release`** (`Draft release`; only when `tag` found one) — extracts the CHANGELOG section as the release notes (`scripts/extract-changelog.ps1`, so a build that is not a release never needs one), downloads this run's packages, generates `SHA256SUMS.txt`, checks once more that no release exists for the tag, and creates one **draft** release with everything attached.
 
    These are the same scripts you run locally, so a local run is a faithful rehearsal of CI. Each one:
    - checks that the active Rust is at least the `rust-version` in `Cargo.toml` (the crate's minimum supported Rust) and fails if not (`scripts/lib/common.sh`, with a PowerShell twin in the Windows script). It is a floor, not an exact match: any newer compiler passes;
@@ -85,7 +101,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
    | `MechvibesDX-<version>-Setup-x64.exe` | Windows | The installer. **The only asset the auto-updater consumes** — its name must keep containing `x64` and ending in `.exe`. |
    | `mechvibes-dx_<version>_amd64.deb` | Debian/Ubuntu | `sudo dpkg -i`. Does **not** add the user to the `input` group (see below). |
    | `mechvibes-dx-<version>-x86_64.AppImage` | Any Linux distro | Portable, no install. Needs `chmod +x` first, and has the **same** `input` group requirement as the `.deb`. |
-   | `mechvibes-dx-<version>-macos-<arch>-experimental.dmg` | macOS | **Experimental, ad-hoc signed, not notarized, untested.** Contains `MechvibesDX.app` and an `/Applications` symlink. |
+   | `mechvibes-dx-<version>-macos-<arch>.dmg` | macOS | **Ad-hoc signed, not notarized.** Contains `MechvibesDX.app` and an `/Applications` symlink. |
    | `README-macos-<version>.txt` | macOS | DMG install, Gatekeeper and Accessibility instructions. |
    | `SHA256SUMS.txt` | all | Digests of every other asset. **The in-app auto-updater refuses to run an installer that is not listed here with a matching hash**, so a release missing this file silently degrades every Windows user to a manual download. |
 
@@ -110,7 +126,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
    The job asserts bundled soundpack audio, `config.json` and font counts **match the source tree** (same rationale as macOS: the mouse packs are `.mp3`, so an `.ogg`-only check would pass while dropping all four), unpacks the finished image with `--appimage-extract` and checks the ELF magic byte-wise. `appimagetool` runs with `APPIMAGE_EXTRACT_AND_RUN=1` because GitHub runners have no FUSE, so it cannot mount itself.
 
-   **macOS assets are labelled experimental on purpose.** The build has never been run on a real Mac and is **not notarized**, so Gatekeeper still blocks a plain double-click (right-click → Open clears it, once). The label belongs in both the filename and the notes so nobody mistakes it for a supported download.
+   **The macOS asset is not notarized.** It is ad-hoc signed only, so Gatekeeper still blocks a plain double-click (right-click → Open clears it, once). The release notes say so. It is no longer labelled experimental, in the filename or the notes.
 
    **The macOS asset is a DMG containing a hand-assembled `.app`.** `dx bundle` is not used — DioxusLabs/dioxus#5723 makes the 0.7.x resource copier fail on every directory in `Dioxus.toml`'s `resources`, and it exits non-zero having already written a `.app` with an *empty* `Contents/Resources`, so "use the .app if one exists" would ship a silent app. `scripts/build-macos-app.sh` assembles the bundle explicitly (`Info.plist`, binary, `Resources/` with soundpacks + assets + a generated `.icns`), ad-hoc signs it (`codesign --force --deep -s -`), and packages it with `hdiutil`. Revisit once the upstream fix ships (present in 0.8.0-alpha.1).
 
@@ -155,10 +171,18 @@ The auto-updater only recognizes Windows assets whose filename contains `x64` an
 Note the same filter constrains the *other* platforms' asset names in reverse: no Linux or macOS asset may contain `x64` and end in `.exe`, or it could be served to Windows users as an update. The Linux and macOS packaging scripts assert this on their output (`assert_no_updater_collision` in `scripts/lib/common.sh`), and the names use `x86_64`/`amd64`/`arm64` (none of which contain the substring `x64`) with non-`.exe` extensions. If the filter in `find_download_url` ever loosens, revisit those assertions.
 
 **The Linux leg fails on a missing `-dev` package**
-The system-dependency list lives in one place, `.github/actions/linux-system-deps/action.yml`, which both `ci.yml` and `release.yml` use. Add a new dependency there, and to the Linux list in `README.md`.
+The system-dependency list lives in one place, `.github/actions/linux-system-deps/action.yml`, which the `build` job in `ci.yml` uses. Add a new dependency there, and to the Linux list in `README.md`.
 
 **The macOS leg is red**
-It blocks the release like every other leg. The macOS build is experimental (see `README-macos.txt`), but it is now also checked on every push and pull request by the `macOS` entry in `ci.yml`'s matrix, so a break should show up there long before a tag.
+It blocks the release like every other leg. It is built on every pull request and push to `main` by the `macOS` entry in `ci.yml`'s matrix, so a break should show up there long before a tag.
+
+**I pushed a tag but no release appeared**
+The tag only matters when the run's `Find release tag` job looks at the remote, after the builds. Check that job's log:
+- *"No v* tag points at <sha> on the remote"* — the tag was pushed after the job ran, or it points at a different commit than the one that was built (a squash merge, a branch commit). Push the tag to the built commit, then re-run `Find release tag` from the run's page. Nothing is rebuilt.
+- *"Commit ... has the tag(s) vX but Cargo.toml says version Y"* — the tag does not match `Cargo.toml`. Delete the tag, fix whichever is wrong, and tag again.
+
+**Workflow fails at "Check that no release exists for this tag"**
+A release (draft or published) for that tag already exists. The workflow stops rather than add assets to it or replace them. Look at the release it links to; if you really mean to redo it, delete that release in GitHub and re-run the `Draft release` job. (The check runs right before the release is created, so two runs for one tag cannot both publish.)
 
 **A leg fails with "Rust ... is active but Cargo.toml requires rust-version ... or newer"**
 The Rust in use is older than the `rust-version` in `Cargo.toml` (or there is no `rustc` at all). Locally, run `rustup update stable`, or look for an exported `RUSTUP_TOOLCHAIN` pointing at an old toolchain. In CI the job uses the runner's preinstalled Rust, so this means the runner image is older than the floor. A Rust *newer* than the floor is not an error. To raise the minimum, change `rust-version` in `Cargo.toml`.

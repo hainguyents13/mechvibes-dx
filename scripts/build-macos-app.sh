@@ -11,7 +11,7 @@
 # Usage: scripts/build-macos-app.sh <version> [--skip-build]
 #   Builds target/release/mechvibes-dx (cargo build --release --locked) first.
 #   --skip-build reuses an existing binary, e.g. when CI built it already.
-#   Writes dist/mechvibes-dx-<version>-macos-<arch>-experimental.dmg
+#   Writes dist/mechvibes-dx-<version>-macos-<arch>.dmg
 #
 # macOS only (uses sips, iconutil, codesign, hdiutil).
 
@@ -221,7 +221,7 @@ cp README-macos.txt "$DMG_ROOT/README.txt"
 
 # "arm64"/"x86_64" contain no "x64" substring and this is not a .exe, so the
 # Windows auto-updater filter in src/utils/auto_updater.rs cannot pick it up.
-DMG="dist/mechvibes-dx-${VERSION}-macos-${ARCH}-experimental.dmg"
+DMG="dist/mechvibes-dx-${VERSION}-macos-${ARCH}.dmg"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG"
 hdiutil verify "$DMG"
 

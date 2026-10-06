@@ -79,3 +79,63 @@ assert_no_updater_collision() {
   done
   return $status
 }
+
+# Prints the release tag for a commit, going by what the REMOTE says rather than
+# by how a CI run was triggered. That is what lets one run (started by a branch
+# push) build a commit and still release it when a tag points at it.
+#
+#   resolve_release_tag <commit-sha> [remote]      (remote defaults to origin)
+#
+# - prints "v<Cargo.toml version>" if that tag points at the commit;
+# - prints nothing (success) if no v* tag points at it: an ordinary build;
+# - prints an error and fails if a v* tag points at it but none matches the
+#   Cargo.toml version, so a mistyped tag cannot publish the wrong release.
+#
+# `git ls-remote` lists an annotated tag twice: the tag object's own id, then the
+# commit it points at on a line ending in "^{}". The commit is what has to match.
+resolve_release_tag() {
+  local sha="$1" remote="${2:-origin}" version refs tags expected
+
+  version=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "${_REPO_ROOT}/Cargo.toml" | head -n1)
+  if [ -z "$version" ]; then
+    echo "::error::Could not find version in Cargo.toml" >&2
+    return 1
+  fi
+
+  # Fail loudly if the remote cannot be asked. Inside `$(...)` a failure is not
+  # fatal even under `set -e`, so an unreachable remote would otherwise look
+  # exactly like "no tag" and quietly skip a release.
+  refs=$(git ls-remote --tags "$remote" 'refs/tags/v*') || {
+    echo "::error::Could not list the tags on '${remote}'" >&2
+    return 1
+  }
+
+  tags=$(printf '%s\n' "$refs" | awk -v sha="$sha" '
+    {
+      name = $2
+      sub(/^refs\/tags\//, "", name)
+      if (name ~ /\^\{\}$/) {
+        sub(/\^\{\}$/, "", name)
+        peeled[name] = $1
+      } else {
+        direct[name] = $1
+      }
+    }
+    END {
+      for (n in direct) {
+        commit = (n in peeled) ? peeled[n] : direct[n]
+        if (commit == sha) print n
+      }
+    }' | sort)
+
+  if [ -z "$tags" ]; then
+    return 0
+  fi
+
+  expected="v${version}"
+  if ! printf '%s\n' "$tags" | grep -qx "$expected"; then
+    echo "::error::Commit ${sha} has the tag(s) $(echo $tags) but Cargo.toml says version ${version}, so the tag should be ${expected}." >&2
+    return 1
+  fi
+  echo "$expected"
+}
