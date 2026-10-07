@@ -50,6 +50,7 @@ pub fn start_input_capture_with_focus(
             crate::debug_print!("🎮 Starting evdev keyboard listener (Wayland mode)...");
             crate::libs::evdev_input_listener::start_evdev_keyboard_listener(
                 keyboard_tx.clone(),
+                mouse_tx.clone(),
                 hotkey_tx.clone(),
                 window_focused.clone()
             );

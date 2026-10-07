@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Mouse wheel scrolling now reaches the engine on Wayland.** Scrolling was ignored because the input-device listener only looked at keys and buttons. Wheel up and wheel down now arrive as `MouseWheelUp` and `MouseWheelDown`, limited to one sound per 120 ms so a fast scroll does not machine-gun the samples. Whether you hear anything depends on your pack defining those two codes: as with every other key, a pack that does not define them stays silent rather than falling back to the left click. X11 is unchanged: its listener does not report the wheel yet.
+
 ## [0.8.3] - 2026-10-07
 
 ### Changed
