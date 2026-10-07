@@ -3576,6 +3576,7 @@ dependencies = [
  "env_logger",
  "evdev",
  "futures-timer",
+ "glib",
  "hound",
  "image 0.24.9",
  "libc",

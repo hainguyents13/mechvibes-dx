@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The tray icon menu works while the window is hidden.** Hiding to the tray used to leave the menu able to act once: after a first Mute, Show or Exit nothing in it responded any more, and the mute checkmark moved without the sound changing. The window also came back behind every other window instead of to the front. The menu is now handled on the toolkit's own main loop, which keeps running while the window is hidden, and the window is raised and focused when it is asked for.
+
 ## [0.8.3] - 2026-10-07
 
 ### Changed
