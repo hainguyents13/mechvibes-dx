@@ -452,7 +452,7 @@ Note: `DeviceLost` was removed in Phase 7 (watchdog removal). On device unplug, 
 | `src/state/config.rs` | Persistent configuration schema |
 | `src/state/soundpack.rs` | Soundpack metadata and definitions |
 | `src/state/ambiance.rs` | Ambiance player state and commands |
-| `.github/workflows/release.yml` | CI/CD: tag → build → installer → release |
+| `.github/workflows/ci.yml` | Build + test + package for Windows, Linux, macOS on PRs and pushes to `main`; drafts a release when a tag points at the built commit |
 
 ---
 

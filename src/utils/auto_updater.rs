@@ -985,7 +985,7 @@ mod tests {
         vec![
             asset("MechvibesDX-0.7.0-Setup-x64.exe"),
             asset("SHA256SUMS.txt"),
-            asset("mechvibes-dx-0.7.0-macos-arm64-experimental.dmg"),
+            asset("mechvibes-dx-0.7.0-macos-arm64.dmg"),
             asset("mechvibes-dx-0.7.0-x86_64.AppImage"),
             asset("mechvibes-dx_0.7.0_amd64.deb")
         ]
@@ -1027,7 +1027,7 @@ mod tests {
         );
         assert_eq!(
             pick(InstallKind::MacOs).as_deref(),
-            Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64-experimental.dmg")
+            Some("https://example.com/mechvibes-dx-0.7.0-macos-arm64.dmg")
         );
         assert_eq!(
             pick(InstallKind::LinuxAppImage).as_deref(),
@@ -1096,7 +1096,7 @@ mod tests {
     #[test]
     fn the_macos_rule_does_not_match_the_readme_text_file() {
         assert!(!asset_matches(InstallKind::MacOs, "readme-macos-0.7.0.txt"));
-        assert!(asset_matches(InstallKind::MacOs, "mechvibes-dx-0.7.0-macos-arm64-experimental.dmg"));
+        assert!(asset_matches(InstallKind::MacOs, "mechvibes-dx-0.7.0-macos-arm64.dmg"));
     }
 
     /// A release missing this kind's asset yields None, so the UI falls back to
@@ -1134,8 +1134,8 @@ mod tests {
             |name: &str| name.ends_with(".exe") && name.contains("x64");
 
         for name in [
-            "mechvibes-dx-0.7.0-macos-arm64-experimental.dmg",
-            "mechvibes-dx-0.7.0-macos-x86_64-experimental.dmg",
+            "mechvibes-dx-0.7.0-macos-arm64.dmg",
+            "mechvibes-dx-0.7.0-macos-x86_64.dmg",
             "mechvibes-dx_0.7.0_amd64.deb",
             // "x86_64" is x-8-6-_-6-4: the substring "x64" does not occur in
             // it, and the extension is not .exe either. Both halves of the

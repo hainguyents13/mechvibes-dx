@@ -11,11 +11,13 @@
 # Usage: scripts/build-macos-app.sh <version> [--skip-build]
 #   Builds target/release/mechvibes-dx (cargo build --release --locked) first.
 #   --skip-build reuses an existing binary, e.g. when CI built it already.
-#   Writes dist/mechvibes-dx-<version>-macos-<arch>-experimental.dmg
+#   Writes dist/mechvibes-dx-<version>-macos-<arch>.dmg
 #
 # macOS only (uses sips, iconutil, codesign, hdiutil).
 
 set -euo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
 SKIP_BUILD=0
 VERSION=""
@@ -38,6 +40,10 @@ BINARY="target/release/mechvibes-dx"
 IDENTIFIER="com.hainguyents13.mechvibesdx"
 # arm64 macOS starts at 11.0; nothing older can run an Apple Silicon build.
 MIN_MACOS="11.0"
+
+# Fail first, and with a clear message, if the Rust in use is older than the
+# `rust-version` declared in Cargo.toml.
+verify_rust_toolchain
 
 # Build step. The release binary is built here by default so a wrong toolchain
 # compiler older than `rust-version` in Cargo.toml, or a stale Cargo.lock,
@@ -215,13 +221,51 @@ cp README-macos.txt "$DMG_ROOT/README.txt"
 
 # "arm64"/"x86_64" contain no "x64" substring and this is not a .exe, so the
 # Windows auto-updater filter in src/utils/auto_updater.rs cannot pick it up.
-DMG="dist/mechvibes-dx-${VERSION}-macos-${ARCH}-experimental.dmg"
+DMG="dist/mechvibes-dx-${VERSION}-macos-${ARCH}.dmg"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG"
 hdiutil verify "$DMG"
+
+# ---------------------------------------------------------------------------
+# 7. Mount the finished DMG and check what is actually inside it, so the build
+# log is itself the evidence that the shipped artifact has the right shape. A
+# green exit from the assembly steps only proves the commands ran.
+# ---------------------------------------------------------------------------
+echo "=== Verifying $DMG ($(du -h "$DMG" | cut -f1)) ==="
+MOUNT_POINT="$(mktemp -d)"
+trap 'hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true; rmdir "$MOUNT_POINT" 2>/dev/null || true' EXIT
+hdiutil attach "$DMG" -mountpoint "$MOUNT_POINT" -nobrowse -readonly -quiet
+
+MOUNTED_APP="$MOUNT_POINT/${APP_NAME}.app"
+[ -d "$MOUNTED_APP" ] || { echo "::error::DMG has no ${APP_NAME}.app"; exit 1; }
+[ -L "$MOUNT_POINT/Applications" ] || { echo "::error::DMG has no Applications symlink"; exit 1; }
+
+echo "--- bundle tree ---"
+find "$MOUNTED_APP" -maxdepth 3 | sort
+echo "--- binary ---"
+file "$MOUNTED_APP/Contents/MacOS/mechvibes-dx"
+file "$MOUNTED_APP/Contents/MacOS/mechvibes-dx" | grep -q "Mach-O" \
+  || { echo "::error::bundled executable is not a Mach-O binary"; exit 1; }
+
+DMG_AUDIO=$(count_audio "$MOUNTED_APP/Contents/Resources/soundpacks")
+if [ "$DMG_AUDIO" -ne "$expected" ]; then
+  echo "::error::DMG holds $DMG_AUDIO soundpack audio files but the source tree has $expected"
+  exit 1
+fi
+echo "soundpack audio in DMG: $DMG_AUDIO (matches source tree)"
+
+# Ad-hoc signature only. spctl is deliberately NOT gated on: it fails without
+# notarization, which is expected for this build.
+codesign --verify --deep --strict --verbose=2 "$MOUNTED_APP"
+
+hdiutil detach "$MOUNT_POINT" -quiet
+rmdir "$MOUNT_POINT"
+trap - EXIT
 
 # Ship the bundle only inside the DMG.
 rm -rf "$BUNDLE"
 cp README-macos.txt "dist/README-macos-${VERSION}.txt"
+
+assert_no_updater_collision dist
 
 echo "--- dist/ ---"
 ls -la dist/

@@ -1,90 +1,371 @@
 name: CI
 
-# Verifies the crate actually compiles on Linux. Everything up to now was
-# built and tested on Windows only, so the `#[cfg(target_os = ...)]` gates
-# added for the input worker were reviewed by eye but never fed to a Linux
-# compiler. A cfg typo, a Linux-only module that stopped compiling, or a
-# `use` that only resolves on Windows would all have shipped silently.
+# One workflow for building, testing, packaging and releasing. A single run
+# holds everything: the check and test results, the package for every OS, and -
+# when the commit being built is tagged - the draft release made from those
+# packages, with its notes. There is one run per commit: tagging a commit never
+# starts a second run, so the packages are never split across a "CI" run and a
+# separate "Release" run, and the commit is never built twice.
 #
-# Tags are deliberately not a trigger: release.yml owns tag builds, and
-# duplicating them here would double the work on every release.
+# Triggers:
+# - pull_request into main: every PR is built and tested, from this repo or a
+#   fork. Nothing is uploaded, so a PR never leaves a package behind that could
+#   be mistaken for something deployable.
+# - push to main: builds the commit and keeps the packages as artifacts of the
+#   run. If a `vX.Y.Z` tag points at that commit on the remote when the builds
+#   finish, the same run then drafts the release from those packages.
+# - workflow_dispatch: build any branch or tag by hand (Actions tab or
+#   `gh workflow run ci.yml --ref <branch>`). Treated like a push.
+#
+# A tag push is deliberately NOT a trigger. `git push origin main --tags` would
+# start two runs on the same commit (one for the branch, one for the tag) and
+# build it twice, leaving the packages in one run and the release in the other.
+# Instead the `tag` job
+# asks the remote, after the builds, whether the commit has a release tag. So the
+# tag can be pushed together with the commit, or while the builds are running.
+# If it arrives after the run has finished, re-run the `Find release tag` job
+# (and the release job that follows it): the packages are kept with the run, so
+# nothing is rebuilt.
+#
+# Feature branches without a PR are not built.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
-# One run per branch/PR. A quick follow-up push cancels the previous run
-# instead of leaving two builds racing for the same answer.
+# A pull request cancels its own superseded runs. Everything else gets one group
+# per commit and is never cancelled: a push that cancelled the previous commit's
+# run could kill a release halfway through drafting, and a commit whose run was
+# replaced while still queued would never be built, so tagging it would release
+# nothing.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  # Incremental builds only bloat the cache on a runner that is thrown away.
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  linux-check:
-    name: Linux (check + test)
-    runs-on: ubuntu-latest
+  # Every platform, every run. Each leg is a thin wrapper around the same script
+  # you run locally (scripts/build-*.sh|ps1). The scripts check that the Rust in
+  # use is at least `rust-version` from Cargo.toml, build with `--locked`,
+  # package, and check what they produced, so this job only installs what a script cannot
+  # (the cache, the OS's system libraries, packaging tools) and uploads the
+  # result.
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Let every leg finish so one failure still shows the state of the rest.
+      # The release job requires all of them, so a failed leg stops the release.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows installer
+            os: windows-latest
+            shell: pwsh
+            package: .\scripts\build-windows-installer.ps1
+            artifact: windows-release
+            # The installer only.
+            paths: dist/MechvibesDX-*-Setup-x64.exe
+          - name: Linux packages
+            os: ubuntu-latest
+            shell: bash
+            # Produces the .deb and the AppImage from one binary.
+            package: ./scripts/build-linux-appimage.sh "$VERSION"
+            artifact: linux-release
+            paths: dist/*
+          - name: macOS DMG
+            os: macos-latest
+            shell: bash
+            package: ./scripts/build-macos-app.sh "$VERSION"
+            artifact: macos-release
+            paths: dist/*
+    # A step's own `shell:` cannot read the matrix, but a job default can. Steps
+    # that need a specific shell regardless of OS set it explicitly.
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-
-      # Mirrors the "Linux (Ubuntu/Debian)" list in README.md. The AppImage
-      # extras from that list (autoconf, automake, libtool, libfuse2) are
-      # omitted on purpose: they are packaging tools, and this job never
-      # bundles an AppImage. libasound2-dev backs rodio/cpal, libevdev-dev
-      # backs the Linux input listener, and the webkit/gtk/appindicator/rsvg
-      # set backs the Dioxus desktop webview and tray icon.
-      - name: Install system dependencies
+      # The version is read from Cargo.toml, the single source of truth. For a
+      # release, the `tag` job later asserts the tag matches it. Read here rather
+      # than in a separate job: that would cost a runner start-up and a checkout
+      # just to run one `sed`.
+      - name: Read version from Cargo.toml
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev \
-            pkg-config \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libevdev-dev \
-            libxdo-dev
+          set -euo pipefail
+          version=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::Could not find version in Cargo.toml"
+            exit 1
+          fi
+          echo "App version (from Cargo.toml): $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
-      - name: Cargo check
-        run: cargo check --locked --all-targets
+      # Only the main branch saves the cache. Pull request builds and manual
+      # dispatches on other refs can still restore from it, but letting each one
+      # save would fill the repo's 10 GB cache quota with throwaway caches and
+      # evict the real one.
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      # Safe on a headless runner: the test suite is pure logic. The audio
-      # tests cover the voice pool, mute rules, and the resampler, and none
-      # of them opens a device. The Windows-only tests sit behind file-level
-      # `#![cfg(target_os = "windows")]` gates, so they compile out here.
-      - name: Cargo test
-        run: cargo test --locked
+      # --- tools and libraries a script cannot install for itself -------------
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-system-deps
 
-  windows-check:
-    name: Windows (check + test)
-    runs-on: windows-latest
+      # build-linux-appimage.sh builds the .deb through this.
+      - name: Install cargo-deb
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+
+      # build-windows-installer.ps1 compiles the installer with it.
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup -y
+
+      # --- the same steps as a local build ------------------------------------
+      # Compile and test in the release profile first, so a broken build fails
+      # before anything is packaged and the package build reuses these
+      # artifacts. No `clippy -D warnings` on purpose - the repo has pre-existing
+      # clippy warnings unrelated to release correctness; gating on them would
+      # make every build red until that debt is paid down separately.
+      - name: Verify toolchain, check and test (release profile)
+        shell: bash
+        run: bash scripts/ci-check.sh --release
+
+      # Builds the release binary (`--locked`), packages it and checks the
+      # result: the AppImage and DMG are unpacked/mounted and walked, the
+      # installer name is asserted against the auto-updater's filter.
+      - name: Build and package
+        run: ${{ matrix.package }}
+
+      # Informational only, and deliberately NOT gated on: a GUI app on a
+      # headless runner with no audio or input device is expected to be
+      # unhappy, so what matters is WHICH way it fails. Verified on 260804
+      # (run 30909285529): the app reaches soundpack scanning, resolves every
+      # bundled pack out of the mounted image, and writes its config to
+      # ~/.local/share/mechvibes - which is the whole point of the path work.
+      - name: Headless smoke (informational, never gates)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          APPIMAGE=$(ls dist/*.AppImage)
+          timeout 20s env APPIMAGE_EXTRACT_AND_RUN=1 "./$APPIMAGE" 2>&1 | head -40 || true
+
+      # Pull requests build and verify but leave nothing behind.
+      - name: Upload artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.paths }}
+          if-no-files-found: error
+
+  # Asks the remote whether a release tag points at this commit. Runs after the
+  # builds on purpose: the tag may be pushed together with the commit or while
+  # they are running, and looking only now means a tag that arrives mid-build is
+  # still seen. The trigger of this run (a push to a branch) says nothing about
+  # tags, so nothing here relies on it.
+  tag:
+    name: Find release tag
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+      version: ${{ steps.find.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      # `v<Cargo.toml version>` if that tag points at this commit on the remote;
+      # empty if the commit carries no v* tag (an ordinary build); a failure if it
+      # carries a v* tag that does not match Cargo.toml. The logic is in
+      # scripts/lib/common.sh so it can be run locally.
+      - name: Find the release tag for this commit
+        id: find
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/lib/common.sh
+          tag=$(resolve_release_tag "$GITHUB_SHA" origin)
+          if [ -z "$tag" ]; then
+            echo "::notice::No v* tag points at $GITHUB_SHA on the remote, so this is not a release. Tag it and re-run this job to release it."
+          else
+            echo "::notice::Release tag $tag points at $GITHUB_SHA"
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+  # Only for a tagged commit. A single job writes to GitHub Releases: letting
+  # every build leg call action-gh-release against the same tag races, because
+  # concurrent runs read the draft, append their own asset, and write back, so
+  # the last writer can drop the others' files. One writer, no race.
+  release:
+    name: Draft release
+    needs: [build, tag]
+    # Every platform must be built before anything is published: a release that
+    # silently lacks one platform's asset is worse than one that does not go
+    # out. The implicit `success()` already requires `build` (every leg) and
+    # `tag` to have passed; this limits the job to tagged commits.
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      # The releases API only lists draft releases for a token that can write,
+      # and the check below has to see drafts.
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      # No system deps step: the webview is part of Windows, and the Windows
-      # input path uses winapi, which needs no extra packages.
-      - name: Cargo check
-        run: cargo check --locked --all-targets
+      # Release notes exist only for a tagged commit, so they are extracted here
+      # and not for every build. A missing changelog section fails the release
+      # (nothing has been published yet), not the build.
+      - name: Extract changelog notes
+        shell: pwsh
+        run: |
+          # Capture output and exit code from the script invocation directly
+          # rather than relying on $LASTEXITCODE after a pipe - a .ps1 (not
+          # a native exe) doesn't reliably set $LASTEXITCODE when piped, and
+          # $null -ne 0 is $true in PowerShell, so that pattern silently
+          # always looks like failure.
+          $notes = & .\scripts\extract-changelog.ps1 -Version "${{ needs.tag.outputs.version }}"
+          $scriptSucceeded = $?
+          if (-not $scriptSucceeded) {
+            Write-Error "Failed to extract CHANGELOG.md section for ${{ needs.tag.outputs.version }}"
+            exit 1
+          }
+          $notes | Out-File -FilePath notes.md -Encoding utf8
+          Write-Host "Extracted release notes for ${{ needs.tag.outputs.version }}"
 
-      # This is the half that exercises the input-worker tests, which are
-      # cfg'd out of the Linux job.
-      - name: Cargo test
-        run: cargo test --locked
+      # Built by the `build` job in this run.
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release"
+          path: artifacts
+
+      - name: Collect release assets
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+
+          if ! ls release/MechvibesDX-*-Setup-x64.exe >/dev/null 2>&1; then
+            echo "::error::Windows installer missing from collected assets"
+            exit 1
+          fi
+
+          # Record which platforms actually made it, so the release body can
+          # say so instead of leaving a maintainer to diff the asset list.
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Downloads"
+            echo ""
+            echo "- **Windows**: \`MechvibesDX-<version>-Setup-x64.exe\` — installer, the only asset the in-app updater uses."
+          } >> notes.md
+          if ls release/*.deb >/dev/null 2>&1; then
+            {
+              echo "- **Linux (Debian/Ubuntu)**: \`.deb\` — install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
+            } >> notes.md
+          fi
+          if ls release/*.AppImage >/dev/null 2>&1; then
+            {
+              echo "- **Linux (any distro)**: \`.AppImage\` is portable, with no install step. Run \`chmod +x\` on it first, then launch it. The \`input\` group requirement is the same as the \`.deb\` and nothing sets it up for you: \`sudo usermod -a -G input \$USER\`, then log out and back in, or key events won't be seen."
+            } >> notes.md
+          fi
+          if ls release/*macos*.dmg >/dev/null 2>&1; then
+            echo "- **macOS (Apple Silicon)**: \`.dmg\` — open it and drag **MechvibesDX** to Applications. Ad-hoc signed but **not notarized**, so Gatekeeper blocks a normal double-click: right-click the app → **Open** → confirm, once. See \`README-macos.txt\`." >> notes.md
+          fi
+
+          echo "Assets to publish:"
+          ls -la release/
+
+      # The in-app auto-updater downloads this file from the release, finds
+      # the line for the installer it is about to run, and refuses to execute
+      # anything whose digest does not match. Generated here, in the single
+      # writer job, so it covers exactly the assets that actually ship.
+      #
+      # Names are stored bare (no directory), which is what the updater's
+      # parser expects. Releases published before this step existed have no
+      # SHA256SUMS.txt at all; the app treats that as "verification
+      # unavailable" and falls back to the manual download button.
+      - name: Generate SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          echo "Checksums covering $(($(wc -l < SHA256SUMS.txt))) assets:"
+          cat SHA256SUMS.txt
+
+      # A sums file that misses the installer would silently disable
+      # verification for every user, so assert coverage rather than trust it.
+      - name: Verify checksums cover the Windows installer
+        run: |
+          set -euo pipefail
+          installer=$(cd release && ls MechvibesDX-*-Setup-x64.exe)
+          if ! grep -q " [*]\?${installer}\$" release/SHA256SUMS.txt; then
+            echo "::error::SHA256SUMS.txt has no entry for ${installer}"
+            exit 1
+          fi
+          echo "SHA256SUMS.txt covers ${installer}"
+
+      # Refuse to add to or replace an existing release. Checked right before
+      # creating one, which is also what stops two runs for the same tag (say a
+      # push and a manual dispatch) from both publishing.
+      - name: Check that no release exists for this tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The releases API lists drafts too (for a token that can write), which
+          # `gh release view <tag>` does not: a draft has no published tag yet.
+          existing=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.tag_name == "${{ needs.tag.outputs.tag }}") | "\(.html_url) draft=\(.draft)"')
+          if [ -n "$existing" ]; then
+            echo "::error::A release for ${{ needs.tag.outputs.tag }} already exists: $existing"
+            echo "::error::Publishing again would add assets to it or replace them. Delete that release (and re-run the release job) if you really want to redo it."
+            exit 1
+          fi
+          echo "No existing release for ${{ needs.tag.outputs.tag }}"
+
+      # Release assets are only ever created here, from packages built by this
+      # run and verified above. If this step fails nothing has been published.
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          # The run was triggered by a branch push, so the action must be told
+          # which tag this is; it would otherwise use the branch name.
+          tag_name: ${{ needs.tag.outputs.tag }}
+          # Only used if the tag has vanished since it was found: publishing then
+          # creates it at the commit that was built.
+          target_commitish: ${{ github.sha }}
+          # Plain "vX.Y.Z" title by user preference (260803) - the repo name
+          # already says what the project is.
+          name: "v${{ needs.tag.outputs.version }}"
+          body_path: notes.md
+          files: release/*

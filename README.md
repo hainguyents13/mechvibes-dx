@@ -11,7 +11,7 @@ Play rich keyboard and mouse sounds with every keystroke and click. A polyphonic
 | **Windows** | [`MechvibesDX-*-Setup-x64.exe`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | One-click installer with automatic in-app updates (SHA-256 verified). |
 | **Linux (Debian/Ubuntu)** | [`mechvibes-dx_*_amd64.deb`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | `sudo dpkg -i`. Requires: `sudo usermod -a -G input $USER` + re-log. |
 | **Linux (any distro)** | [`mechvibes-dx-*-x86_64.AppImage`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | Portable (no install). Requires: `chmod +x` + same input group setup. |
-| **macOS** | [`mechvibes-dx-*-macos-arm64-experimental.dmg`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | Experimental, unsigned. Right-click the app, then Open to bypass Gatekeeper. |
+| **macOS** | [`mechvibes-dx-*-macos-arm64.dmg`](https://github.com/hainguyents13/mechvibes-dx/releases/latest) | Experimental, unsigned. Right-click the app, then Open to bypass Gatekeeper. |
 
 All links point to the [latest release](https://github.com/hainguyents13/mechvibes-dx/releases/latest); every release also ships a `SHA256SUMS.txt` covering all assets.
 
@@ -195,26 +195,22 @@ On macOS the permissions apply to the app that launched it. When run from a term
 # Output: dist/MechvibesDX-0.8.1-Setup-x64.exe
 ```
 
-**Release (Linux, AppImage):**
+**Release (Linux, AppImage and DEB):**
 ```bash
+cargo install cargo-deb                   # once; or pass --no-deb to skip the .deb
 ./scripts/build-linux-appimage.sh 0.8.1   # builds first; add --skip-build to reuse target/release
 chmod +x dist/mechvibes-dx-0.8.1-x86_64.AppImage
+sudo dpkg -i dist/mechvibes-dx_0.8.1_amd64.deb
 # Remember: run 'sudo usermod -a -G input $USER' and re-log before first use
-```
-
-**Release (Linux, DEB):**
-```bash
-cargo build --release
-cargo install cargo-deb
-cargo deb --no-build
-sudo dpkg -i target/debian/mechvibes-dx_0.8.1_amd64.deb
 ```
 
 **Release (macOS):**
 ```bash
 ./scripts/build-macos-app.sh 0.8.1   # builds first; add --skip-build to reuse target/release
-# Output: dist/mechvibes-dx-0.8.1-macos-arm64-experimental.dmg
+# Output: dist/mechvibes-dx-0.8.1-macos-arm64.dmg
 ```
+
+To run the same compile-and-test gate that CI runs (it also checks that Rust is at least the `rust-version` in `Cargo.toml`): `./scripts/ci-check.sh --release`. CI builds and packages every pull request and every push to `main` this way; when a `v*` tag points at a commit it built, the same run drafts the release from those packages.
 
 For architecture details, see [docs/system-architecture.md](docs/system-architecture.md). For release procedures and deployment, see [docs/deployment-guide.md](docs/deployment-guide.md).
 

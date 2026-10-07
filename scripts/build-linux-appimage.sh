@@ -2,13 +2,17 @@
 #
 # Assemble AppDir/ and package it as an AppImage.
 #
-# Usage: ./scripts/build-linux-appimage.sh <version> [--skip-build]
+# Usage: ./scripts/build-linux-appimage.sh <version> [--skip-build] [--no-deb]
 #   e.g. ./scripts/build-linux-appimage.sh 0.8.0
 #
-# Builds target/release/mechvibes-dx (cargo build --release --locked) first.
-# Pass --skip-build to reuse an existing binary - CI does, because it builds
-# once and shares that binary with the .deb, so this script never triggers a
-# second 10-minute compile there.
+# Builds target/release/mechvibes-dx (cargo build --release --locked), then
+# produces BOTH Linux packages from that one binary:
+#   dist/mechvibes-dx_<version>_amd64.deb         (needs cargo-deb installed)
+#   dist/mechvibes-dx-<version>-x86_64.AppImage
+# Each is checked after it is built.
+#
+#   --skip-build  reuse an existing binary instead of building one.
+#   --no-deb      skip the .deb, for a machine without cargo-deb.
 #
 # The AppDir deliberately mirrors the .deb's filesystem layout - usr/bin,
 # usr/share/mechvibes-dx/soundpacks - so that one binary serves both packages
@@ -27,17 +31,21 @@
 
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
 SKIP_BUILD=0
+BUILD_DEB=1
 VERSION=""
 for arg in "$@"; do
   case "$arg" in
     --skip-build) SKIP_BUILD=1 ;;
+    --no-deb) BUILD_DEB=0 ;;
     -*) echo "unknown option: $arg" >&2; exit 2 ;;
     *) VERSION="$arg" ;;
   esac
 done
 if [ -z "$VERSION" ]; then
-  echo "usage: build-linux-appimage.sh <version> [--skip-build]" >&2
+  echo "usage: build-linux-appimage.sh <version> [--skip-build] [--no-deb]" >&2
   exit 2
 fi
 
@@ -46,6 +54,10 @@ ARCH="x86_64"
 BINARY="target/release/${APP_NAME}"
 APPDIR="build/AppDir"
 OUTPUT="dist/${APP_NAME}-${VERSION}-${ARCH}.AppImage"
+
+# Fail first, and with a clear message, if the Rust in use is older than the
+# `rust-version` declared in Cargo.toml.
+verify_rust_toolchain
 
 # Build step. The release binary is built here by default so a wrong toolchain
 # compiler older than `rust-version` in Cargo.toml, or a stale Cargo.lock,
@@ -82,6 +94,30 @@ if [ "$SKIP_BUILD" -eq 1 ]; then
     echo "$stale"
     exit 1
   fi
+fi
+
+# --- .deb -------------------------------------------------------------------
+# Built from the same binary as the AppImage (--no-build: cargo-deb's own build
+# would not reuse it, and the file list lives in [package.metadata.deb] in
+# Cargo.toml). The package deliberately has no maintainer scripts, so it does
+# NOT add the user to the `input` group - the release notes say so. cargo-deb
+# leaves the binary unstripped and byte-identical, so the same BuildID ends up
+# in the AppImage below.
+if [ "$BUILD_DEB" -eq 1 ]; then
+  if ! command -v cargo-deb >/dev/null 2>&1; then
+    echo "::error::cargo-deb not found - install it ('cargo install cargo-deb') or pass --no-deb"
+    exit 1
+  fi
+  echo "=== Building .deb ==="
+  cargo deb --no-build
+  DEB_SOURCE=$(ls target/debian/"${APP_NAME}"_"${VERSION}"*.deb 2>/dev/null | head -1 || true)
+  if [ -z "$DEB_SOURCE" ] || [ ! -f "$DEB_SOURCE" ]; then
+    echo "::error::No .deb produced for version ${VERSION} in target/debian/"
+    exit 1
+  fi
+  mkdir -p dist
+  cp "$DEB_SOURCE" "dist/${APP_NAME}_${VERSION}_amd64.deb"
+  echo "=== Built dist/${APP_NAME}_${VERSION}_amd64.deb ==="
 fi
 
 echo "=== Assembling AppDir for ${APP_NAME} ${VERSION} ==="
@@ -192,3 +228,39 @@ APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$ARCH" "./$TOOL" --no-appstream "$APPDIR" "$OUT
 
 chmod +x "$OUTPUT"
 echo "=== Built $OUTPUT ($(du -h "$OUTPUT" | cut -f1)) ==="
+
+# --- verify the finished image ----------------------------------------------
+# Unpack it and walk it, so the build log is itself the evidence that the
+# shipped artifact has the right shape. A green exit from the steps above only
+# proves the commands ran.
+echo "=== Verifying $OUTPUT ==="
+VERIFY_DIR="build/verify"
+rm -rf "$VERIFY_DIR"
+mkdir -p "$VERIFY_DIR"
+OUTPUT_ABS="$(cd "$(dirname "$OUTPUT")" && pwd)/$(basename "$OUTPUT")"
+(cd "$VERIFY_DIR" && "$OUTPUT_ABS" --appimage-extract >/dev/null)
+
+IMG="$VERIFY_DIR/squashfs-root"
+echo "--- AppDir tree (depth 4) ---"
+find "$IMG" -maxdepth 4 | sort
+
+IMG_AUDIO=$(count_audio "$IMG/usr/share/${APP_NAME}/soundpacks")
+IMG_CFG=$(count_configs "$IMG/usr/share/${APP_NAME}/soundpacks")
+IMG_FONTS=$(find "$IMG/usr/lib/${APP_NAME}/assets/fonts" -type f -name '*.ttf' | wc -l)
+echo "soundpack audio: image=$IMG_AUDIO source=$SRC_AUDIO"
+echo "soundpack config.json: image=$IMG_CFG source=$SRC_CONFIGS"
+echo "fonts: image=$IMG_FONTS source=$SRC_FONTS"
+[ "$IMG_AUDIO" -eq "$SRC_AUDIO" ] && [ "$IMG_AUDIO" -gt 0 ] \
+  || { echo "::error::AppImage soundpack audio does not match the source tree"; exit 1; }
+[ "$IMG_CFG" -eq "$SRC_CONFIGS" ] && [ "$IMG_CFG" -gt 0 ] \
+  || { echo "::error::AppImage soundpack config.json does not match the source tree"; exit 1; }
+[ "$IMG_FONTS" -eq "$SRC_FONTS" ] && [ "$IMG_FONTS" -gt 0 ] \
+  || { echo "::error::AppImage fonts do not match the source tree"; exit 1; }
+
+# ELF magic checked byte-wise rather than trusting `file`'s wording.
+[ "$(head -c 4 "$IMG/usr/bin/${APP_NAME}" | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] \
+  || { echo "::error::bundled executable is not an ELF binary"; exit 1; }
+echo "ELF magic OK"
+rm -rf "$VERIFY_DIR"
+
+assert_no_updater_collision dist

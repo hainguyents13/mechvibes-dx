@@ -102,14 +102,17 @@ mechvibes-dx/
 ├── Cargo.lock              # Locked dependency versions
 ├── build.rs                # Pre-build script (Windows icon setup)
 ├── .github/
+│   ├── actions/linux-system-deps/ # Shared Linux apt dependency list (used by ci.yml)
 │   └── workflows/
-│       └── release.yml         # Release workflow: tag → build → GitHub release
+│       └── ci.yml              # Build + test + package matrix (Windows, Linux, macOS); drafts a release if a tag points at the built commit
 ├── scripts/
 │   ├── bump-version.ps1        # Increment version (PowerShell)
 │   ├── extract-changelog.ps1   # Extract CHANGELOG.md section (PowerShell)
 │   ├── build-windows-installer.ps1 # Inno Setup builder (Windows)
 │   ├── build-macos-app.sh      # .app + DMG assembler (macOS)
-│   └── build-linux-appimage.sh # AppDir + AppImage assembler (Linux)
+│   ├── build-linux-appimage.sh # .deb + AppImage assembler (Linux)
+│   ├── ci-check.sh             # toolchain check + cargo check + cargo test (CI and local)
+│   └── lib/common.sh           # shared bash helpers (toolchain check, asset-name check)
 ├── installer/
 │   ├── windows/
 │   │   └── mechvibes-dx-setup.iss # Inno Setup config
@@ -461,13 +464,10 @@ cargo test --release  # For audio tests (opt=2 in dev profile)
 - Bumped via `scripts/bump-version.ps1` (PowerShell, Windows).
 - CHANGELOG.md updated manually before tagging.
 
-**Release workflow (`.github/workflows/release.yml`):**
-1. Tag pushed as `v0.6.0`.
-2. GitHub Actions checks tag matches `Cargo.toml` version.
-3. Runs `cargo test --release` + `cargo build --release`.
-4. Calls `scripts/build-windows-installer.ps1` (Inno Setup).
-5. Extracts changelog section via `scripts/extract-changelog.ps1`.
-6. Creates draft GitHub release with installer asset.
+**Build and release workflow (`.github/workflows/ci.yml`):** one workflow for every build and for releases. Triggers: pull requests into `main` (verification only, nothing uploaded), pushes to `main` and manual dispatch (packages kept as artifacts of the run). A tag push is not a trigger; a tag is noticed by the run that built its commit. So there is one run per commit: no second run for the tag, no duplicate build, and the packages and the draft release live in the same run. Only `main` saves the cargo cache.
+1. `build` job (every run): a matrix (Windows, Linux, macOS in parallel); each leg reads the version from `Cargo.toml`, runs `scripts/ci-check.sh --release`, then its packaging script (`build-windows-installer.ps1`, `build-linux-appimage.sh`, `build-macos-app.sh`), which check that Rust is at least `rust-version` from `Cargo.toml`, build with `--locked` and check their own output, and uploads `windows-release`, `linux-release` and `macos-release` (except for pull requests).
+2. `tag` job (not on PRs): after the builds, asks the remote (`resolve_release_tag` in `scripts/lib/common.sh`) whether `v<Cargo.toml version>` points at the built commit. No tag means an ordinary build; a `v*` tag that does not match `Cargo.toml` fails.
+3. `release` job (only if `tag` found one): extracts the changelog section (`scripts/extract-changelog.ps1`), downloads this run's packages, generates `SHA256SUMS.txt`, refuses a tag that already has a release, and creates one draft GitHub release with every asset. If the tag arrives after the run finished, re-run the `tag` job; the packages are kept with the run.
 
 **Platforms:**
 - Windows: Inno Setup EXE installer (interim; waiting for dioxus bundle fix DioxusLabs/dioxus#5723).

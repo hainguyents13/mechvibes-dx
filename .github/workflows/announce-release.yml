@@ -4,7 +4,7 @@ name: Announce release
 # the draft. Publishing is the human approval step, so the announcement can
 # never get ahead of a build the maintainer hasn't signed off on. Verified
 # live with v0.7.0: clicking Publish posted on its own, even though the
-# draft was created by release.yml with GITHUB_TOKEN (GitHub's anti-recursion
+# draft was created by ci.yml with GITHUB_TOKEN (GitHub's anti-recursion
 # rule only suppresses events *performed by* that token, and Publish is
 # performed by the human).
 on:
