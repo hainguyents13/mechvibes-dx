@@ -94,7 +94,7 @@ The `.githooks/` hooks enforce that nothing broken leaves your machine:
 
 6. **Review the draft release**
 
-   Go to the repo's Releases page, open the draft, and check the notes and assets:
+   Go to the repo's Releases page, open the draft, and check the notes and assets. The notes end with GitHub's generated "What's Changed" and "New Contributors" lists, which credit each merged PR and its author. Remove any line for a PR that already shipped in the previous release.
 
    | Asset | Platform | Notes |
    |---|---|---|
