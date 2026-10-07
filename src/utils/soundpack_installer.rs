@@ -2,19 +2,12 @@ use crate::utils::path;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
+use std::path::{ Path, PathBuf };
 use uuid::Uuid;
 use zip::ZipArchive;
 
-/// Check if a soundpack ID already exists in the app state
-pub fn check_soundpack_id_conflict(
-    id: &str,
-    soundpacks: &[crate::state::soundpack::SoundpackMetadata]
-) -> bool {
-    soundpacks.iter().any(|pack| pack.id == id)
-}
-
-/// Extract soundpack ID from ZIP without extracting files
-pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
+/// Read and parse the `config.json` inside a soundpack ZIP.
+fn read_config_from_zip(file_path: &str) -> Result<Value, String> {
     let file = File::open(file_path).map_err(|e| format!("Failed to open ZIP file: {}", e))?;
     let mut archive = ZipArchive::new(file).map_err(|e|
         format!("Failed to read ZIP archive: {}", e)
@@ -33,24 +26,76 @@ pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
                 .read_to_string(&mut config_content)
                 .map_err(|e| format!("Failed to read config.json: {}", e))?;
 
-            // Extract ID from config content only
             let config: Value = serde_json
                 ::from_str(&config_content)
                 .map_err(|e| format!("Failed to parse config.json: {}", e))?;
 
-            // Check if the config already contains an ID field
-            if let Some(id) = config.get("id").and_then(|v| v.as_str()) {
-                if !id.trim().is_empty() {
-                    return Ok(id.to_string());
-                }
-            }
-
-            // If no ID in config, generate a UUID-based ID
-            return Ok(format!("imported-{}", Uuid::new_v4()));
+            return Ok(config);
         }
     }
 
     Err("No config.json found in ZIP file".to_string())
+}
+
+/// The raw ID stored in `config.json`, generating one when it is absent or blank.
+fn soundpack_id_from_config(config: &Value) -> String {
+    match config.get("id").and_then(|v| v.as_str()) {
+        Some(id) if !id.trim().is_empty() => id.to_string(),
+        _ => format!("imported-{}", Uuid::new_v4()),
+    }
+}
+
+/// Extract soundpack ID from ZIP without extracting files
+pub fn get_soundpack_id_from_zip(file_path: &str) -> Result<String, String> {
+    let config = read_config_from_zip(file_path)?;
+    Ok(soundpack_id_from_config(&config))
+}
+
+/// Resolve the soundpack type exactly as the installer does.
+fn resolve_soundpack_type(
+    config: &Value,
+    target_type: Option<crate::state::soundpack::SoundpackType>
+) -> &'static str {
+    if let Some(target) = target_type {
+        match target {
+            crate::state::soundpack::SoundpackType::Keyboard => "keyboard",
+            crate::state::soundpack::SoundpackType::Mouse => "mouse",
+        }
+    } else if determine_soundpack_type(config) {
+        "mouse"
+    } else {
+        "keyboard"
+    }
+}
+
+/// Resolve the directory an import of `file_path` would install into.
+///
+/// Reads the ZIP's `config.json` and resolves the type the same way
+/// `extract_and_install_soundpack_with_type` does, then joins the raw ID.
+/// `base` is normally `get_custom_soundpacks_dir()`, so the returned path is
+/// exactly what a repeated import would overwrite.
+pub fn resolve_soundpack_install_dir(
+    file_path: &str,
+    target_type: Option<crate::state::soundpack::SoundpackType>,
+    base: &Path
+) -> Result<PathBuf, String> {
+    let config = read_config_from_zip(file_path)?;
+    let soundpack_id = soundpack_id_from_config(&config);
+    let soundpack_type = resolve_soundpack_type(&config, target_type);
+    Ok(base.join(soundpack_type).join(&soundpack_id))
+}
+
+/// Check whether installing `file_path` would overwrite an existing pack.
+///
+/// Resolves the destination directory the installer would use and reports
+/// whether it already exists, so a repeated ID cannot silently replace it.
+/// This also catches a directory left on disk that is not in the loaded list.
+pub fn check_soundpack_conflict(
+    file_path: &str,
+    target_type: Option<crate::state::soundpack::SoundpackType>,
+    base: &Path
+) -> Result<bool, String> {
+    Ok(resolve_soundpack_install_dir(file_path, target_type, base)?.exists())
 }
 
 /// Extract and install soundpack from ZIP file with specified target type
@@ -123,20 +168,7 @@ pub fn extract_and_install_soundpack_with_type(
     }
 
     // Determine soundpack type - use target type if provided, otherwise auto-detect
-    let soundpack_type = if let Some(target) = target_type {
-        match target {
-            crate::state::soundpack::SoundpackType::Keyboard => "keyboard",
-            crate::state::soundpack::SoundpackType::Mouse => "mouse",
-        }
-    } else {
-        // Auto-detect from config
-        let is_mouse_soundpack = determine_soundpack_type(&config);
-        if is_mouse_soundpack {
-            "mouse"
-        } else {
-            "keyboard"
-        }
-    };
+    let soundpack_type = resolve_soundpack_type(&config, target_type);
 
     // Determine installation directory using soundpack type and ID
     // Custom soundpacks go to system app data directory
@@ -236,4 +268,92 @@ fn determine_soundpack_type(config: &serde_json::Value) -> bool {
 
     // Default to keyboard
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::soundpack::SoundpackType;
+    use std::io::Write;
+
+    const MOUSE_CONFIG: &str =
+        r#"{"id":"custom-sound-pack-77777732","defs":{"MouseLeft":{"type":"single","file":"a.ogg"}}}"#;
+    const KEYBOARD_CONFIG: &str =
+        r#"{"id":"thocky","defs":{"KeyA":{"type":"single","file":"a.ogg"}}}"#;
+
+    /// A unique scratch directory per test, so the real data dir is never read.
+    fn scratch_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(
+            format!("mechvibes-soundpack-test-{}", Uuid::new_v4())
+        );
+        std::fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    /// Build a ZIP in memory and write it to `dir`, returning its path.
+    fn zip_with_config(dir: &Path, name: &str, config: &str) -> String {
+        let zip_path = dir.join(name);
+        let file = File::create(&zip_path).expect("zip file");
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file("config.json", zip::write::SimpleFileOptions::default())
+            .expect("start config entry");
+        writer.write_all(config.as_bytes()).expect("write config");
+        writer.finish().expect("finish zip");
+        zip_path.to_string_lossy().to_string()
+    }
+
+    #[test]
+    fn mouse_config_without_target_type_resolves_to_mouse_dir() {
+        let base = scratch_dir();
+        let pack_zip = zip_with_config(&base, "pack.zip", MOUSE_CONFIG);
+        let install_dir = resolve_soundpack_install_dir(&pack_zip, None, &base).expect(
+            "resolve"
+        );
+        assert_eq!(install_dir, base.join("mouse").join("custom-sound-pack-77777732"));
+    }
+
+    #[test]
+    fn explicit_target_type_wins_for_mouse_and_keyboard() {
+        let base = scratch_dir();
+        let pack_zip = zip_with_config(&base, "pack.zip", MOUSE_CONFIG);
+
+        let mouse_dir = resolve_soundpack_install_dir(
+            &pack_zip,
+            Some(SoundpackType::Mouse),
+            &base
+        ).expect("resolve mouse");
+        assert_eq!(mouse_dir, base.join("mouse").join("custom-sound-pack-77777732"));
+
+        let keyboard_dir = resolve_soundpack_install_dir(
+            &pack_zip,
+            Some(SoundpackType::Keyboard),
+            &base
+        ).expect("resolve keyboard");
+        assert_eq!(keyboard_dir, base.join("keyboard").join("custom-sound-pack-77777732"));
+    }
+
+    #[test]
+    fn keyboard_config_auto_detects_keyboard() {
+        let base = scratch_dir();
+        let pack_zip = zip_with_config(&base, "pack.zip", KEYBOARD_CONFIG);
+        let install_dir = resolve_soundpack_install_dir(&pack_zip, None, &base).expect(
+            "resolve"
+        );
+        assert_eq!(install_dir, base.join("keyboard").join("thocky"));
+    }
+
+    #[test]
+    fn conflict_is_reported_only_when_destination_exists() {
+        let base = scratch_dir();
+        let pack_zip = zip_with_config(&base, "pack.zip", MOUSE_CONFIG);
+        let install_dir = resolve_soundpack_install_dir(&pack_zip, None, &base).expect(
+            "resolve"
+        );
+
+        assert!(!check_soundpack_conflict(&pack_zip, None, &base).expect("free check"));
+
+        std::fs::create_dir_all(&install_dir).expect("existing pack dir");
+        assert!(check_soundpack_conflict(&pack_zip, None, &base).expect("taken check"));
+    }
 }
