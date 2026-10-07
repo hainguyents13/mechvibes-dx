@@ -281,4 +281,33 @@ mod tests {
             "the rdev mouse path must be gated by evdev pointer coverage, got: {unified_arguments}"
         );
     }
+
+    /// Neither Windows nor macOS can be compiled by this suite, and macOS has no
+    /// job in ci.yml at all - it is only built when a release is tagged. So this
+    /// file is the only place a drift in those two branches gets caught before a
+    /// user finds it.
+    ///
+    /// Both must hand the unified listener `None` for the pointer gate. Neither
+    /// platform has /dev/input, so rdev is the mouse source there and there is no
+    /// evdev listener to hand the gate to - passing one by accident would either
+    /// silence the mouse or need a listener that does not exist. The X11 branch
+    /// says the same thing and is compiled here, so it needs no guard.
+    #[test]
+    fn the_platforms_without_evdev_must_pass_no_pointer_gate() {
+        const SOURCE: &str = include_str!("bootstrap.rs");
+        let runtime = SOURCE.split("#[cfg(test)]").next().expect("runtime code precedes tests");
+
+        for platform in ["windows", "macos"] {
+            let block = runtime
+                .split(&format!("#[cfg(target_os = \"{platform}\")]"))
+                .nth(1)
+                .unwrap_or_else(|| panic!("the {platform} branch must exist"));
+
+            let arguments = call_arguments(block, "start_unified_input_listener");
+            assert!(
+                arguments.trim_end().ends_with("None"),
+                "{platform} has no evdev listener, so it must pass None as the pointer gate, got: {arguments}"
+            );
+        }
+    }
 }
