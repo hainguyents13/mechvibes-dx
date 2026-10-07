@@ -1,10 +1,12 @@
-use crate::libs::tray::{ handle_tray_events, TrayManager, TrayMessage };
+use crate::libs::tray::{ handle_tray_events, store_tray, with_tray, TrayManager, TrayMessage };
 use crate::libs::tray_service::TRAY_UPDATE_SERVICE;
 use crate::libs::window_manager::{ WindowAction, WINDOW_MANAGER };
 use crate::libs::AudioContext;
 use crate::{ debug_print, always_eprint };
 use dioxus::desktop::use_window;
 use dioxus::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::Arc;
 
@@ -17,6 +19,13 @@ use std::sync::Arc;
 /// minimized window, so nothing appears and the app is never activated. The
 /// macOS branch therefore restores it from the Dock first and activates the
 /// app explicitly. Windows and Linux behavior is unchanged.
+///
+/// The `set_focus()` below is not what raises the window on Linux or Windows:
+/// it runs while `set_visible(true)` is still only queued for tao's event loop,
+/// and tao drops a focus request for a window it has not shown yet. The focus is
+/// asked for again, once the window reports itself visible, in the loop that
+/// calls this function. It is kept here because it is the path macOS was
+/// written against, where `activate_app()` then does the real work.
 fn show_window(window: &dioxus::desktop::DesktopContext) {
     #[cfg(target_os = "macos")]
     crate::always_print!(
@@ -25,10 +34,8 @@ fn show_window(window: &dioxus::desktop::DesktopContext) {
         window.is_visible()
     );
 
-    #[cfg(target_os = "macos")]
-    window.set_minimized(false);
-
     window.set_visible(true);
+    window.set_minimized(false);
     window.set_focus();
 
     #[cfg(target_os = "macos")]
@@ -118,15 +125,16 @@ pub fn WindowController() -> Element {
         });
     }
 
-    // Create a static receiver for window actions
-    let mut window_action_receiver = use_signal(|| None::<mpsc::Receiver<WindowAction>>); // Create a signal to hold the tray manager
-    let mut tray_manager = use_signal(|| None::<TrayManager>);
-
-    // Initialize the receiver once using use_resource to avoid reactive loops
-    let _window_channel = use_resource(move || async move {
+    // The window-action receiver is created exactly once, on the first render,
+    // and handed to the loop below. It cannot live in a `Signal`: on Linux that
+    // loop runs on the glib main context, outside the Dioxus runtime, where
+    // reading a `Signal` is not allowed. `use_hook` returns a cloneable handle
+    // because a `Receiver` is not `Clone` itself; the receiver is taken out of
+    // it once, before the driver is installed.
+    let window_action_receiver = use_hook(|| {
         let (tx, rx) = mpsc::channel::<WindowAction>();
         WINDOW_MANAGER.set_action_sender(tx);
-        window_action_receiver.set(Some(rx));
+        Rc::new(RefCell::new(Some(rx)))
     });
 
     // Initialize tray using use_resource to avoid reactive scope warnings
@@ -134,7 +142,7 @@ pub fn WindowController() -> Element {
         match TrayManager::new() {
             Ok(tray) => {
                 debug_print!("✅ System tray initialized successfully");
-                tray_manager.set(Some(tray));
+                store_tray(tray);
             }
             Err(e) => {
                 always_eprint!("❌ Failed to initialize system tray: {}", e);
@@ -145,117 +153,219 @@ pub fn WindowController() -> Element {
     // Use effect to listen for both window actions and tray events
     use_effect(move || {
         let window_clone = window.clone();
-        let mut tray_manager_clone = tray_manager.clone();
         let audio_ctx = audio_ctx.clone();
         let update_config = update_config.clone();
 
-        spawn(async move {
-            loop {
-                // Handle window actions from internal sources
-                if let Some(receiver) = window_action_receiver.read().as_ref() {
-                    if let Ok(action) = receiver.try_recv() {
-                        match action {
-                            WindowAction::Show => {
-                                show_window(&window_clone);
-                                WINDOW_MANAGER.set_visible(true);
-                                crate::always_print!("🔼 Window shown from internal action");
-                            }
-                            WindowAction::Hide => {
-                                window_clone.set_visible(false);
-                                WINDOW_MANAGER.set_visible(false);
-                                crate::always_print!("🔽 Window hidden from internal action");
-                            }
-                        }
-                    }
-                }
-                // Handle tray update requests from other parts of the application
-                if let Some(_) = TRAY_UPDATE_SERVICE.try_receive() {
-                    tray_manager_clone.with_mut(|tray_opt| {
-                        if let Some(tray) = tray_opt {
-                            if let Err(e) = tray.update_menu() {
-                                crate::always_eprint!("❌ Failed to update tray menu from global request: {}", e);
-                            } else {
-                                crate::always_print!("✅ Tray menu updated from global request");
-                            }
-                        }
-                    });
-                }
+        // Take the receiver once, before the driver is installed: the loop
+        // owns it rather than reading a Signal per tick, so it can run outside
+        // the Dioxus runtime.
+        let Some(window_action_receiver) = window_action_receiver.borrow_mut().take() else {
+            return;
+        };
 
-                // Handle tray events
-                if let Some(tray_message) = handle_tray_events() {
-                    match tray_message {
-                        TrayMessage::Show => {
-                            show_window(&window_clone);
-                            WINDOW_MANAGER.set_visible(true);
-                            debug_print!("🔼 Window shown from tray");
-                        }
-                        TrayMessage::ToggleMute => {
-                            // Toggle the global sound enable flag. This goes
-                            // through the audio context (not a bare config
-                            // write) so the engine thread, which caches this
-                            // flag in its own state, actually stops playing.
-                            let enabled = !audio_ctx.is_sound_enabled();
-                            audio_ctx.set_sound_enabled(enabled);
-                            // Publish the new flag so the mute button and the
-                            // disabled sliders re-render; the audio context
-                            // only writes the file.
-                            update_config(
-                                Box::new(move |config| {
-                                    config.enable_sound = enabled;
-                                })
-                            );
-                            debug_print!(
-                                "🔇 Sounds {} via tray menu",
-                                if enabled { "enabled" } else { "disabled" }
-                            );
-                            // Update tray menu to reflect new state
-                            tray_manager_clone.with_mut(|tray_opt| {
-                                if let Some(tray) = tray_opt {
-                                    if let Err(e) = tray.update_menu() {
-                                        always_eprint!("❌ Failed to update tray menu: {}", e);
-                                    }
-                                }
-                            });
-                        }
-                        TrayMessage::OpenGitHub => {
-                            let url = "https://github.com/hainguyents13/mechvibes-dx";
-                            if let Err(e) = open::that(url) {
-                                always_eprint!("❌ Failed to open GitHub URL: {}", e);
-                            } else {
-                                debug_print!("🐙 Opened GitHub repository in browser");
-                            }
-                        }
-                        TrayMessage::OpenDiscord => {
-                            let url = "https://discord.com/invite/MMVrhWxa4w";
-                            if let Err(e) = open::that(url) {
-                                crate::always_eprint!("❌ Failed to open Discord URL: {}", e);
-                            } else {
-                                crate::always_print!("💬 Opened Discord community in browser");
-                            }
-                        }
-                        TrayMessage::OpenWebsite => {
-                            let url = "https://mechvibes.com";
-                            if let Err(e) = open::that(url) {
-                                crate::always_eprint!("❌ Failed to open website URL: {}", e);
-                            } else {
-                                crate::always_print!("🌐 Opened official website in browser");
-                            }
-                        }
-                        TrayMessage::Exit => {
-                            crate::always_print!("📢 Tray: Exit requested - closing application");
-                            // Close the window which will trigger app exit
-                            window_clone.close();
-                        }
+        // Set by the show paths below and cleared once the window has actually
+        // become visible. See the focus block near the end of the tick.
+        let mut pending_show_focus = false;
+
+        let mut tick = move || {
+            // Handle window actions from internal sources
+            if let Ok(action) = window_action_receiver.try_recv() {
+                match action {
+                    WindowAction::Show => {
+                        show_window(&window_clone);
+                        WINDOW_MANAGER.set_visible(true);
+                        pending_show_focus = true;
+                        crate::always_print!("🔼 Window show requested from internal action");
+                    }
+                    WindowAction::Hide => {
+                        window_clone.set_visible(false);
+                        WINDOW_MANAGER.set_visible(false);
+                        crate::always_print!("🔽 Window hidden from internal action");
                     }
                 }
-                // Small delay to prevent busy-waiting
-                futures_timer::Delay::new(std::time::Duration::from_millis(50)).await;
             }
-        });
+            // Handle tray update requests from other parts of the application
+            if let Some(_) = TRAY_UPDATE_SERVICE.try_receive() {
+                let _ = with_tray(|tray| {
+                    if let Err(e) = tray.update_menu() {
+                        crate::always_eprint!("❌ Failed to update tray menu from global request: {}", e);
+                    } else {
+                        crate::always_print!("✅ Tray menu updated from global request");
+                    }
+                });
+            }
+
+            // Handle tray events
+            if let Some(tray_message) = handle_tray_events() {
+                match tray_message {
+                    TrayMessage::Show => {
+                        // Only ask for the show here. Asking for the focus on
+                        // the next line drops it: see the block near the end
+                        // of this loop for why.
+                        show_window(&window_clone);
+                        WINDOW_MANAGER.set_visible(true);
+                        pending_show_focus = true;
+                        crate::always_print!("🔼 Window show requested from tray");
+                    }
+                    TrayMessage::ToggleMute => {
+                        // Toggle the global sound enable flag. This goes
+                        // through the audio context (not a bare config
+                        // write) so the engine thread, which caches this
+                        // flag in its own state, actually stops playing.
+                        let enabled = !audio_ctx.is_sound_enabled();
+                        audio_ctx.set_sound_enabled(enabled);
+                        // Publish the new flag so the mute button and the
+                        // disabled sliders re-render; the audio context
+                        // only writes the file.
+                        update_config(
+                            Box::new(move |config| {
+                                config.enable_sound = enabled;
+                            })
+                        );
+                        debug_print!(
+                            "🔇 Sounds {} via tray menu",
+                            if enabled { "enabled" } else { "disabled" }
+                        );
+                        // Update tray menu to reflect new state
+                        let _ = with_tray(|tray| {
+                            if let Err(e) = tray.update_menu() {
+                                always_eprint!("❌ Failed to update tray menu: {}", e);
+                            }
+                        });
+                    }
+                    TrayMessage::OpenGitHub => {
+                        let url = "https://github.com/hainguyents13/mechvibes-dx";
+                        if let Err(e) = open::that(url) {
+                            always_eprint!("❌ Failed to open GitHub URL: {}", e);
+                        } else {
+                            debug_print!("🐙 Opened GitHub repository in browser");
+                        }
+                    }
+                    TrayMessage::OpenDiscord => {
+                        let url = "https://discord.com/invite/MMVrhWxa4w";
+                        if let Err(e) = open::that(url) {
+                            crate::always_eprint!("❌ Failed to open Discord URL: {}", e);
+                        } else {
+                            crate::always_print!("💬 Opened Discord community in browser");
+                        }
+                    }
+                    TrayMessage::OpenWebsite => {
+                        let url = "https://mechvibes.com";
+                        if let Err(e) = open::that(url) {
+                            crate::always_eprint!("❌ Failed to open website URL: {}", e);
+                        } else {
+                            crate::always_print!("🌐 Opened official website in browser");
+                        }
+                    }
+                    TrayMessage::Exit => {
+                        crate::always_print!("📢 Tray: Exit requested - closing application");
+                        // Close the window which will trigger app exit
+                        window_clone.close();
+                    }
+                }
+            }
+            // `set_visible` only queues a request for tao's event loop to
+            // apply, and tao's `set_focus` refuses to queue a focus request
+            // unless the window already reports itself visible. Called back
+            // to back, the focus is dropped every time, so a window brought
+            // back from the tray returned without focus and stayed behind
+            // whatever was already on screen. Send the focus on a later tick,
+            // once the visibility request has been applied.
+            if pending_show_focus && window_clone.is_visible() {
+                window_clone.set_focus();
+                pending_show_focus = false;
+                crate::always_print!("🔼 Window raised and focused");
+            }
+        };
+
+        // Linux: the Dioxus runtime stops polling its tasks while the window is
+        // unmapped (`set_visible(false)`, what "Hide to tray" does), so nothing
+        // would drain `MenuEvent::receiver()` and every tray click - `Show`
+        // included - would be silently ignored. The glib main context keeps
+        // running while the window is hidden, so the loop is driven from a
+        // glib timeout source instead. Dioxus runs its VDOM on that same main
+        // thread, so the `!Send` tray and window objects never leave it.
+        #[cfg(target_os = "linux")]
+        {
+            let _ = glib::timeout_add_local(
+                std::time::Duration::from_millis(50),
+                move || {
+                    tick();
+                    glib::ControlFlow::Continue
+                }
+            );
+        }
+
+        // Windows and macOS never unmap the window out from under the runtime,
+        // so the async timer they always had keeps driving the loop.
+        #[cfg(not(target_os = "linux"))]
+        {
+            spawn(async move {
+                loop {
+                    tick();
+                    futures_timer::Delay::new(std::time::Duration::from_millis(50)).await;
+                }
+            });
+        }
     });
 
     rsx! {
         // This component doesn't render anything visible
         span { style: "display: none;" }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The tray loop's driver on Linux, checked against the source that ships.
+    ///
+    /// The failure this guards is invisible to every other test: the Dioxus
+    /// runtime stops polling its tasks while the window is unmapped, so moving
+    /// the loop back onto `spawn` silently makes every tray menu click - "Show"
+    /// included - get ignored again. Only a source guard can catch that
+    /// regression before a user does.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_drives_the_tray_loop_from_glib_not_the_dioxus_runtime() {
+        const SOURCE: &str = include_str!("window_controller.rs");
+        let runtime = SOURCE.split("#[cfg(test)]").next().expect("runtime code precedes the tests");
+
+        let linux_driver = runtime
+            .split("#[cfg(target_os = \"linux\")]")
+            .nth(1)
+            .expect("the Linux driver must be selected explicitly")
+            .split("#[cfg(not(target_os = \"linux\"))]")
+            .next()
+            .expect("the Linux driver must end before the other platforms' driver");
+
+        assert!(
+            linux_driver.contains("glib::timeout_add_local"),
+            "Linux must drive the tray loop from the glib main context"
+        );
+        assert!(
+            linux_driver.contains("glib::ControlFlow::Continue"),
+            "the glib timeout source must keep ticking"
+        );
+        assert!(
+            !linux_driver.contains("futures_timer::Delay"),
+            "Linux must not drive the tray loop with a Dioxus timer"
+        );
+        assert!(
+            !linux_driver.contains("spawn("),
+            "Linux must not run the tray loop on the Dioxus runtime"
+        );
+
+        let other_driver = runtime
+            .split("#[cfg(not(target_os = \"linux\"))]")
+            .nth(1)
+            .expect("the other platforms' driver must be selected explicitly");
+        assert!(
+            other_driver.contains("futures_timer::Delay"),
+            "Windows and macOS must keep the async timer they always had"
+        );
+        assert!(
+            !other_driver.contains("glib::timeout_add_local"),
+            "glib is a Linux-only dependency and must stay out of the other platforms' driver"
+        );
     }
 }
