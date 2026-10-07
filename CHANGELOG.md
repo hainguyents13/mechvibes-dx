@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Mouse clicks now make sound in every application on Linux under Wayland.** On Wayland the mouse was read through X11, which only sees input while one of its own windows is under the pointer. Clicks in Wayland-native windows — the terminal, the file manager, the browser, and this app's own window — produced no sound at all, while apps that run through XWayland (Discord, for one) kept working. Mouse buttons are now read straight from the input devices, the same way keystrokes already are. If the input devices cannot be read, the previous behaviour stays as a fallback, and a click is never played twice.
+
 ## [0.8.3] - 2026-10-07
 
 ### Changed
