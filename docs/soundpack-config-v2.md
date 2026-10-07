@@ -204,16 +204,44 @@ NumpadDecimal, NumpadEnter
 
 ### Mouse Keys
 
-Use these for mouse soundpacks (indicated by including them in `definitions`):
-```
-MouseLeft
-MouseRight
-MouseMiddle (if supported)
-Wheel*     (e.g., WheelUp, WheelDown - prefix for wheel events)
-Button*    (e.g., Button4, Button5 - extra mouse buttons)
+The app captures these mouse events on every platform and the engine understands
+these exact code strings:
+
+| Code | Emitted when |
+|------|--------------|
+| `MouseLeft` | Left button press/release |
+| `MouseRight` | Right button press/release |
+| `MouseMiddle` | Middle (wheel) button press/release |
+| `MouseWheelUp` | Wheel scrolled up |
+| `MouseWheelDown` | Wheel scrolled down |
+| `Mouse4` | First extra button (usually Back) |
+| `Mouse5` | Second extra button (usually Forward) |
+| `Mouse6`, `Mouse7`, `Mouse8` | Further extra buttons, on mice that have them |
+
+**A mouse code a pack does not define produces no sound.** The app deliberately
+does not substitute another sound: a wheel that sounds like the left click is
+worse than silence. So a pack that wants wheel, wheel-click or extra-button
+sounds has to define them; a pack that defines only `MouseLeft`/`MouseRight`
+simply stays silent for the rest.
+
+Define a mouse sound by adding its timing entry to `definitions`:
+
+```json
+"definitions": {
+  "MouseLeft": { "timing": [[0, 100], [100, 200]] },
+  "MouseRight": { "timing": [[200, 300], [300, 400]] },
+  "MouseMiddle": { "timing": [[400, 500], [500, 600]] },
+  "MouseWheelUp": { "timing": [[600, 700]] }
+}
 ```
 
-The app auto-detects mouse packs by checking if key names start with `Mouse`, `Button`, or `Wheel`.
+Wheel codes are impulses: a scroll has no release event, so a single
+`[start, end]` pair is enough. The app rate-limits wheel sounds to one per
+120 ms, so a fast scroll cannot machine-gun the sound. Up and down share that
+limit.
+
+The app auto-detects mouse packs by checking if key names start with `Mouse`,
+`Button`, or `Wheel`.
 
 ---
 
