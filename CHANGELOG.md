@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The sound pack list is usable again.** Opening the keyboard or mouse pack selector drew the list underneath the sections below it, so the Mouse section and the volume row sat on top of most of the options and picking a pack was guesswork. The list now floats above everything else, and clicking outside it closes it the way it should.
+
 ## [0.8.3] - 2026-10-07
 
 ### Changed
