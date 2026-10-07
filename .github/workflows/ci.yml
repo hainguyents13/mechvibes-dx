@@ -368,4 +368,9 @@ jobs:
           # already says what the project is.
           name: "v${{ needs.tag.outputs.version }}"
           body_path: notes.md
+          # Appends GitHub's "What's Changed" list (every merged PR with its
+          # author) and "New Contributors" after the notes, so contributors are
+          # credited. It lands after the Downloads section, which the Discord
+          # announcement never reads past.
+          generate_release_notes: true
           files: release/*
