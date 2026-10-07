@@ -284,11 +284,11 @@ jobs:
             echo ""
             echo "### Downloads"
             echo ""
-            echo "- **Windows**: \`MechvibesDX-<version>-Setup-x64.exe\` — installer, the only asset the in-app updater uses."
+            echo "- **Windows**: \`MechvibesDX-<version>-Setup-x64.exe\`, the installer and the only asset the in-app updater uses."
           } >> notes.md
           if ls release/*.deb >/dev/null 2>&1; then
             {
-              echo "- **Linux (Debian/Ubuntu)**: \`.deb\` — install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
+              echo "- **Linux (Debian/Ubuntu)**: \`.deb\`. Install with \`sudo dpkg -i\`. It does **not** add you to the \`input\` group; run \`sudo usermod -a -G input \$USER\` and log out/in, or key events won't be seen."
             } >> notes.md
           fi
           if ls release/*.AppImage >/dev/null 2>&1; then
@@ -297,7 +297,7 @@ jobs:
             } >> notes.md
           fi
           if ls release/*macos*.dmg >/dev/null 2>&1; then
-            echo "- **macOS (Apple Silicon)**: \`.dmg\` — open it and drag **MechvibesDX** to Applications. Ad-hoc signed but **not notarized**, so Gatekeeper blocks a normal double-click: right-click the app → **Open** → confirm, once. See \`README-macos.txt\`." >> notes.md
+            echo "- **macOS (Apple Silicon)**: \`.dmg\`. Open it and drag **MechvibesDX** to Applications. Ad-hoc signed but **not notarized**, so Gatekeeper blocks a normal double-click: right-click the app → **Open** → confirm, once. See \`README-macos.txt\`." >> notes.md
           fi
 
           echo "Assets to publish:"
