@@ -50,7 +50,7 @@ use std::sync::{ Mutex, OnceLock };
 /// `load()` runs during the `get_or_init` below, so a re-entrant `current()`
 /// would deadlock on the initialising `OnceLock`. The one thing `load()` calls
 /// out to is `auto_startup::get_auto_startup_state`, which reads the Windows
-/// registry and never touches the config - keep it that way.
+/// registry (or, on macOS, the login-item service) and never touches the config - keep it that way.
 static AUTHORITY: OnceLock<Mutex<AppConfig>> = OnceLock::new();
 
 /// Bumped on every write that actually changed something.
@@ -140,9 +140,69 @@ pub fn generation() -> u64 {
     GENERATION.load(Ordering::Acquire)
 }
 
+/// Forces the saved `config.json` (and the rename that put it there) onto disk.
+///
+/// `apply` writes through `save_json_to_file_atomically`, which writes a temp
+/// file and renames it over the target but never syncs, so the new bytes can sit
+/// in the OS cache for a while. That is fine for a slider, but not for the
+/// start-at-login preferences: they are read on the very next launch, which is
+/// often right after a logout or reboot.
+///
+/// - The file is synced on every OS. It is opened for write (without
+///   truncating) because Windows' `FlushFileBuffers` needs a writable handle.
+///   On macOS `File::sync_all` issues `F_FULLFSYNC`, which is what actually
+///   reaches the disk.
+/// - The parent directory is synced too, on Unix only, because that is where
+///   the rename lives. A directory cannot be opened this way on Windows.
+///
+/// Best effort: a failure is logged, never fatal.
+pub fn flush_to_disk() {
+    let path = crate::state::paths::data::config_json();
+    if let Err(e) = flush_path(&path) {
+        crate::always_eprint!("❌ [config] Failed to flush {} to disk: {}", path.display(), e);
+    }
+}
+
+fn flush_path(path: &std::path::Path) -> std::io::Result<()> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.sync_all())
+        .and_then(|_| sync_parent_dir(path))
+}
+
+#[cfg(unix)]
+fn sync_parent_dir(path: &std::path::Path) -> std::io::Result<()> {
+    match path.parent() {
+        Some(dir) => std::fs::File::open(dir)?.sync_all(),
+        None => Ok(()),
+    }
+}
+
+#[cfg(not(unix))]
+fn sync_parent_dir(_path: &std::path::Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flush_path_syncs_an_existing_file_without_changing_it() {
+        let path = std::env::temp_dir().join(format!("mv-flush-test-{}.json", std::process::id()));
+        std::fs::write(&path, b"{\"a\":1}").unwrap();
+        assert!(flush_path(&path).is_ok());
+        assert_eq!(std::fs::read(&path).unwrap(), b"{\"a\":1}");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn flush_path_reports_a_missing_file_instead_of_creating_it() {
+        let path = std::env::temp_dir().join(format!("mv-flush-missing-{}.json", std::process::id()));
+        assert!(flush_path(&path).is_err());
+        assert!(!path.exists());
+    }
     use crate::libs::theme::{ BuiltInTheme, Theme };
 
     /// The authority is process-global and backed by the real config file, so

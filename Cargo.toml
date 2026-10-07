@@ -55,6 +55,9 @@ libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 macos-accessibility-client = "0.0.1"
+# Login-item registration via SMAppService (src/utils/auto_startup.rs).
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["NSError", "NSString"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

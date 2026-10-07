@@ -120,6 +120,105 @@ pub fn is_auto_startup_enabled() -> bool {
     }
 }
 
+/// macOS: register the app as a login item with `SMAppService`.
+///
+/// `SMAppService.mainApp` is the supported API (macOS 13+). The app then shows
+/// up in System Settings > General > Login Items, where the user can see and
+/// remove it. It launches the app with no arguments, so "start minimized" is
+/// decided from the saved config at startup (`main.rs`), not a `--minimized`
+/// flag as on Windows.
+///
+/// It only works from an app bundle in a normal location (e.g.
+/// /Applications). A bare `target/release/mechvibes-dx` or `dx serve` run has
+/// no bundle, so registering fails and reports not-enabled.
+#[cfg(target_os = "macos")]
+mod macos {
+    use objc2::rc::Retained;
+    use objc2::runtime::{ AnyClass, AnyObject };
+    use objc2::msg_send;
+    use objc2_foundation::NSError;
+
+    // Nothing in the Rust code references the framework directly (everything
+    // goes through the Objective-C runtime), so link it explicitly or the
+    // SMAppService class does not exist at runtime.
+    #[link(name = "ServiceManagement", kind = "framework")]
+    unsafe extern "C" {}
+
+    /// `SMAppServiceStatus`
+    const STATUS_ENABLED: isize = 1;
+    const STATUS_REQUIRES_APPROVAL: isize = 2;
+
+    fn service_class() -> Result<&'static AnyClass, String> {
+        // Missing before macOS 13.
+        AnyClass::get(c"SMAppService").ok_or_else(||
+            "Start at login needs macOS 13 or later".to_string()
+        )
+    }
+
+    fn main_app_service() -> Result<Retained<AnyObject>, String> {
+        let class = service_class()?;
+        // SAFETY: `+mainAppService` takes no arguments and returns an object.
+        let service: Option<Retained<AnyObject>> = unsafe { msg_send![class, mainAppService] };
+        service.ok_or_else(|| "SMAppService.mainApp is unavailable".to_string())
+    }
+
+    fn status(service: &AnyObject) -> isize {
+        // SAFETY: `-status` takes no arguments and returns an NSInteger.
+        unsafe { msg_send![service, status] }
+    }
+
+    pub fn is_enabled() -> bool {
+        match main_app_service() {
+            Ok(service) => status(&service) == STATUS_ENABLED,
+            Err(_) => false,
+        }
+    }
+
+    pub fn enable() -> Result<(), String> {
+        let service = main_app_service()?;
+        if status(&service) != STATUS_ENABLED {
+            // SAFETY: `-registerAndReturnError:` returns BOOL and fills in an
+            // NSError on failure, which `msg_send!` turns into the Result.
+            let result: Result<(), Retained<NSError>> = unsafe {
+                msg_send![&*service, registerAndReturnError: _]
+            };
+            result.map_err(|e| format!("Failed to register login item: {}", e.localizedDescription()))?;
+        }
+
+        // The user can have switched this app off under Login Items. register()
+        // succeeds but it stays disabled until they approve it, so take them there.
+        if status(&service) == STATUS_REQUIRES_APPROVAL {
+            crate::always_print!("ℹ️ Login item needs approval in System Settings > General > Login Items");
+            if let Ok(class) = service_class() {
+                // SAFETY: class method with no arguments and no return value.
+                unsafe {
+                    let _: () = msg_send![class, openSystemSettingsLoginItems];
+                }
+            }
+            return Err("Allow MechvibesDX in System Settings > General > Login Items".to_string());
+        }
+
+        crate::always_print!("✅ Auto startup enabled (macOS login item)");
+        Ok(())
+    }
+
+    pub fn disable() -> Result<(), String> {
+        let service = main_app_service()?;
+        if status(&service) == 0 {
+            // SMAppServiceStatusNotRegistered
+            crate::always_print!("ℹ️ Auto startup was not enabled");
+            return Ok(());
+        }
+        // SAFETY: as in `enable`.
+        let result: Result<(), Retained<NSError>> = unsafe {
+            msg_send![&*service, unregisterAndReturnError: _]
+        };
+        result.map_err(|e| format!("Failed to remove login item: {}", e.localizedDescription()))?;
+        crate::always_print!("✅ Auto startup disabled");
+        Ok(())
+    }
+}
+
 /// Set auto startup state (enable or disable)
 pub fn set_auto_startup(enable: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -127,7 +226,12 @@ pub fn set_auto_startup(enable: bool) -> Result<(), String> {
         if enable { enable_auto_startup() } else { disable_auto_startup() }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        if enable { macos::enable() } else { macos::disable() }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         Err("Auto startup is only supported on Windows".to_string())
     }
@@ -140,7 +244,12 @@ pub fn get_auto_startup_state() -> bool {
         is_auto_startup_enabled()
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        macos::is_enabled()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         false
     }
@@ -149,6 +258,15 @@ pub fn get_auto_startup_state() -> bool {
 #[cfg(test)]
 mod tests {
     use super::exe_path_from_run_command;
+
+    /// A test binary is not an app bundle, so it can never be a registered
+    /// login item. This also proves the SMAppService lookup and the framework
+    /// link work at runtime without registering anything.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_bare_binary_is_not_a_registered_login_item() {
+        assert!(!super::get_auto_startup_state());
+    }
 
     /// Mirrors the unquoted shape `enable_auto_startup` writes when
     /// `start_minimized` is off.

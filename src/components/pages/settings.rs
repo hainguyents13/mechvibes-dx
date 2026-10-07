@@ -97,8 +97,8 @@ pub fn SettingsPage() -> Element {
                 }
                 // Auto Start
                 Toggler {
-                  title: "Start with Windows".to_string(),
-                  description: Some(format!("Automatically start {} when Windows boots", APP_NAME)),
+                  title: "Start at login".to_string(),
+                  description: Some(format!("Automatically start {} when you log in", APP_NAME)),
                   checked: auto_start(),
                   on_change: {
                       let update_config = update_config.clone();
@@ -108,6 +108,9 @@ pub fn SettingsPage() -> Element {
                                   config.auto_start = new_value;
                               }),
                           );
+                          // Persist the preference to disk now, before the login item is
+                          // touched.
+                          crate::state::config_writer::flush_to_disk();
                           spawn(async move {
                               match crate::utils::auto_startup::set_auto_startup(new_value) {
                                   Ok(_) => {
@@ -116,6 +119,17 @@ pub fn SettingsPage() -> Element {
                                   }
                                   Err(e) => {
                                       crate::always_eprint!("❌ Failed to set auto startup: {}", e);
+                                      // macOS: registration can fail (not running from an
+                                      // app bundle, or the user must approve it under Login
+                                      // Items). Don't leave the toggle on for a login item
+                                      // that does not exist.
+                                      #[cfg(target_os = "macos")]
+                                      if new_value {
+                                          crate::state::config_writer::apply(|config| {
+                                              config.auto_start = false;
+                                          });
+                                          crate::state::config_writer::flush_to_disk();
+                                      }
                                   }
                               }
                           });
@@ -126,7 +140,7 @@ pub fn SettingsPage() -> Element {
                 if auto_start() {
                   Toggler {
                     title: "Start minimized to tray".to_string(),
-                    description: Some("When starting with Windows, open minimized to system tray".to_string()),
+                    description: Some("When starting at login, open minimized to the system tray".to_string()),
                     checked: start_minimized(),
                     on_change: {
                         let update_config = update_config.clone();
@@ -136,6 +150,7 @@ pub fn SettingsPage() -> Element {
                                     config.start_minimized = new_value;
                                 }),
                             );
+                            crate::state::config_writer::flush_to_disk();
                             spawn(async move {
                                 if crate::state::config_writer::current().auto_start {
                                     match crate::utils::auto_startup::set_auto_startup(true) {

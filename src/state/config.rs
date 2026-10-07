@@ -140,7 +140,7 @@ pub struct AppConfig {
     // Note: ambiance play state is not persistent - always starts paused
     // System settings
     pub auto_start: bool,
-    pub start_minimized: bool, // Start minimized to tray when auto-starting with Windows
+    pub start_minimized: bool, // Start minimized to tray when starting at login
     pub landscape_mode: bool, // Enable/disable landscape mode layout
     pub auto_update: AutoUpdateConfig, // Auto-update settings
     /// Send one anonymous launch event (OS + app version) per start.
