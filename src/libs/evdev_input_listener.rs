@@ -316,7 +316,90 @@ fn map_evdev_keycode(key: evdev::KeyCode) -> &'static str {
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
+    use crossbeam_channel::{ unbounded, Receiver };
     use evdev::KeyCode;
+
+    /// A router wired to three channels the test can read back.
+    fn router() -> (EventRouter, Receiver<String>, Receiver<String>, Receiver<String>) {
+        let (keyboard_tx, keyboard_rx) = unbounded();
+        let (mouse_tx, mouse_rx) = unbounded();
+        let (hotkey_tx, hotkey_rx) = unbounded();
+        (EventRouter::new(keyboard_tx, mouse_tx, hotkey_tx), keyboard_rx, mouse_rx, hotkey_rx)
+    }
+
+    fn drain(rx: &Receiver<String>) -> Vec<String> {
+        rx.try_iter().collect()
+    }
+
+    /// Press and release must both reach the engine, with the `UP:` prefix on
+    /// the release, and auto-repeat must not count as a new keystroke.
+    #[test]
+    fn key_press_release_and_repeat_are_routed() {
+        let (mut router, keyboard_rx, mouse_rx, hotkey_rx) = router();
+
+        router.handle_key_event(KeyCode::KEY_A.0, 1);
+        router.handle_key_event(KeyCode::KEY_A.0, 2);
+        router.handle_key_event(KeyCode::KEY_A.0, 0);
+
+        assert_eq!(drain(&keyboard_rx), vec!["KeyA", "UP:KeyA"]);
+        assert!(drain(&mouse_rx).is_empty());
+        assert!(drain(&hotkey_rx).is_empty());
+    }
+
+    /// Clicks travel the mouse channel and never the keyboard one.
+    #[test]
+    fn mouse_buttons_go_to_the_mouse_channel() {
+        let (mut router, keyboard_rx, mouse_rx, _hotkey_rx) = router();
+
+        router.handle_key_event(KeyCode::BTN_LEFT.0, 1);
+        router.handle_key_event(KeyCode::BTN_LEFT.0, 0);
+
+        assert_eq!(drain(&mouse_rx), vec!["MouseLeft", "UP:MouseLeft"]);
+        assert!(drain(&keyboard_rx).is_empty());
+    }
+
+    /// Codes with no table entry are dropped instead of being sent as "".
+    #[test]
+    fn unmapped_keys_are_dropped() {
+        let (mut router, keyboard_rx, mouse_rx, _hotkey_rx) = router();
+
+        router.handle_key_event(KeyCode::KEY_MUTE.0, 1);
+        router.handle_key_event(KeyCode::BTN_TOUCH.0, 1);
+
+        assert!(drain(&keyboard_rx).is_empty());
+        assert!(drain(&mouse_rx).is_empty());
+    }
+
+    /// Ctrl+Alt+M toggles sound and is swallowed, even when the modifiers come
+    /// from different devices (the router state is shared across them).
+    #[test]
+    fn ctrl_alt_m_fires_the_hotkey_and_is_not_played() {
+        let (mut router, keyboard_rx, _mouse_rx, hotkey_rx) = router();
+
+        router.handle_key_event(KeyCode::KEY_LEFTCTRL.0, 1);
+        router.handle_key_event(KeyCode::KEY_RIGHTALT.0, 1);
+        router.handle_key_event(KeyCode::KEY_M.0, 1);
+
+        assert_eq!(drain(&hotkey_rx), vec!["TOGGLE_SOUND"]);
+        assert_eq!(drain(&keyboard_rx), vec!["ControlLeft", "AltRight"]);
+    }
+
+    /// M alone, or with only one modifier held, is an ordinary key; releasing a
+    /// modifier disarms the hotkey.
+    #[test]
+    fn m_without_both_modifiers_is_a_plain_key() {
+        let (mut router, keyboard_rx, _mouse_rx, hotkey_rx) = router();
+
+        router.handle_key_event(KeyCode::KEY_M.0, 1);
+        router.handle_key_event(KeyCode::KEY_LEFTCTRL.0, 1);
+        router.handle_key_event(KeyCode::KEY_LEFTALT.0, 1);
+        router.handle_key_event(KeyCode::KEY_LEFTALT.0, 0);
+        router.handle_key_event(KeyCode::KEY_M.0, 1);
+
+        assert!(drain(&hotkey_rx).is_empty());
+        let keys = drain(&keyboard_rx);
+        assert_eq!(keys.iter().filter(|key| key.as_str() == "KeyM").count(), 2);
+    }
 
     /// Pointer buttons ride the keyboard event path, so their translation has
     /// to land on the exact codes `map_button_to_code` emits: the soundpack
