@@ -2,9 +2,13 @@ pub mod audio;
 pub mod bootstrap;
 pub mod cli_args;
 pub mod device_manager;
+// rdev/device_query listeners. Linux does not use them: it reads evdev directly
+// (`evdev_input_listener`), so the X11 stack (XRecord) is not part of input.
+#[cfg(not(target_os = "linux"))]
 pub mod focused_input_listener;
 pub mod headless;
 pub mod input_device_manager;
+#[cfg(not(target_os = "linux"))]
 pub mod input_listener;
 pub mod input_manager;
 pub mod protocol;
